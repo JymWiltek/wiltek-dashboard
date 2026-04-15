@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wiltek · MASTER Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090f;--s1:#0d1117;--s2:#111827;--s3:#1a2235;--bdr:#1e2d42;--g:#00e5c4;--g2:#00b89e;--r:#ff4d6d;--y:#f5c842;--b:#4d9fff;--p:#b87cff;--o:#ff8c42;--txt:#dce8f5;--mu:#5a738a;--w:#ff8c42}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh;font-size:14px}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(0,229,196,.04) 0%,transparent 60%),radial-gradient(ellipse 50% 30% at 90% 100%,rgba(77,159,255,.04) 0%,transparent 60%);pointer-events:none;z-index:0}
+.topbar{position:sticky;top:0;z-index:200;background:rgba(7,9,15,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--bdr);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:50px}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-icon{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--g),var(--b));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#07090f}
+.brand-name{font-weight:800;font-size:14px;letter-spacing:-.3px}.brand-name em{color:var(--g);font-style:normal}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.msel{background:var(--s2);border:1px solid var(--bdr);color:var(--txt);padding:4px 8px;border-radius:7px;font-size:11px;font-family:'JetBrains Mono',monospace;cursor:pointer;outline:none}
+.msel:focus{border-color:var(--g)}
+.pb{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--g);background:rgba(0,229,196,.08);border:1px solid rgba(0,229,196,.2);padding:3px 9px;border-radius:99px}
+.lsw{display:flex;gap:2px;background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:2px}
+.lb{font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:none;background:transparent;color:var(--mu);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+.lb.active{background:var(--g);color:#07090f}
+.layout{display:flex;position:relative;z-index:1}
+.sidenav{width:185px;min-height:calc(100vh - 50px);background:var(--s1);border-right:1px solid var(--bdr);padding:12px 0;position:sticky;top:50px;height:calc(100vh - 50px);overflow-y:auto;flex-shrink:0}
+.ns{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mu);padding:12px 15px 4px}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 15px;cursor:pointer;font-size:12px;font-weight:500;color:var(--mu);border-left:2px solid transparent;transition:all .15s;user-select:none}
+.ni:hover{color:var(--txt);background:var(--s2);border-left-color:var(--bdr)}
+.ni.active{color:var(--g);background:rgba(0,229,196,.06);border-left-color:var(--g)}
+.nx{font-size:13px;width:15px;text-align:center}
+.main{flex:1;padding:20px 24px;overflow-x:hidden;min-width:0}
+.page{display:none}.page.active{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.ph{font-size:18px;font-weight:800;letter-spacing:-.4px;margin-bottom:2px}
+.ps{font-size:10px;color:var(--mu);margin-bottom:14px;font-family:'JetBrains Mono',monospace}
+
+/* INSIGHT BOX */
+.ins{border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:14px;line-height:1.75;color:var(--txt)}
+.ins strong{font-size:14px}
+.ins.ba{background:rgba(255,77,109,.05);border:1px solid rgba(255,77,109,.25)}.ins.ba strong{color:var(--r)}
+.ins.wa{background:rgba(255,140,66,.05);border:1px solid rgba(255,140,66,.25)}.ins.wa strong{color:var(--w)}
+.ins.ok{background:rgba(0,229,196,.04);border:1px solid rgba(0,229,196,.2)}.ins.ok strong{color:var(--g)}
+.ins.info{background:rgba(77,159,255,.04);border:1px solid rgba(77,159,255,.2)}.ins.info strong{color:var(--b)}
+.ins .act{display:inline-block;margin-top:10px;background:rgba(0,229,196,.12);border:1px solid rgba(0,229,196,.3);color:var(--g);padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.ins .act.r{background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.3);color:var(--r)}
+.ins .act.y{background:rgba(245,200,66,.12);border-color:rgba(245,200,66,.3);color:var(--y)}
+
+/* KPI */
+.kr{display:grid;gap:10px;margin-bottom:13px}
+.c2{grid-template-columns:repeat(2,1fr)}.c3{grid-template-columns:repeat(3,1fr)}.c4{grid-template-columns:repeat(4,1fr)}.c5{grid-template-columns:repeat(5,1fr)}.c6{grid-template-columns:repeat(6,1fr)}
+.kpi{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:13px 15px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s}
+.kpi:hover{transform:translateY(-1px)}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.g::after{background:var(--g)}.kpi.r::after{background:var(--r)}.kpi.y::after{background:var(--y)}.kpi.b::after{background:var(--b)}.kpi.p::after{background:var(--p)}.kpi.o::after{background:var(--o)}
+.kpi:hover.g{border-color:rgba(0,229,196,.4)}.kpi:hover.r{border-color:rgba(255,77,109,.4)}
+.kl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--mu);margin-bottom:5px}
+.kv{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:600;line-height:1;letter-spacing:-.5px}
+.kpi.g .kv{color:var(--g)}.kpi.r .kv{color:var(--r)}.kpi.y .kv{color:var(--y)}.kpi.b .kv{color:var(--b)}.kpi.p .kv{color:var(--p)}.kpi.o .kv{color:var(--o)}
+.ks{font-size:10px;color:var(--mu);margin-top:5px;font-family:'JetBrains Mono',monospace;line-height:1.6}
+.pl{display:inline-flex;align-items:center;padding:2px 6px;border-radius:99px;font-size:9px;font-family:'JetBrains Mono',monospace;margin-top:4px}
+.pl.up{background:rgba(0,229,196,.12);color:var(--g)}.pl.dn{background:rgba(255,77,109,.12);color:var(--r)}.pl.wa{background:rgba(245,200,66,.12);color:var(--y)}.pl.ne{background:rgba(90,115,138,.12);color:var(--mu)}
+
+/* GRID */
+.gr{display:grid;gap:12px;margin-bottom:13px}
+.g12{grid-template-columns:1fr}.g11{grid-template-columns:1fr 1fr}.g21{grid-template-columns:2fr 1fr}.g13{grid-template-columns:1fr 3fr}.g111{grid-template-columns:1fr 1fr 1fr}.g1111{grid-template-columns:repeat(4,1fr)}.g211{grid-template-columns:2fr 1fr 1fr}
+.card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:15px 17px;transition:border-color .2s}
+.card:hover{border-color:rgba(0,229,196,.15)}
+.ch{font-size:12px;font-weight:700;margin-bottom:2px}
+.cs{font-size:10px;color:var(--mu);margin-bottom:12px;font-family:'JetBrains Mono',monospace}
+.cv{position:relative}
+.cv.h150{height:150px}.cv.h180{height:180px}.cv.h200{height:200px}.cv.h220{height:220px}.cv.h240{height:240px}.cv.h260{height:260px}.cv.h300{height:300px}
+
+/* TABLE */
+.tc{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;margin-bottom:13px}
+.th{padding:10px 15px;border-bottom:1px solid var(--bdr);font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{background:var(--s2);padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--mu);border-bottom:1px solid var(--bdr)}
+th:not(:first-child){text-align:right}
+tbody tr{border-bottom:1px solid rgba(30,45,66,.4);transition:background .1s}
+tbody tr:hover{background:var(--s2)}
+tbody tr:last-child{border-bottom:none}
+td{padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px}
+td.la{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:500}
+td.la2{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:400;color:var(--mu);padding-left:22px}
+td:not(.la):not(.la2){text-align:right}
+.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.co{color:var(--o)}.cm{color:var(--mu)}
+.tr td{font-weight:700;background:rgba(0,229,196,.04);color:var(--g)}.tr td.la{font-weight:700}
+.hl td{background:rgba(0,229,196,.06)!important}
+.mb{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.mbr{width:48px;height:4px;background:var(--s3);border-radius:2px;overflow:hidden;flex-shrink:0}
+.mbf{height:100%;border-radius:2px}
+
+/* SEC */
+.sec{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--mu);margin:15px 0 9px;display:flex;align-items:center;gap:8px}
+.sec::after{content:'';flex:1;height:1px;background:var(--bdr)}
+
+/* ACTION PLAN */
+.apg{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px}
+.ap{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:16px 18px}
+.apb{display:inline-block;padding:2px 9px;border-radius:99px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px}
+.apb.p1{background:rgba(255,77,109,.15);color:var(--r)}.apb.p2{background:rgba(245,200,66,.12);color:var(--y)}.apb.p3{background:rgba(0,229,196,.1);color:var(--g)}
+.apt{font-size:15px;font-weight:700;margin-bottom:5px;line-height:1.3}
+.apd{font-size:12px;color:var(--mu);margin-bottom:9px;line-height:1.6}
+.apl{list-style:none}
+.apl li{font-size:12px;padding:4px 0;border-bottom:1px solid rgba(30,45,66,.4);display:flex;align-items:flex-start;gap:7px;line-height:1.5}
+.apl li:last-child{border-bottom:none}
+.apl li::before{content:'→';color:var(--g);font-weight:700;flex-shrink:0;margin-top:1px}
+.apm{display:flex;gap:13px;margin-top:10px;padding-top:9px;border-top:1px solid var(--bdr);flex-wrap:wrap}
+.apm span{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mu)}
+.apm span strong{display:block;color:var(--txt);font-size:10px;margin-top:1px}
+
+/* GAUGE */
+.gauge{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 17px;margin-bottom:13px}
+.gt{font-size:12px;font-weight:700;margin-bottom:2px}
+.gs{font-size:10px;color:var(--mu);margin-bottom:12px;font-family:'JetBrains Mono',monospace}
+.gtrack{position:relative;height:26px;background:var(--s3);border-radius:6px;overflow:visible;margin-bottom:7px}
+.gzone{position:absolute;top:0;height:100%}
+.gz-ideal{background:rgba(0,229,196,.25);border:1px solid rgba(0,229,196,.4)}
+.gz-over{background:rgba(255,77,109,.15)}
+.gmark{position:absolute;top:-4px;width:3px;height:calc(100% + 8px);background:var(--r);border-radius:2px;box-shadow:0 0 8px var(--r);z-index:2}
+.gmark::after{content:attr(data-l);position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--r);white-space:nowrap;background:var(--bg);padding:0 3px}
+.glabels{display:flex;justify-content:space-between;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--mu)}
+.gleg{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}
+.gli{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--mu)}
+.gld{width:10px;height:10px;border-radius:2px}
+
+/* GP COMPARE */
+.gpbox{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;overflow:hidden}
+.gpbh{padding:11px 15px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px}
+.tag-a{background:rgba(77,159,255,.15);color:var(--b);font-size:9px;padding:2px 8px;border-radius:99px;font-weight:700;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.tag-b{background:rgba(0,229,196,.12);color:var(--g);font-size:9px;padding:2px 8px;border-radius:99px;font-weight:700;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.gpbb{padding:13px 15px}
+.formula{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu);background:var(--s2);border-radius:6px;padding:7px 10px;margin-bottom:9px;line-height:1.6}
+.formula em{color:var(--y);font-style:normal}
+
+@media(max-width:960px){.sidenav{display:none}.kr.c4,.kr.c5,.kr.c6{grid-template-columns:1fr 1fr}.gr.g11,.gr.g21,.gr.g111,.gr.g211{grid-template-columns:1fr}.apg{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══ -->
+<div id="lockScreen" style="position:fixed;inset:0;background:#07090f;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;">
+  <div style="text-align:center;max-width:380px;width:100%;padding:0 24px;">
+    <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#00e5c4,#4d9fff);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;color:#07090f;margin:0 auto 24px;">W</div>
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;color:#dce8f5;margin-bottom:6px;">Wiltek MASTER</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5a738a;margin-bottom:32px;letter-spacing:1px;">COMPANY DASHBOARD · CONFIDENTIAL</div>
+    <input id="loginUser" type="text" placeholder="Username" autocomplete="off" autocapitalize="none"
+      style="width:100%;background:#0d1117;border:1px solid #1e2d42;color:#dce8f5;padding:13px 16px;border-radius:10px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;margin-bottom:10px;box-sizing:border-box;transition:border-color .2s;"
+      onkeydown="if(event.key==='Enter')document.getElementById('loginPw').focus()"
+      onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+    <input id="loginPw" type="password" placeholder="Password" autocomplete="off"
+      style="width:100%;background:#0d1117;border:1px solid #1e2d42;color:#dce8f5;padding:13px 16px;border-radius:10px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;margin-bottom:12px;box-sizing:border-box;transition:border-color .2s;"
+      onkeydown="if(event.key==='Enter')checkPw()"
+      onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+    <button onclick="checkPw()" style="width:100%;background:linear-gradient(135deg,#00e5c4,#00b89e);border:none;color:#07090f;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:10px;">
+      Sign In
+    </button>
+    <div id="pwErr" style="color:#ff4d6d;font-size:12px;font-family:'JetBrains Mono',monospace;min-height:18px;"></div>
+    <div style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#2a3d52;">Wiltek Homeware Sdn Bhd · Internal Use Only</div>
+  </div>
+</div>
+
+<!-- ══ ADMIN EDIT MODAL ══ -->
+<div id="adminModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:8000;align-items:center;justify-content:center;">
+  <div style="background:#0d1117;border:1px solid #1e2d42;border-radius:14px;padding:28px;width:520px;max-width:95vw;">
+    <div style="font-size:16px;font-weight:700;color:#dce8f5;margin-bottom:4px;" id="adminModalTitle">Edit Value</div>
+    <div style="font-size:11px;color:#5a738a;font-family:'JetBrains Mono',monospace;margin-bottom:20px;" id="adminModalPath"></div>
+    <input id="adminModalInput" style="width:100%;background:#111827;border:1px solid #1e2d42;color:#dce8f5;padding:12px 14px;border-radius:8px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:16px;"
+      onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeAdminModal()" style="background:#1a2235;border:1px solid #1e2d42;color:#5a738a;padding:9px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Cancel</button>
+      <button onclick="saveAdminEdit()" style="background:linear-gradient(135deg,#00e5c4,#00b89e);border:none;color:#07090f;padding:9px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ USER MANAGEMENT MODAL ══ -->
+<div id="userMgmtModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:8500;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;">
+  <div style="background:#0d1117;border:1px solid #1e2d42;border-radius:14px;padding:28px;width:820px;max-width:96vw;margin:0 auto 40px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#dce8f5;">👥 User Management</div>
+        <div style="font-size:10px;color:#5a738a;font-family:'JetBrains Mono',monospace;margin-top:2px;">Changes are saved in your browser. Passwords are NOT encrypted — keep this file secure.</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="addNewUser()" style="background:rgba(0,229,196,.12);border:1px solid rgba(0,229,196,.3);color:#00e5c4;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">+ Add User</button>
+        <button onclick="closeUserMgmt()" style="background:#1a2235;border:1px solid #1e2d42;color:#5a738a;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:12px;">Close</button>
+      </div>
+    </div>
+    <div id="userMgmtTable"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">W</div>
+    <div class="brand-name">Wiltek <em>MASTER</em></div>
+  </div>
+  <div class="topbar-right">
+    <select class="msel" id="mSel" onchange="selMonth=this.value;render()">
+      <option value="Mar26" selected>Mar 2026 (Latest)</option>
+      <option value="Feb26">Feb 2026</option>
+      <option value="Jan26">Jan 2026</option>
+      <option value="Dec25">Dec 2025</option>
+      <option value="Nov25">Nov 2025</option>
+      <option value="Oct25">Oct 2025</option>
+      <option value="Sep25">Sep 2025</option>
+      <option value="Aug25">Aug 2025</option>
+      <option value="Jul25">Jul 2025</option>
+      <option value="Jun25">Jun 2025</option>
+      <option value="May25">May 2025</option>
+      <option value="Apr25">Apr 2025</option>
+      <option value="Mar25">Mar 2025</option>
+      <option value="Feb25">Feb 2025</option>
+      <option value="Jan25">Jan 2025</option>
+    </select>
+    <div class="pb" id="pb">📅 Mar 2026</div>
+    <div id="gd-status" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a738a;padding:3px 10px;border-radius:99px;background:rgba(90,115,138,.08);border:1px solid rgba(90,115,138,.2);">⚫ Local Data</div>
+    <button onclick="fetchFromGoogleDrive()" style="background:rgba(0,229,196,.1);border:1px solid rgba(0,229,196,.25);color:#00e5c4;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;" title="Sync from Google Drive">🔄 Sync GD</button>
+    <div id="adminBadge" style="display:none;background:rgba(184,124,255,.15);border:1px solid rgba(184,124,255,.3);color:#b87cff;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="toggleAdminMode()">ADMIN ✎</div>
+    <div id="saveBtn" style="display:none;background:rgba(0,229,196,.15);border:1px solid rgba(0,229,196,.3);color:#00e5c4;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="saveEdits()">💾 SAVE</div>
+    <div id="userBadge" style="display:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:#dce8f5;background:rgba(30,45,66,.6);border:1px solid #1e2d42;padding:3px 10px;border-radius:99px;align-items:center;gap:6px;"></div>
+    <button id="userMgmtBtn" onclick="openUserMgmt()" style="display:none;background:rgba(184,124,255,.1);border:1px solid rgba(184,124,255,.25);color:#b87cff;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;" title="User Management">⚙ Users</button>
+    <button onclick="logout()" id="logoutBtn" style="display:none;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);color:#ff4d6d;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;">↩ Logout</button>
+    <div class="lsw">
+      <button class="lb active" onclick="setLang('en')">EN</button>
+      <button class="lb" onclick="setLang('zh')">中文</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="sidenav" id="sidenav">
+  <div class="ns" id="nav-s1"></div>
+  <div class="ni active" onclick="nav('health')"><span class="nx">🏥</span><span id="nav-health"></span></div>
+  <div class="ni" onclick="nav('pl')"><span class="nx">📋</span><span id="nav-pl"></span></div>
+  <div class="ni" onclick="nav('cashflow')"><span class="nx">💧</span><span id="nav-cf"></span></div>
+  <div class="ns" id="nav-s2"></div>
+  <div class="ni" onclick="nav('gp')"><span class="nx">📈</span><span id="nav-gp"></span></div>
+  <div class="ni" onclick="nav('branches')"><span class="nx">🏪</span><span id="nav-br"></span></div>
+  <div class="ns" id="nav-s3"></div>
+  <div class="ni" onclick="nav('inventory')"><span class="nx">📦</span><span id="nav-inv"></span></div>
+  <div class="ni" onclick="nav('expenses')"><span class="nx">📊</span><span id="nav-exp"></span></div>
+  <div class="ns" id="nav-s4"></div>
+  <div class="ni" onclick="nav('action')"><span class="nx">⚡</span><span id="nav-act"></span></div>
+  <div class="ns" id="nav-s5"></div>
+  <div class="ni" onclick="nav('balancesheet')"><span class="nx">🏦</span><span id="nav-bs"></span></div>
+  <div class="ni" onclick="nav('customers')"><span class="nx">👥</span><span id="nav-cust"></span></div>
+  <div class="ns" id="nav-s6"></div>
+  <div class="ni" onclick="nav('branchhub')"><span class="nx">🗂️</span><span id="nav-hub"></span></div>
+  <div class="ni" onclick="nav('quicklinks')"><span class="nx">🔗</span><span id="nav-links"></span></div>
+</nav>
+
+<main class="main">
+
+<!-- ══════════ CEO OVERVIEW (Health) ══════════ -->
+<div class="page active" id="p-health">
+  <!-- Header row -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+    <div>
+      <div class="ph" id="h-ph" style="font-size:22px;margin-bottom:3px;"></div>
+      <div class="ps" id="h-ps"></div>
+    </div>
+    <div id="h-verdict" style="font-size:13px;font-weight:700;padding:8px 18px;border-radius:99px;"></div>
+  </div>
+
+  <!-- 5 BIG KPIs -->
+  <div id="h-kpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;"></div>
+
+  <!-- Traffic Light Status Bar -->
+  <div id="h-traffic" style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 20px;margin-bottom:18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;"></div>
+
+  <!-- CEO Alert Box -->
+  <div id="h-ins" class="ins ba" style="margin-bottom:18px;font-size:13px;"></div>
+
+  <!-- Two charts: Revenue 14M + Branch bars -->
+  <div class="gr g11">
+    <div class="card">
+      <div class="ch" id="h-c1t"></div>
+      <div class="cs" id="h-c1s"></div>
+      <div class="cv h220"><canvas id="salesTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch" id="h-c2t"></div>
+      <div class="cs" id="h-c2s"></div>
+      <div class="cv h220"><canvas id="netProfitTrend"></canvas></div>
+    </div>
+  </div>
+
+  <!-- MoM delta panel (compact) -->
+  <div class="card" style="margin-bottom:4px;">
+    <div class="ch" id="h-mom-title" style="margin-bottom:8px;"></div>
+    <div id="h-mom"></div>
+  </div>
+  <div id="h-mom-sub" style="display:none;"></div>
+</div>
+
+<!-- ══════════ P&L ══════════ -->
+<div class="page" id="p-pl">
+  <div class="ph" id="pl-ph"></div>
+  <div class="ps" id="pl-ps"></div>
+  <div id="pl-ins" class="ins ok"></div>
+  <div class="kr c5" id="pl-kpis"></div>
+  <div class="tc">
+    <div class="th" id="pl-tht">📋 <span id="pl-thl"></span></div>
+    <table><thead><tr id="pl-thead"></tr></thead><tbody id="pl-tbody"></tbody></table>
+  </div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="pl-c1t"></div><div class="cs" id="pl-c1s"></div><div class="cv h220"><canvas id="plWaterfallChart"></canvas></div></div>
+    <div class="card"><div class="ch" id="pl-c2t"></div><div class="cs" id="pl-c2s"></div><div class="cv h220"><canvas id="plExpPieChart"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════ CASHFLOW ══════════ -->
+<div class="page" id="p-cashflow">
+  <div class="ph" id="cf-ph"></div>
+  <div class="ps" id="cf-ps"></div>
+  <div id="cf-ins" class="ins ba"></div>
+  <div class="kr c4" id="cf-kpis"></div>
+  <div class="gr g12">
+    <div class="card"><div class="ch" id="cf-c1t"></div><div class="cs" id="cf-c1s"></div><div class="cv h240"><canvas id="cfChart"></canvas></div></div>
+  </div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="cf-c2t"></div><div class="cs" id="cf-c2s"></div><div class="cv h200"><canvas id="cfCollectPay"></canvas></div></div>
+    <div class="card"><div class="ch" id="cf-c3t"></div><div class="cs" id="cf-c3s"></div><div class="cv h200"><canvas id="cfInvColl"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════ GROSS PROFIT ══════════ -->
+<div class="page" id="p-gp">
+  <div class="ph" id="gp-ph"></div>
+  <div class="ps" id="gp-ps"></div>
+  <div id="gp-ins" class="ins ok"></div>
+  <div class="gr g11">
+    <div class="gpbox"><div class="gpbh"><span class="tag-a" id="gp-ta"></span><span style="font-size:13px;font-weight:700;" id="gp-tah"></span></div><div class="gpbb"><div class="formula" id="gp-fa"></div><div class="ins info" style="margin:0;font-size:12px;" id="gp-ia"></div></div></div>
+    <div class="gpbox"><div class="gpbh"><span class="tag-b" id="gp-tb"></span><span style="font-size:13px;font-weight:700;" id="gp-tbh"></span></div><div class="gpbb"><div class="formula" id="gp-fb"></div><div class="ins ok" style="margin:0;font-size:12px;" id="gp-ib"></div></div></div>
+  </div>
+  <div class="gr g12">
+    <div class="card"><div class="ch" id="gp-c1t"></div><div class="cs" id="gp-c1s"></div><div class="cv h240"><canvas id="gpCompare"></canvas></div></div>
+  </div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="gp-c2t"></div><div class="cs" id="gp-c2s"></div><div class="cv h240"><canvas id="gpBrand"></canvas></div></div>
+    <div class="card"><div class="ch" id="gp-c3t"></div><div class="cs" id="gp-c3s"></div><div class="cv h240"><canvas id="gpMix"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════ BRANCHES ══════════ -->
+<div class="page" id="p-branches">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <div class="ph" id="br-ph"></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:11px;color:var(--mu);font-family:'JetBrains Mono',monospace;" id="br-toggle-lbl">View:</span>
+      <div style="display:flex;gap:2px;background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:2px;">
+        <button id="btn-monthly" class="lb active" onclick="setBrView('monthly')"></button>
+        <button id="btn-ytd" class="lb" onclick="setBrView('ytd')"></button>
+      </div>
+    </div>
+  </div>
+  <div class="ps" id="br-ps"></div>
+  <div id="br-range-warn" style="display:none;background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#f5c842;"></div>
+  <div id="br-ins" class="ins wa"></div>
+
+  <div class="sec" id="br-sec1"></div>
+  <div class="tc">
+    <div class="th" id="br-t1h">🏪 <span id="br-t1l"></span></div>
+    <table><thead><tr id="br-thead1"></tr></thead><tbody id="br-tbody1"></tbody></table>
+  </div>
+
+  <div class="sec" id="br-sec2"></div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="br-c1t"></div><div class="cs" id="br-c1s"></div><div class="cv h200"><canvas id="brNetChart"></canvas></div></div>
+    <div class="card"><div class="ch" id="br-c2t"></div><div class="cs" id="br-c2s"></div><div class="cv h200"><canvas id="brMarginChart"></canvas></div></div>
+  </div>
+
+  <div class="sec" id="br-sec3"></div>
+  <div class="tc">
+    <div class="th" id="br-t2h">💰 <span id="br-t2l"></span></div>
+    <table><thead><tr id="br-thead2"></tr></thead><tbody id="br-tbody2"></tbody></table>
+  </div>
+</div>
+
+<!-- ══════════ INVENTORY ══════════ -->
+<div class="page" id="p-inventory">
+  <div class="ph" id="inv-ph"></div>
+  <div class="ps" id="inv-ps"></div>
+  <div id="inv-ins" class="ins ba"></div>
+  <div id="inv-gauge" class="gauge"></div>
+  <div class="kr c4" id="inv-kpis"></div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="inv-c1t"></div><div class="cs" id="inv-c1s"></div><div class="cv h220"><canvas id="stockChart"></canvas></div></div>
+    <div class="card"><div class="ch" id="inv-c2t"></div><div class="cs" id="inv-c2s"></div><div class="cv h220"><canvas id="purchBreakdown"></canvas></div></div>
+  </div>
+  <div class="tc">
+    <div class="th" id="inv-tht">📦 <span id="inv-thl"></span></div>
+    <table><thead><tr id="inv-thead"></tr></thead><tbody id="inv-tbody"></tbody></table>
+  </div>
+</div>
+
+<!-- ══════════ EXPENSES ══════════ -->
+<div class="page" id="p-expenses">
+  <div class="ph" id="exp-ph"></div>
+  <div class="ps" id="exp-ps"></div>
+  <div id="exp-ins" class="ins ba"></div>
+  <div class="kr c5" id="exp-kpis"></div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="exp-c1t"></div><div class="cs" id="exp-c1s"></div><div class="cv h220"><canvas id="hrTrend"></canvas></div></div>
+    <div class="card"><div class="ch" id="exp-c2t"></div><div class="cs" id="exp-c2s"></div><div class="cv h220"><canvas id="expDonut"></canvas></div></div>
+  </div>
+  <div class="sec" id="exp-sec1"></div>
+  <div class="tc">
+    <div class="th" id="exp-tht">📊 <span id="exp-thl"></span></div>
+    <table><thead><tr id="exp-thead"></tr></thead><tbody id="exp-tbody"></tbody></table>
+  </div>
+  <div class="gr g12">
+    <div class="card"><div class="ch" id="exp-c3t"></div><div class="cs" id="exp-c3s"></div><div class="cv h240"><canvas id="expStack"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════ ACTION PLAN ══════════ -->
+<div class="page" id="p-action">
+  <div class="ph" id="act-ph"></div>
+  <div class="ps" id="act-ps"></div>
+  <div id="act-ins" class="ins ok"></div>
+  <div id="act-cards" class="apg"></div>
+</div>
+
+<!-- ══════════ BALANCE SHEET ══════════ -->
+<div class="page" id="p-balancesheet">
+  <div class="ph" id="bs-ph"></div>
+  <div class="ps" id="bs-ps"></div>
+  <div id="bs-ins" class="ins info"></div>
+  <div class="kr c4" id="bs-kpis"></div>
+  <div class="gr g11">
+    <div class="tc">
+      <div class="th">🏦 <span id="bs-assets-title"></span></div>
+      <table><thead><tr id="bs-assets-head"></tr></thead><tbody id="bs-assets-body"></tbody></table>
+    </div>
+    <div class="tc">
+      <div class="th">⚠️ <span id="bs-liab-title"></span></div>
+      <table><thead><tr id="bs-liab-head"></tr></thead><tbody id="bs-liab-body"></tbody></table>
+    </div>
+  </div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="bs-c1t"></div><div class="cs" id="bs-c1s"></div><div class="cv h220"><canvas id="bsDonut"></canvas></div></div>
+    <div class="card"><div class="ch" id="bs-c2t"></div><div class="cs" id="bs-c2s"></div><div class="cv h220"><canvas id="bsOAF"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════ CUSTOMERS ══════════ -->
+<div class="page" id="p-customers">
+  <div class="ph" id="cu-ph"></div>
+  <div class="ps" id="cu-ps"></div>
+  <div id="cu-ins" class="ins ok"></div>
+  <div class="kr c4" id="cu-kpis"></div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="cu-c1t"></div><div class="cs" id="cu-c1s"></div><div class="cv h220"><canvas id="cuWalkin"></canvas></div></div>
+    <div class="card"><div class="ch" id="cu-c2t"></div><div class="cs" id="cu-c2s"></div><div class="cv h220"><canvas id="cuBasket"></canvas></div></div>
+  </div>
+  <div class="tc">
+    <div class="th">👥 <span id="cu-race-title"></span></div>
+    <table><thead><tr id="cu-race-head"></tr></thead><tbody id="cu-race-body"></tbody></table>
+  </div>
+  <div class="gr g11">
+    <div class="card"><div class="ch" id="cu-c3t"></div><div class="cs" id="cu-c3s"></div><div class="cv h220"><canvas id="cuBranchRev"></canvas></div></div>
+    <div class="card"><div class="ch" id="cu-c4t"></div><div class="cs" id="cu-c4s"></div><div class="cv h220"><canvas id="cuBrandGP"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══════════ BRANCH HUB ══════════ -->
+<div class="page" id="p-branchhub">
+  <div class="ph" id="hub-ph">🗂️ Branch Hub</div>
+  <div class="ps" id="hub-ps">Quick access to all branch operational dashboards</div>
+  <div class="ins info" id="hub-ins"></div>
+
+  <div class="sec" id="hub-sec1"></div>
+  <div class="kr c3" id="hub-cards"></div>
+
+  <div class="sec" id="hub-sec2"></div>
+  <div class="tc">
+    <div class="th">🏪 <span>Branch YTD Ranking</span></div>
+    <table>
+      <thead><tr>
+        <th>Branch</th><th>YTD Sales</th><th>YTD Net</th><th>Net%</th><th>GP%</th><th>Status</th>
+      </tr></thead>
+      <tbody id="hub-ranking"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ QUICK LINKS ══════════ -->
+<div class="page" id="p-quicklinks">
+  <div class="ph" id="ql-ph">🔗 Quick Links</div>
+  <div class="ps" id="ql-ps">All Wiltek dashboards in one place</div>
+
+  <div class="sec" id="ql-sec1"></div>
+  <div class="kr c2" id="ql-cards"></div>
+
+  <div class="sec" id="ql-sec2"></div>
+  <div class="kr c3" id="ql-branch-cards"></div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// MULTI-USER RBAC SYSTEM
+// ═══════════════════════════════════════
+
+// ── Default user accounts ──
+// Admin can add/edit/remove users via the User Management panel.
+// Changes are stored in localStorage. Passwords are plain text —
+// this dashboard should only be served on a trusted internal network.
+const DEFAULT_USERS = [
+  { id:'admin',  pw:'Wiltek888',  name:'Administrator',     role:'admin',      branch:null },
+  { id:'ceo',    pw:'CEO2026',    name:'CEO',               role:'ceo',        branch:null },
+  { id:'cfo',    pw:'CFO2026',    name:'CFO',               role:'cfo',        branch:null },
+  { id:'dir',    pw:'DIR2026',    name:'Director',          role:'director',   branch:null },
+  { id:'sm',     pw:'SM2026',     name:'Sales Manager',     role:'sales_mgr',  branch:null },
+  { id:'w01',    pw:'W01_2026',   name:'W01 Manager',       role:'branch_mgr', branch:'W01' },
+  { id:'w02',    pw:'W02_2026',   name:'W02 Manager',       role:'branch_mgr', branch:'W02' },
+  { id:'w03',    pw:'W03_2026',   name:'W03 Manager',       role:'branch_mgr', branch:'W03' },
+  { id:'w05',    pw:'W05_2026',   name:'W05 Manager',       role:'branch_mgr', branch:'W05' },
+  { id:'w07',    pw:'W07_2026',   name:'W07 Manager',       role:'branch_mgr', branch:'W07' },
+  { id:'w11',    pw:'W11_2026',   name:'W11 Manager',       role:'branch_mgr', branch:'W11' },
+  { id:'hr',     pw:'HR2026',     name:'HR',                role:'hr',         branch:null },
+  { id:'wh',     pw:'WH2026',     name:'Warehouse',         role:'warehouse',  branch:null },
+  { id:'mkt',    pw:'MKT2026',    name:'Marketing',         role:'marketing',  branch:null },
+  { id:'emp',    pw:'EMP2026',    name:'Employee',          role:'employee',   branch:null },
+];
+
+// ── Default permissions per role ──
+const ROLE_DEFAULTS = {
+  admin:      { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:true  },
+  ceo:        { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
+  cfo:        { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
+  director:   { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
+  sales_mgr:  { pages:['health','pl','gp','branches','inventory','expenses','action','customers','branchhub','quicklinks'], showNet:true,  showGPpct:true,  showCF:false, showBS:false, allBranches:true,  canRefresh:false, canManageUsers:false },
+  branch_mgr: { pages:['health','branches','inventory','action','customers','branchhub','quicklinks'],                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  hr:         { pages:['expenses','quicklinks'],                                                                             showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  warehouse:  { pages:['inventory','quicklinks'],                                                                            showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  marketing:  { pages:['customers','branchhub','quicklinks'],                                                               showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  employee:   { pages:['branchhub','quicklinks'],                                                                            showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+};
+
+// ── localStorage helpers ──
+function loadUsers(){
+  try{
+    const s=localStorage.getItem('wiltek_users');
+    return s?JSON.parse(s):[...DEFAULT_USERS];
+  }catch(e){return[...DEFAULT_USERS];}
+}
+function saveUsers(arr){
+  localStorage.setItem('wiltek_users',JSON.stringify(arr));
+}
+function loadPermOverrides(){
+  try{const s=localStorage.getItem('wiltek_perm_overrides');return s?JSON.parse(s):{};}
+  catch(e){return{};}
+}
+function savePermOverrides(o){
+  localStorage.setItem('wiltek_perm_overrides',JSON.stringify(o));
+}
+
+// ── Active state ──
+let currentUser = null;
+let userPerms   = {};
+let adminMode   = false;
+let adminEditTarget = null;
+
+function getPerms(user){
+  const base = {...(ROLE_DEFAULTS[user.role]||ROLE_DEFAULTS.employee)};
+  const overrides = loadPermOverrides()[user.id]||{};
+  // Merge page list override if present
+  const merged = {...base,...overrides};
+  if(overrides.pages) merged.pages=[...overrides.pages];
+  merged.branch = user.branch;
+  return merged;
+}
+
+function canAccess(page){ return userPerms.pages&&userPerms.pages.includes(page); }
+
+// ── Login ──
+function checkPw(){
+  const uid = (document.getElementById('loginUser').value||'').trim().toLowerCase();
+  const pw  = (document.getElementById('loginPw').value||'');
+  const users = loadUsers();
+  const user  = users.find(u=>u.id===uid && u.pw===pw);
+  if(user){
+    currentUser = user;
+    userPerms   = getPerms(user);
+    unlock();
+  } else {
+    const err=document.getElementById('pwErr');
+    err.textContent='Invalid username or password.';
+    document.getElementById('loginPw').value='';
+    setTimeout(()=>err.textContent='',3000);
+  }
+}
+
+function unlock(){
+  document.getElementById('lockScreen').style.display='none';
+  // Admin badge
+  const ab=document.getElementById('adminBadge');
+  if(currentUser.role==='admin'&&ab){ ab.style.display='flex'; }
+  // User badge
+  const ub=document.getElementById('userBadge');
+  if(ub){
+    const roleLabel = currentUser.role.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
+    ub.innerHTML=`<span style="color:#5a738a">●</span> ${currentUser.name} <span style="color:#5a738a;margin-left:4px;">${roleLabel}</span>`;
+    ub.style.display='flex';
+  }
+  // User management button (admin only)
+  const umBtn=document.getElementById('userMgmtBtn');
+  if(umBtn&&currentUser.role==='admin') umBtn.style.display='flex';
+  // Logout button
+  const lb2=document.getElementById('logoutBtn');
+  if(lb2) lb2.style.display='flex';
+  // Refresh button visibility
+  const syncBtn=document.querySelector('button[onclick="fetchFromGoogleDrive()"]');
+  if(syncBtn) syncBtn.style.display=userPerms.canRefresh?'':'none';
+  // GD status visibility
+  const gds=document.getElementById('gd-status');
+  if(gds) gds.style.display=userPerms.canRefresh?'':'none';
+  updateNav();
+  applyRoleCSS();
+  render();
+}
+
+function logout(){
+  currentUser=null;
+  userPerms={};
+  adminMode=false;
+  const ls=document.getElementById('lockScreen');
+  if(ls){ls.style.display='flex';}
+  const ub=document.getElementById('userBadge');
+  if(ub){ub.style.display='none';}
+  const ab=document.getElementById('adminBadge');
+  if(ab){ab.style.display='none';}
+  const umBtn=document.getElementById('userMgmtBtn');
+  if(umBtn){umBtn.style.display='none';}
+  const lb2=document.getElementById('logoutBtn');
+  if(lb2){lb2.style.display='none';}
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPw').value='';
+  document.getElementById('loginUser').focus();
+}
+
+// ── Navigation visibility ──
+// Maps page id → nav item onclick attribute
+const NAV_MAP = {
+  health:'health', pl:'pl', cashflow:'cashflow', gp:'gp',
+  branches:'branches', inventory:'inventory', expenses:'expenses',
+  action:'action', balancesheet:'balancesheet', customers:'customers',
+  branchhub:'branchhub', quicklinks:'quicklinks'
+};
+
+function updateNav(){
+  document.querySelectorAll('.ni').forEach(ni=>{
+    const oc=ni.getAttribute('onclick')||'';
+    const m=oc.match(/nav\('(\w+)'\)/);
+    if(!m) return;
+    const pageId=m[1];
+    const allowed=canAccess(pageId);
+    ni.style.display=allowed?'flex':'none';
+  });
+  // Hide section headers if all items in section are hidden
+  // (section headers have class .ns)
+  document.querySelectorAll('.ns').forEach(ns=>{
+    let sib=ns.nextElementSibling;
+    let anyVisible=false;
+    while(sib&&!sib.classList.contains('ns')){
+      if(sib.classList.contains('ni')&&sib.style.display!=='none') anyVisible=true;
+      sib=sib.nextElementSibling;
+    }
+    ns.style.display=anyVisible?'':'none';
+  });
+  // Navigate to first allowed page
+  const first=userPerms.pages&&userPerms.pages[0];
+  if(first) nav(first);
+}
+
+let isAdmin = false; // kept for legacy adminMode edits compatibility
+
+function toggleAdminMode(){
+  if(currentUser?.role!=='admin') return;
+  adminMode = !adminMode;
+  isAdmin = adminMode;
+  const badge = document.getElementById('adminBadge');
+  const saveBtn = document.getElementById('saveBtn');
+  if(badge){
+    badge.style.background = adminMode ? 'rgba(184,124,255,.3)' : 'rgba(184,124,255,.15)';
+    badge.textContent = adminMode ? 'ADMIN ✎ ON' : 'ADMIN ✎';
+    badge.style.color = adminMode ? '#e0b4ff' : '#b87cff';
+  }
+  if(saveBtn) saveBtn.style.display = adminMode ? 'flex' : 'none';
+  render();
+}
+
+function saveEdits(){
+  // Export current D and BR data as a JSON snapshot
+  const snapshot = {
+    timestamp: new Date().toISOString(),
+    D_modified: {},
+    BR_modified: {}
+  };
+  // Only export arrays that might have been changed
+  ['sales_inv','br_ns','br_cogs','br_gp','br_exp','br_net','hr_total','adm_total','acc_total',
+   'online_total','purch_total','stock_close'].forEach(k=>{
+    if(D[k]) snapshot.D_modified[k] = D[k];
+  });
+  Object.keys(BR).forEach(b=>{
+    snapshot.BR_modified[b] = {};
+    ['jan','feb','mar'].forEach(p=>{
+      if(BR[b][p]) snapshot.BR_modified[b][p] = {...BR[b][p]};
+    });
+  });
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'FMM_edited_data_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function openAdminModal(title, path, currentVal, onSave){
+  document.getElementById('adminModalTitle').textContent = 'Edit: ' + title;
+  document.getElementById('adminModalPath').textContent = path;
+  const inp = document.getElementById('adminModalInput');
+  inp.value = currentVal;
+  adminEditTarget = onSave;
+  const modal = document.getElementById('adminModal');
+  if(modal) modal.style.display = 'flex';
+  setTimeout(()=>inp.select(),50);
+}
+function closeAdminModal(){ const m=document.getElementById('adminModal'); if(m) m.style.display='none'; adminEditTarget=null; }
+function saveAdminEdit(){
+  if(adminEditTarget){
+    const val = document.getElementById('adminModalInput').value;
+    adminEditTarget(val);
+    closeAdminModal();
+    render();
+  }
+}
+// Click outside modal to close
+document.addEventListener('click',e=>{
+  if(e.target===document.getElementById('adminModal')) closeAdminModal();
+});
+
+// Make a value editable if admin mode is on
+const _editCbs = {};
+let _editIdx = 0;
+function editable(display, title, path, currentVal, setter){
+  if(!adminMode) return display;
+  const key = 'e'+(++_editIdx);
+  _editCbs[key] = (v)=>{ try{ setter(v); }catch(e){console.error(e);} };
+  const safeTitle = title.replace(/['"]/g,'');
+  const safeVal = String(currentVal).replace(/['"]/g,'');
+  return `<span style="cursor:pointer;border-bottom:1px dashed #b87cff;color:inherit;" title="Click to edit: ${safeTitle}" onclick="openAdminModal('${safeTitle}','${path}','${safeVal}',_editCbs['${key}'])">${display}</span>`;
+}
+
+// ═══════════════════════════════
+// DATA
+// ═══════════════════════════════
+const M15 = ['Jan25','Feb25','Mar25','Apr25','May25','Jun25','Jul25','Aug25','Sep25','Oct25','Nov25','Dec25','Jan26','Feb26','Mar26'];
+
+const D = {
+  sales_inv:[490570.49,505702.7,494906.54,454056.0,498183.47,484183.85,465099.06,460531.17,425858.43,358262.77,381898.11,444253.18,516682.9,419078.47,382542.05],
+  sales_coll:[516289.0,498134.14,488956.04,453542.25,482448.39,483586.01,465742.43,448644.83,438718.95,357367.87,367223.54,452843.51,492651.88,364550.14,386279.12],
+  total_pay:[534264.56,551352.76,457640.36,510363.05,471042.42,496564.79,531544.24,428143.03,447458.41,391175.81,496030.28,562349.02,497692.95,376267.73,386083.07],
+  cf_true:[42084.44,-53158.62,39767.68,-56760.8,11405.97,-12918.78,-20301.81,20622.81,-8739.46,2192.06,-128806.37,-106313.61,-200.2,-9469.74,2693.95],
+  other_recv:[60060.0,60.0,8452.0,60.0,0.0,60.0,45500.0,121.01,0.0,36000.0,702793.37,3191.9,4840.87,2247.85,2497.9],
+  purch_total:[241462.9,254272.69,143094.81,276169.5,219518.87,245917.02,273312.03,168267.37,183953.87,109159.39,236735.5,344907.15,260165.22,130458.71,175842.18],
+  china_p:[83341.61,84684.93,79709.86,81933.73,86980.63,78042.07,127809.76,79396.9,83363.02,4439.76,137758.19,87932.98,112371.28,8375.65,105282.46],
+  trans_p:[14842.52,12409.36,9123.81,18951.51,8477.92,8421.58,11338.96,22866.11,7778.93,6519.95,7851.09,41058.65,8228.2,5365.62,13976.4],
+  local_p:[143278.77,98142.67,54261.14,175284.26,124060.32,104569.4,134163.31,66004.36,92811.92,16594.72,91126.22,171087.43,98731.11,43851.29,56583.32],
+  oaf_p:[0.0,59035.73,0.0,0.0,0.0,54883.97,0.0,0.0,0.0,81604.96,0.0,44828.09,40834.63,72866.15,0.0],
+  // Op & Mktg details
+  op_total:[4057.17,5390.02,2487.45,3660.02,2402.87,2362.39,3516.55,8838.61,12224.23,8108.65,2980.4,4565.37,20092.69,1943.75,6619.11],
+  op_branch:[3828.08,5031.47,1173.85,3503.6,1065.27,2276.69,2343.07,8032.49,11161.45,7335.25,2980.4,2833.1,996.86,1593.75,5899.11],
+  op_contractor:[1108.45,993.55,340.85,1856.35,772.2,989.1,967.7,2257.3,1778.95,1113.85,1510.5,529.7,89.4,1593.75,88.6],
+  op_misc:[519.63,388.92,833.0,1028.25,159.57,937.59,1375.37,2478.19,8452.0,5467.9,1054.9,2303.4,607.46,0.0,350.51],
+  op_banner:[0.0,0.0,0.0,619.0,133.5,350.0,0.0,897.0,133.5,753.5,415.0,0.0,0.0,0.0,0.0],
+  mkt_total:[229.09,358.55,1313.6,156.42,1337.6,85.7,1173.48,806.12,1062.78,773.4,0.0,1732.27,19095.83,350.0,720.0],
+  mkt_promo:[0.0,0.0,720.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16000.0,0.0,0.0],
+  mkt_google:[229.09,358.55,213.6,156.42,157.6,65.7,453.48,206.12,342.78,173.4,0.0,969.07,91.03,0.0,0.0],
+  mkt_banner:[0.0,0.0,380.0,0.0,1180.0,20.0,720.0,600.0,720.0,600.0,0.0,763.2,3004.8,350.0,720.0],
+  online_total:[12040.0,44002.69,33901.01,4562.96,5840.46,5824.65,11054.85,6371.44,6075.2,45353.57,4055.8,3134.93,6502.11,10692.17,10314.75],
+  online_social:[3724.0,3198.13,4408.69,4562.96,3284.46,5425.25,4793.73,6371.44,6075.2,5263.97,4055.8,3134.93,6502.11,7138.97,5454.75],
+  online_kol:[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,40089.6,0.0,0.0,0.0,3553.2,0.0],
+  log_total:[1996.51,2067.85,1776.17,1483.21,1496.99,2265.99,1419.55,1344.0,2265.6,879.35,332.2,1951.25,2753.96,1411.41,2046.95],
+  log_diesel:[1007.88,949.35,932.3,924.59,481.64,1017.09,923.46,0.0,0.0,100.0,0.0,333.15,1066.48,725.69,865.63],
+  log_toll:[150.0,150.0,100.0,200.0,150.0,100.0,200.0,100.0,100.0,50.0,53.0,150.0,150.0,100.0,150.0],
+  log_lalamove:[226.2,210.5,307.05,152.6,331.15,383.5,223.2,488.0,61.1,510.35,257.6,662.3,1130.7,308.1,327.6],
+  adm_total:[66770.34,59336.48,61846.79,58213.43,61968.05,63154.29,62461.38,70016.17,62019.05,59864.84,56884.37,63318.57,54721.02,59285.28,65514.92],
+  adm_rental:[44500.0,44500.0,44500.0,44500.0,44500.0,44500.0,44500.0,43000.0,44500.0,44500.0,40200.0,40700.0,41100.0,41100.0,35100.0],
+  adm_utility:[10869.21,9534.12,10183.39,10142.0,10893.7,11465.1,11655.26,11150.93,10770.5,11071.41,9664.04,9251.85,8801.57,8866.44,7898.85],
+  adm_office:[422.08,535.74,97.4,80.0,1126.88,1058.69,80.0,3323.16,508.95,430.03,1092.85,1757.72,639.59,0.0,126.9],
+  adm_var:[2976.3,3341.62,4030.0,470.0,3443.47,285.0,1023.8,1625.2,5097.0,2260.8,2529.48,6239.0,3473.0,8611.98,19332.59],
+  adm_medical:[0.0,0.0,30.0,0.0,0.0,0.0,46.0,0.0,0.0,0.0,0.0,0.0,80.0,60.0,0.0],
+  adm_stationary:[848.5,632.63,0.0,0.0,1043.47,285.0,37.8,379.3,515.0,1000.0,1640.24,1909.0,332.0,415.05,30.8],
+  adm_misc_hq:[540.0,2350.0,4000.0,270.0,0.0,0.0,940.0,1100.0,3032.0,0.0,889.24,2000.0,941.0,479.37,400.0],
+  adm_refresh:[0.0,0.0,0.0,0.0,0.0,0.0,0.0,145.9,0.0,0.0,0.0,0.0,0.0,7657.56,18901.79],
+  hr_total:[179666.51,171563.45,197886.05,150253.2,163028.82,161818.6,164906.13,154568.58,152202.15,154997.28,143588.52,128355.83,133163.52,141840.48,110578.74],
+  hr_netpay:[135675.53,121291.72,153885.82,95502.02,114354.87,120418.5,120646.23,111434.41,110363.57,109767.82,103374.65,97517.32,99591.1,106356.62,71453.68],
+  hr_statutory:[43990.98,50225.13,44000.23,54751.18,43939.53,41400.1,44259.9,43134.17,40974.58,40620.16,40213.87,25321.47,33572.42,35483.86,39125.06],
+  acc_total:[28271.13,14719.58,16648.08,16020.73,16786.36,15221.85,14873.75,18736.86,28718.31,12812.73,51453.49,16115.92,20294.43,30635.93,15166.42],
+  acc_loan:[7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0],
+  acc_hp1:[1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0],
+  acc_hp2:[2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0],
+  acc_bank:[2585.56,1407.94,78.0,78.0,78.0,1277.93,535.3,78.0,78.0,78.0,194.87,1540.21,958.05,2311.45,998.13],
+  acc_claim_cf:[420.17,618.64,1888.08,427.23,259.06,1000.92,395.45,317.91,393.71,291.73,377.32,868.61,275.38,865.78,1121.8],
+  acc_claim_cck:[400.8,0.0,2239.0,3072.5,3046.3,0.0,0.0,5897.95,883.6,0.0,638.3,657.1,525.0,1797.9,566.49],
+  acc_secretary:[0.0,250.0,0.0,0.0,960.0,500.0,0.0,0.0,0.0,0.0,1800.0,0.0,5950.0,0.0,0.0],
+  acc_audit:[10114.2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,10654.2,0.0],
+  acc_others:[2307.4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,36000.0,599.0,209.0,2563.6,37.0],
+  stock_close:[1145558,1122461,1122461,1169561,1169561,1134890,1060220,1039161,1087025,1118406,1135800,1067225,1092871,1210425,1167280],
+  stock_open: [1145558,1145558,1122461,1122461,1169561,1190868,1134890,1060220,1039161,1087025,1118406,1135800,1067225,1092871,1210425],
+  // Branch totals (from Branch25/26 inv basis)
+  br_ns:[510231.39,522241.54,494150.48,441064.88,491694.49,476446.11,444843.84,439449.86,399586.12,363829.17,404051.09,421480.18,517152.6,389251.55,372155.91],
+  br_cogs:[274590.69,280862.15,258853.79,234749.66,265857.78,252806.22,223089.35,221399.78,199845.21,182100.25,191379.7,203362.64,263880.81,211491.13,193110.73],
+  br_gp:[235640.7,241379.39,235296.69,206315.22,225836.71,223639.89,221754.49,218050.08,199740.91,181728.92,212671.39,218117.54,253271.79,177760.42,179045.18],
+  br_exp:[161164.82,148778.35,172031.55,160137.99,140405.37,144061.18,148041.42,142082.8,139960.4,133911.61,118865.81,118944.68,129003.2,128124.52,126217.0],
+  br_net:[74475.88,92601.04,63265.14,46177.23,85431.34,79578.71,73713.07,75967.28,59780.51,47817.31,93805.58,99172.86,124268.59,49635.9,52828.18],
+  // GP%
+  gp_acctg:[0.4618,0.4622,0.4762,0.4678,0.4593,0.4694,0.4985,0.4962,0.4999,0.4995,0.5263,0.5175,0.4897,0.4567,0.4820],
+  gp_direct:[0.4618,0.4622,0.4762,0.4678,0.4593,0.4694,0.4985,0.4962,0.4999,0.4995,0.5263,0.5175,0.4897,0.4567,0.4820],
+};
+
+// ═══════════════════════════════
+// BALANCE SHEET (as at Mar 2026)
+// ═══════════════════════════════
+const BS = {
+  assets: {
+    building: 2500000,
+    stock: 1167280,
+    total_fixed: 3667280,
+    cash_mbi: 30385.50,
+    cash_pbb: 23204.51,
+    cash_pbi: 612,
+    total_cash: 54202.01,
+    total: 3721482.01,
+  },
+  liabilities: {
+    term_loan: 1055678.97,    // MBI 77/240 mths
+    od_mbi: 205852.87,        // OD MBI Ampang
+    hp_pqk: 111340,           // HP PQK6168
+    oaf_apr: 43532.10,        // Due 29/04/2026
+    oaf_may: 37414.12,        // Due 29/05/2026
+    oaf_jun: 59206.34,        // Due 26/06/2026
+    total_oaf: 140152.56,
+    total: 1513024.40,
+  },
+  net_surplus: 2208457.61,
+};
+
+// ═══════════════════════════════
+// CUSTOMER DATA 2026 (Jan–Mar)
+// ═══════════════════════════════
+const CUST26 = {
+  months: ['Jan','Feb','Mar'],
+  total: {
+    walkin:   [1658, 1365, 1417],
+    purchase: [1291, 1081, 1070],
+    amount:   [504229.60, 413558.30, 378928.65],
+    basket:   [390.57, 382.57, 354.14],
+    cr:       [0.7786, 0.7919, 0.7551],
+  },
+  chinese: {
+    walkin:   [683, 468, 565],
+    purchase: [531, 367, 407],
+    amount:   [179646, 130036.38, 136072.60],
+    basket:   [338.32, 354.32, 334.33],
+    cr:       [0.7775, 0.7842, 0.7204],
+  },
+  malay: {
+    walkin:   [896, 825, 764],
+    purchase: [692, 652, 589],
+    amount:   [300092.10, 267007.32, 224020],
+    basket:   [433.66, 409.52, 380.34],
+    cr:       [0.7723, 0.7903, 0.7709],
+  },
+  indian: {
+    walkin:   [56, 48, 61],
+    purchase: [48, 41, 52],
+    amount:   [18428, 12941.60, 11448],
+    basket:   [383.92, 315.65, 220.15],
+    cr:       [0.8571, 0.8542, 0.8525],
+  },
+  others: {
+    walkin:   [23, 24, 27],
+    purchase: [20, 21, 22],
+    amount:   [6063.50, 3573, 7388.05],
+    basket:   [303.18, 170.14, 335.82],
+    cr:       [0.8696, 0.875, 0.8148],
+  },
+  // Per-branch YTD Jan-Mar totals
+  branches: {
+    W01:{walkin:408, purchase:306, amount:98926, basket:323.29, cr:0.75},
+    W02:{walkin:551, purchase:391, amount:151629, basket:387.80, cr:0.7096},
+    W03:{walkin:427, purchase:304, amount:142021, basket:467.17, cr:0.7119},
+    W05:{walkin:296, purchase:265, amount:122197, basket:461.12, cr:0.8953},
+    W07:{walkin:614, purchase:436, amount:161534, basket:370.49, cr:0.71},
+    W11:{walkin:144, purchase:100, amount:19809,  basket:198.09, cr:0.694},
+  },
+  // Brand GP% (Mar 2026 - FMM Official)
+  brandGP_mar26: [
+    {brand:'Val (CN)',   pct:70.91, origin:'China'},
+    {brand:'HBA (CN)',   pct:68.52, origin:'China'},
+    {brand:'Gino (CN)',  pct:64.54, origin:'China'},
+    {brand:'Wiltek (CN)',pct:60.41, origin:'China'},
+    {brand:'Etek (CN)',  pct:43.19, origin:'China'},
+    {brand:'Docasa',     pct:41.18, origin:'Malaysia'},
+    {brand:'Sorento',    pct:32.92, origin:'Malaysia'},
+    {brand:'Saniware',   pct:32.81, origin:'Malaysia'},
+    {brand:'Vitally',    pct:30.92, origin:'Malaysia'},
+    {brand:'Livinox',    pct:18.87, origin:'Malaysia'},
+    {brand:'Senz',       pct:16.19, origin:'Malaysia'},
+  ],
+  // 27-month branch revenue (Jan2024–Mar2026) from CUSTOMER BUY.V3
+  branch_27m: {
+    labels:['Jan24','Feb24','Mar24','Apr24','May24','Jun24','Jul24','Aug24','Sep24','Oct24','Nov24','Dec24',
+            'Jan25','Feb25','Mar25','Apr25','May25','Jun25','Jul25','Aug25','Sep25','Oct25','Nov25','Dec25',
+            'Jan26','Feb26','Mar26'],
+    W01:[98248,66635,87880,87288,89806,53065,93842,74437,92243,71025,39048,78462,62427,45942,61246,94612,63950,65043,76155,71865,55738,58785,79593,53778,80813,38371,33644],
+    W02:[111551,71624,137848,103314,231771,129639,90351,102382,76858,117382,132055,141842,101193,122556,119878,99151,102082,110549,100081,102464,69506,95055,77073,114942,134593,79628,52968],
+    W03:[101403,83268,97352,93914,102214,102279,104601,101343,97543,90148,92540,88542,85574,102648,90470,53922,92846,95819,66329,83488,76086,83452,73819,84795,91424,70257,37927],
+    W05:[67379,71243,69965,57189,65663,81712,61617,47648,55603,56175,65436,61338,91124,70930,66030,53967,74975,78081,70963,59810,61084,47373,43695,72081,95554,113778,22643],
+    W07:[75107,29253,92794,47856,89533,59188,67036,78638,69261,35305,94068,94878,79499,111528,72134,62674,66855,66751,63566,47928,69342,25602,66733,66047,78720,60302,30793],
+    W11:[0,0,0,0,0,5856,16963,18415,19011,39166,58139,49739,43941,31685,42873,44479,52331,34586,37914,30342,30689,34536,34734,27196,36499,26870,15013],
+  },
+};
+
+// Per-branch data (YTD 2026 Jan+Feb combined)
+const BR = {
+  W01:{name_en:'W01 Pandan Indah',   name_zh:'W01 班达英达',   rent:13000,
+    feb:{ns:38371,cogs:19636,gp:18735,adm:7465,hr:8811,salary:6518,statutory:1793,fin:211,mkt:16,total_exp:16486,net:2248,gp_pct:.488},
+    mar:{ns: 55491, cogs: 33644, gp: 21847, adm: 14987, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 14987, net: 6860, gp_pct: 0.394},jan:{ns:80813,cogs:44451,gp:36362,adm:11043,hr:7497,salary:5629,statutory:1868,fin:480,mkt:0,total_exp:19019,net:17343,gp_pct:.450}},
+  W02:{name_en:'W02 Ampang Waterfront',name_zh:'W02 安邦水岸',rent:18200,
+    feb:{ns:79628,cogs:42223,gp:37405,adm:10490,hr:16218,salary:10780,statutory:3008,fin:575,mkt:0,total_exp:27283,net:10122,gp_pct:.470},
+    mar:{ns: 100038, cogs: 52968, gp: 47070, adm: 29670, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 29670, net: 17400, gp_pct: 0.47},jan:{ns:134593,cogs:70306,gp:64287,adm:17055,hr:10477,salary:8327,statutory:2150,fin:601,mkt:0,total_exp:28133,net:36154,gp_pct:.478}},
+  W03:{name_en:'W03 Wangsa Maju',    name_zh:'W03 旺沙玛珠',  rent:18000,
+    feb:{ns:70257,cogs:39690,gp:30567,adm:10391,hr:16067,salary:11548,statutory:2541,fin:494,mkt:677,total_exp:27629,net:2938,gp_pct:.435},
+    mar:{ns: 75727, cogs: 37927, gp: 37800, adm: 26004, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 26004, net: 11796, gp_pct: 0.499},jan:{ns:91424,cogs:46445,gp:44979,adm:16626,hr:11387,salary:8490,statutory:2897,fin:564,mkt:0,total_exp:28577,net:16402,gp_pct:.492}},
+  W05:{name_en:'W05 Bangi',          name_zh:'W05 万宜',      rent:7000,
+    feb:{ns:113824,cogs:66453,gp:47371,adm:4503,hr:15452,salary:12345,statutory:3107,fin:379,mkt:763,total_exp:21097,net:26274,gp_pct:.416},
+    mar:{ns: 43487, cogs: 22655, gp: 20832, adm: 29528, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 29528, net: -8696, gp_pct: 0.479},jan:{ns:95554,cogs:46489,gp:49065,adm:4428,hr:11671,salary:10087,statutory:1584,fin:0,mkt:89,total_exp:17644,net:31421,gp_pct:.514}},
+  W07:{name_en:'W07 Pandan Jaya',    name_zh:'W07 班达再也',  rent:14000,
+    feb:{ns:60302,cogs:29826,gp:30475,adm:7698,hr:13782,salary:10862,statutory:2920,fin:746,mkt:0,total_exp:22226,net:8249,gp_pct:.505},
+    mar:{ns: 68158, cogs: 30890, gp: 37268, adm: 18539, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 18539, net: 18728, gp_pct: 0.547},jan:{ns:78720,cogs:37617,gp:41102,adm:7625,hr:12219,salary:9734,statutory:2485,fin:646,mkt:0,total_exp:20490,net:20612,gp_pct:.522}},
+  W11:{name_en:'W11 Taman Midah',    name_zh:'W11 道明苑',    rent:12000,
+    feb:{ns:26870,cogs:13663,gp:13207,adm:6967,hr:6332,salary:4384,statutory:1448,fin:104,mkt:0,total_exp:13403,net:-196,gp_pct:.491},
+    mar:{ns: 29255, cogs: 15027, gp: 14228, adm: 7489, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 7489, net: 6739, gp_pct: 0.486},jan:{ns:36049,cogs:18572,gp:17477,adm:8868,hr:5964,salary:4537,statutory:1426,fin:308,mkt:0,total_exp:15140,net:2337,gp_pct:.485}},
+};
+
+// YTD Jan+Feb 2026 combined
+const BR_YTD = {
+  // YTD Jan+Feb+Mar 2026
+  W01:{ns:174675,cogs:97732,gp:76944,adm:33494,hr:16308,salary:12147,statutory:3661,fin:691,mkt:16,total_exp:50492,net:26451,gp_pct:.441},
+  W02:{ns:314259,cogs:165497,gp:148762,adm:57215,hr:26695,salary:19107,statutory:5158,fin:1176,mkt:0,total_exp:85086,net:63676,gp_pct:.473},
+  W03:{ns:237408,cogs:124062,gp:113346,adm:53021,hr:27454,salary:20038,statutory:5438,fin:1058,mkt:677,total_exp:82210,net:31136,gp_pct:.477},
+  W05:{ns:252865,cogs:135597,gp:117268,adm:38259,hr:27123,salary:22432,statutory:4691,fin:379,mkt:852,total_exp:68269,net:48999,gp_pct:.464},
+  W07:{ns:207180,cogs:98333,gp:108847,adm:33862,hr:26001,salary:20596,statutory:5405,fin:1392,mkt:0,total_exp:61255,net:47589,gp_pct:.525},
+  W11:{ns:92174,cogs:47262,gp:44912,adm:22574,hr:12296,salary:8921,statutory:2874,fin:412,mkt:0,total_exp:35532,net:8880,gp_pct:.487},
+};
+
+
+// ═══════════════════════════════
+// LANGUAGE
+// ═══════════════════════════════
+let lang='en', selMonth='Mar26', brView='monthly'; // Mar26 = latest data available
+
+const T = {
+  // Nav
+  nav_s1:     {en:'Overview',zh:'总览'},
+  nav_health: {en:'Financial Health',zh:'财务健康'},
+  nav_pl:     {en:'P&L Statement',zh:'损益表'},
+  nav_cf:     {en:'Cash Flow',zh:'现金流'},
+  nav_s2:     {en:'Profit',zh:'盈利分析'},
+  nav_gp:     {en:'Gross Profit',zh:'毛利分析'},
+  nav_br:     {en:'Branch P&L',zh:'门市盈亏'},
+  nav_s3:     {en:'Cost & Stock',zh:'成本与库存'},
+  nav_inv:    {en:'Inventory',zh:'库存'},
+  nav_exp:    {en:'Expenses',zh:'费用明细'},
+  nav_s4:     {en:'Strategy',zh:'战略'},
+  nav_act:    {en:'Action Plan',zh:'行动计划'},
+  nav_s5:    {en:'Finance & Customers',zh:'财务与顾客'},
+  nav_bs:    {en:'Balance Sheet',zh:'资产负债'},
+  nav_cust:  {en:'Customers 2026',zh:'顾客分析'},
+  nav_s6:    {en:'Hub & Links',zh:'总览与链接'},
+  nav_hub:   {en:'Branch Hub',zh:'分行总览'},
+  nav_links: {en:'Quick Links',zh:'快速链接'},
+};
+
+function t(k){return T[k]?T[k][lang]||T[k].en:k}
+
+function setLang(l){
+  lang=l;
+  document.querySelectorAll('.lb').forEach(b=>b.classList.toggle('active',b.textContent.trim()===(l==='en'?'EN':'中文')));
+  render();
+}
+
+function txt(el,en,zh){if(el)el.innerHTML=lang==='en'?en:zh}
+function setBrView(v){
+  brView=v;
+  document.querySelectorAll('#btn-monthly,#btn-ytd').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+v).classList.add('active');
+  renderBranches(selMonth, M15.indexOf(selMonth));
+}
+
+function nav(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('p-'+id).classList.add('active');
+  document.querySelectorAll('.ni').forEach(n=>{if(n.getAttribute('onclick')===`nav('${id}')`)n.classList.add('active')});
+}
+
+// ═══════════════════════════════
+// HELPERS
+// ═══════════════════════════════
+const idx = m=>M15.indexOf(m);
+const d    = (k,m)=>(D[k]&&D[k][idx(m)])||0;
+const rm   = v=>'RM '+(+v).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});
+const pct  = v=>(+v*100).toFixed(1)+'%';
+const C={g:'#00e5c4',g2:'rgba(0,229,196,.15)',r:'#ff4d6d',r2:'rgba(255,77,109,.15)',y:'#f5c842',y2:'rgba(245,200,66,.15)',b:'#4d9fff',b2:'rgba(77,159,255,.15)',o:'#ff8c42',mu:'#5a738a'};
+Chart.defaults.font.family="'JetBrains Mono',monospace";Chart.defaults.font.size=10;Chart.defaults.color=C.mu;Chart.defaults.plugins.legend.labels.boxWidth=10;Chart.defaults.plugins.legend.labels.padding=9;
+const charts={};
+function mkChart(id,cfg){if(charts[id])charts[id].destroy();const e=document.getElementById(id);if(e)charts[id]=new Chart(e,cfg);}
+function prevM(m){const i=idx(m);return i>0?M15[i-1]:null;}
+
+function pilll(cls,txt){return `<span class="pl ${cls}">${txt}</span>`}
+
+function kpiHtml(cls,lbl,val,sub,pill){
+  return `<div class="kpi ${cls}"><div class="kl">${lbl}</div><div class="kv">${val}</div><div class="ks">${sub}</div>${pill||''}</div>`;
+}
+
+// ═══════════════════════════════
+// RENDER
+// ═══════════════════════════════
+function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[k]);
+  const m=selMonth, prev=prevM(m), i=idx(m);
+  document.getElementById('pb').textContent='📅 '+m;
+
+  // Nav labels
+  ['s1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','links'].forEach(k=>{
+    const el=document.getElementById('nav-'+k);
+    if(el) el.textContent=t('nav_'+k);
+  });
+
+  [
+    ()=>renderHealth(m,prev,i),
+    ()=>renderPL(m,prev,i),
+    ()=>renderCF(m,prev,i),
+    ()=>renderGP(m,i),
+    ()=>renderBranches(m,i),
+    ()=>renderInventory(m,i),
+    ()=>renderExpenses(m,prev,i),
+    ()=>renderAction(),
+    ()=>renderBalanceSheet(),
+    ()=>renderCustomers(),
+    ()=>renderBranchHub(),
+    ()=>renderQuickLinks(),
+  ].forEach(fn=>{try{fn();}catch(e){console.error(fn.toString().slice(0,40),e);}});
+}
+
+// ─────────── CEO OVERVIEW ───────────
+function renderHealth(m,prev,i){
+  const en=lang==='en';
+
+  // Core numbers
+  const si=d('sales_inv',m), net=d('br_net',m), hr=d('hr_total',m);
+  const ns=d('br_ns',m), gp=d('br_gp',m);
+  const stock=d('stock_close',m), cf=d('cf_true',m);
+  const hrPct=hr/si, gpPct=gp/ns, netPct=net/ns;
+  const avgCogs=D.br_cogs.slice(0,14).reduce((a,b)=>a+b,0)/14;
+  const days=Math.round(stock/(avgCogs/30));
+  const prevSI=prev?d('sales_inv',prev):0;
+  const prevNet=prev?d('br_net',prev):0;
+  const siDelta=prevSI?((si-prevSI)/prevSI):0;
+  const netDelta=prevNet?(net-prevNet)/Math.abs(prevNet):0;
+
+  // Page header
+  txt(document.getElementById('h-ph'),`Wiltek — ${m}`,`Wiltek — ${m}`);
+  txt(document.getElementById('h-ps'), 'CEO Overview · 6 Branches · Key Metrics', 'CEO总览 · 6家分行 · 关键指标');
+
+  // Overall verdict pill
+  const issues=[];
+  if(hrPct>.32) issues.push(en?'HR High':'HR偏高');
+  if(days>130)  issues.push(en?`Stock ${days}d`:`库存${days}天`);
+  if(cf<0)      issues.push(en?'Cash -ve':'现金负数');
+  const verdictEl=document.getElementById('h-verdict');
+  if(verdictEl){
+    if(issues.length===0){
+      verdictEl.textContent=en?'✅ All Good':'✅ 运营良好';
+      verdictEl.style.cssText='background:rgba(0,229,196,.15);border:1px solid rgba(0,229,196,.4);color:#00e5c4;font-size:13px;font-weight:700;padding:8px 18px;border-radius:99px;';
+    } else {
+      verdictEl.textContent='⚠ '+issues.join(' · ');
+      verdictEl.style.cssText='background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.35);color:#ff4d6d;font-size:13px;font-weight:700;padding:8px 18px;border-radius:99px;';
+    }
+  }
+
+  // 5 BIG KPIs
+  const kpi5=v=>`<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:18px 16px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${v.color}"></div>
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mu);margin-bottom:10px;">${v.label}</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${v.color};line-height:1;margin-bottom:8px;">${v.value}</div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:6px;">${v.sub}</div>
+    <div style="font-size:12px;font-weight:600;color:${v.delta&&v.delta.startsWith('▲')?'#00e5c4':v.delta&&v.delta.startsWith('▼')?'#ff4d6d':'#5a738a'};">${v.delta||''}</div>
+  </div>`;
+
+  document.getElementById('h-kpis').innerHTML=[
+    {label:en?'MONTHLY REVENUE':'月度营业额', value:rm(si), color:'#4d9fff',
+     sub:en?`Invoice · ${m}`:`发票基准 · ${m}`,
+     delta:prev?(siDelta>=0?'▲':'▼')+pct(Math.abs(siDelta))+' vs '+prev:''},
+    {label:en?'NET PROFIT':'净利润', value:rm(net), color:net>=50000?'#00e5c4':net>=20000?'#f5c842':'#ff4d6d',
+     sub:pct(netPct)+' of sales',
+     delta:prev?(netDelta>=0?'▲':'▼')+pct(Math.abs(netDelta))+' vs '+prev:''},
+    {label:en?'GROSS MARGIN':'毛利率', value:pct(gpPct), color:gpPct>=.47?'#00e5c4':'#f5c842',
+     sub:en?'GP '+rm(gp):'毛利润 '+rm(gp),
+     delta:en?'Target ≥47%':'目标 ≥47%'},
+    {label:en?'CASH FLOW':'现金流', value:rm(cf), color:cf>=0?'#00e5c4':'#ff4d6d',
+     sub:en?'Collected − Paid':'收款 − 付款',
+     delta:cf>=0?(en?'▲ Surplus':'▲ 盈余'):(en?'▼ Deficit':'▼ 亏损')},
+    {label:en?'STOCK COVER':'库存覆盖', value:days+'d', color:days<=90?'#00e5c4':days<=130?'#f5c842':'#ff4d6d',
+     sub:rm(stock),
+     delta:en?'Ideal: 60–90 days':'理想：60-90天'},
+  ].map(kpi5).join('');
+
+  // Traffic Light Status Bar
+  const lights=[
+    {en:'Revenue',zh:'营业额',   ok:si>=430000,  warn:si>=370000,  val:rm(si)},
+    {en:'Net Profit',zh:'净利润', ok:netPct>=.12, warn:netPct>=.05, val:rm(net)},
+    {en:'GP%',zh:'毛利率',        ok:gpPct>=.47,  warn:gpPct>=.42,  val:pct(gpPct)},
+    {en:'HR%',zh:'HR占比',        ok:hrPct<=.28,  warn:hrPct<=.34,  val:pct(hrPct)},
+    {en:'Stock',zh:'库存',        ok:days<=90,    warn:days<=130,   val:days+'d'},
+    {en:'Cash CF',zh:'现金流',    ok:cf>=0,       warn:cf>=-30000,  val:cf>=0?'+'+(cf/1000).toFixed(0)+'K':'-'+(Math.abs(cf)/1000).toFixed(0)+'K'},
+  ];
+  const tEl=document.getElementById('h-traffic');
+  if(tEl){
+    tEl.innerHTML=`<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mu);margin-right:4px;">${en?'STATUS':'状态'}</span>`+
+    lights.map(l=>{
+      const col=l.ok?'#00e5c4':l.warn?'#f5c842':'#ff4d6d';
+      return `<div style="display:flex;align-items:center;gap:5px;">
+        <span style="color:${col};font-size:14px;">●</span>
+        <div>
+          <div style="font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:1px;">${en?l.en:l.zh}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:${col};">${l.val}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // CEO Alert (1 sentence)
+  const ins=document.getElementById('h-ins');
+  const ytdNet=D.br_net.slice(0,i+1).reduce((a,b)=>a+b,0);
+  const ytdSales=D.br_ns.slice(0,i+1).reduce((a,b)=>a+b,0);
+  const excessStock=Math.max(0,stock-avgCogs*2.5);
+
+  if(hrPct>.32&&days>130){
+    ins.className='ins ba';
+    txt(ins,
+      `<strong>⚠ Two fixes = ${rm(Math.round((hr-si*.28)+excessStock/5))}/month freed:</strong> (1) HR ${pct(hrPct)} → cut to 28% = save ${rm(Math.round(hr-si*.28))}/month. (2) Stock ${days}d → purchasing RM 150K x 5 months = free ${rm(Math.round(excessStock/5))}/month. YTD 2026: ${rm(ytdNet)} net profit on ${rm(ytdSales)} sales.`,
+      `<strong>⚠ 两项修复 = 每月释放${rm(Math.round((hr-si*.28)+excessStock/5))}：</strong>(1) HR ${pct(hrPct)} → 降至28% = 节省${rm(Math.round(hr-si*.28))}/月。(2) 库存${days}天 → 采购降至15万 x 5个月 = 释放${rm(Math.round(excessStock/5))}/月。2026年累计：销售${rm(ytdSales)}，净利润${rm(ytdNet)}。`
+    );
+  } else if(hrPct>.32){
+    ins.className='ins wa';
+    txt(ins,
+      `<strong>⚠ HR ${pct(hrPct)} (target ≤28%):</strong> Extra cost ${rm(Math.round(hr-si*.28))}/month. W05 benchmark 14%. YTD: ${rm(ytdSales)} sales · ${rm(ytdNet)} net profit.`,
+      `<strong>⚠ HR占${pct(hrPct)}（目标≤28%）：</strong>每月多花${rm(Math.round(hr-si*.28))}。W05基准14%。年初至今：销售${rm(ytdSales)}·净利润${rm(ytdNet)}。`
+    );
+  } else if(days>130){
+    ins.className='ins wa';
+    txt(ins,
+      `<strong>⚠ Stock ${days}d (ideal 60–90):</strong> Excess ${rm(excessStock)} locked up. Reduce purchasing to RM 150K/month for 5 months. YTD net: ${rm(ytdNet)}.`,
+      `<strong>⚠ 库存${days}天（理想60-90）：</strong>超额${rm(excessStock)}占用资金。采购降至15万/月 x 5个月。年初至今净利：${rm(ytdNet)}。`
+    );
+  } else {
+    ins.className='ins ok';
+    txt(ins,
+      `<strong>✅ ${m} on track:</strong> Revenue ${rm(si)} · Net ${rm(net)} (${pct(netPct)}) · GP ${pct(gpPct)} · HR ${pct(hrPct)} ✅ · Stock ${days}d ✅. YTD: ${rm(ytdSales)} sales · ${rm(ytdNet)} net.`,
+      `<strong>✅ ${m}表现良好：</strong>营业额${rm(si)}·净利润${rm(net)}（${pct(netPct)}）·毛利率${pct(gpPct)}·HR${pct(hrPct)} ✅·库存${days}天 ✅。年初至今：销售${rm(ytdSales)}·净利润${rm(ytdNet)}。`
+    );
+  }
+
+  // Two charts
+  txt(document.getElementById('h-c1t'), 'Revenue & Net Profit — 15 Months', '营业额与净利润 — 15个月');
+  txt(document.getElementById('h-c1s'),en?'Jan 2025 – Mar 2026 · Highlighted: '+m:'2025年1月–2026年3月 · 高亮：'+m,'');
+  mkChart('salesTrend',{type:'bar',data:{labels:M15,datasets:[
+    {label:en?'Revenue':'营业额',data:D.sales_inv,backgroundColor:M15.map((_,j)=>j===i?'rgba(245,200,66,.9)':'rgba(77,159,255,.3)'),borderColor:M15.map((_,j)=>j===i?C.y:C.b),borderWidth:1.5,yAxisID:'y'},
+    {label:en?'Net Profit':'净利润',data:D.br_net,type:'line',borderColor:C.g,backgroundColor:'transparent',tension:.3,pointRadius:M15.map((_,j)=>j===i?6:2),pointBackgroundColor:M15.map((_,j)=>j===i?C.y:C.g),borderWidth:2,yAxisID:'y'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
+    scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  const bkeys=['W01','W02','W03','W05','W07','W11'];
+  const period=(m==='Mar26')?'mar':(m==='Jan26'?'jan':'feb');
+  const bMonthly=bkeys.map(k=>(BR[k][period]||BR[k]['feb']).net);
+  const bYTD=bkeys.map(k=>BR_YTD[k].net);
+  txt(document.getElementById('h-c2t'), 'Branch Net — Month vs YTD', '分行净利润 — 当月 vs 累计');
+  txt(document.getElementById('h-c2s'),en?'Blue=YTD Jan–Mar · Teal/Red='+m+' month':'蓝=年初至今 · 绿/红='+m,'');
+  mkChart('netProfitTrend',{type:'bar',data:{labels:bkeys,datasets:[
+    {label:en?'YTD Net':'年初至今',data:bYTD,backgroundColor:'rgba(77,159,255,.2)',borderColor:C.b,borderWidth:1.5},
+    {label:en?m+' Net':m+'净利润',data:bMonthly,backgroundColor:bMonthly.map(v=>v>=0?'rgba(0,229,196,.5)':'rgba(255,77,109,.5)'),borderColor:bMonthly.map(v=>v>=0?C.g:C.r),borderWidth:1.5},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
+    scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false}}}}});
+
+  // Compact MoM delta chips
+  const momEl=document.getElementById('h-mom');
+  txt(document.getElementById('h-mom-title'),
+    prev?'📊 vs '+prev+' — What changed':'📊 '+m+' snapshot',
+    prev?'📊 对比'+prev+' — 变化汇总':'📊 '+m+'快照');
+  if(momEl&&prev){
+    const chks=[
+      {en:'Revenue',zh:'营业额',cur:si,prv:d('sales_inv',prev),good:true},
+      {en:'Net Profit',zh:'净利润',cur:net,prv:d('br_net',prev),good:true},
+      {en:'GP',zh:'毛利润',cur:gp,prv:d('br_gp',prev),good:true},
+      {en:'HR Cost',zh:'HR成本',cur:hr,prv:d('hr_total',prev),good:false},
+      {en:'Stock',zh:'库存',cur:stock,prv:d('stock_close',prev),good:false},
+      {en:'Purchasing',zh:'采购',cur:d('purch_total',m),prv:d('purch_total',prev),good:false},
+    ];
+    momEl.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;">'+chks.map(c=>{
+      if(!c.prv) return '';
+      const delta=c.cur-c.prv, dpct=(delta/Math.abs(c.prv)*100).toFixed(1);
+      const up=delta>0;
+      const finalCol=(c.good&&up||!c.good&&!up)?'#00e5c4':'#ff4d6d';
+      return '<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px;min-width:120px;">'+
+        '<div style="font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">'+(en?c.en:c.zh)+'</div>'+
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:'+finalCol+';">'+(up?'▲':'▼')+' '+Math.abs(dpct)+'%</div>'+
+        '<div style="font-size:10px;color:var(--mu);">'+rm(c.cur)+'</div>'+
+        '</div>';
+    }).join('')+'</div>';
+  }
+}
+
+// ─────────── P&L ───────────
+function renderPL(m,prev,i){
+  const en=lang==='en';
+  txt(document.getElementById('pl-ph'),`📋 P&L Statement — ${m}`,`📋 损益表 — ${m}`);
+  txt(document.getElementById('pl-ps'),'Full income statement · Invoice basis · Retail branches + Group','完整损益表 · 发票基准 · 零售分行 + 集团');
+
+  const si=d('sales_inv',m),ns=d('br_ns',m),cogs=d('br_cogs',m),gp=d('br_gp',m);
+  const hr=d('hr_total',m),adm=d('adm_total',m),acc=d('acc_total',m);
+  const op=d('op_total',m),mkt=d('mkt_total',m),onl=d('online_total',m),log=d('log_total',m);
+  const totalExp=hr+adm+acc+op+mkt+onl+log;
+  const netProfit=gp-totalExp;
+  const gpPct=gp/ns,netPct=netProfit/ns;
+
+  const prevNet=prev?d('br_net',prev):0;
+  const netDelta=prev&&prevNet!==0?(netProfit-prevNet)/Math.abs(prevNet):0;
+
+  // Stock-adjusted GP
+  const os=d('stock_open',m),cs=d('stock_close',m),pu=d('purch_total',m);
+  const cogsA=os+pu-cs;
+  const gpA=si-cogsA;
+  const gpAPct=gpA/si;
+
+  document.getElementById('pl-ins').className='ins ok';
+  txt(document.getElementById('pl-ins'),
+    `<strong>📋 ${m} P&L Summary:</strong> Net sales ${rm(ns)} · Direct GP ${rm(gp)} (${pct(gpPct)}) · Total expenses ${rm(totalExp)} · Net profit <strong>${rm(netProfit)}</strong> (${pct(netPct)}). ${netDelta>=0?'▲ +'+pct(Math.abs(netDelta))+' vs '+prev:'▼ '+pct(Math.abs(netDelta))+' vs '+(prev||'—')}. Accounting GP% (stock adj) = ${pct(gpAPct)}.`,
+    `<strong>📋 ${m}损益摘要：</strong>净销售${rm(ns)} · 直接毛利${rm(gp)}（${pct(gpPct)}）· 总费用${rm(totalExp)} · 净利润<strong>${rm(netProfit)}</strong>（${pct(netPct)}）。${netDelta>=0?'▲ +'+pct(Math.abs(netDelta))+' 对比'+prev:'▼ '+pct(Math.abs(netDelta))+' 对比'+(prev||'—')}。会计毛利率（库存调整）= ${pct(gpAPct)}。`
+  );
+
+  document.getElementById('pl-kpis').innerHTML=[
+    kpiHtml('b',en?'Net Sales':'净销售额',rm(ns),en?'Invoice basis':'发票基准',''),
+    kpiHtml('g',en?'Gross Profit (Direct)':'毛利润（直接）',rm(gp),pct(gpPct),pilll('up','GP%')),
+    kpiHtml('r',en?'Total Expenses':'总费用',rm(totalExp),pct(totalExp/ns)+' of sales',''),
+    kpiHtml(netProfit>=0?'g':'r',en?'Net Profit':'净利润',rm(netProfit),pct(netPct),pilll(netDelta>=0?'up':'dn',(netDelta>=0?'▲':'▼')+pct(Math.abs(netDelta)))),
+    kpiHtml('y',en?'Acctg GP% (Stock adj)':'会计毛利率（库存调整）',pct(gpAPct),en?'Incl stock movement':'含库存变动',''),
+  ].join('');
+
+  txt(document.getElementById('pl-thl'),`P&L Breakdown — ${m} vs ${prev||'N/A'}`,`损益明细 — ${m} vs ${prev||'N/A'}`);
+  const ph=prev;
+  // Helper: delta indicator
+  const delta=(cur,prv)=>{
+    if(prv==null||prv===0) return '';
+    const d=cur-prv, p=d/Math.abs(prv)*100;
+    return d>=0
+      ? `<span style="color:#00e5c4;font-size:10px;margin-left:6px;">▲${p.toFixed(1)}%</span>`
+      : `<span style="color:#ff4d6d;font-size:10px;margin-left:6px;">▼${Math.abs(p).toFixed(1)}%</span>`;
+  };
+
+  const rows=[
+    {en:'GROSS SALES',zh:'总销售额',cur:si,prv:ph?d('sales_inv',ph):null,cls:'cb',bold:false,arr:'sales_inv'},
+    {en:'Returns',zh:'退货',cur:si-ns,prv:null,cls:'cr',bold:false,indent:true},
+    {en:'NET SALES',zh:'净销售额',cur:ns,prv:ph?d('br_ns',ph):null,cls:'cb',bold:true},
+    {en:'Direct COGS',zh:'直接销货成本',cur:cogs,prv:ph?d('br_cogs',ph):null,cls:'cr',bold:false,indent:true,arr:'br_cogs'},
+    {en:'GROSS PROFIT',zh:'毛利润',cur:gp,prv:ph?d('br_gp',ph):null,cls:'cg',bold:true,pct:gpPct,arr:'br_gp'},
+    {en:'— HR / Payroll',zh:'— HR薪酬',cur:hr,prv:ph?d('hr_total',ph):null,cls:'cr',bold:false,indent:true,arr:'hr_total'},
+    {en:'— Admin & Rental',zh:'— 行政及租金',cur:adm,prv:ph?d('adm_total',ph):null,cls:'cr',bold:false,indent:true,arr:'adm_total'},
+    {en:'— Accounting/Finance',zh:'— 会计/财务',cur:acc,prv:ph?d('acc_total',ph):null,cls:'cr',bold:false,indent:true,arr:'acc_total'},
+    {en:'— Op & Marketing',zh:'— 运营及营销',cur:op+mkt,prv:null,cls:'cr',bold:false,indent:true},
+    {en:'— Online Marketing',zh:'— 线上营销',cur:onl,prv:ph?d('online_total',ph):null,cls:'cr',bold:false,indent:true,arr:'online_total'},
+    {en:'— Logistics',zh:'— 物流',cur:log,prv:ph?d('log_total',ph):null,cls:'cr',bold:false,indent:true},
+    {en:'TOTAL EXPENSES',zh:'总费用',cur:totalExp,prv:null,cls:'cr',bold:true,pct:totalExp/ns},
+    {en:'NET PROFIT',zh:'净利润',cur:netProfit,prv:ph?d('br_net',ph):null,cls:netProfit>=0?'cg':'cr',bold:true,pct:netPct,isTR:true},
+  ];
+
+  const hdr=document.getElementById('pl-thead');
+  hdr.innerHTML=`<th>${en?'Description':'项目'}</th><th>${m}</th>${ph?`<th>${ph}</th>`:''}${ph?`<th>${en?'Change':'变化'}</th>`:''}`;
+
+  const tbody=document.getElementById('pl-tbody');
+  tbody.innerHTML=rows.map(r=>{
+    const del=r.prv!=null&&r.prv!==0?((r.cur-r.prv)/Math.abs(r.prv)):null;
+    const delVal=r.prv!=null?r.cur-r.prv:null;
+    const delStr=del!=null
+      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+           <span class="${del>=0?'cg':'cr'}" style="font-size:11px;">${del>=0?'▲':'▼'}${pct(Math.abs(del))}</span>
+           <span style="color:var(--mu);font-size:9px;">${del>=0?'+':''}${rm(delVal)}</span>
+         </div>` : '—';
+    const curDisp = r.arr&&adminMode
+      ? editable(rm(r.cur), (en?r.en:r.zh), `D.${r.arr}[${i}]`, r.cur, (v)=>{ D[r.arr][i]=parseFloat(v)||0; })
+      : rm(r.cur);
+    return `<tr class="${r.isTR?'tr':''}">
+      <td class="${r.indent?'la2':'la'}" style="${r.bold?'font-weight:700':''}">${r.indent?'↳ ':''} ${en?r.en:r.zh}</td>
+      <td class="${r.cls}" style="${r.bold?'font-weight:700':''}">${curDisp}${r.pct!=null?` <span class="cm">(${pct(r.pct)})</span>`:''}</td>
+      ${ph?`<td class="${r.cls}">${r.prv!=null?rm(r.prv):'—'}</td>`:''}
+      ${ph?`<td style="vertical-align:middle;">${delStr}</td>`:''}
+    </tr>`;
+  }).join('');
+
+  txt(document.getElementById('pl-c1t'),`P&L Waterfall — ${m}`,`损益瀑布图 — ${m}`);
+  txt(document.getElementById('pl-c1s'),'Revenue → GP → Net Profit','收入 → 毛利 → 净利润');
+  mkChart('plWaterfallChart',{type:'bar',data:{
+    labels:[en?'Net Sales':'净销售',en?'Direct COGS':'直接成本',en?'Gross Profit':'毛利润',en?'HR':'HR',en?'Admin':'行政',en?'Finance':'财务',en?'Mkt/Online':'营销',en?'Net Profit':'净利润'],
+    datasets:[{data:[ns,-cogs,gp,-hr,-adm,-acc,-(op+mkt+onl+log),netProfit],backgroundColor:[C.b2,C.r2,C.g2,C.r2,C.r2,'rgba(184,124,255,.15)',C.r2,netProfit>=0?C.g2:C.r2],borderColor:[C.b,C.r,C.g,C.r,C.r,C.p,C.r,netProfit>=0?C.g:C.r],borderWidth:1.5}]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RM '+ctx.parsed.y.toLocaleString()}}},scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  txt(document.getElementById('pl-c2t'),en?'Expense Breakdown':'费用明细','Expense Breakdown — '+m);
+  txt(document.getElementById('pl-c2s'), 'Share of total expenses', '总费用中的占比');
+  mkChart('plExpPieChart',{type:'doughnut',data:{
+    labels:[en?'HR':'HR',en?'Admin':'行政',en?'Finance':'财务',en?'Marketing':'营销',en?'Online':'线上',en?'Logistics':'物流'],
+    datasets:[{data:[hr,adm,acc,op+mkt,onl,log],backgroundColor:[C.r,'rgba(77,159,255,.6)','rgba(184,124,255,.6)',C.y,C.g,'rgba(255,140,66,.6)'],borderColor:'#0d1117',borderWidth:2}]
+  },options:{cutout:'60%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9},padding:7}}}}});
+}
+
+// ─────────── CASH FLOW ───────────
+function renderCF(m,prev,i){
+  const en=lang==='en';
+  txt(document.getElementById('cf-ph'),`💧 Cash Flow — ${m}`,`💧 现金流 — ${m}`);
+  txt(document.getElementById('cf-ps'),'True operating CF = Collected − Paid (OD drawdowns excluded)','真实运营现金流 = 收款 − 付款（不含透支提款）');
+
+  const cf=d('cf_true',m), sc=d('sales_coll',m), tp=d('total_pay',m), si=d('sales_inv',m);
+  const isNov25=m==='Nov25';
+
+  const ins=document.getElementById('cf-ins');
+  if(isNov25){
+    ins.className='ins ba';
+    txt(ins,
+      `<strong>⚠ Nov 2025 OD Drawdown — NOT Operating Income:</strong> Raw data shows +RM 574K cash flow but this includes RM 702,793 overdraft (OD) drawdown from MBI Ampang classified as "Other Received." True operating CF = RM 382K − RM 496K = <strong>−RM 114K</strong>. OD outstanding: RM 179,782 (of RM 700K facility) — must be repaid.`,
+      `<strong>⚠ 2025年11月透支提款 — 非运营收入：</strong>原始数据显示+57.4万令吉现金流，但其中包含MBI安邦的70.28万令吉透支提款，归类为"其他收款"。真实运营现金流 = 38.2万 − 49.6万 = <strong>-11.4万令吉</strong>。透支余额：17.98万令吉（70万额度）——必须偿还。`
+    );
+  } else if(cf<-50000){
+    ins.className='ins ba';
+    txt(ins,
+      `<strong>⚠ ${m} Cash Deficit: ${rm(cf)}</strong> — Payments exceeded collections by ${rm(Math.abs(cf))}. Key driver: purchasing ${rm(d('purch_total',m))} + HR ${rm(d('hr_total',m))}. OAF obligations of RM 140K due Apr–Jun 2026 need cash planning.`,
+      `<strong>⚠ ${m}现金亏损：${rm(cf)}</strong> — 付款超出收款${rm(Math.abs(cf))}。主要原因：采购${rm(d('purch_total',m))} + HR${rm(d('hr_total',m))}。2026年4-6月的14万令吉OAF义务需要现金规划。`
+    );
+  } else {
+    ins.className='ins ok';
+    txt(ins,
+      `<strong>✅ ${m} Cash Flow: ${rm(cf)}</strong> — ${cf>=0?'Positive operating surplus.':'Small deficit.'} Collected ${rm(sc)} vs paid ${rm(tp)}. Invoice-collection gap: ${rm(si-sc)} in outstanding receivables.`,
+      `<strong>✅ ${m}现金流：${rm(cf)}</strong> — ${cf>=0?'正向运营盈余。':'小额亏损。'}收款${rm(sc)} vs 付款${rm(tp)}。开票-收款差额：${rm(si-sc)}待收应收款。`
+    );
+  }
+
+  document.getElementById('cf-kpis').innerHTML=[
+    kpiHtml(cf>=0?'g':'r',en?'Operating Cash Flow':'运营现金流',rm(cf),en?'True (excl OD)':'真实（不含透支）',pilll(cf>=0?'up':'dn',cf>=0?en?'Surplus':'盈余':en?'Deficit':'亏损')),
+    kpiHtml('y',en?'Invoice-Collection Gap':'开票-收款差额',rm(si-sc),`${en?'Inv':'开票'} ${rm(si)} · ${en?'Coll':'收款'} ${rm(sc)}`,pilll('wa',en?'Receivables lag':'应收滞后')),
+    kpiHtml('o',en?'OD Outstanding':'透支余额',rm(BS.liabilities.od_mbi),en?'Of RM 700K facility':'70万额度中',pilll('wa',en?'Must repay':'须偿还')),
+    kpiHtml('r',en?'OAF Due (90 days)':'OAF到期（90天）',rm(BS.liabilities.total_oaf),en?'Apr/May/Jun 2026':'2026年4/5/6月',pilll('dn',en?'Plan now':'立即规划')),
+  ].join('');
+
+  txt(document.getElementById('cf-c1t'),`True Operating Cash Flow — 14 Months`,`真实运营现金流 — 14个月`);
+  txt(document.getElementById('cf-c1s'),`Green = surplus · Red = deficit · Nov25 corrected: −RM 129K (raw was +574K due to OD)`,`绿 = 盈余 · 红 = 亏损 · 11月25已更正：-12.9万（原始+57.4万含透支）`);
+  mkChart('cfChart',{type:'bar',data:{labels:M15,datasets:[
+    {label:en?'Operating CF':'运营现金流',data:D.cf_true,backgroundColor:D.cf_true.map((v,j)=>j===i?C.y:(v>=0?'rgba(0,229,196,.6)':'rgba(255,77,109,.6)')),borderColor:D.cf_true.map((v,j)=>j===i?C.y:(v>=0?C.g:C.r)),borderWidth:1.5},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'RM'+(v>=0?'+':'')+Math.round(v/1000)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  txt(document.getElementById('cf-c2t'),`Collections vs Payments`,`收款 vs 付款`);
+  txt(document.getElementById('cf-c2s'),'Monthly comparison','月度对比');
+  mkChart('cfCollectPay',{type:'bar',data:{labels:M15,datasets:[
+    {label:en?'Collected':'收款',data:D.sales_coll,backgroundColor:C.g2,borderColor:C.g,borderWidth:1.5},
+    {label:en?'Payments':'付款',data:D.total_pay,backgroundColor:C.r2,borderColor:C.r,borderWidth:1.5},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  txt(document.getElementById('cf-c3t'),`Invoice vs Collected (Receivables)`,`开票 vs 收款（应收账款）`);
+  txt(document.getElementById('cf-c3s'),'Gap = outstanding receivables','差额 = 未收应收款');
+  mkChart('cfInvColl',{type:'line',data:{labels:M15,datasets:[
+    {label:en?'Invoice':'开票',data:D.sales_inv,borderColor:C.b,backgroundColor:C.b2,fill:true,tension:.3,pointRadius:2,borderWidth:1.5},
+    {label:en?'Collected':'收款',data:D.sales_coll,borderColor:C.g,backgroundColor:'transparent',tension:.3,pointRadius:2,borderWidth:1.5},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+}
+
+// ─────────── GROSS PROFIT ───────────
+function renderGP(m,i){
+  const en=lang==='en';
+  txt(document.getElementById('gp-ph'),`📈 Gross Profit Analysis — ${m}`,`📈 毛利分析 — ${m}`);
+  txt(document.getElementById('gp-ps'),'Method A: Accounting (stock adjusted) · Method B: Direct product cost','方法A：会计法（库存调整）· 方法B：直接产品成本法');
+
+  const gpD=d('gp_direct',m), gpA=d('gp_acctg',m), ns=d('br_ns',m);
+
+  const ins=document.getElementById('gp-ins');
+  ins.className='ins ok';
+  txt(ins,
+    `<strong>💡 Method B (Direct) is the Management Truth:</strong> Direct GP = ${pct(gpD)} is stable across all months (46–53%). This is the real product profitability. Method A fluctuates wildly because stock build-up/drawdown distorts COGS. For pricing, product mix and supplier decisions — always use Method B. China goods = 57% GP vs Malaysia goods = 28% GP. Push China mix from 60% → 70% = +RM 12–15K/month GP.`,
+    `<strong>💡 方法B（直接）是管理真实情况：</strong>直接毛利率=${pct(gpD)}，14个月稳定在46-53%。这是真实的产品盈利能力。方法A波动剧烈，因为库存建立/消耗会扭曲销货成本。定价、产品组合和供应商决策——始终使用方法B。中国货品=57%毛利率 vs 马来西亚货品=28%。将中国货品占比从60%提升至70% = 每月+1.2-1.5万令吉毛利润。`
+  );
+
+  document.getElementById('gp-ta').textContent=en?'Method A':'方法A';
+  txt(document.getElementById('gp-tah'),en?'Accounting GP (Traditional)':'会计毛利（传统方式）','Accounting GP (Traditional)');
+  document.getElementById('gp-fa').innerHTML=en?
+    `<em>Opening Stock</em> + <em>Purchases</em> + Transport − <em>Closing Stock</em> = COGS<br>Net Sales − COGS = <em>Accounting Gross Profit</em>`:
+    `<em>期初库存</em> + <em>采购</em> + 运输 − <em>期末库存</em> = 销货成本<br>净销售额 − 销货成本 = <em>会计毛利润</em>`;
+  txt(document.getElementById('gp-ia'),
+    `<strong>Key limitation:</strong> Monthly GP% swings dramatically. When stock increases (big purchase month), COGS drops and GP% looks high. When stock decreases (low purchase), COGS rises and GP% falls. This creates a false reading for monthly management decisions.`,
+    `<strong>主要局限性：</strong>月度毛利率波动剧烈。库存增加时（大采购月），销货成本下降，毛利率看起来很高。库存减少时，销货成本上升，毛利率下降。这对月度管理决策产生误导。`
+  );
+  document.getElementById('gp-tb').textContent=en?'Method B':'方法B';
+  txt(document.getElementById('gp-tbh'),en?'Direct Product Cost GP':'直接产品成本毛利','Direct Product Cost GP');
+  document.getElementById('gp-fb').innerHTML=en?
+    `Net Sales − <em>Direct COGS</em> (actual cost of items sold) = <em>True GP</em><br><em>No stock movement adjustments</em>`:
+    `净销售额 − <em>直接销货成本</em>（已售商品实际成本）= <em>真实毛利润</em><br><em>不含库存变动调整</em>`;
+  txt(document.getElementById('gp-ib'),
+    `<strong>Management insight:</strong> Stable 46–53% across all 14 months. China goods = 57% GP (Gino 63%, HBA 65%, Val 65%). Malaysia goods = 28% average. This is your real pricing and margin benchmark. Use this to set sales targets, evaluate suppliers, and optimise product mix.`,
+    `<strong>管理洞察：</strong>14个月稳定在46-53%。中国货品=57%毛利率（Gino 63%，HBA 65%，Val 65%）。马来西亚货品平均28%。这是真实的定价和利润率基准。用于设定销售目标、评估供应商和优化产品组合。`
+  );
+
+  txt(document.getElementById('gp-c1t'),`GP% Comparison — Method A vs Method B (14 months)`,`毛利率对比 — 方法A vs 方法B（14个月）`);
+  txt(document.getElementById('gp-c1s'),`Green (B) = stable truth · Blue dashed (A) = accounting distortion`,`绿色（B）= 稳定真相 · 蓝色虚线（A）= 会计失真`);
+  mkChart('gpCompare',{type:'line',data:{labels:M15,datasets:[
+    {label:en?'Method B — Direct GP%':'方法B—直接毛利率',data:D.gp_direct.map(v=>+(v*100).toFixed(1)),borderColor:C.g,backgroundColor:C.g2,fill:true,tension:.3,pointRadius:3,pointBackgroundColor:C.g,borderWidth:2},
+    {label:en?'Method A — Acctg GP%':'方法A—会计毛利率',data:D.gp_acctg.map(v=>+(v*100).toFixed(1)),borderColor:C.b,backgroundColor:'transparent',tension:.3,pointRadius:2,borderWidth:1.5,borderDash:[4,2]},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{ticks:{callback:v=>v+'%'},grid:{color:'rgba(30,45,66,.5)'},min:0,max:100},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  txt(document.getElementById('gp-c2t'),en?`GP% by Brand — Feb 2026`:`各品牌毛利率 — 2026年2月`,`GP% by Brand — Feb 2026`);
+  txt(document.getElementById('gp-c2s'),en?'Direct cost basis · Green ≥40% · Yellow 25–40% · Red <25%':'直接成本基准');
+  mkChart('gpBrand',{type:'bar',data:{
+    labels:['Val (CN)','HBA (CN)','Gino (CN)','Wiltek (CN)','Etek (CN)','Docasa','Saniware','Vitally','Senz','Livinox','Mysolar'],
+    datasets:[{label:'GP%',data:[65.2,64.7,63.3,57.7,41.7,41.5,33.8,25.1,19.0,15.4,15.0],
+      backgroundColor:d=>[65.2,64.7,63.3,57.7,41.7,41.5,33.8,25.1,19.0,15.4,15.0].map(v=>v>=40?C.g2:v>=25?C.y2:C.r2)[d.dataIndex],
+      borderColor:d=>[65.2,64.7,63.3,57.7,41.7,41.5,33.8,25.1,19.0,15.4,15.0].map(v=>v>=40?C.g:v>=25?C.y:C.r)[d.dataIndex],
+      borderWidth:1.5}]
+  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+'%'}}},scales:{x:{ticks:{callback:v=>v+'%'},max:80,grid:{color:'rgba(30,45,66,.5)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  txt(document.getElementById('gp-c3t'),en?'Revenue Mix vs COGS Mix — Feb 2026':'收入组合 vs 销货成本组合',`Revenue Mix — Feb 2026`);
+  txt(document.getElementById('gp-c3s'),'China: high rev share, low cost = ideal','中国货：高收入占比，低成本 = 理想');
+  mkChart('gpMix',{type:'bar',data:{labels:[en?'Revenue Mix':'收入组合',en?'COGS Mix':'销货成本组合'],datasets:[
+    {label:en?'China Goods':'中国货品',data:[60.3,47.6],backgroundColor:C.y,borderWidth:0},
+    {label:en?'Malaysia Goods':'马来西亚货品',data:[39.7,52.4],backgroundColor:'rgba(77,159,255,.6)',borderWidth:0},
+  ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'rgba(30,45,66,.5)'}},y:{stacked:true,grid:{display:false}}}}});
+}
+
+// ─────────── BRANCHES ───────────
+function renderBranches(m,i){
+  const en=lang==='en';
+  const _allBkeys=['W01','W02','W03','W05','W07','W11'];
+  const bkeys=userPerms&&!userPerms.allBranches&&userPerms.branch?[userPerms.branch]:_allBkeys;
+
+  // ── 1. Define all state variables FIRST ──
+  const validBranchMonths=['Jan26','Feb26','Mar26'];
+  const inRange=validBranchMonths.includes(m);
+  const _effectiveM=inRange?m:'Mar26';
+  const period=(_effectiveM==='Mar26')?'mar':(_effectiveM==='Jan26'?'jan':'feb');
+  const useYTD=(brView==='ytd');
+  const viewLabel=useYTD?(en?'YTD Jan–Mar 2026':'2026年1-3月累计'):_effectiveM;
+
+  // Show warning banner when viewing a month outside Jan–Mar 2026
+  const _brWarnEl=document.getElementById('br-range-warn');
+  if(_brWarnEl){
+    _brWarnEl.style.display=inRange?'none':'block';
+    _brWarnEl.innerHTML=en
+      ?`⚠️ Branch P&L data is only available for Jan–Mar 2026. Showing <strong>Mar 2026</strong> data.`
+      :`⚠️ 门市损益数据仅支持2026年1–3月。当前显示 <strong>2026年3月</strong> 数据。`;
+  }
+  const rentMult=useYTD?2:1;
+
+  // ── 2. Build unified data array ──
+  const bdata_all=useYTD
+    ? bkeys.map(k=>({...BR_YTD[k], gp_pct:BR_YTD[k].gp/BR_YTD[k].ns}))
+    : bkeys.map(k=>{const b=BR[k][period]||BR[k]['feb']; return {...b, gp_pct:b.gp/b.ns};});
+
+  // ── 3. Set page headers ──
+  txt(document.getElementById('br-ph'),`🏪 Branch P\u0026L — ${m}`,`🏪 门市盈亏 — ${m}`);
+  txt(document.getElementById('br-ps'),'YTD 2026 (Jan–Feb) · WCO excluded (warehouse/cost centre)','2026年累计（1-2月）· WCO不含（仓库/成本中心）');
+
+  // ── 4. Set toggle buttons ──
+  const btnM=document.getElementById('btn-monthly');
+  const btnY=document.getElementById('btn-ytd');
+  if(btnM){btnM.textContent=en?m:'当月 '+m; btnM.className='lb'+(useYTD?'':' active');}
+  if(btnY){btnY.textContent=en?'YTD Jan–Mar':'累计 Jan–Mar'; btnY.className='lb'+(useYTD?' active':'');}
+  txt(document.getElementById('br-toggle-lbl'),'View:','查看：');
+
+  // ── 5. Insight box ──
+  const ins=document.getElementById('br-ins');
+  ins.className='ins wa';
+  // Dynamic insight based on selected period
+  const periodData = bdata_all;
+  const worstBranch = bkeys.reduce((a,b,bi)=>bdata_all[bi].net < bdata_all[bkeys.indexOf(a)].net ? bkeys[bi] : a, bkeys[0]);
+  const bestBranch  = bkeys.reduce((a,b,bi)=>bdata_all[bi].net > bdata_all[bkeys.indexOf(a)].net ? bkeys[bi] : a, bkeys[0]);
+  const bestD  = bdata_all[bkeys.indexOf(bestBranch)];
+  const worstD = bdata_all[bkeys.indexOf(worstBranch)];
+  const worstNetPct = (worstD.net/worstD.ns*100).toFixed(1);
+  const bestNetPct  = (bestD.net/bestD.ns*100).toFixed(1);
+
+  txt(ins,
+    `<strong>Branch Snapshot — ${viewLabel}:</strong> Best: <b>${bestBranch}</b> ${BR[bestBranch]?.name_en||''} net ${rm(bestD.net)} (${bestNetPct}%). Weakest: <b>${worstBranch}</b> ${BR[worstBranch]?.name_en||''} net ${rm(worstD.net)} (${worstNetPct}%). W05 Bangi benchmark: lowest rent (RM 3.5K), lean HR, highest net margin — replicate this model. <span class="act y">W11 Decision by May 2026</span>`,
+    `<strong>分行快照 — ${viewLabel}：</strong>最佳：<b>${bestBranch}</b> 净利润${rm(bestD.net)}（${bestNetPct}%）。最弱：<b>${worstBranch}</b> 净利润${rm(worstD.net)}（${worstNetPct}%）。W05万宜基准：最低租金（3.5千），精简HR，最高净利率——复制此模式。<span class="act y">W11须在2026年5月前作出决定</span>`
+  );
+
+  // ── 6. Section headers ──
+  txt(document.getElementById('br-sec1'), 'P&L BY BRANCH', '各分行损益');
+  txt(document.getElementById('br-t1l'),
+    en?`Branch P&L — ${viewLabel} · Invoice · Direct COGS`:`分行损益 — ${viewLabel} · 发票基准 · 直接成本`,
+    'Branch P&L');
+
+  // ── 7. P&L table ──
+  // Previous period data for MoM (use prior period if monthly, not YTD)
+  const prevPeriod = (period==='mar')?'feb':(period==='feb'?'jan':null);
+  const bprev = prevPeriod ? bkeys.map(k=>BR[k][prevPeriod]||null) : null;
+
+  const bth=document.getElementById('br-thead1');
+  bth.innerHTML=`<th>${en?'Branch':'分行'}</th><th>${en?'Net Sales':'净销售'}</th><th>GP%</th><th>${en?'Net Profit':'净利润'}</th><th>Net%</th><th>${en?'Expenses':'费用'}</th><th>Exp%</th>${bprev?`<th>${en?'vs '+prevPeriod:'对比 '+prevPeriod}</th>`:''}<th></th>`;
+
+  const btbody=document.getElementById('br-tbody1');
+  let tNS=0,tCOGS=0,tGP=0,tExp=0,tNet=0;
+  btbody.innerHTML=bkeys.map((bk,bi)=>{
+    const b=bdata_all[bi];
+    const gpp=b.gp/b.ns, netp=b.net/b.ns, expp=b.total_exp/b.ns;
+    const sc=b.net<0?'cr':b.net<5000?'cy':'cg';
+    const pill=b.net<0?`<span class="pl dn">${en?'Loss':'亏损'}</span>`:b.net<10000?`<span class="pl wa">${en?'Weak':'偏弱'}</span>`:`<span class="pl up">${en?'OK':'盈利'}</span>`;
+    tNS+=b.ns;tCOGS+=b.cogs;tGP+=b.gp;tExp+=b.total_exp;tNet+=b.net;
+    // MoM delta vs prior period
+    const bp = bprev?bprev[bi]:null;
+    let momCell = '';
+    if(bp && bp.net !== undefined){
+      const netD = b.net - bp.net;
+      const nsD  = b.ns  - bp.ns;
+      const clr  = netD>=0?'#00e5c4':'#ff4d6d';
+      momCell = `<td style="vertical-align:middle;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;">
+          <div style="color:${clr};">${netD>=0?'▲':'▼'}Net ${rm(Math.abs(netD))}</div>
+          <div style="color:${nsD>=0?'#00e5c4':'#ff4d6d'};margin-top:2px;">${nsD>=0?'▲':'▼'}Sales ${rm(Math.abs(nsD))}</div>
+        </div>
+      </td>`;
+    } else if(bprev){ momCell='<td>—</td>'; }
+
+    return `<tr>
+      <td class="la">${en?BR[bk].name_en:BR[bk].name_zh}</td>
+      <td>${b.ns.toLocaleString()}</td>
+      <td><div class="mb"><span class="${gpp>=.47?'cg':gpp>=.4?'cy':'cr'}">${pct(gpp)}</span><div class="mbr"><div class="mbf" style="width:${Math.min(100,gpp*100).toFixed(0)}%;background:${gpp>=.47?C.g:gpp>=.4?C.y:C.r}"></div></div></div></td>
+      <td class="${sc}">${b.net.toLocaleString()}</td>
+      <td class="${sc}">${pct(netp)}</td>
+      <td class="cr">${b.total_exp.toLocaleString()}</td>
+      <td class="${expp>=.35?'cr':expp>=.25?'cy':'cg'}">${pct(expp)}</td>
+      ${momCell}
+      <td>${pill}</td>
+    </tr>`;
+  }).join('');
+  btbody.innerHTML+=`<tr class="tr"><td class="la">${en?'TOTAL':'合计'}</td><td>${tNS.toLocaleString()}</td><td>${pct(tGP/tNS)}</td><td class="cg">${tNet.toLocaleString()}</td><td class="cg">${pct(tNet/tNS)}</td><td class="cr">${tExp.toLocaleString()}</td><td>${pct(tExp/tNS)}</td>${bprev?'<td>—</td>':''}<td></td></tr>`;
+
+  // ── 8. Charts ──
+  txt(document.getElementById('br-sec2'), 'PERFORMANCE CHARTS', '绩效图表');
+  txt(document.getElementById('br-c1t'),en?`Net Profit by Branch — ${viewLabel}`:`各分行净利润 — ${viewLabel}`,'');
+  txt(document.getElementById('br-c1s'), 'RM · Invoice basis', '令吉 · 发票基准');
+  txt(document.getElementById('br-c2t'),en?`Margin Comparison — ${viewLabel}`:`利润率对比 — ${viewLabel}`,'');
+  txt(document.getElementById('br-c2s'), 'GP% vs Net% vs Exp%', '毛利率 vs 净利率 vs 费用率');
+
+  mkChart('brNetChart',{type:'bar',data:{
+    labels:bkeys.map(k=>en?BR[k].name_en:BR[k].name_zh),
+    datasets:[{label:en?'Net Profit':'净利润',
+      data:bdata_all.map(b=>b.net),
+      backgroundColor:bdata_all.map(b=>b.net>=20000?C.g2:b.net>=5000?C.y2:C.r2),
+      borderColor:bdata_all.map(b=>b.net>=20000?C.g:b.net>=5000?C.y:C.r),borderWidth:1.5}]
+  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},
+            y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  mkChart('brMarginChart',{type:'bar',data:{labels:bkeys,datasets:[
+    {label:'GP%', data:bdata_all.map(b=>+(b.gp/b.ns*100).toFixed(1)),backgroundColor:'rgba(0,229,196,.2)',borderColor:C.g,borderWidth:1.5},
+    {label:'Net%',data:bdata_all.map(b=>+(b.net/b.ns*100).toFixed(1)),backgroundColor:'rgba(245,200,66,.2)',borderColor:C.y,borderWidth:1.5},
+    {label:'Exp%',data:bdata_all.map(b=>+(b.total_exp/b.ns*100).toFixed(1)),backgroundColor:C.r2,borderColor:C.r,borderWidth:1.5},
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'}},
+    scales:{y:{ticks:{callback:v=>v+'%'},max:70,grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false}}}}});
+
+  // ── 9. Expense breakdown table ──
+  txt(document.getElementById('br-sec3'),en?`EXPENSE BREAKDOWN — ${viewLabel}`:`费用明细 — ${viewLabel}`,'');
+  txt(document.getElementById('br-t2l'),en?`Expense Detail by Branch — ${viewLabel}`:`各分行费用明细 — ${viewLabel}`,'Expense Breakdown');
+
+  const eth=document.getElementById('br-thead2');
+  eth.innerHTML=`<th>${en?'Item':'项目'}</th>${bkeys.map(k=>`<th>${k}${bprev&&bprev[bkeys.indexOf(k)]?`<br><span style="font-size:8px;color:var(--mu)">vs ${prevPeriod||''}</span>`:''}`)}</th>`.replace(/-->/g,'').replace(/<!--.*?-->/g,'');
+  eth.innerHTML=`<th>${en?'Item':'项目'}</th>${bkeys.map((k,ki)=>`<th style="text-align:right">${k}${bprev&&bprev[ki]?`<div style="font-size:8px;color:var(--mu);font-weight:400">vs ${prevPeriod||''}</div>`:''}</th>`).join('')}`;
+
+  const expRows=[
+    {en:'NET SALES',     zh:'净销售额',     fn:(b,k)=>b.ns,           cls:'cb',bold:true, editKey:'ns'},
+    {en:'Direct COGS',   zh:'直接销货成本', fn:(b,k)=>b.cogs,          cls:'cr'},
+    {en:'GROSS PROFIT',  zh:'毛利润',       fn:(b,k)=>b.gp,            cls:'cg',bold:true,showPct:true},
+    {en:'↳ Rental',      zh:'↳ 租金',       fn:(b,k)=>BR[k].rent*rentMult, cls:'cr',indent:true},
+    {en:'↳ Salary (Net)',zh:'↳ 净薪资',     fn:(b,k)=>b.salary||0,     cls:'cr',indent:true},
+    {en:'↳ Statutory',   zh:'↳ 法定供款',   fn:(b,k)=>b.statutory||0,  cls:'cr',indent:true},
+    {en:'↳ Admin',       zh:'↳ 行政',       fn:(b,k)=>b.adm,           cls:'cr',indent:true},
+    {en:'↳ HR Total',    zh:'↳ HR总额',     fn:(b,k)=>b.hr,            cls:'cr',indent:true},
+    {en:'↳ Marketing',   zh:'↳ 营销',       fn:(b,k)=>b.mkt,           cls:'cr',indent:true},
+    {en:'↳ Finance',     zh:'↳ 财务',       fn:(b,k)=>b.fin,           cls:'cr',indent:true},
+    {en:'TOTAL EXPENSES',zh:'总费用',       fn:(b,k)=>b.total_exp,     cls:'cr',bold:true,showPct:true},
+    {en:'NET PROFIT',    zh:'净利润',       fn:(b,k)=>b.net,           cls:'',bold:true,isTR:true,showPct:true},
+  ];
+
+  const etb=document.getElementById('br-tbody2');
+  etb.innerHTML=expRows.map(r=>{
+    const vals=bkeys.map((k,j)=>r.fn(bdata_all[j],k));
+    return `<tr class="${r.isTR?'tr':''}">
+      <td class="la" style="${r.bold?'font-weight:700':''}${r.indent?';padding-left:22px':''}">
+        ${en?r.en:r.zh}
+      </td>
+      ${vals.map((v,j)=>{
+        const b=bdata_all[j];
+        const ns=b.ns;
+        const netCls=r.isTR?(v>=0?'cg':'cr'):r.cls;
+        const pctStr=(r.showPct&&ns&&!r.isTR)?` <span style="color:var(--mu);font-size:9px">(${(v/ns*100).toFixed(1)}%)</span>`:'';
+        const netPctStr=(r.isTR&&ns)?` <span style="color:var(--mu);font-size:9px">(${(v/ns*100).toFixed(1)}%)</span>`:'';
+        return `<td class="${netCls}" style="${r.bold?'font-weight:700':''}">
+          ${v!==0?v.toLocaleString()+''+pctStr+netPctStr:'—'}
+        </td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
+}
+
+// ─────────── INVENTORY ───────────
+function renderInventory(m,i){
+  const en=lang==='en';
+  txt(document.getElementById('inv-ph'),`📦 Inventory Analysis`,`📦 库存分析`);
+  txt(document.getElementById('inv-ps'),`Stock level · Days cover · Ideal range · Purchasing plan`,`库存水平 · 覆盖天数 · 理想区间 · 采购计划`);
+
+  const stock=d('stock_close',m), avgCogs=D.br_cogs.reduce((a,b)=>a+b,0)/14;
+  const daily=avgCogs/30, days=Math.round(stock/daily);
+  const ideal75=Math.round(daily*75), ideal60=Math.round(daily*60), ideal90=Math.round(daily*90);
+  const excess=Math.max(0,stock-ideal90);
+
+  const ins=document.getElementById('inv-ins');
+  ins.className='ins ba';
+  txt(ins,
+    `<strong>⚠ Inventory is the #2 Problem (after HR):</strong> ${m} closing stock = ${rm(stock)} = ${days}-day cover. Ideal = 60–90 days = ${rm(ideal60)}–${rm(ideal90)}. Excess inventory = <strong>${rm(excess)}</strong> in dead cash. Feb 2026 purchasing anomaly: China goods only RM 8,376 vs monthly avg RM 90K — risk of stockout on high-margin products in Q2 recovery. <span class="act r">Reduce purchasing to RM 150K/month for 4–5 months</span>`,
+    `<strong>⚠ 库存是第二大问题（仅次于HR）：</strong>${m}期末库存=${rm(stock)}=${days}天覆盖。理想=60-90天=${rm(ideal60)}–${rm(ideal90)}。超额库存=<strong>${rm(excess)}</strong>死钱。2026年2月采购异常：中国货品仅8,376令吉 vs 月均9万令吉——第二季度复苏时高利润产品断货风险。<span class="act r">将月采购降至15万令吉，持续4-5个月</span>`
+  );
+
+  // Gauge
+  const gEl=document.getElementById('inv-gauge');
+  const maxDays=240, pMin=ideal60/stock*100*days/maxDays, pMax=(ideal90/stock)*100*(days/maxDays);
+  const markerPct=Math.min(days/maxDays*100,98);
+  gEl.innerHTML=`
+    <div class="gt" id="inv-gt"></div><div class="gs" id="inv-gs"></div>
+    <div class="gtrack">
+      <div class="gzone gz-ideal" style="left:${60/maxDays*100}%;width:${(90-60)/maxDays*100}%;"></div>
+      <div class="gzone gz-over" style="left:${90/maxDays*100}%;width:${(maxDays-90)/maxDays*100}%;"></div>
+      <div class="gmark" style="left:${Math.min(markerPct,96)}%;" data-l="${days}d"></div>
+    </div>
+    <div class="glabels"><span>0d</span><span>30d</span><span>60d</span><span>90d</span><span>120d</span><span>150d</span><span>180d</span><span>210d+</span></div>
+    <div class="gleg">
+      <div class="gli"><div class="gld" style="background:rgba(0,229,196,.4)"></div><span>${en?'Ideal Zone (60–90 days)':'理想区间（60-90天）'}</span></div>
+      <div class="gli"><div class="gld" style="background:rgba(255,77,109,.3)"></div><span>${en?'Overstocked Zone':'超额库存区'}</span></div>
+      <div class="gli"><div class="gld" style="background:var(--r)"></div><span>${en?`Current: ${days} days = ${rm(stock)}`:`当前：${days}天 = ${rm(stock)}`}</span></div>
+    </div>`;
+  txt(document.getElementById('inv-gt'),`Stock Days-Cover Gauge — ${m}`,`库存覆盖天数 — ${m}`);
+  txt(document.getElementById('inv-gs'),`Avg daily COGS ${rm(Math.round(daily))} · Ideal stock ${rm(ideal60)}–${rm(ideal90)}`,`日均销货成本${rm(Math.round(daily))} · 理想库存${rm(ideal60)}–${rm(ideal90)}`);
+
+  document.getElementById('inv-kpis').innerHTML=[
+    kpiHtml('r',en?'Current Stock':'当前库存',rm(stock),days+(en?'-day cover':'-天覆盖'),pilll(days<=90?'up':days<=130?'wa':'dn',days+'d')),
+    kpiHtml('g',en?'Ideal Stock (75d)':'理想库存（75天）',rm(ideal75),en?'Based on avg COGS':'基于月均销货成本',pilll('up',en?'Target':'目标')),
+    kpiHtml('y',en?'Excess Inventory':'超额库存',rm(excess),en?'Dead cash — no return':'死钱——无回报',pilll('dn',en?'Locked up':'占用资金')),
+    kpiHtml('b',en?'Recommended Purchasing':'建议采购额','RM 150K',en?'Until stock = RM 600K':'直至库存降至60万',pilll('ne',en?'Reduce for 5 months':'减少5个月')),
+  ].join('');
+
+  mkChart('stockChart',{type:'line',data:{labels:M15,datasets:[
+    {label:en?'Closing Stock':'期末库存',data:D.stock_close,borderColor:C.o,backgroundColor:C.o2,fill:true,tension:.3,pointRadius:3,pointBackgroundColor:M15.map((_,j)=>j===i?C.y:C.o),borderWidth:2},
+    {label:en?'Ideal Max (90d)':'理想上限（90天）',data:M15.map(()=>ideal90),borderColor:C.g,borderDash:[4,3],backgroundColor:'transparent',pointRadius:0,borderWidth:1.5},
+    {label:en?'Ideal Min (60d)':'理想下限（60天）',data:M15.map(()=>ideal60),borderColor:'rgba(0,229,196,.4)',borderDash:[2,4],backgroundColor:'transparent',pointRadius:0,borderWidth:1},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}}},scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  mkChart('purchBreakdown',{type:'bar',data:{labels:M15,datasets:[
+    {label:en?'China':'中国',data:D.china_p,backgroundColor:C.y,stack:'a'},
+    {label:en?'Local':'本地',data:D.local_p,backgroundColor:'rgba(77,159,255,.6)',stack:'a'},
+    {label:'OAF',data:D.oaf_p,backgroundColor:'rgba(184,124,255,.6)',stack:'a'},
+    {label:en?'Transport':'运输',data:D.trans_p,backgroundColor:'rgba(255,140,66,.5)',stack:'a'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}}},scales:{y:{stacked:true,ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  txt(document.getElementById('inv-thl'),en?'Monthly Stock & Purchasing Analysis (14 months)':'月度库存与采购分析（14个月）',`Stock Analysis`);
+  const ith=document.getElementById('inv-thead');
+  ith.innerHTML=`<th>${en?'Month':'月份'}</th><th>${en?'Sales':'销售'}</th><th>${en?'Purchasing':'采购'}</th><th>${en?'China':'中国'}</th><th>${en?'Local':'本地'}</th><th>${en?'Closing Stock':'期末库存'}</th><th>${en?'Days Cover':'覆盖天数'}</th><th>${en?'Stock/Sales':'库销比'}</th>`;
+  const itb=document.getElementById('inv-tbody');
+  itb.innerHTML=M15.map((mo,j)=>{
+    const s=D.stock_close[j], si=D.sales_inv[j], p=D.purch_total[j], cp=D.china_p[j], lp=D.local_p[j];
+    const dy=Math.round(s/daily);
+    const isSel=mo===m;
+    const cls=dy<=90?'cg':dy<=130?'cy':'cr';
+    return `<tr class="${isSel?'hl':''}"><td class="la">${mo}</td><td>${si.toLocaleString()}</td><td>${p.toLocaleString()}</td><td class="cy">${cp.toLocaleString()}</td><td class="cb">${lp.toLocaleString()}</td><td class="${cls}">${s.toLocaleString()}</td><td class="${cls}">${dy}d</td><td class="${cls}">${(s/si).toFixed(2)}x</td></tr>`;
+  }).join('');
+}
+
+// ─────────── EXPENSES ───────────
+function renderExpenses(m,prev,i){
+  const en=lang==='en';
+  txt(document.getElementById('exp-ph'),`📊 Expense Breakdown — ${m}`,`📊 费用明细 — ${m}`);
+  txt(document.getElementById('exp-ps'),'Full line-item expense breakdown · All categories','完整费用逐项明细 · 所有类别');
+
+  const hr=d('hr_total',m), adm=d('adm_total',m), acc=d('acc_total',m);
+  const op=d('op_total',m), mkt=d('mkt_total',m), onl=d('online_total',m), log=d('log_total',m);
+  const si=d('sales_inv',m);
+  const hrPct=hr/si;
+
+  const ins=document.getElementById('exp-ins');
+  ins.className='ins ba';
+  txt(ins,
+    `<strong>⚠ HR = ${pct(hrPct)} of Sales — Single Largest Cost:</strong> ${m} HR = ${rm(hr)} (net pay ${rm(d('hr_netpay',m))} + statutory ${rm(d('hr_statutory',m))}). Target ≤28% = saves ${rm(Math.max(0,hr-si*.28))}/month. W05 Bangi benchmark = 13–15%. Admin ${rm(adm)} includes rental ${rm(d('adm_rental',m))} — fixed cost that doesn't scale with revenue. Finance/accounting ${rm(acc)} includes term loan RM 7,906 + 2 HP payments RM 4,471 monthly — these are fixed obligations. <span class="act y">Audit headcount now</span>`,
+    `<strong>⚠ HR = ${pct(hrPct)}销售额 — 单项最大成本：</strong>${m} HR = ${rm(hr)}（实发工资${rm(d('hr_netpay',m))} + 法定${rm(d('hr_statutory',m))}）。目标≤28%=节省${rm(Math.max(0,hr-si*.28))}/月。W05万宜基准=13-15%。行政${rm(adm)}含租金${rm(d('adm_rental',m))}——不随收入增长的固定成本。财务/会计${rm(acc)}含定期贷款7,906令吉+2笔分期付款4,471令吉/月——固定义务。<span class="act y">立即审计人员编制</span>`
+  );
+
+  const hrPctV=pct(hr/si), admPctV=pct(adm/si), accPctV=pct(acc/si), onlPctV=pct(onl/si);
+  document.getElementById('exp-kpis').innerHTML=[
+    kpiHtml('r',en?'HR / Payroll':'HR薪酬',rm(hr),hrPctV+' of sales',pilll(hrPct<=.28?'up':'dn',hrPct<=.28?'✅ Target':'▲ High')),
+    kpiHtml('b',en?'Admin & Rental':'行政及租金',rm(adm),admPctV+' · Rental '+rm(d('adm_rental',m)),pilll('ne',en?'Incl. fixed':'含固定')),
+    kpiHtml('p',en?'Accounting/Finance':'会计/财务',rm(acc),accPctV+' · Loan+HP '+rm(7906+4471),pilll('ne',en?'Fixed obligations':'固定义务')),
+    kpiHtml('g',en?'Online Marketing':'线上营销',rm(onl),onlPctV+' · '+(en?'Social+KOL':'社交+KOL'),pilll('up',en?'Controlled':'受控')),
+    kpiHtml('y',en?'Op & Marketing':'运营及营销',rm(op+mkt),(pct((op+mkt)/si))+' · '+(en?'BTL spend':'BTL支出'),pilll('ne','Detail ↓')),
+  ].join('');
+
+  const hrRatios=D.hr_total.map((h,j)=>+(h/D.sales_inv[j]*100).toFixed(1));
+  mkChart('hrTrend',{type:'line',data:{labels:M15,datasets:[
+    {label:en?'HR/Sales %':'HR/销售%',data:hrRatios,borderColor:C.r,backgroundColor:C.r2,fill:true,tension:.3,pointRadius:3,pointBackgroundColor:M15.map((_,j)=>j===i?C.y:C.r),borderWidth:2},
+    {label:en?'Target 28%':'目标28%',data:M15.map(()=>28),borderColor:C.g,borderDash:[4,3],backgroundColor:'transparent',pointRadius:0,borderWidth:1.5},
+    {label:'W05 ~14%',data:M15.map(()=>14),borderColor:C.b,borderDash:[2,4],backgroundColor:'transparent',pointRadius:0,borderWidth:1},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{ticks:{callback:v=>v+'%'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  mkChart('expDonut',{type:'doughnut',data:{
+    labels:[en?'HR':'HR',en?'Admin+Rental':'行政+租金',en?'Accounting':'会计',en?'Op+Mkt':'运营+营销',en?'Online':'线上',en?'Logistics':'物流'],
+    datasets:[{data:[hr,adm,acc,op+mkt,onl,log],backgroundColor:[C.r,'rgba(77,159,255,.6)','rgba(184,124,255,.6)',C.y,C.g,'rgba(255,140,66,.6)'],borderColor:'#0d1117',borderWidth:2}]
+  },options:{cutout:'60%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9},padding:7}}}}});
+
+  txt(document.getElementById('exp-sec1'), 'FULL LINE-ITEM BREAKDOWN', '完整逐项明细');
+  txt(document.getElementById('exp-thl'),en?`All Expense Lines — ${m}`:`所有费用项目 — ${m}`,``);
+
+  const etH=document.getElementById('exp-thead');
+  etH.innerHTML=`<th></th><th>${en?'Line Item':'明细项目'}</th><th>${m}</th><th>${en?'% Sales':'占销售%'}</th>`;
+
+  const expLines=[
+    {cat:en?'HR / Payroll':'HR薪酬',cat_cls:'cr',rows:[
+      {en:'Net Pay + Bonus',zh:'实发工资+奖金',k:'hr_netpay'},{en:'Statutory + HRDF',zh:'法定+HRDF',k:'hr_statutory'},
+      {en:'TOTAL HR',zh:'HR合计',k:'hr_total',bold:true,sum:true},
+    ]},
+    {cat:en?'Admin & Rental':'行政及租金',cat_cls:'cb',rows:[
+      {en:'Rental',zh:'租金',k:'adm_rental'},{en:'Utilities',zh:'水电',k:'adm_utility'},{en:'Office Maintenance',zh:'办公室维护',k:'adm_office'},
+      {en:'Misc Variable',zh:'其他变动',k:'adm_var'},{en:'Stationery',zh:'文具',k:'adm_stationary'},{en:'Medical',zh:'医疗',k:'adm_medical'},{en:'Misc HQ',zh:'总部杂项',k:'adm_misc_hq'},{en:'Refreshment',zh:'餐饮',k:'adm_refresh'},
+      {en:'TOTAL ADMIN',zh:'行政合计',k:'adm_total',bold:true,sum:true},
+    ]},
+    {cat:en?'Op & Marketing (BTL)':'运营及营销（BTL）',cat_cls:'cy',rows:[
+      {en:'Branch Operations',zh:'分行运营',k:'op_branch'},{en:'Contractor Commission',zh:'承包商佣金',k:'op_contractor'},{en:'Deco/Misc',zh:'装饰/杂项',k:'op_misc'},{en:'Banner Permit',zh:'横幅许可',k:'op_banner'},
+      {en:'Branch Activity/Promo',zh:'分行活动/促销',k:'mkt_promo'},{en:'Google Review Gift',zh:'谷歌评价礼品',k:'mkt_google'},{en:'Banner/License',zh:'横幅/牌照',k:'mkt_banner'},
+      {en:'TOTAL OP+MKT',zh:'运营+营销合计',k:'op_total',bold:true,sum:true,add:'mkt_total'},
+    ]},
+    {cat:en?'Online Marketing':'线上营销',cat_cls:'cg',rows:[
+      {en:'Facebook/Google/TikTok',zh:'脸书/谷歌/抖音',k:'online_social'},{en:'KOL',zh:'KOL',k:'online_kol'},
+      {en:'TOTAL ONLINE',zh:'线上合计',k:'online_total',bold:true,sum:true},
+    ]},
+    {cat:en?'Logistics':'物流',cat_cls:'co',rows:[
+      {en:'Diesel',zh:'柴油',k:'log_diesel'},{en:'Toll',zh:'过路费',k:'log_toll'},{en:'Lalamove/3PL',zh:'Lalamove/第三方物流',k:'log_lalamove'},
+      {en:'TOTAL LOGISTICS',zh:'物流合计',k:'log_total',bold:true,sum:true},
+    ]},
+    {cat:en?'Accounting/Finance':'会计/财务',cat_cls:'cp',rows:[
+      {en:'Term Loan (MBI)',zh:'定期贷款（MBI）',k:'acc_loan'},{en:'HP VKS8849',zh:'HP VKS8849',k:'acc_hp1'},{en:'HP WQL6168',zh:'HP WQL6168',k:'acc_hp2'},
+      {en:'Bank/OAF Charges',zh:'银行/OAF费用',k:'acc_bank'},{en:'Director Claims',zh:'董事报销',fn:j=>D.acc_claim_cf[j]+D.acc_claim_cck[j]},
+      {en:'Secretary Fee',zh:'秘书费',k:'acc_secretary'},{en:'Audit Fee',zh:'审计费',k:'acc_audit'},{en:'Others',zh:'其他',k:'acc_others'},
+      {en:'TOTAL ACCOUNTING',zh:'会计合计',k:'acc_total',bold:true,sum:true},
+    ]},
+  ];
+
+  const etb=document.getElementById('exp-tbody');
+  etb.innerHTML=expLines.map(cat=>{
+    const catHdr=`<tr style="background:var(--s3)"><td class="la" colspan="4" style="font-weight:700;color:var(--txt);padding:8px 11px;border-top:1px solid var(--bdr)">${cat.cat}</td></tr>`;
+    const rowsHtml=cat.rows.map(r=>{
+      const val=r.fn?r.fn(i):(D[r.k]?D[r.k][i]:0)+(r.add?D[r.add][i]:0);
+      const pctV=(val&&si)?pct(val/si):'—';
+      const isTR=r.bold&&r.sum;
+      // MoM delta
+      let expDelta='';
+      if(prev&&!isTR&&!r.fn&&D[r.k]){
+        const prevVal=(D[r.k][idx(prev)]||0)+(r.add?D[r.add][idx(prev)]||0:0);
+        if(prevVal&&val){
+          const ed=val-prevVal;
+          const good=ed<=0; // expenses: decrease is good
+          expDelta=` <span style="color:${good?'#00e5c4':'#ff4d6d'};font-size:9px;">${ed>=0?'▲':'▼'}${Math.abs(ed).toLocaleString()}</span>`;
+        }
+      }
+      const dispVal=val?val.toLocaleString():'—';
+      const editDisp=(r.k&&adminMode&&D[r.k]&&!isTR)
+        ? editable(dispVal,(en?r.en:r.zh),`D.${r.k}[${i}]`,val,(nv)=>{D[r.k][i]=parseFloat(nv)||0;})
+        : dispVal;
+      return `<tr class="${isTR?'tr':''}">
+        <td></td>
+        <td class="la" style="${r.bold?'font-weight:700;':''}${r.sum?'':'padding-left:18px'}">${en?r.en:r.zh}</td>
+        <td class="${val>0?'':'cm'}" style="${r.bold?'font-weight:700':''}">${editDisp}${expDelta}</td>
+        <td class="${val&&si&&val/si>.1?'cr':val&&si&&val/si>.05?'cy':'cm'}">${pctV}</td>
+      </tr>`;
+    }).join('');
+    return catHdr+rowsHtml;
+  }).join('');
+
+  mkChart('expStack',{type:'bar',data:{labels:M15,datasets:[
+    {label:en?'HR':'HR',data:D.hr_total,backgroundColor:'rgba(255,77,109,.7)',stack:'a'},
+    {label:en?'Admin':'行政',data:D.adm_total,backgroundColor:'rgba(77,159,255,.6)',stack:'a'},
+    {label:en?'Finance':'财务',data:D.acc_total,backgroundColor:'rgba(184,124,255,.6)',stack:'a'},
+    {label:en?'Op+Mkt':'运营+营销',data:D.op_total.map((v,j)=>v+D.mkt_total[j]),backgroundColor:'rgba(245,200,66,.5)',stack:'a'},
+    {label:en?'Online':'线上',data:D.online_total,backgroundColor:'rgba(0,229,196,.5)',stack:'a'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}}},scales:{y:{stacked:true,ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}}}}});
+}
+
+// ─────────── ACTION PLAN ───────────
+function renderAction(){
+  const en=lang==='en';
+  txt(document.getElementById('act-ph'),'⚡ Strategic Action Plan','⚡ 战略行动计划');
+  txt(document.getElementById('act-ps'),'Prioritised by urgency · Owner · Timeline · Financial impact','按紧迫性排序 · 负责人 · 时间线 · 财务影响');
+
+  const ins=document.getElementById('act-ins');
+  ins.className='ins ok';
+  txt(ins,
+    `<strong>✅ Business Verdict:</strong> 6 retail branches earned RM 881K profit in 2025 (16% net margin, 48% GP). The business model works. Two hidden drains: HR at 34% of sales (−RM 25–35K/month vs target) and excess stock RM 627K locked in dead inventory (releasing over 5 months = RM 125K/month extra cash). Fix these two and the business is on track for RM 1M+ annual profit.`,
+    `<strong>✅ 业务判断：</strong>6家零售分行2025年赚取88.1万令吉利润（16%净利率，48%毛利率）。商业模式有效。两大隐藏漏洞：HR占销售额34%（比目标多花每月2.5-3.5万令吉）和62.7万令吉超额库存被锁定（5个月内释放=每月额外12.5万令吉现金）。解决这两点，业务有望实现年利润100万+令吉。`
+  );
+
+  const actions=[
+    {badge:'p1',badge_t:{en:'🚨 P1 — Immediate',zh:'🚨 P1 — 立即执行'},
+      title:{en:'Reduce Stock from RM 1.21M to RM 600K (5-month plan)',zh:'将库存从121万降至60万令吉（5个月计划）'},
+      desc:{en:'Current 156-day cover vs ideal 75 days. RM 627K in dead cash. Monthly purchasing at RM 220K avg can be reduced to RM 150K for 5 months.',zh:'当前156天覆盖 vs 理想75天。62.7万令吉死钱。月均采购22万可降至15万，持续5个月。'},
+      items:{en:['Reduce total monthly purchasing to RM 150K for Mar–Jul 2026','Restore China goods purchasing: Feb anomaly RM 8K → target RM 85–100K/month','Stop reordering Livinox, Mysolar, Senz until existing stock cleared','Conduct full stock-take: identify slow-moving SKUs, discount and clear within 30 days'],
+             zh:['2026年3-7月将月度总采购降至15万令吉','恢复中国货品采购：2月异常8千令吉 → 目标每月8.5-10万令吉','停止补订Livinox、Mysolar、Senz，直至现有库存清完','进行全面盘点：识别滞销SKU，30天内折价清货']},
+      meta:{en:{timeline:'Mar–Jul 2026',owner:'Purchasing Mgr',impact:'RM 627K cash freed'},zh:{timeline:'2026年3-7月',owner:'采购经理',impact:'释放62.7万现金'}}},
+    {badge:'p1',badge_t:{en:'🚨 P1 — Immediate',zh:'🚨 P1 — 立即执行'},
+      title:{en:'Protect Cash: Cover RM 140K OAF (Apr–Jun 2026)',zh:'保护现金：覆盖14万令吉OAF（2026年4-6月）'},
+      desc:{en:'Bank = RM 57K. OAF = RM 140K due in 90 days. Must collect ≥ RM 470K/month to fund operations + OAF repayment.',zh:'银行余额=5.7万。OAF=90天内到期14万。须月收款≥47万以支付运营+OAF。'},
+      items:{en:['Mar 2026 target: RM 480K+ (post-CNY rebound — Mar 2025 was RM 489K)','Close Feb receivables gap: invoice RM 392K vs collected RM 367K — chase RM 25K','Set aside RM 45K/month from March as OAF provision (treated as fixed expense)','Do NOT increase purchasing in March — preserve cash for OAF'],
+             zh:['2026年3月目标：48万+（农历新年后反弹——2025年3月为48.9万）','弥合2月应收差额：开票39.2万 vs 收款36.7万——追收2.5万','从3月起每月预留4.5万令吉作为OAF拨备（视为固定支出）','3月不要增加采购——保留现金用于OAF']},
+      meta:{en:{timeline:'Mar–Jun 2026',owner:'CFO',impact:'Avoid cash crisis'},zh:{timeline:'2026年3-6月',owner:'财务总监',impact:'避免现金危机'}}},
+    {badge:'p2',badge_t:{en:'⚠ P2 — High Priority',zh:'⚠ P2 — 高优先级'},
+      title:{en:'Reduce HR from 34% → ≤28% of Revenue',zh:'将HR从34%降至≤收入28%'},
+      desc:{en:'HR = RM 142K/month. W05 Bangi achieves 13–15% with a 2-person team. Closing half the gap = RM 25K/month saved = RM 300K/year.',zh:'HR=每月14.2万。W05万宜用2人团队实现13-15%。弥合一半差距=每月节省2.5万=每年30万。'},
+      items:{en:['Audit all 6 branches + HQ headcount: benchmark vs W05 Bangi 2-person model','Link salary increments to branch revenue targets — performance-based','Cross-train staff for multi-branch coverage to reduce headcount organically','If W11 closes, redeploy staff to other branches (avoid redundancy cost)'],
+             zh:['审计6家分行及总部人员：对标W05万宜2人模式','将薪酬增长与分行收入目标挂钩——绩效导向','培训员工跨分行能力以有机减少人员','若W11关闭，将员工调至其他分行（避免裁员成本）']},
+      meta:{en:{timeline:'Q1–Q2 2026',owner:'HR + CFO',impact:'RM 300–420K/year'},zh:{timeline:'2026年第1-2季度',owner:'HR+财务',impact:'每年30-42万'}}},
+    {badge:'p2',badge_t:{en:'⚠ P2 — High Priority',zh:'⚠ P2 — 高优先级'},
+      title:{en:'W11 Taman Midah — 90-Day Recovery or Exit',zh:'W11道明苑 — 90天恢复或退出'},
+      desc:{en:'Feb collection RM 16,817 only. Net loss −RM 196. Break-even = RM 35K/month. 8 months open. Each month below break-even = RM 12K+ absorbed loss.',zh:'2月收款仅1.68万。净亏损-196令吉。盈亏平衡=月3.5万。开业8个月。低于盈亏平衡每月损失1.2万+。'},
+      items:{en:['Mar 2026: intensive post-CNY promotion targeting RM 35K+ collection','Deploy Google Review incentive (proven across other branches)','30-60-90 day gates: if May still < RM 30K → begin closure by Jun 2026','Closure plan: return stock to central, redeploy staff, avoid lease penalty'],
+             zh:['2026年3月：密集农历新年后促销，目标收款3.5万+','启动谷歌评价激励（其他分行已验证）','30-60-90天检查点：若5月仍低于3万 → 2026年6月前开始关闭','关闭计划：将库存退回中央，调配员工，避免租约违约']},
+      meta:{en:{timeline:'Mar–May 2026',owner:'COO',impact:'Recover or save RM 12K+/mth'},zh:{timeline:'2026年3-5月',owner:'运营总监',impact:'恢复或节省1.2万+/月'}}},
+    {badge:'p2',badge_t:{en:'⚠ P2 — High Priority',zh:'⚠ P2 — 高优先级'},
+      title:{en:'Shift Product Mix: China Goods 60% → 70%',zh:'调整产品组合：中国货品60% → 70%'},
+      desc:{en:'China = 57% GP vs Malaysia = 28%. Each 10% shift adds RM 12–15K gross profit/month without increasing sales volume.',zh:'中国货品=57%毛利率 vs 马来西亚=28%。每转移10%，在不增加销量的情况下增加1.2-1.5万令吉毛利/月。'},
+      items:{en:['Train staff to lead with Gino (63%), HBA (65%), Val (65%), Wiltek (58%)','Review Livinox (15%), Mysolar (15%), Senz (19%) — delist or reduce ordering','Restore China purchasing in March to RM 90–100K/month','Set monthly China goods sales target at each branch (60% of branch revenue)'],
+             zh:['培训员工优先推介Gino（63%）、HBA（65%）、Val（65%）、Wiltek（58%）','审查Livinox（15%）、Mysolar（15%）、Senz（19%）——下架或减少订单','3月恢复中国货品采购至每月9-10万令吉','在每家分行设定中国货品月销售目标（60%分行收入）']},
+      meta:{en:{timeline:'Q2 2026',owner:'Sales + Procurement',impact:'+RM 12–15K GP/month'},zh:{timeline:'2026年第2季度',owner:'销售+采购',impact:'+1.2-1.5万毛利/月'}}},
+    {badge:'p3',badge_t:{en:'✅ P3 — Growth',zh:'✅ P3 — 增长'},
+      title:{en:'Next Branch: W05 Bangi Model (H2 2026)',zh:'下一家分行：W05万宜模式（2026年下半年）'},
+      desc:{en:'W05 = 28% net margin, RM 3.5K rent, 2-person team, China-heavy SKU. Best-in-class model. After cash stabilises, open 1 new branch on this template.',zh:'W05=28%净利率，3.5千租金，2人团队，以中国货品为主。最佳模式。现金稳定后，按此模板开设1家新分行。'},
+      items:{en:['Document W05 playbook: rent cap RM 4K, 2 staff, ≥60% China goods, suburb location','Scout 2 Klang Valley targets: Cheras/Kajang/Putrajaya (similar demographics to Bangi)','Open only after: stock at RM 600K, HR ratio ≤30%, W11 resolved','Break-even model: RM 50K/month sales, RM 3.5K rent, 2 staff = 6-month payback'],
+             zh:['记录W05操作手册：租金上限4千，2名员工，≥60%中国货品，郊区选址','勘察巴生谷2个目标：茨厂街/加影/布城（与万宜人口相似）','仅在以下条件后开业：库存60万，HR比率≤30%，W11问题解决','盈亏平衡模型：月销售5万，租金3.5千，2名员工=6个月回收']},
+      meta:{en:{timeline:'H2 2026',owner:'CEO',impact:'Additional RM 70–100K/yr'},zh:{timeline:'2026年下半年',owner:'CEO',impact:'额外7-10万令吉/年'}}},
+  ];
+
+  document.getElementById('act-cards').innerHTML=actions.map(a=>`
+    <div class="ap">
+      <div class="apb ${a.badge}">${a.badge_t[lang]}</div>
+      <div class="apt">${a.title[lang]}</div>
+      <div class="apd">${a.desc[lang]}</div>
+      <ul class="apl">${a.items[lang].map(it=>`<li>${it}</li>`).join('')}</ul>
+      <div class="apm">
+        <span>${en?'Timeline':'时间线'}: <strong>${a.meta[lang].timeline}</strong></span>
+        <span>${en?'Owner':'负责人'}: <strong>${a.meta[lang].owner}</strong></span>
+        <span>${en?'Impact':'影响'}: <strong>${a.meta[lang].impact}</strong></span>
+      </div>
+    </div>`).join('');
+}
+
+// ─────────── BALANCE SHEET ───────────
+function renderBalanceSheet(){
+  const en=lang==='en';
+  txt(document.getElementById('bs-ph'),'🏦 Balance Sheet — Mar 2026','🏦 资产负债表 — 2026年3月');
+  txt(document.getElementById('bs-ps'),'As at 31 March 2026 · Building + Stock + Cash vs Loans + OAF','截至2026年3月31日 · 楼房+库存+现金 vs 贷款+OAF');
+
+  const ins=document.getElementById('bs-ins');
+  ins.className='ins info';
+  const ratio=(BS.assets.total/BS.liabilities.total).toFixed(2);
+  txt(ins,
+    `<strong>💡 Net Surplus: ${rm(BS.net_surplus)}</strong> — Total assets ${rm(BS.assets.total)} vs total liabilities ${rm(BS.liabilities.total)}. Asset-to-liability ratio: <strong>${ratio}x</strong>. Immediate concern: OAF RM 140,152 due Apr–Jun 2026 (cash on hand only ${rm(BS.assets.total_cash)}). OD balance: ${rm(BS.liabilities.od_mbi)} must be managed. Building at cost RM 2.5M is the primary asset anchor.`,
+    `<strong>💡 净剩余：${rm(BS.net_surplus)}</strong> — 总资产${rm(BS.assets.total)} vs 总负债${rm(BS.liabilities.total)}。资产负债比：<strong>${ratio}倍</strong>。即时关注：OAF 14万令吉将于2026年4-6月到期（手头现金仅${rm(BS.assets.total_cash)}）。透支余额：${rm(BS.liabilities.od_mbi)}须妥善管理。楼房成本250万是主要资产锚。`
+  );
+
+  document.getElementById('bs-kpis').innerHTML=[
+    kpiHtml('g',en?'Total Assets':'总资产',rm(BS.assets.total),en?'Building + Stock + Cash':'楼房+库存+现金',pilll('up',en?'Strong':'稳健')),
+    kpiHtml('r',en?'Total Liabilities':'总负债',rm(BS.liabilities.total),en?'Loans + OD + OAF':'贷款+透支+OAF',pilll('dn',en?'Manage':'须管理')),
+    kpiHtml('g',en?'Net Surplus':'净剩余',rm(BS.net_surplus),ratio+'x asset cover',pilll('up',en?'Solvent':'资产充足')),
+    kpiHtml('r',en?'OAF Due 90 days':'OAF 90天到期',rm(BS.liabilities.total_oaf),en?'Apr / May / Jun 2026':'2026年4/5/6月',pilll('dn',en?'Plan cash':'规划现金')),
+  ].join('');
+
+  // Assets table
+  txt(document.getElementById('bs-assets-title'), 'Assets — Mar 2026', '资产 — 2026年3月');
+  document.getElementById('bs-assets-head').innerHTML=`<th>${en?'Item':'项目'}</th><th>${en?'Amount (RM)':'金额（令吉）'}</th><th>${en?'% of Total':'占总资产%'}</th>`;
+  const aRows=[
+    {en:'Building (at cost)',zh:'楼房（按成本）',v:BS.assets.building,cls:'cb',bold:false},
+    {en:'Closing Stock',zh:'期末库存',v:BS.assets.stock,cls:'cy',bold:false},
+    {en:'TOTAL FIXED & STOCK',zh:'固定资产及库存合计',v:BS.assets.total_fixed,cls:'cb',bold:true},
+    {en:'Cash — MBI Ampang Saving',zh:'现金 — MBI安邦储蓄',v:BS.assets.cash_mbi,cls:'cg',bold:false},
+    {en:'Cash — PBB Thambi Dollah',zh:'现金 — 大众银行',v:BS.assets.cash_pbb,cls:'cg',bold:false},
+    {en:'Cash — PBI Taman Muda',zh:'现金 — PBI道明苑',v:BS.assets.cash_pbi,cls:'cg',bold:false},
+    {en:'TOTAL CASH',zh:'现金合计',v:BS.assets.total_cash,cls:'cg',bold:true},
+    {en:'TOTAL ASSETS',zh:'总资产',v:BS.assets.total,cls:'cg',bold:true,isTR:true},
+  ];
+  document.getElementById('bs-assets-body').innerHTML=aRows.map(r=>`
+    <tr class="${r.isTR?'tr':''}">
+      <td class="la" style="${r.bold?'font-weight:700':''}">${en?r.en:r.zh}</td>
+      <td class="${r.cls}" style="${r.bold?'font-weight:700':''}">${rm(r.v)}</td>
+      <td class="cm">${(r.v/BS.assets.total*100).toFixed(1)}%</td>
+    </tr>`).join('');
+
+  // Liabilities table
+  txt(document.getElementById('bs-liab-title'), 'Liabilities — Mar 2026', '负债 — 2026年3月');
+  document.getElementById('bs-liab-head').innerHTML=`<th>${en?'Item':'项目'}</th><th>${en?'Amount (RM)':'金额（令吉）'}</th><th>${en?'% of Total':'占总负债%'}</th>`;
+  const lRows=[
+    {en:'Term Loan MBI (77/240 mths)',zh:'定期贷款MBI（77/240月）',v:BS.liabilities.term_loan,cls:'cr',bold:false},
+    {en:'OD MBI Ampang',zh:'透支MBI安邦',v:BS.liabilities.od_mbi,cls:'cr',bold:false},
+    {en:'Hire Purchase PQK6168',zh:'分期付款PQK6168',v:BS.liabilities.hp_pqk,cls:'cr',bold:false},
+    {en:'OAF Due 29 Apr 2026',zh:'OAF到期 2026年4月29日',v:BS.liabilities.oaf_apr,cls:'cy',bold:false},
+    {en:'OAF Due 29 May 2026',zh:'OAF到期 2026年5月29日',v:BS.liabilities.oaf_may,cls:'cy',bold:false},
+    {en:'OAF Due 26 Jun 2026',zh:'OAF到期 2026年6月26日',v:BS.liabilities.oaf_jun,cls:'cy',bold:false},
+    {en:'TOTAL OAF',zh:'OAF合计',v:BS.liabilities.total_oaf,cls:'cy',bold:true},
+    {en:'TOTAL LIABILITIES',zh:'总负债',v:BS.liabilities.total,cls:'cr',bold:true,isTR:true},
+  ];
+  document.getElementById('bs-liab-body').innerHTML=lRows.map(r=>`
+    <tr class="${r.isTR?'tr':''}">
+      <td class="la" style="${r.bold?'font-weight:700':''}">${en?r.en:r.zh}</td>
+      <td class="${r.cls}" style="${r.bold?'font-weight:700':''}">${rm(r.v)}</td>
+      <td class="cm">${(r.v/BS.liabilities.total*100).toFixed(1)}%</td>
+    </tr>`).join('');
+
+  txt(document.getElementById('bs-c1t'), 'Asset Composition — Mar 2026', '资产构成 — 2026年3月');
+  txt(document.getElementById('bs-c1s'), 'Building 67% · Stock 31% · Cash 1.5%', '楼房67% · 库存31% · 现金1.5%');
+  mkChart('bsDonut',{type:'doughnut',data:{
+    labels:[en?'Building':'楼房',en?'Stock':'库存',en?'Cash':'现金'],
+    datasets:[{data:[BS.assets.building,BS.assets.stock,BS.assets.total_cash],
+      backgroundColor:['rgba(77,159,255,.6)','rgba(245,200,66,.6)','rgba(0,229,196,.6)'],
+      borderColor:'#0d1117',borderWidth:2}]
+  },options:{cutout:'60%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:8}}}}});
+
+  txt(document.getElementById('bs-c2t'), 'OAF Payment Schedule — Next 90 Days', 'OAF还款计划 — 未来90天');
+  txt(document.getElementById('bs-c2s'),en?'Cash on hand: '+rm(BS.assets.total_cash)+' vs obligations':'手头现金：'+rm(BS.assets.total_cash)+' vs 义务','');
+  mkChart('bsOAF',{type:'bar',data:{
+    labels:['Apr 2026','May 2026','Jun 2026',en?'Cash on Hand':'手头现金'],
+    datasets:[{label:en?'Amount (RM)':'金额（令吉）',
+      data:[BS.liabilities.oaf_apr,BS.liabilities.oaf_may,BS.liabilities.oaf_jun,BS.assets.total_cash],
+      backgroundColor:['rgba(255,77,109,.6)','rgba(255,77,109,.5)','rgba(255,77,109,.4)','rgba(0,229,196,.6)'],
+      borderColor:['#ff4d6d','#ff4d6d','#ff4d6d','#00e5c4'],borderWidth:1.5}]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RM '+ctx.parsed.y.toLocaleString()}}},
+    scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false}}}}});
+}
+
+// ─────────── CUSTOMERS 2026 ───────────
+function renderCustomers(){
+  const en=lang==='en';
+  txt(document.getElementById('cu-ph'),'👥 Customer Insights — 2026 YTD','👥 顾客分析 — 2026年累计');
+  txt(document.getElementById('cu-ps'), 'Jan–Mar 2026 · Walk-in · Closing Rate · Basket Size · Race Breakdown', '2026年1-3月 · 进店人数 · 成交率 · 均消费 · 种族分布');
+
+  const ins=document.getElementById('cu-ins');
+  ins.className='ins ok';
+  const totalWI=CUST26.total.walkin.reduce((a,b)=>a+b,0);
+  const totalPur=CUST26.total.purchase.reduce((a,b)=>a+b,0);
+  const totalAmt=CUST26.total.amount.reduce((a,b)=>a+b,0);
+  const avgCR=(CUST26.total.cr.reduce((a,b)=>a+b,0)/3).toFixed(1)+'%';
+  const avgBasket=(totalAmt/totalPur).toFixed(0);
+  txt(ins,
+    `<strong>✅ YTD Jan–Mar 2026:</strong> Total walk-in <b>${totalWI.toLocaleString()}</b> customers · <b>${totalPur.toLocaleString()}</b> purchases · Average basket <b>RM ${avgBasket}</b> · Avg closing rate <b>${(totalPur/totalWI*100).toFixed(1)}%</b>. Malay segment drives 61% of revenue (RM ${rm(CUST26.malay.amount.reduce((a,b)=>a+b,0))}). Indian segment has highest closing rate (85%+). W05 Bangi leads with 89.5% closing rate — replicate this model.`,
+    `<strong>✅ 2026年1-3月累计：</strong>总进店<b>${totalWI.toLocaleString()}</b>人 · <b>${totalPur.toLocaleString()}</b>次购买 · 均消费<b>RM ${avgBasket}</b> · 均成交率<b>${(totalPur/totalWI*100).toFixed(1)}%</b>。马来族贡献61%收入（${rm(CUST26.malay.amount.reduce((a,b)=>a+b,0))}）。印度族成交率最高（85%+）。W05万宜成交率89.5%领先——复制此模式。`
+  );
+
+  document.getElementById('cu-kpis').innerHTML=[
+    kpiHtml('b',en?'Total Walk-in':'总进店人数',totalWI.toLocaleString(),en?'Jan–Mar 2026':'2026年1-3月',pilll('up','YTD')),
+    kpiHtml('g',en?'Avg Closing Rate':'均成交率',(totalPur/totalWI*100).toFixed(1)+'%',en?'2024 ref: 67.7%':'2024参考：67.7%',pilll('up',en?'▲ Improved':'▲ 提升')),
+    kpiHtml('y',en?'Avg Basket Size':'均消费额','RM '+avgBasket,en?'2024 ref: RM 346':'2024参考：346',pilll('up',en?'▲ Higher':'▲ 提升')),
+    kpiHtml('p',en?'Total Revenue':'总营业额',rm(totalAmt),en?'6 branches YTD':'6家分行累计',pilll('up','YTD')),
+  ].join('');
+
+  txt(document.getElementById('cu-c1t'), 'Monthly Walk-in & Closing Rate', '月度进店及成交率');
+  txt(document.getElementById('cu-c1s'), 'Jan–Mar 2026 · All branches', '2026年1-3月 · 全分行');
+  mkChart('cuWalkin',{type:'bar',data:{labels:CUST26.months,datasets:[
+    {label:en?'Walk-in':'进店',data:CUST26.total.walkin,backgroundColor:'rgba(77,159,255,.5)',borderColor:'#4d9fff',borderWidth:1.5,yAxisID:'y'},
+    {label:en?'Purchase':'购买',data:CUST26.total.purchase,backgroundColor:'rgba(0,229,196,.5)',borderColor:'#00e5c4',borderWidth:1.5,yAxisID:'y'},
+    {label:en?'Closing Rate %':'成交率%',data:CUST26.total.cr.map(v=>+(v*100).toFixed(1)),type:'line',borderColor:'#f5c842',backgroundColor:'transparent',pointRadius:5,borderWidth:2,yAxisID:'y2'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
+    scales:{y:{ticks:{callback:v=>v},grid:{color:'rgba(30,45,66,.5)'}},y2:{position:'right',min:60,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}},x:{grid:{display:false}}}}});
+
+  txt(document.getElementById('cu-c2t'), 'Avg Basket Size by Race — Jan–Mar 2026', '各种族均消费 — 2026年1-3月');
+  txt(document.getElementById('cu-c2s'), 'Malay highest basket · Indian highest closing rate', '马来族均消费最高 · 印度族成交率最高');
+  const races=[en?'Chinese':'华族',en?'Malay':'马来族',en?'Indian':'印度族',en?'Others':'其他'];
+  const baskets=[
+    CUST26.chinese.amount.reduce((a,b)=>a+b,0)/CUST26.chinese.purchase.reduce((a,b)=>a+b,0),
+    CUST26.malay.amount.reduce((a,b)=>a+b,0)/CUST26.malay.purchase.reduce((a,b)=>a+b,0),
+    CUST26.indian.amount.reduce((a,b)=>a+b,0)/CUST26.indian.purchase.reduce((a,b)=>a+b,0),
+    CUST26.others.amount.reduce((a,b)=>a+b,0)/CUST26.others.purchase.reduce((a,b)=>a+b,0),
+  ];
+  mkChart('cuBasket',{type:'bar',data:{labels:races,datasets:[
+    {label:en?'Avg Basket (RM)':'均消费（令吉）',data:baskets.map(v=>+v.toFixed(0)),
+     backgroundColor:['rgba(245,200,66,.5)','rgba(0,229,196,.5)','rgba(77,159,255,.5)','rgba(184,124,255,.5)'],
+     borderColor:['#f5c842','#00e5c4','#4d9fff','#b87cff'],borderWidth:1.5}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RM '+ctx.parsed.y.toFixed(0)}}},
+    scales:{y:{ticks:{callback:v=>'RM'+v},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false}}}}});
+
+  // Race table
+  txt(document.getElementById('cu-race-title'), 'Race Breakdown — Jan–Mar 2026', '种族分布 — 2026年1-3月');
+  document.getElementById('cu-race-head').innerHTML=`<th>${en?'Race':'种族'}</th><th>${en?'Walk-in':'进店'}</th><th>${en?'Purchase':'购买'}</th><th>${en?'Closing Rate':'成交率'}</th><th>${en?'Total Revenue':'总营收'}</th><th>${en?'Avg Basket':'均消费'}</th><th>${en?'Revenue Share':'营收占比'}</th>`;
+  const raceData=[
+    {en:'Chinese',zh:'华族',d:CUST26.chinese,color:'#f5c842'},
+    {en:'Malay',  zh:'马来族',d:CUST26.malay,  color:'#00e5c4'},
+    {en:'Indian', zh:'印度族',d:CUST26.indian,color:'#4d9fff'},
+    {en:'Others', zh:'其他',  d:CUST26.others,color:'#b87cff'},
+  ];
+  document.getElementById('cu-race-body').innerHTML=raceData.map(r=>{
+    const wi=r.d.walkin.reduce((a,b)=>a+b,0);
+    const pu=r.d.purchase.reduce((a,b)=>a+b,0);
+    const amt=r.d.amount.reduce((a,b)=>a+b,0);
+    const cr=(pu/wi*100).toFixed(1)+'%';
+    const bk='RM '+(amt/pu).toFixed(0);
+    const share=(amt/totalAmt*100).toFixed(1)+'%';
+    return `<tr>
+      <td class="la"><span style="color:${r.color}">●</span> ${en?r.en:r.zh}</td>
+      <td>${wi.toLocaleString()}</td><td>${pu.toLocaleString()}</td>
+      <td class="cg">${cr}</td><td class="cy">${rm(amt)}</td>
+      <td class="cb">${bk}</td>
+      <td><div class="mb"><span>${share}</span><div class="mbr"><div class="mbf" style="width:${(amt/totalAmt*100).toFixed(0)}%;background:${r.color}"></div></div></div></td>
+    </tr>`;
+  }).join('');
+
+  txt(document.getElementById('cu-c3t'), '27-Month Branch Revenue (Jan 2024 – Mar 2026)', '27个月分行营业额（2024年1月–2026年3月）');
+  txt(document.getElementById('cu-c3s'), 'From customer transaction data', '来自顾客交易数据');
+  const brColors=['#00e5c4','#4d9fff','#f5c842','#b87cff','#ff8c42','#ff4d6d'];
+  const bkeys=['W01','W02','W03','W05','W07','W11'];
+  mkChart('cuBranchRev',{type:'line',data:{labels:CUST26.branch_27m.labels,datasets:
+    bkeys.map((k,i)=>({label:k,data:CUST26.branch_27m[k],borderColor:brColors[i],backgroundColor:'transparent',tension:.3,pointRadius:0,borderWidth:1.5}))
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}}},
+    scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:8},maxRotation:45}}}}});
+
+  txt(document.getElementById('cu-c4t'), 'Brand GP% — Mar 2026 (FMM Official)', '品牌毛利率 — 2026年3月（FMM官方）');
+  txt(document.getElementById('cu-c4s'), 'China brands 43–71% · Malaysia brands 16–41%', '中国品牌43-71% · 马来西亚品牌16-41%');
+  mkChart('cuBrandGP',{type:'bar',data:{
+    labels:CUST26.brandGP_mar26.map(b=>b.brand),
+    datasets:[{label:'GP%',data:CUST26.brandGP_mar26.map(b=>b.pct),
+      backgroundColor:CUST26.brandGP_mar26.map(b=>b.origin==='China'?'rgba(245,200,66,.5)':'rgba(77,159,255,.4)'),
+      borderColor:CUST26.brandGP_mar26.map(b=>b.origin==='China'?'#f5c842':'#4d9fff'),borderWidth:1.5}]
+  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+'%'}}},
+    scales:{x:{ticks:{callback:v=>v+'%'},max:80,grid:{color:'rgba(30,45,66,.5)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+}
+
+// ─────────── BRANCH HUB ───────────
+function renderBranchHub(){
+  const en=lang==='en';
+  txt(document.getElementById('hub-ph'),'🗂️ Branch Hub — All 6 Branches','🗂️ 分行总览 — 全部6家分行');
+  txt(document.getElementById('hub-ps'), 'Click any branch card to open its full operational dashboard', '点击分行卡片打开完整运营仪表板');
+  txt(document.getElementById('hub-sec1'),'BRANCH OPERATIONAL DASHBOARDS','分行运营仪表板');
+  txt(document.getElementById('hub-sec2'),'YTD 2026 PERFORMANCE SUMMARY (Jan–Mar)','2026年度表现摘要（1–3月）');
+
+  const ins=document.getElementById('hub-ins');
+  txt(ins,
+    `<strong>ℹ️ How to use:</strong> Each branch card shows YTD net profit and links to the full branch dashboard. The branch dashboards contain sales entry, customer tracking, task management, and race breakdown data. Open them in a separate tab for detailed operational management.`,
+    `<strong>ℹ️ 使用说明：</strong>每个分行卡片显示年初至今净利润，并链接到完整分行仪表板。分行仪表板包含销售录入、顾客追踪、任务管理和种族分析数据。在新标签中打开以进行详细运营管理。`
+  );
+
+  const branches=[
+    {code:'W01',name_en:'Pandan Indah',name_zh:'班达英达',color:'#00e5c4',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W01%20-%202604%20-%20Dashboard.html'},
+    {code:'W02',name_en:'Ampang Waterfront',name_zh:'安邦水岸',color:'#4d9fff',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W02%20-%202604%20-%20Dashboard.html'},
+    {code:'W03',name_en:'Wangsa Maju',name_zh:'旺沙玛珠',color:'#f5c842',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W03%20-%202604%20-%20Dashboard.html'},
+    {code:'W05',name_en:'Bangi',name_zh:'万宜',color:'#b87cff',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W05%20-%202604%20-%20Dashboard.html'},
+    {code:'W07',name_en:'Pandan Jaya',name_zh:'班达再也',color:'#ff8c42',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W07%20-%202604%20-%20Dashboard.html'},
+    {code:'W11',name_en:'Taman Midah',name_zh:'道明苑',color:'#ff4d6d',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W11%20-%202604%20-%20Dashboard.html'},
+  ];
+
+  const rm2=v=>'RM '+(+v).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});
+
+  const visibleBranches=userPerms&&!userPerms.allBranches&&userPerms.branch?branches.filter(b=>b.code===userPerms.branch):branches;
+  document.getElementById('hub-cards').innerHTML=visibleBranches.map(b=>{
+    const ytd=BR_YTD[b.code];
+    const netCls=ytd.net<0?'cr':ytd.net<10000?'cy':'cg';
+    return `<div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="window.open('${b.file}','_blank')" title="Open ${b.code} Dashboard">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${b.color}"></div>
+      <div class="kl" style="color:${b.color}">${b.code} · ${en?b.name_en:b.name_zh}</div>
+      <div class="kv" style="color:${b.color};font-size:15px;">${rm2(ytd.ns)}</div>
+      <div class="ks">YTD Sales · Net: <span class="${netCls}" style="font-family:'JetBrains Mono',monospace;">${rm2(ytd.net)}</span></div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr);">
+        <span style="font-size:10px;color:${b.color};font-family:'JetBrains Mono',monospace;">→ Open Dashboard ↗</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Ranking table
+  const _hubBkeys=['W01','W02','W03','W05','W07','W11'];
+  const _filtBkeys=userPerms&&!userPerms.allBranches&&userPerms.branch?[userPerms.branch]:_hubBkeys;
+  const ranked=[..._filtBkeys].sort((a,b)=>BR_YTD[b].net-BR_YTD[a].net);
+  document.getElementById('hub-ranking').innerHTML=ranked.map((k,ri)=>{
+    const b=BR_YTD[k], br=branches.find(x=>x.code===k);
+    const gpp=b.gp/b.ns, netp=b.net/b.ns;
+    const rank=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'][ri];
+    return `<tr>
+      <td class="la">${rank} <span style="color:${br.color}">${k}</span> ${en?br.name_en:br.name_zh}</td>
+      <td>${b.ns.toLocaleString()}</td>
+      <td class="${b.net>=0?'cg':'cr'}" style="font-weight:700">${b.net.toLocaleString()}</td>
+      <td class="${netp>=.15?'cg':netp>=.05?'cy':'cr'}">${(netp*100).toFixed(1)}%</td>
+      <td class="${gpp>=.47?'cg':gpp>=.4?'cy':'cr'}">${(gpp*100).toFixed(1)}%</td>
+      <td>${b.net<0?`<span class="pl dn">${en?'Loss':'亏损'}</span>`:b.net<10000?`<span class="pl wa">${en?'Watch':'关注'}</span>`:`<span class="pl up">${en?'Healthy':'健康'}</span>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────── QUICK LINKS ───────────
+function renderQuickLinks(){
+  const en=lang==='en';
+  txt(document.getElementById('ql-ph'),'🔗 Quick Links — All Dashboards','🔗 快速链接 — 全部仪表板');
+  txt(document.getElementById('ql-ps'), 'Open any specialized dashboard in a new tab', '在新标签打开任何专用仪表板');
+  txt(document.getElementById('ql-sec1'),'SPECIALIZED DASHBOARDS','专用仪表板');
+  txt(document.getElementById('ql-sec2'),'BRANCH DASHBOARDS','分行仪表板');
+
+  const mainDash=[
+    {title_en:'FMM Executive Dashboard',title_zh:'FMM财务管理仪表板',
+     desc_en:'Full financial management: P&L, Cash Flow, Gross Profit, Expenses, Inventory',
+     desc_zh:'完整财务管理：损益表、现金流、毛利分析、费用明细、库存',
+     file:'file:///Users/jymchee/Downloads/FMM_Dashboard_v5_1.html',
+     color:'#00e5c4',icon:'📊'},
+    {title_en:'BI Analytics Dashboard',title_zh:'商业智能分析仪表板',
+     desc_en:'27M sales data, 1,313 SKUs, customer loyalty, product mix, category analysis',
+     desc_zh:'27个月销售数据，1313个SKU，顾客忠诚度，产品组合，类别分析',
+     file:'file:///Users/jymchee/Downloads/Wiltek_BI_v4_2.html',
+     color:'#4d9fff',icon:'📈'},
+  ];
+
+  document.getElementById('ql-cards').innerHTML=mainDash.map(d=>`
+    <div class="kpi" style="cursor:pointer;padding:18px;border-color:${d.color}33;" onclick="window.open('${d.file}','_blank')">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${d.color}"></div>
+      <div style="font-size:22px;margin-bottom:10px;">${d.icon}</div>
+      <div class="kl" style="color:${d.color};font-size:11px;margin-bottom:6px;">${en?d.title_en:d.title_zh}</div>
+      <div style="font-size:12px;color:var(--txt);line-height:1.5;margin-bottom:12px;">${en?d.desc_en:d.desc_zh}</div>
+      <div style="font-size:10px;color:${d.color};font-family:'JetBrains Mono',monospace;">→ Open in new tab ↗</div>
+    </div>`).join('');
+
+  const branches=[
+    {code:'W01',name_en:'Pandan Indah',name_zh:'班达英达',color:'#00e5c4',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W01%20-%202604%20-%20Dashboard.html'},
+    {code:'W02',name_en:'Ampang Waterfront',name_zh:'安邦水岸',color:'#4d9fff',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W02%20-%202604%20-%20Dashboard.html'},
+    {code:'W03',name_en:'Wangsa Maju',name_zh:'旺沙玛珠',color:'#f5c842',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W03%20-%202604%20-%20Dashboard.html'},
+    {code:'W05',name_en:'Bangi',name_zh:'万宜',color:'#b87cff',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W05%20-%202604%20-%20Dashboard.html'},
+    {code:'W07',name_en:'Pandan Jaya',name_zh:'班达再也',color:'#ff8c42',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W07%20-%202604%20-%20Dashboard.html'},
+    {code:'W11',name_en:'Taman Midah',name_zh:'道明苑',color:'#ff4d6d',
+     file:'file:///Users/jymchee/Google%20Drive/BMM/W11%20-%202604%20-%20Dashboard.html'},
+  ];
+
+  document.getElementById('ql-branch-cards').innerHTML=branches.map(b=>`
+    <div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="window.open('${b.file}','_blank')">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${b.color}"></div>
+      <div class="kl" style="color:${b.color}">${b.code}</div>
+      <div class="kv" style="color:${b.color};font-size:14px;">${en?b.name_en:b.name_zh}</div>
+      <div style="margin-top:8px;font-size:10px;color:${b.color};font-family:'JetBrains Mono',monospace;">→ Open ↗</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// ROLE-BASED CSS VISIBILITY
+// ═══════════════════════════════════════════
+function applyRoleCSS(){
+  // Inject a style tag that hides sensitive columns based on permissions
+  let style=document.getElementById('role-css');
+  if(!style){style=document.createElement('style');style.id='role-css';document.head.appendChild(style);}
+  const rules=[];
+  if(!userPerms.showNet){
+    rules.push('.hide-no-net{display:none!important}');
+  }
+  if(!userPerms.showGPpct){
+    rules.push('.hide-no-gppct{display:none!important}');
+  }
+  style.textContent=rules.join('\n');
+}
+
+// ═══════════════════════════════════════════
+// USER MANAGEMENT PANEL
+// ═══════════════════════════════════════════
+const ALL_ROLES=['admin','ceo','cfo','director','sales_mgr','branch_mgr','hr','warehouse','marketing','employee'];
+const BRANCHES=['W01','W02','W03','W05','W07','W11'];
+const PAGE_IDS=['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks'];
+const PAGE_LABELS={health:'CEO Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',quicklinks:'Quick Links'};
+
+function openUserMgmt(){
+  if(currentUser?.role!=='admin') return;
+  renderUserMgmtTable();
+  const m=document.getElementById('userMgmtModal');
+  if(m){m.style.display='flex';}
+}
+function closeUserMgmt(){
+  const m=document.getElementById('userMgmtModal');
+  if(m){m.style.display='none';}
+}
+
+function renderUserMgmtTable(){
+  const users=loadUsers();
+  const overrides=loadPermOverrides();
+  const tbl=document.getElementById('userMgmtTable');
+  if(!tbl) return;
+
+  tbl.innerHTML=users.map((u,ui)=>{
+    const perms=getPerms(u);
+    const ro=overrides[u.id]||{};
+    const roleColor={admin:'#b87cff',ceo:'#00e5c4',cfo:'#4d9fff',director:'#00e5c4',sales_mgr:'#f5c842',branch_mgr:'#ff8c42',hr:'#4d9fff',warehouse:'#4d9fff',marketing:'#ff8c42',employee:'#5a738a'};
+    const pagesHtml=PAGE_IDS.map(pid=>{
+      const hasPerm=(ro.pages?ro.pages:ROLE_DEFAULTS[u.role]?.pages||[]).includes(pid);
+      return `<label style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${hasPerm?'#dce8f5':'#5a738a'};cursor:pointer;margin:1px 3px 1px 0;white-space:nowrap;">
+        <input type="checkbox" ${hasPerm?'checked':''} onchange="togglePagePerm('${u.id}','${pid}',this.checked)" style="accent-color:#00e5c4;width:10px;height:10px;"> ${PAGE_LABELS[pid]}
+      </label>`;
+    }).join('');
+
+    return `<div style="background:#111827;border:1px solid #1e2d42;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div style="min-width:130px;">
+          <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Username</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#dce8f5;font-weight:600;">${u.id}</div>
+        </div>
+        <div style="min-width:150px;">
+          <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Display Name</div>
+          <input value="${u.name}" onchange="updateUserField(${ui},'name',this.value)"
+            style="background:#0d1117;border:1px solid #1e2d42;color:#dce8f5;padding:4px 8px;border-radius:6px;font-size:12px;width:100%;outline:none;"
+            onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+        </div>
+        <div style="min-width:140px;">
+          <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Password</div>
+          <input value="${u.pw}" onchange="updateUserField(${ui},'pw',this.value)" type="text"
+            style="background:#0d1117;border:1px solid #1e2d42;color:#dce8f5;padding:4px 8px;border-radius:6px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%;outline:none;"
+            onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+        </div>
+        <div style="min-width:130px;">
+          <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Role</div>
+          <select onchange="updateUserRole(${ui},this.value)"
+            style="background:#0d1117;border:1px solid #1e2d42;color:${roleColor[u.role]||'#dce8f5'};padding:4px 8px;border-radius:6px;font-size:11px;outline:none;cursor:pointer;">
+            ${ALL_ROLES.map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r.replace('_',' ')}</option>`).join('')}
+          </select>
+        </div>
+        <div style="min-width:110px;">
+          <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Branch</div>
+          <select onchange="updateUserField(${ui},'branch',this.value||null)"
+            style="background:#0d1117;border:1px solid #1e2d42;color:#dce8f5;padding:4px 8px;border-radius:6px;font-size:11px;outline:none;cursor:pointer;">
+            <option value="">All</option>
+            ${BRANCHES.map(b=>`<option value="${b}" ${u.branch===b?'selected':''}>${b}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:11px;color:#5a738a;margin-bottom:4px;">Page Access <span style="color:#2a3d52;font-size:9px;">(click to toggle)</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:2px;">${pagesHtml}</div>
+        </div>
+        ${u.id!=='admin'?`<button onclick="deleteUser(${ui})" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.2);color:#ff4d6d;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;align-self:flex-start;margin-top:20px;flex-shrink:0;">✕ Remove</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateUserField(idx,field,val){
+  const users=loadUsers();
+  if(users[idx]) users[idx][field]=val;
+  saveUsers(users);
+}
+
+function updateUserRole(idx,role){
+  const users=loadUsers();
+  if(!users[idx]) return;
+  users[idx].role=role;
+  // Reset page overrides to new role defaults
+  const overrides=loadPermOverrides();
+  delete overrides[users[idx].id]; // Remove old overrides so defaults apply
+  savePermOverrides(overrides);
+  saveUsers(users);
+  renderUserMgmtTable();
+}
+
+function togglePagePerm(userId,pageId,checked){
+  const overrides=loadPermOverrides();
+  const users=loadUsers();
+  const user=users.find(u=>u.id===userId);
+  if(!user) return;
+  // Get current effective pages
+  const basePerm=overrides[userId]?.pages||[...(ROLE_DEFAULTS[user.role]?.pages||[])];
+  let pages=[...basePerm];
+  if(checked&&!pages.includes(pageId)) pages.push(pageId);
+  if(!checked) pages=pages.filter(p=>p!==pageId);
+  // Preserve original order
+  pages.sort((a,b)=>PAGE_IDS.indexOf(a)-PAGE_IDS.indexOf(b));
+  if(!overrides[userId]) overrides[userId]={};
+  overrides[userId].pages=pages;
+  savePermOverrides(overrides);
+}
+
+function deleteUser(idx){
+  if(!confirm('Remove this user account?')) return;
+  const users=loadUsers();
+  users.splice(idx,1);
+  saveUsers(users);
+  renderUserMgmtTable();
+}
+
+function addNewUser(){
+  const users=loadUsers();
+  const newUser={id:'user'+(users.length+1),pw:'newpass',name:'New User',role:'employee',branch:null};
+  users.push(newUser);
+  saveUsers(users);
+  renderUserMgmtTable();
+}
+
+function resetAllUsers(){
+  if(!confirm('Reset ALL users to factory defaults? This will delete any custom accounts.')) return;
+  localStorage.removeItem('wiltek_users');
+  localStorage.removeItem('wiltek_perm_overrides');
+  renderUserMgmtTable();
+}
+
+// ═══════════════════════════════════════════
+// GOOGLE DRIVE LIVE DATA CONNECTION
+// ═══════════════════════════════════════════
+// AUTO-DETECT connection mode:
+// • Hosted on server  → auto uses '/api/data' (Node.js server reads Google Drive)
+// • Local file://     → uses Apps Script URL below (or empty = offline only)
+// • Apps Script URL   → paste here for file:// mode
+const GD_APPS_SCRIPT_URL = ''; // paste Apps Script URL here if using file:// mode
+const GD_API_URL = (typeof window !== 'undefined' && window.location.protocol !== 'file:')
+  ? '/api/data'
+  : GD_APPS_SCRIPT_URL;
+
+let gdLastFetch = null;
+let gdStatus = 'offline'; // 'offline' | 'loading' | 'live' | 'error'
+
+function renderGDStatus(){
+  const el = document.getElementById('gd-status');
+  if(!el) return;
+  const icons = {offline:'⚫',loading:'🔄',live:'🟢',error:'🔴'};
+  const labels = {
+    offline: {en:'Local Data (No Google Drive)',zh:'本地数据（未连接）'},
+    loading: {en:'Fetching from Google Drive...',zh:'正在从Google Drive获取...'},
+    live:    {en:'Live — Google Drive',zh:'实时 — Google Drive'},
+    error:   {en:'GD Error — Using Local Data',zh:'Google Drive错误 — 使用本地数据'},
+  };
+  el.innerHTML = `${icons[gdStatus]} ${labels[gdStatus][lang]}${gdLastFetch?' · '+gdLastFetch:''}`;
+  el.style.color = gdStatus==='live'?'#00e5c4':gdStatus==='error'?'#ff4d6d':'#5a738a';
+}
+
+async function fetchFromGoogleDrive(){
+  if(!GD_API_URL){
+    gdStatus='offline';
+    renderGDStatus();
+    return;
+  }
+  gdStatus='loading';
+  renderGDStatus();
+  try {
+    // Server endpoint uses '/api/data', Apps Script uses '?action=all'
+    const url = GD_API_URL.startsWith('/') ? GD_API_URL : GD_API_URL+'?action=all';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const json = await res.json();
+    if(json.error) throw new Error(json.error);
+
+    // ── Merge remote data into local D, BR, BR_YTD, BS, CUST26 ──
+    if(json.fmm){
+      const f = json.fmm;
+      // Overwrite D arrays with live data where available
+      ['sales_inv','sales_coll','br_ns','br_gp','br_net','hr_total',
+       'adm_total','acc_total','purch_total','china_p','stock_close','br_cogs','br_exp'].forEach(k=>{
+        if(f[k] && Array.isArray(f[k]) && f[k].length>0) D[k]=f[k];
+      });
+    }
+    if(json.liability){
+      const l = json.liability;
+      if(l.assets)      Object.assign(BS.assets, l.assets);
+      if(l.liabilities) Object.assign(BS.liabilities, l.liabilities);
+      if(l.net_surplus) BS.net_surplus = l.net_surplus;
+    }
+    if(json.branches){
+      // Update BR monthly data
+      ['W01','W02','W03','W05','W07','W11'].forEach(bk=>{
+        if(json.branches.monthly && json.branches.monthly[bk]){
+          Object.assign(BR[bk], json.branches.monthly[bk]);
+        }
+      });
+    }
+    if(json.customers){
+      const c = json.customers;
+      ['total','chinese','malay','indian','others'].forEach(seg=>{
+        if(c[seg]) Object.assign(CUST26[seg], c[seg]);
+      });
+    }
+
+    gdStatus='live';
+    gdLastFetch = new Date().toLocaleTimeString('en-MY');
+    renderGDStatus();
+    render(); // Re-render with fresh data
+  } catch(err){
+    console.error('Google Drive fetch failed:',err);
+    gdStatus='error';
+    renderGDStatus();
+  }
+}
+
+// ═══ INIT ═══
+window.addEventListener('load', ()=>{
+  document.getElementById('loginUser')?.focus();
+});
+
+// Auto-refresh from Google Drive every 5 minutes when live
+setInterval(()=>{ if(gdStatus==='live') fetchFromGoogleDrive(); }, 5*60*1000);
+</script>
+</body>
+</html>
