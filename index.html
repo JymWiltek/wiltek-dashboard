@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wiltek Homeware — Command Centre</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --border-bright: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #555;
+    --accent: #c8a96e;
+    --accent-dim: rgba(200,169,110,0.12);
+    --danger: #e05c5c;
+    --green: #5cb88a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── LOGIN SCREEN ── */
+  #login-screen {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    z-index: 100;
+    transition: opacity 0.5s ease;
+  }
+  #login-screen.fade-out { opacity: 0; pointer-events: none; }
+  .login-box {
+    width: 380px;
+    border: 1px solid var(--border-bright);
+    padding: 48px 40px;
+    background: var(--surface);
+    position: relative;
+  }
+  .login-box::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 40px; right: 40px; height: 2px;
+    background: var(--accent);
+  }
+  .login-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .login-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+  .login-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .login-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: 0.08em;
+  }
+  .login-input:focus { border-color: var(--accent); }
+  .login-btn {
+    width: 100%;
+    margin-top: 20px;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 14px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .login-btn:hover { opacity: 0.85; }
+  .login-error {
+    margin-top: 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--danger);
+    letter-spacing: 0.08em;
+    min-height: 16px;
+  }
+  .login-hint {
+    margin-top: 24px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--border-bright);
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+
+  /* ── MAIN APP ── */
+  #app { display: none; min-height: 100vh; }
+  #app.visible { display: block; }
+
+  /* grid noise texture */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .topbar {
+    position: sticky; top: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 40px;
+    height: 56px;
+    background: rgba(10,10,10,0.95);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .topbar-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  .topbar-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .topbar-right {
+    display: flex; align-items: center; gap: 20px;
+  }
+  #clock {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .logout-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border-bright);
+    padding: 5px 12px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .logout-btn:hover { color: var(--text); border-color: var(--muted); }
+
+  .main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 40px 80px;
+    position: relative; z-index: 1;
+  }
+
+  .section-header {
+    display: flex; align-items: baseline; gap: 16px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── HERO CARDS (Group level) ── */
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin-bottom: 40px;
+  }
+  .hero-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px 36px;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .hero-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+  }
+  .hero-card:hover { border-color: var(--border-bright); }
+  .hero-card:hover::after { transform: scaleX(1); }
+  .card-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-tag::before {
+    content: '';
+    display: inline-block;
+    width: 16px; height: 1px;
+    background: var(--accent);
+  }
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.1;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .card-arrow {
+    position: absolute;
+    bottom: 28px; right: 28px;
+    font-size: 20px;
+    color: var(--border-bright);
+    transition: color 0.2s, transform 0.2s;
+  }
+  .hero-card:hover .card-arrow {
+    color: var(--accent);
+    transform: translate(3px, -3px);
+  }
+
+  /* ── BRANCH GRID ── */
+  .branch-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin-bottom: 40px;
+  }
+  .branch-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px 28px;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .branch-card:hover {
+    border-color: var(--border-bright);
+    background: #141414;
+  }
+  .branch-code {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .branch-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .branch-pw {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #333;
+    letter-spacing: 0.1em;
+  }
+  .branch-arrow {
+    position: absolute;
+    top: 24px; right: 24px;
+    font-size: 14px;
+    color: var(--border-bright);
+    transition: color 0.2s;
+  }
+  .branch-card:hover .branch-arrow { color: var(--accent); }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .status-item {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .status-dot.amber { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.red { background: var(--danger); box-shadow: 0 0 6px var(--danger); animation: none; }
+
+  /* ── NOTICE ── */
+  .notice {
+    margin-top: 32px;
+    border: 1px solid #1a1a1a;
+    border-left: 2px solid var(--accent);
+    padding: 16px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+  .notice strong { color: var(--accent); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">WILTEK</div>
+    <div class="login-sub">Homeware Sdn Bhd — Command Centre</div>
+    <label class="login-label">Access Password</label>
+    <input class="login-input" type="password" id="pw-input" placeholder="Enter password" autocomplete="off">
+    <button class="login-btn" onclick="doLogin()">Enter</button>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-hint">CONFIDENTIAL · INTERNAL USE ONLY</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">WILTEK</div>
+    <div class="topbar-right">
+      <span id="clock"></span>
+      <button class="logout-btn" onclick="doLogout()">Lock</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- GROUP DASHBOARDS -->
+    <div class="section-header">
+      <span class="section-title">Group Intelligence</span>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="hero-grid">
+      <a class="hero-card" href="executive.html">
+        <div class="card-tag">Executive</div>
+        <div class="card-title">Group Executive Dashboard</div>
+        <div class="card-desc">Revenue trends · Branch rankings · Loyalty segments · Category mix</div>
+        <div class="card-arrow">↗</div>
+      </a>
+      <a class="hero-card" href="financial.html">
+        <div class="card-tag">Finance</div>
+        <div class="card-title">Financial Dashboard</div>
+        <div class="card-desc">P&amp;L · Cash flow · Gross profit · Branch P&amp;L · Expenses</div>
+        <div class="card-arrow">↗</div>
+      </a>
+      <a class="hero-card" href="bi.html">
+        <div class="card-tag">Business Intelligence</div>
+        <div class="card-title">BI Dashboard</div>
+        <div class="card-desc">Customer intelligence · Inventory status · Procurement · Action plan</div>
+        <div class="card-arrow">↗</div>
+      </a>
+      <a class="hero-card" href="product-pl.html" style="opacity:0.45; pointer-events:none; cursor:default;">
+        <div class="card-tag">Coming Soon</div>
+        <div class="card-title">Product P&amp;L Dashboard</div>
+        <div class="card-desc">GP by product · Brand analysis · Smart Sink deep-dive · Loss alerts</div>
+        <div class="card-arrow" style="color:#222">↗</div>
+      </a>
+    </div>
+
+    <!-- BRANCH DASHBOARDS -->
+    <div class="section-header">
+      <span class="section-title">Branch Operations</span>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="branch-grid">
+      <a class="branch-card" href="branch/W01.html">
+        <div class="branch-code">W01</div>
+        <div class="branch-name">Pandan Indah</div>
+        <div class="branch-pw">pw: Wiltek01</div>
+        <div class="branch-arrow">↗</div>
+      </a>
+      <a class="branch-card" href="branch/W02.html">
+        <div class="branch-code">W02</div>
+        <div class="branch-name">Ampang</div>
+        <div class="branch-pw">pw: Wiltek02</div>
+        <div class="branch-arrow">↗</div>
+      </a>
+      <a class="branch-card" href="branch/W03.html">
+        <div class="branch-code">W03</div>
+        <div class="branch-name">Wangsa Maju</div>
+        <div class="branch-pw">pw: Wiltek03</div>
+        <div class="branch-arrow">↗</div>
+      </a>
+      <a class="branch-card" href="branch/W05.html">
+        <div class="branch-code">W05</div>
+        <div class="branch-name">Bangi</div>
+        <div class="branch-pw">pw: Wiltek05</div>
+        <div class="branch-arrow">↗</div>
+      </a>
+      <a class="branch-card" href="branch/W07.html">
+        <div class="branch-code">W07</div>
+        <div class="branch-name">Pandan Jaya</div>
+        <div class="branch-pw">pw: Wiltek07</div>
+        <div class="branch-arrow">↗</div>
+      </a>
+      <a class="branch-card" href="branch/W11.html">
+        <div class="branch-code">W11</div>
+        <div class="branch-name">Taman Midah</div>
+        <div class="branch-pw">pw: Wiltek11</div>
+        <div class="branch-arrow">↗</div>
+      </a>
+    </div>
+
+    <!-- STATUS -->
+    <div class="section-header">
+      <span class="section-title">System Status</span>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-item"><div class="status-dot"></div> Executive Dashboard · Live</div>
+      <div class="status-item"><div class="status-dot"></div> Financial Dashboard · Live</div>
+      <div class="status-item"><div class="status-dot"></div> BI Dashboard · Live</div>
+      <div class="status-item"><div class="status-dot amber"></div> Product P&amp;L · Pending</div>
+      <div class="status-item"><div class="status-dot"></div> All 6 Branches · Live</div>
+    </div>
+
+    <div class="notice">
+      <strong>DATA REFRESH CYCLE</strong> · Upload <code>raw_data.xlsx</code> + <code>CUSTOMER_BUY_V3.xlsx</code> to Claude monthly → Receive updated HTML files → Replace files in this repo via GitHub Desktop → All branches auto-update on next load.<br>
+      <strong>BRANCH DATA</strong> · Each branch manager's KPI &amp; GTD data is stored locally in their browser (localStorage). Master Backup available via Admin login on each branch dashboard.
+    </div>
+
+  </div>
+</div>
+
+<script>
+const PORTAL_PW = 'Wiltek2026';
+const SESSION_KEY = 'wiltek_portal_auth';
+
+function doLogin() {
+  const val = document.getElementById('pw-input').value;
+  const err = document.getElementById('login-error');
+  if (val === PORTAL_PW) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('login-screen').classList.add('fade-out');
+    setTimeout(() => {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').classList.add('visible');
+    }, 500);
+    err.textContent = '';
+  } else {
+    err.textContent = 'Incorrect password.';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// Auto-login if session active
+if (sessionStorage.getItem(SESSION_KEY)) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const d = now.toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
+  const t = now.toLocaleTimeString('en-MY', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('clock').textContent = `${d}  ${t}`;
+}
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>
