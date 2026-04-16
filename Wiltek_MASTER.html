@@ -85,6 +85,7 @@ td.la{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:500}
 td.la2{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:400;color:var(--mu);padding-left:22px}
 td:not(.la):not(.la2){text-align:right}
 .cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.co{color:var(--o)}.cm{color:var(--mu)}
+.neg{color:#ff4d6d!important;font-weight:700}.pos-good{color:#00e5c4!important}
 .tr td{font-weight:700;background:rgba(0,229,196,.04);color:var(--g)}.tr td.la{font-weight:700}
 .hl td{background:rgba(0,229,196,.06)!important}
 .mb{display:flex;align-items:center;gap:6px;justify-content:flex-end}
@@ -167,7 +168,8 @@ td:not(.la):not(.la2){text-align:right}
     <div style="font-size:16px;font-weight:700;color:#dce8f5;margin-bottom:4px;" id="adminModalTitle">Edit Value</div>
     <div style="font-size:11px;color:#5a738a;font-family:'JetBrains Mono',monospace;margin-bottom:20px;" id="adminModalPath"></div>
     <input id="adminModalInput" style="width:100%;background:#111827;border:1px solid #1e2d42;color:#dce8f5;padding:12px 14px;border-radius:8px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:16px;"
-      onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+      onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'"
+      onkeydown="if(event.key==='Enter')saveAdminEdit()">
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <button onclick="closeAdminModal()" style="background:#1a2235;border:1px solid #1e2d42;color:#5a738a;padding:9px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Cancel</button>
       <button onclick="saveAdminEdit()" style="background:linear-gradient(135deg,#00e5c4,#00b89e);border:none;color:#07090f;padding:9px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">Save</button>
@@ -199,7 +201,8 @@ td:not(.la):not(.la2){text-align:right}
   </div>
   <div class="topbar-right">
     <select class="msel" id="mSel" onchange="selMonth=this.value;render()">
-      <option value="Mar26" selected>Mar 2026 (Latest)</option>
+      <option value="Apr26" selected>Apr 2026 (Latest)</option>
+      <option value="Mar26">Mar 2026</option>
       <option value="Feb26">Feb 2026</option>
       <option value="Jan26">Jan 2026</option>
       <option value="Dec25">Dec 2025</option>
@@ -429,6 +432,7 @@ td:not(.la):not(.la2){text-align:right}
 <div class="page" id="p-balancesheet">
   <div class="ph" id="bs-ph"></div>
   <div class="ps" id="bs-ps"></div>
+  <div id="bs-static-notice" style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.3);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#f5c842;"></div>
   <div id="bs-ins" class="ins info"></div>
   <div class="kr c4" id="bs-kpis"></div>
   <div class="gr g11">
@@ -675,9 +679,15 @@ function updateNav(){
     }
     ns.style.display=anyVisible?'':'none';
   });
-  // Navigate to first allowed page
-  const first=userPerms.pages&&userPerms.pages[0];
-  if(first) nav(first);
+  // Navigate to role-appropriate landing page
+  const roleLanding={
+    admin:'health', ceo:'health', cfo:'cashflow', director:'health',
+    sales_mgr:'health', branch_mgr:'branches',
+    hr:'expenses', warehouse:'inventory', marketing:'customers', employee:'branchhub'
+  };
+  const landing = roleLanding[currentUser&&currentUser.role] || (userPerms.pages&&userPerms.pages[0]) || 'health';
+  if(canAccess(landing)) nav(landing);
+  else { const first=userPerms.pages&&userPerms.pages[0]; if(first) nav(first); }
 }
 
 let isAdmin = false; // kept for legacy adminMode edits compatibility
@@ -763,69 +773,69 @@ function editable(display, title, path, currentVal, setter){
 // ═══════════════════════════════
 // DATA
 // ═══════════════════════════════
-const M15 = ['Jan25','Feb25','Mar25','Apr25','May25','Jun25','Jul25','Aug25','Sep25','Oct25','Nov25','Dec25','Jan26','Feb26','Mar26'];
+const M15 = ['Jan25','Feb25','Mar25','Apr25','May25','Jun25','Jul25','Aug25','Sep25','Oct25','Nov25','Dec25','Jan26','Feb26','Mar26','Apr26'];
 
 const D = {
-  sales_inv:[490570.49,505702.7,494906.54,454056.0,498183.47,484183.85,465099.06,460531.17,425858.43,358262.77,381898.11,444253.18,516682.9,419078.47,382542.05],
-  sales_coll:[516289.0,498134.14,488956.04,453542.25,482448.39,483586.01,465742.43,448644.83,438718.95,357367.87,367223.54,452843.51,492651.88,364550.14,386279.12],
-  total_pay:[534264.56,551352.76,457640.36,510363.05,471042.42,496564.79,531544.24,428143.03,447458.41,391175.81,496030.28,562349.02,497692.95,376267.73,386083.07],
-  cf_true:[42084.44,-53158.62,39767.68,-56760.8,11405.97,-12918.78,-20301.81,20622.81,-8739.46,2192.06,-128806.37,-106313.61,-200.2,-9469.74,2693.95],
-  other_recv:[60060.0,60.0,8452.0,60.0,0.0,60.0,45500.0,121.01,0.0,36000.0,702793.37,3191.9,4840.87,2247.85,2497.9],
-  purch_total:[241462.9,254272.69,143094.81,276169.5,219518.87,245917.02,273312.03,168267.37,183953.87,109159.39,236735.5,344907.15,260165.22,130458.71,175842.18],
-  china_p:[83341.61,84684.93,79709.86,81933.73,86980.63,78042.07,127809.76,79396.9,83363.02,4439.76,137758.19,87932.98,112371.28,8375.65,105282.46],
-  trans_p:[14842.52,12409.36,9123.81,18951.51,8477.92,8421.58,11338.96,22866.11,7778.93,6519.95,7851.09,41058.65,8228.2,5365.62,13976.4],
-  local_p:[143278.77,98142.67,54261.14,175284.26,124060.32,104569.4,134163.31,66004.36,92811.92,16594.72,91126.22,171087.43,98731.11,43851.29,56583.32],
-  oaf_p:[0.0,59035.73,0.0,0.0,0.0,54883.97,0.0,0.0,0.0,81604.96,0.0,44828.09,40834.63,72866.15,0.0],
+  sales_inv:[490570.49,505702.7,494906.54,454056.0,498183.47,484183.85,465099.06,460531.17,425858.43,358262.77,381898.11,444253.18,516682.9,419078.47,382542.05,0],
+  sales_coll:[516289.0,498134.14,488956.04,453542.25,482448.39,483586.01,465742.43,448644.83,438718.95,357367.87,367223.54,452843.51,492651.88,364550.14,386279.12,0],
+  total_pay:[534264.56,551352.76,457640.36,510363.05,471042.42,496564.79,531544.24,428143.03,447458.41,391175.81,496030.28,562349.02,497692.95,376267.73,386083.07,0],
+  cf_true:[42084.44,-53158.62,39767.68,-56760.8,11405.97,-12918.78,-20301.81,20622.81,-8739.46,2192.06,-128806.37,-106313.61,-200.2,-9469.74,2693.95,0],
+  other_recv:[60060.0,60.0,8452.0,60.0,0.0,60.0,45500.0,121.01,0.0,36000.0,702793.37,3191.9,4840.87,2247.85,2497.9,0],
+  purch_total:[241462.9,254272.69,143094.81,276169.5,219518.87,245917.02,273312.03,168267.37,183953.87,109159.39,236735.5,344907.15,260165.22,130458.71,175842.18,0],
+  china_p:[83341.61,84684.93,79709.86,81933.73,86980.63,78042.07,127809.76,79396.9,83363.02,4439.76,137758.19,87932.98,112371.28,8375.65,105282.46,0],
+  trans_p:[14842.52,12409.36,9123.81,18951.51,8477.92,8421.58,11338.96,22866.11,7778.93,6519.95,7851.09,41058.65,8228.2,5365.62,13976.4,0],
+  local_p:[143278.77,98142.67,54261.14,175284.26,124060.32,104569.4,134163.31,66004.36,92811.92,16594.72,91126.22,171087.43,98731.11,43851.29,56583.32,0],
+  oaf_p:[0.0,59035.73,0.0,0.0,0.0,54883.97,0.0,0.0,0.0,81604.96,0.0,44828.09,40834.63,72866.15,0.0,0],
   // Op & Mktg details
-  op_total:[4057.17,5390.02,2487.45,3660.02,2402.87,2362.39,3516.55,8838.61,12224.23,8108.65,2980.4,4565.37,20092.69,1943.75,6619.11],
-  op_branch:[3828.08,5031.47,1173.85,3503.6,1065.27,2276.69,2343.07,8032.49,11161.45,7335.25,2980.4,2833.1,996.86,1593.75,5899.11],
-  op_contractor:[1108.45,993.55,340.85,1856.35,772.2,989.1,967.7,2257.3,1778.95,1113.85,1510.5,529.7,89.4,1593.75,88.6],
-  op_misc:[519.63,388.92,833.0,1028.25,159.57,937.59,1375.37,2478.19,8452.0,5467.9,1054.9,2303.4,607.46,0.0,350.51],
-  op_banner:[0.0,0.0,0.0,619.0,133.5,350.0,0.0,897.0,133.5,753.5,415.0,0.0,0.0,0.0,0.0],
-  mkt_total:[229.09,358.55,1313.6,156.42,1337.6,85.7,1173.48,806.12,1062.78,773.4,0.0,1732.27,19095.83,350.0,720.0],
-  mkt_promo:[0.0,0.0,720.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16000.0,0.0,0.0],
-  mkt_google:[229.09,358.55,213.6,156.42,157.6,65.7,453.48,206.12,342.78,173.4,0.0,969.07,91.03,0.0,0.0],
-  mkt_banner:[0.0,0.0,380.0,0.0,1180.0,20.0,720.0,600.0,720.0,600.0,0.0,763.2,3004.8,350.0,720.0],
-  online_total:[12040.0,44002.69,33901.01,4562.96,5840.46,5824.65,11054.85,6371.44,6075.2,45353.57,4055.8,3134.93,6502.11,10692.17,10314.75],
-  online_social:[3724.0,3198.13,4408.69,4562.96,3284.46,5425.25,4793.73,6371.44,6075.2,5263.97,4055.8,3134.93,6502.11,7138.97,5454.75],
-  online_kol:[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,40089.6,0.0,0.0,0.0,3553.2,0.0],
-  log_total:[1996.51,2067.85,1776.17,1483.21,1496.99,2265.99,1419.55,1344.0,2265.6,879.35,332.2,1951.25,2753.96,1411.41,2046.95],
-  log_diesel:[1007.88,949.35,932.3,924.59,481.64,1017.09,923.46,0.0,0.0,100.0,0.0,333.15,1066.48,725.69,865.63],
-  log_toll:[150.0,150.0,100.0,200.0,150.0,100.0,200.0,100.0,100.0,50.0,53.0,150.0,150.0,100.0,150.0],
-  log_lalamove:[226.2,210.5,307.05,152.6,331.15,383.5,223.2,488.0,61.1,510.35,257.6,662.3,1130.7,308.1,327.6],
-  adm_total:[66770.34,59336.48,61846.79,58213.43,61968.05,63154.29,62461.38,70016.17,62019.05,59864.84,56884.37,63318.57,54721.02,59285.28,65514.92],
-  adm_rental:[44500.0,44500.0,44500.0,44500.0,44500.0,44500.0,44500.0,43000.0,44500.0,44500.0,40200.0,40700.0,41100.0,41100.0,35100.0],
-  adm_utility:[10869.21,9534.12,10183.39,10142.0,10893.7,11465.1,11655.26,11150.93,10770.5,11071.41,9664.04,9251.85,8801.57,8866.44,7898.85],
-  adm_office:[422.08,535.74,97.4,80.0,1126.88,1058.69,80.0,3323.16,508.95,430.03,1092.85,1757.72,639.59,0.0,126.9],
-  adm_var:[2976.3,3341.62,4030.0,470.0,3443.47,285.0,1023.8,1625.2,5097.0,2260.8,2529.48,6239.0,3473.0,8611.98,19332.59],
-  adm_medical:[0.0,0.0,30.0,0.0,0.0,0.0,46.0,0.0,0.0,0.0,0.0,0.0,80.0,60.0,0.0],
-  adm_stationary:[848.5,632.63,0.0,0.0,1043.47,285.0,37.8,379.3,515.0,1000.0,1640.24,1909.0,332.0,415.05,30.8],
-  adm_misc_hq:[540.0,2350.0,4000.0,270.0,0.0,0.0,940.0,1100.0,3032.0,0.0,889.24,2000.0,941.0,479.37,400.0],
-  adm_refresh:[0.0,0.0,0.0,0.0,0.0,0.0,0.0,145.9,0.0,0.0,0.0,0.0,0.0,7657.56,18901.79],
-  hr_total:[179666.51,171563.45,197886.05,150253.2,163028.82,161818.6,164906.13,154568.58,152202.15,154997.28,143588.52,128355.83,133163.52,141840.48,110578.74],
-  hr_netpay:[135675.53,121291.72,153885.82,95502.02,114354.87,120418.5,120646.23,111434.41,110363.57,109767.82,103374.65,97517.32,99591.1,106356.62,71453.68],
-  hr_statutory:[43990.98,50225.13,44000.23,54751.18,43939.53,41400.1,44259.9,43134.17,40974.58,40620.16,40213.87,25321.47,33572.42,35483.86,39125.06],
-  acc_total:[28271.13,14719.58,16648.08,16020.73,16786.36,15221.85,14873.75,18736.86,28718.31,12812.73,51453.49,16115.92,20294.43,30635.93,15166.42],
-  acc_loan:[7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0],
-  acc_hp1:[1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0],
-  acc_hp2:[2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0],
-  acc_bank:[2585.56,1407.94,78.0,78.0,78.0,1277.93,535.3,78.0,78.0,78.0,194.87,1540.21,958.05,2311.45,998.13],
-  acc_claim_cf:[420.17,618.64,1888.08,427.23,259.06,1000.92,395.45,317.91,393.71,291.73,377.32,868.61,275.38,865.78,1121.8],
-  acc_claim_cck:[400.8,0.0,2239.0,3072.5,3046.3,0.0,0.0,5897.95,883.6,0.0,638.3,657.1,525.0,1797.9,566.49],
-  acc_secretary:[0.0,250.0,0.0,0.0,960.0,500.0,0.0,0.0,0.0,0.0,1800.0,0.0,5950.0,0.0,0.0],
-  acc_audit:[10114.2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,10654.2,0.0],
-  acc_others:[2307.4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,36000.0,599.0,209.0,2563.6,37.0],
-  stock_close:[1145558,1122461,1122461,1169561,1169561,1134890,1060220,1039161,1087025,1118406,1135800,1067225,1092871,1210425,1167280],
-  stock_open: [1145558,1145558,1122461,1122461,1169561,1190868,1134890,1060220,1039161,1087025,1118406,1135800,1067225,1092871,1210425],
+  op_total:[4057.17,5390.02,2487.45,3660.02,2402.87,2362.39,3516.55,8838.61,12224.23,8108.65,2980.4,4565.37,20092.69,1943.75,6619.11,0],
+  op_branch:[3828.08,5031.47,1173.85,3503.6,1065.27,2276.69,2343.07,8032.49,11161.45,7335.25,2980.4,2833.1,996.86,1593.75,5899.11,0],
+  op_contractor:[1108.45,993.55,340.85,1856.35,772.2,989.1,967.7,2257.3,1778.95,1113.85,1510.5,529.7,89.4,1593.75,88.6,0],
+  op_misc:[519.63,388.92,833.0,1028.25,159.57,937.59,1375.37,2478.19,8452.0,5467.9,1054.9,2303.4,607.46,0.0,350.51,0],
+  op_banner:[0.0,0.0,0.0,619.0,133.5,350.0,0.0,897.0,133.5,753.5,415.0,0.0,0.0,0.0,0.0,0],
+  mkt_total:[229.09,358.55,1313.6,156.42,1337.6,85.7,1173.48,806.12,1062.78,773.4,0.0,1732.27,19095.83,350.0,720.0,0],
+  mkt_promo:[0.0,0.0,720.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,16000.0,0.0,0.0,0],
+  mkt_google:[229.09,358.55,213.6,156.42,157.6,65.7,453.48,206.12,342.78,173.4,0.0,969.07,91.03,0.0,0.0,0],
+  mkt_banner:[0.0,0.0,380.0,0.0,1180.0,20.0,720.0,600.0,720.0,600.0,0.0,763.2,3004.8,350.0,720.0,0],
+  online_total:[12040.0,44002.69,33901.01,4562.96,5840.46,5824.65,11054.85,6371.44,6075.2,45353.57,4055.8,3134.93,6502.11,10692.17,10314.75,0],
+  online_social:[3724.0,3198.13,4408.69,4562.96,3284.46,5425.25,4793.73,6371.44,6075.2,5263.97,4055.8,3134.93,6502.11,7138.97,5454.75,0],
+  online_kol:[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,40089.6,0.0,0.0,0.0,3553.2,0.0,0],
+  log_total:[1996.51,2067.85,1776.17,1483.21,1496.99,2265.99,1419.55,1344.0,2265.6,879.35,332.2,1951.25,2753.96,1411.41,2046.95,0],
+  log_diesel:[1007.88,949.35,932.3,924.59,481.64,1017.09,923.46,0.0,0.0,100.0,0.0,333.15,1066.48,725.69,865.63,0],
+  log_toll:[150.0,150.0,100.0,200.0,150.0,100.0,200.0,100.0,100.0,50.0,53.0,150.0,150.0,100.0,150.0,0],
+  log_lalamove:[226.2,210.5,307.05,152.6,331.15,383.5,223.2,488.0,61.1,510.35,257.6,662.3,1130.7,308.1,327.6,0],
+  adm_total:[66770.34,59336.48,61846.79,58213.43,61968.05,63154.29,62461.38,70016.17,62019.05,59864.84,56884.37,63318.57,54721.02,59285.28,65514.92,0],
+  adm_rental:[44500.0,44500.0,44500.0,44500.0,44500.0,44500.0,44500.0,43000.0,44500.0,44500.0,40200.0,40700.0,41100.0,41100.0,35100.0,0],
+  adm_utility:[10869.21,9534.12,10183.39,10142.0,10893.7,11465.1,11655.26,11150.93,10770.5,11071.41,9664.04,9251.85,8801.57,8866.44,7898.85,0],
+  adm_office:[422.08,535.74,97.4,80.0,1126.88,1058.69,80.0,3323.16,508.95,430.03,1092.85,1757.72,639.59,0.0,126.9,0],
+  adm_var:[2976.3,3341.62,4030.0,470.0,3443.47,285.0,1023.8,1625.2,5097.0,2260.8,2529.48,6239.0,3473.0,8611.98,19332.59,0],
+  adm_medical:[0.0,0.0,30.0,0.0,0.0,0.0,46.0,0.0,0.0,0.0,0.0,0.0,80.0,60.0,0.0,0],
+  adm_stationary:[848.5,632.63,0.0,0.0,1043.47,285.0,37.8,379.3,515.0,1000.0,1640.24,1909.0,332.0,415.05,30.8,0],
+  adm_misc_hq:[540.0,2350.0,4000.0,270.0,0.0,0.0,940.0,1100.0,3032.0,0.0,889.24,2000.0,941.0,479.37,400.0,0],
+  adm_refresh:[0.0,0.0,0.0,0.0,0.0,0.0,0.0,145.9,0.0,0.0,0.0,0.0,0.0,7657.56,18901.79,0],
+  hr_total:[179666.51,171563.45,197886.05,150253.2,163028.82,161818.6,164906.13,154568.58,152202.15,154997.28,143588.52,128355.83,133163.52,141840.48,110578.74,0],
+  hr_netpay:[135675.53,121291.72,153885.82,95502.02,114354.87,120418.5,120646.23,111434.41,110363.57,109767.82,103374.65,97517.32,99591.1,106356.62,71453.68,0],
+  hr_statutory:[43990.98,50225.13,44000.23,54751.18,43939.53,41400.1,44259.9,43134.17,40974.58,40620.16,40213.87,25321.47,33572.42,35483.86,39125.06,0],
+  acc_total:[28271.13,14719.58,16648.08,16020.73,16786.36,15221.85,14873.75,18736.86,28718.31,12812.73,51453.49,16115.92,20294.43,30635.93,15166.42,0],
+  acc_loan:[7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,7906.0,0],
+  acc_hp1:[1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,1686.0,0],
+  acc_hp2:[2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,2785.0,0],
+  acc_bank:[2585.56,1407.94,78.0,78.0,78.0,1277.93,535.3,78.0,78.0,78.0,194.87,1540.21,958.05,2311.45,998.13,0],
+  acc_claim_cf:[420.17,618.64,1888.08,427.23,259.06,1000.92,395.45,317.91,393.71,291.73,377.32,868.61,275.38,865.78,1121.8,0],
+  acc_claim_cck:[400.8,0.0,2239.0,3072.5,3046.3,0.0,0.0,5897.95,883.6,0.0,638.3,657.1,525.0,1797.9,566.49,0],
+  acc_secretary:[0.0,250.0,0.0,0.0,960.0,500.0,0.0,0.0,0.0,0.0,1800.0,0.0,5950.0,0.0,0.0,0],
+  acc_audit:[10114.2,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,10654.2,0.0,0],
+  acc_others:[2307.4,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,36000.0,599.0,209.0,2563.6,37.0,0],
+  stock_close:[1145558,1122461,1122461,1169561,1169561,1134890,1060220,1039161,1087025,1118406,1135800,1067225,1092871,1210425,1167280,0],
+  stock_open: [1145558,1145558,1122461,1122461,1169561,1190868,1134890,1060220,1039161,1087025,1118406,1135800,1067225,1092871,1210425,0],
   // Branch totals (from Branch25/26 inv basis)
-  br_ns:[510231.39,522241.54,494150.48,441064.88,491694.49,476446.11,444843.84,439449.86,399586.12,363829.17,404051.09,421480.18,517152.6,389251.55,372155.91],
-  br_cogs:[274590.69,280862.15,258853.79,234749.66,265857.78,252806.22,223089.35,221399.78,199845.21,182100.25,191379.7,203362.64,263880.81,211491.13,193110.73],
-  br_gp:[235640.7,241379.39,235296.69,206315.22,225836.71,223639.89,221754.49,218050.08,199740.91,181728.92,212671.39,218117.54,253271.79,177760.42,179045.18],
-  br_exp:[161164.82,148778.35,172031.55,160137.99,140405.37,144061.18,148041.42,142082.8,139960.4,133911.61,118865.81,118944.68,129003.2,128124.52,126217.0],
-  br_net:[74475.88,92601.04,63265.14,46177.23,85431.34,79578.71,73713.07,75967.28,59780.51,47817.31,93805.58,99172.86,124268.59,49635.9,52828.18],
+  br_ns:[510231.39,522241.54,494150.48,441064.88,491694.49,476446.11,444843.84,439449.86,399586.12,363829.17,404051.09,421480.18,517152.6,389251.55,372155.91,0],
+  br_cogs:[274590.69,280862.15,258853.79,234749.66,265857.78,252806.22,223089.35,221399.78,199845.21,182100.25,191379.7,203362.64,263880.81,211491.13,193110.73,0],
+  br_gp:[235640.7,241379.39,235296.69,206315.22,225836.71,223639.89,221754.49,218050.08,199740.91,181728.92,212671.39,218117.54,253271.79,177760.42,179045.18,0],
+  br_exp:[161164.82,148778.35,172031.55,160137.99,140405.37,144061.18,148041.42,142082.8,139960.4,133911.61,118865.81,118944.68,129003.2,128124.52,126217.0,0],
+  br_net:[74475.88,92601.04,63265.14,46177.23,85431.34,79578.71,73713.07,75967.28,59780.51,47817.31,93805.58,99172.86,124268.59,49635.9,52828.18,0],
   // GP%
-  gp_acctg:[0.4618,0.4622,0.4762,0.4678,0.4593,0.4694,0.4985,0.4962,0.4999,0.4995,0.5263,0.5175,0.4897,0.4567,0.4820],
-  gp_direct:[0.4618,0.4622,0.4762,0.4678,0.4593,0.4694,0.4985,0.4962,0.4999,0.4995,0.5263,0.5175,0.4897,0.4567,0.4820],
+  gp_acctg:[0.4618,0.4622,0.4762,0.4678,0.4593,0.4694,0.4985,0.4962,0.4999,0.4995,0.5263,0.5175,0.4897,0.4567,0.4820,0],
+  gp_direct:[0.4618,0.4622,0.4762,0.4678,0.4593,0.4694,0.4985,0.4962,0.4999,0.4995,0.5263,0.5175,0.4897,0.4567,0.4820,0],
 };
 
 // ═══════════════════════════════
@@ -969,7 +979,18 @@ const BR_YTD = {
 // ═══════════════════════════════
 // LANGUAGE
 // ═══════════════════════════════
-let lang='en', selMonth='Mar26', brView='monthly'; // Mar26 = latest data available
+let lang='en', selMonth='Apr26', brView='monthly'; // Apr26 = current month (data pending)
+
+// ── Month code → readable label ──
+function mLabel(code){
+  const map={
+    'Jan25':'Jan 2025','Feb25':'Feb 2025','Mar25':'Mar 2025','Apr25':'Apr 2025',
+    'May25':'May 2025','Jun25':'Jun 2025','Jul25':'Jul 2025','Aug25':'Aug 2025',
+    'Sep25':'Sep 2025','Oct25':'Oct 2025','Nov25':'Nov 2025','Dec25':'Dec 2025',
+    'Jan26':'Jan 2026','Feb26':'Feb 2026','Mar26':'Mar 2026','Apr26':'Apr 2026'
+  };
+  return map[code]||code;
+}
 
 const T = {
   // Nav
@@ -1010,6 +1031,7 @@ function setBrView(v){
 }
 
 function nav(id){
+  window.scrollTo(0,0);
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   document.getElementById('p-'+id).classList.add('active');
@@ -1040,7 +1062,7 @@ function kpiHtml(cls,lbl,val,sub,pill){
 // ═══════════════════════════════
 function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[k]);
   const m=selMonth, prev=prevM(m), i=idx(m);
-  document.getElementById('pb').textContent='📅 '+m;
+  document.getElementById('pb').textContent='📅 '+mLabel(m);
 
   // Nav labels
   ['s1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','links'].forEach(k=>{
@@ -1089,6 +1111,12 @@ function renderHealth(m,prev,i){
   if(hrPct>.32) issues.push(en?'HR High':'HR偏高');
   if(days>130)  issues.push(en?`Stock ${days}d`:`库存${days}天`);
   if(cf<0)      issues.push(en?'Cash -ve':'现金负数');
+  // Check for any branch running at a loss this month
+  const lossBranches=['W01','W02','W03','W05','W07','W11'].filter(k=>{
+    const bd=BR[k]&&(BR[k][period]||BR[k]['mar']);
+    return bd&&bd.net<0;
+  });
+  if(lossBranches.length>0) issues.push((en?'Branch loss: ':'门市亏损: ')+lossBranches.join(', '));
   const verdictEl=document.getElementById('h-verdict');
   if(verdictEl){
     if(issues.length===0){
@@ -1460,7 +1488,7 @@ function renderBranches(m,i){
   const validBranchMonths=['Jan26','Feb26','Mar26'];
   const inRange=validBranchMonths.includes(m);
   const _effectiveM=inRange?m:'Mar26';
-  const period=(_effectiveM==='Mar26')?'mar':(_effectiveM==='Jan26'?'jan':'feb');
+  const period=_effectiveM==='Mar26'?'mar':_effectiveM==='Feb26'?'feb':_effectiveM==='Jan26'?'jan':'mar';
   const useYTD=(brView==='ytd');
   const viewLabel=useYTD?(en?'YTD Jan–Mar 2026':'2026年1-3月累计'):_effectiveM;
 
@@ -1472,7 +1500,7 @@ function renderBranches(m,i){
       ?`⚠️ Branch P&L data is only available for Jan–Mar 2026. Showing <strong>Mar 2026</strong> data.`
       :`⚠️ 门市损益数据仅支持2026年1–3月。当前显示 <strong>2026年3月</strong> 数据。`;
   }
-  const rentMult=useYTD?2:1;
+  const rentMult=useYTD?3:1; // Jan+Feb+Mar = 3 months YTD
 
   // ── 2. Build unified data array ──
   const bdata_all=useYTD
@@ -1481,12 +1509,12 @@ function renderBranches(m,i){
 
   // ── 3. Set page headers ──
   txt(document.getElementById('br-ph'),`🏪 Branch P\u0026L — ${m}`,`🏪 门市盈亏 — ${m}`);
-  txt(document.getElementById('br-ps'),'YTD 2026 (Jan–Feb) · WCO excluded (warehouse/cost centre)','2026年累计（1-2月）· WCO不含（仓库/成本中心）');
+  txt(document.getElementById('br-ps'),'YTD 2026 (Jan–Mar) · WCO excluded (warehouse/cost centre)','2026年累计（1-3月）· WCO不含（仓库/成本中心）');
 
   // ── 4. Set toggle buttons ──
   const btnM=document.getElementById('btn-monthly');
   const btnY=document.getElementById('btn-ytd');
-  if(btnM){btnM.textContent=en?m:'当月 '+m; btnM.className='lb'+(useYTD?'':' active');}
+  if(btnM){btnM.textContent=en?mLabel(m):'当月 '+mLabel(m); btnM.className='lb'+(useYTD?'':' active');}
   if(btnY){btnY.textContent=en?'YTD Jan–Mar':'累计 Jan–Mar'; btnY.className='lb'+(useYTD?' active':'');}
   txt(document.getElementById('br-toggle-lbl'),'View:','查看：');
 
@@ -1886,6 +1914,7 @@ function renderBalanceSheet(){
   const en=lang==='en';
   txt(document.getElementById('bs-ph'),'🏦 Balance Sheet — Mar 2026','🏦 资产负债表 — 2026年3月');
   txt(document.getElementById('bs-ps'),'As at 31 March 2026 · Building + Stock + Cash vs Loans + OAF','截至2026年3月31日 · 楼房+库存+现金 vs 贷款+OAF');
+  document.getElementById('bs-static-notice').innerHTML='<div style="background:#FEF3CD;border-left:4px solid #D4A017;padding:10px 14px;margin-bottom:16px;border-radius:4px;font-size:13px;color:#5A3E00;">⚠️ Balance Sheet adalah snapshot tetap pada 31 Mac 2026 — tidak berubah apabila anda menukar bulan. / Balance Sheet is a static snapshot at 31 Mar 2026 — does not update with month selector.</div>';
 
   const ins=document.getElementById('bs-ins');
   ins.className='ins info';
@@ -2340,6 +2369,7 @@ const GD_API_KEY = 'WiltekAPI2026';
 
 let gdLastFetch = null;
 let gdStatus = 'offline'; // 'offline' | 'loading' | 'live' | 'error'
+let gdLastError = '';
 
 function renderGDStatus(){
   const el = document.getElementById('gd-status');
@@ -2347,11 +2377,16 @@ function renderGDStatus(){
   const icons = {offline:'⚫',loading:'🔄',live:'🟢',error:'🔴'};
   const labels = {
     offline: {en:'Local Data',zh:'本地数据'},
-    loading: {en:'Fetching from Google Drive...',zh:'正在从Google Drive获取...'},
+    loading: {en:'Fetching...',zh:'获取中...'},
     live:    {en:'Live — Google Drive',zh:'实时 — Google Drive'},
-    error:   {en:'GD Error — Using Local Data',zh:'Google Drive错误 — 使用本地数据'},
+    error:   {en:'GD Error',zh:'GD错误'},
   };
-  el.innerHTML = `${icons[gdStatus]} ${labels[gdStatus][lang]}${gdLastFetch?' · '+gdLastFetch:''}`;
+  const base = `${icons[gdStatus]} ${labels[gdStatus][lang]}`;
+  const detail = gdStatus==='live' ? (gdLastFetch?' · '+gdLastFetch:'')
+               : gdStatus==='error' ? (gdLastError?' · '+gdLastError:'')
+               : '';
+  el.innerHTML = base+detail;
+  el.title = gdLastError||'';
   el.style.color = gdStatus==='live'?'#00e5c4':gdStatus==='error'?'#ff4d6d':'#5a738a';
 }
 
@@ -2366,7 +2401,7 @@ function ym2label(yyyymm){
 function recalcBR_YTD(){
   const bkeys=['W01','W02','W03','W05','W07','W11'];
   bkeys.forEach(bk=>{
-    let ns=0,cogs=0,gp=0,exp=0,net=0;
+    let ns=0,cogs=0,gp=0,exp=0,net=0,hr=0,adm=0,mkt=0,fin=0,sal=0,stat=0;
     ['jan','feb','mar'].forEach(p=>{
       const d=BR[bk][p];
       if(d){
@@ -2375,14 +2410,23 @@ function recalcBR_YTD(){
         gp  +=(d.gp||0);
         exp +=(d.adm_tot||d.total_exp||0);
         net +=(d.net||0);
+        hr  +=(d.hr||0);
+        adm +=(d.adm||0);
+        mkt +=(d.mkt||0);
+        fin +=(d.fin||0);
+        sal +=(d.salary||0);
+        stat+=(d.statutory||0);
       }
     });
-    BR_YTD[bk]={ns,cogs,gp,exp,net};
+    BR_YTD[bk]={ns,cogs,gp,exp,net,
+      hr,adm,mkt,fin,salary:sal,statutory:stat,
+      gp_pct:ns>0?(gp/ns*100).toFixed(1):'0.0'};
   });
 }
 
 async function fetchFromGoogleDrive(){
   gdStatus='loading';
+  gdLastError='';
   renderGDStatus();
 
   const ctrl = new AbortController();
@@ -2395,8 +2439,10 @@ async function fetchFromGoogleDrive(){
     });
     clearTimeout(tid);
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if(json.ok !== true) throw new Error(json.error||'API returned ok:false');
+    let json;
+    try { json = await res.json(); }
+    catch(e){ throw new Error('Response not JSON — check Apps Script deployment'); }
+    if(json.ok !== true) throw new Error(json.error||'API ok:false');
 
     const dat = json.data;
 
@@ -2516,7 +2562,9 @@ async function fetchFromGoogleDrive(){
 
   } catch(err){
     clearTimeout(tid);
-    console.error('Google Drive fetch failed:', err.message||err);
+    const msg = err.name==='AbortError' ? 'Timeout (25s)' : (err.message||String(err));
+    console.error('GD fetch failed:', msg);
+    gdLastError = msg;
     gdStatus='error';
     renderGDStatus();
   }

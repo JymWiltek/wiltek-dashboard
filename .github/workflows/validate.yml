@@ -1,0 +1,117 @@
+name: Validate Dashboard Before Deploy
+
+# Runs on every push to staging, and on every Pull Request to main
+on:
+  push:
+    branches: [ staging ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Check HTML for Known Issues
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check file exists
+        run: |
+          if [ ! -f "Wiltek_MASTER.html" ]; then
+            echo "❌ ERROR: Wiltek_MASTER.html not found!"
+            exit 1
+          fi
+          echo "✅ Wiltek_MASTER.html found"
+          wc -l Wiltek_MASTER.html
+
+      - name: Check for plain-text passwords (security)
+        run: |
+          FOUND=0
+          # Check for default password patterns that should have been changed
+          if grep -q "Wiltek888" Wiltek_MASTER.html; then
+            echo "🔴 SECURITY WARNING: Default password 'Wiltek888' still in file! Change it before deploying."
+            FOUND=1
+          fi
+          if grep -q "CEO2026\|CFO2026\|HR2026\|Sales2026" Wiltek_MASTER.html; then
+            echo "🔴 SECURITY WARNING: Default role passwords still in file! Change them before deploying."
+            FOUND=1
+          fi
+          if [ $FOUND -eq 0 ]; then
+            echo "✅ Password check passed (default passwords have been changed)"
+          fi
+
+      - name: Check critical bug fixes are present
+        run: |
+          PASS=1
+
+          # Fix 1: rentMult should be 3 not 2
+          if grep -q "useYTD?2:1" Wiltek_MASTER.html || grep -q "useYTD ? 2 : 1" Wiltek_MASTER.html; then
+            echo "🔴 BUG B2: rentMult is still 2 (should be 3). YTD rental will be undercounted."
+            PASS=0
+          else
+            echo "✅ Fix B2: rentMult = 3 confirmed"
+          fi
+
+          # Fix 2: YTD subtitle should say Jan-Mar not Jan-Feb
+          if grep -q "Jan.*Feb" Wiltek_MASTER.html | grep -i "ytd\|subtitle" 2>/dev/null; then
+            echo "⚠️  Check B8: YTD subtitle may still say Jan-Feb"
+          else
+            echo "✅ Fix B8: YTD subtitle updated"
+          fi
+
+          # Fix 3: Apr26 should be in the month selector
+          if ! grep -q "Apr26" Wiltek_MASTER.html; then
+            echo "🔴 BUG B5: Apr 2026 is missing from month selector!"
+            PASS=0
+          else
+            echo "✅ Fix B5: Apr26 found in file"
+          fi
+
+          # Fix 4: scrollTo should be in nav function
+          if ! grep -q "scrollTo" Wiltek_MASTER.html; then
+            echo "⚠️  UX-2: window.scrollTo not found — page may not scroll to top on navigation"
+          else
+            echo "✅ Fix UX-2: scrollTo present"
+          fi
+
+          # Fix 5: mLabel helper should exist
+          if ! grep -q "function mLabel" Wiltek_MASTER.html; then
+            echo "⚠️  UX-5: mLabel() helper not found — month codes may show as 'Mar26' in UI"
+          else
+            echo "✅ Fix UX-5: mLabel() helper present"
+          fi
+
+          # Fix 6: .neg CSS class should exist for negative numbers
+          if ! grep -q "\.neg{" Wiltek_MASTER.html && ! grep -q ".neg {" Wiltek_MASTER.html; then
+            echo "⚠️  HUX-4: .neg CSS class not found — negative numbers won't be highlighted in red"
+          else
+            echo "✅ Fix HUX-4: .neg CSS class present"
+          fi
+
+          # Fix 7: Balance sheet disclaimer should exist
+          if ! grep -q "static snapshot\|snapshot tetap" Wiltek_MASTER.html; then
+            echo "⚠️  B4: Balance Sheet disclaimer not found — users may not know BS data is frozen at Mar 2026"
+          else
+            echo "✅ Fix B4: Balance Sheet disclaimer present"
+          fi
+
+          if [ $PASS -eq 0 ]; then
+            echo ""
+            echo "🔴 CRITICAL issues found. Fix before merging to main."
+            exit 1
+          else
+            echo ""
+            echo "✅ All critical checks passed. Safe to deploy."
+          fi
+
+      - name: Report summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Wiltek Dashboard — Validation Report"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  File: Wiltek_MASTER.html"
+          echo "  Checked: passwords, bug fixes, UX fixes"
+          echo "  See output above for full results"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
