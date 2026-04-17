@@ -84,7 +84,7 @@ td{padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px}
 td.la{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:500}
 td.la2{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:400;color:var(--mu);padding-left:22px}
 td:not(.la):not(.la2){text-align:right}
-.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.co{color:var(--o)}.cm{color:var(--mu)}
+.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.co{color:var(--o)}.cm{color:var(--mu)}.neg{color:#ff4d6d!important;font-weight:700}.pos-good{color:#00e5c4!important}
 .neg{color:#ff4d6d!important;font-weight:700}.pos-good{color:#00e5c4!important}
 .tr td{font-weight:700;background:rgba(0,229,196,.04);color:var(--g)}.tr td.la{font-weight:700}
 .hl td{background:rgba(0,229,196,.06)!important}
@@ -1089,6 +1089,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
 // ─────────── CEO OVERVIEW ───────────
 function renderHealth(m,prev,i){
   const en=lang==='en';
+  const period=m==='Apr26'?'apr':m==='Mar26'?'mar':m==='Feb26'?'feb':m==='Jan26'?'jan':'mar';
 
   // Core numbers
   const si=d('sales_inv',m), net=d('br_net',m), hr=d('hr_total',m);
@@ -1221,7 +1222,6 @@ function renderHealth(m,prev,i){
     scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
 
   const bkeys=['W01','W02','W03','W05','W07','W11'];
-  const period=(m==='Mar26')?'mar':(m==='Jan26'?'jan':'feb');
   const bMonthly=bkeys.map(k=>(BR[k][period]||BR[k]['feb']).net);
   const bYTD=bkeys.map(k=>BR_YTD[k].net);
   txt(document.getElementById('h-c2t'), 'Branch Net — Month vs YTD', '分行净利润 — 当月 vs 累计');
@@ -1554,7 +1554,7 @@ function renderBranches(m,i){
   btbody.innerHTML=bkeys.map((bk,bi)=>{
     const b=bdata_all[bi];
     const gpp=b.gp/b.ns, netp=b.net/b.ns, expp=b.total_exp/b.ns;
-    const sc=b.net<0?'cr':b.net<5000?'cy':'cg';
+    const sc=b.net<0?'neg':b.net<5000?'cy':'cg';
     const pill=b.net<0?`<span class="pl dn">${en?'Loss':'亏损'}</span>`:b.net<10000?`<span class="pl wa">${en?'Weak':'偏弱'}</span>`:`<span class="pl up">${en?'OK':'盈利'}</span>`;
     tNS+=b.ns;tCOGS+=b.cogs;tGP+=b.gp;tExp+=b.total_exp;tNet+=b.net;
     // MoM delta vs prior period
@@ -1914,7 +1914,18 @@ function renderBalanceSheet(){
   const en=lang==='en';
   txt(document.getElementById('bs-ph'),'🏦 Balance Sheet — Mar 2026','🏦 资产负债表 — 2026年3月');
   txt(document.getElementById('bs-ps'),'As at 31 March 2026 · Building + Stock + Cash vs Loans + OAF','截至2026年3月31日 · 楼房+库存+现金 vs 贷款+OAF');
-  document.getElementById('bs-static-notice').innerHTML='<div style="background:#FEF3CD;border-left:4px solid #D4A017;padding:10px 14px;margin-bottom:16px;border-radius:4px;font-size:13px;color:#5A3E00;">⚠️ Balance Sheet adalah snapshot tetap pada 31 Mac 2026 — tidak berubah apabila anda menukar bulan. / Balance Sheet is a static snapshot at 31 Mar 2026 — does not update with month selector.</div>';
+  const bsNotice=document.getElementById('bs-static-notice');
+  if(selMonth!=='Mar26'){
+    bsNotice.innerHTML=en
+      ?`<strong>⚠ Viewing ${mLabel(selMonth)} — Balance Sheet is fixed at 31 Mar 2026.</strong> This page shows a static snapshot and does not update with the month selector.`
+      :`<strong>⚠ 当前查看${mLabel(selMonth)} — 资产负债表固定于2026年3月31日。</strong>此页面为静态快照，不随月份选择器更新。`;
+    bsNotice.style.display='';
+  } else {
+    bsNotice.innerHTML=en
+      ?`<strong>ℹ Balance Sheet snapshot: 31 Mar 2026.</strong> Data does not update with month selector.`
+      :`<strong>ℹ 资产负债表快照：2026年3月31日。</strong>数据不随月份选择器更新。`;
+    bsNotice.style.display='';
+  }
 
   const ins=document.getElementById('bs-ins');
   ins.className='ins info';
@@ -2123,13 +2134,13 @@ function renderBranchHub(){
   document.getElementById('hub-cards').innerHTML=visibleBranches.map(b=>{
     const ytd=BR_YTD[b.code];
     const netCls=ytd.net<0?'cr':ytd.net<10000?'cy':'cg';
-    return `<div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="window.open('${b.file}','_blank')" title="Open ${b.code} Dashboard">
+    return `<div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="nav('branches')" title="${en?'View Branch P&L':'查看门市盈亏'}: ${b.code}">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${b.color}"></div>
       <div class="kl" style="color:${b.color}">${b.code} · ${en?b.name_en:b.name_zh}</div>
       <div class="kv" style="color:${b.color};font-size:15px;">${rm2(ytd.ns)}</div>
       <div class="ks">YTD Sales · Net: <span class="${netCls}" style="font-family:'JetBrains Mono',monospace;">${rm2(ytd.net)}</span></div>
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr);">
-        <span style="font-size:10px;color:${b.color};font-family:'JetBrains Mono',monospace;">→ Open Dashboard ↗</span>
+        <span style="font-size:10px;color:${b.color};font-family:'JetBrains Mono',monospace;">→ ${en?'View Branch P&L':'查看门市盈亏'}</span>
       </div>
     </div>`;
   }).join('');
