@@ -2433,7 +2433,7 @@ async function fetchFromGoogleDrive(){
   const tid = setTimeout(()=>ctrl.abort(), 25000);
 
   try {
-    const res = await fetch(GD_API_URL+'?key='+GD_API_KEY, {
+    const res = await fetch(GD_API_URL+'?type=all&key='+GD_API_KEY, {
       redirect:'follow',
       signal:ctrl.signal
     });
