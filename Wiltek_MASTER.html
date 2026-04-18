@@ -84,8 +84,8 @@ td{padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px}
 td.la{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:500}
 td.la2{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:400;color:var(--mu);padding-left:22px}
 td:not(.la):not(.la2){text-align:right}
-.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.co{color:var(--o)}.cm{color:var(--mu)}.neg{color:#ff4d6d!important;font-weight:700}.pos-good{color:#00e5c4!important}
-.neg{color:#ff4d6d!important;font-weight:700}.pos-good{color:#00e5c4!important}
+.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.co{color:var(--o)}.cm{color:var(--mu)}
+.neg{color:var(--r)!important;font-weight:600}.pos{color:var(--g)!important}.pos-good{color:var(--g)!important}
 .tr td{font-weight:700;background:rgba(0,229,196,.04);color:var(--g)}.tr td.la{font-weight:700}
 .hl td{background:rgba(0,229,196,.06)!important}
 .mb{display:flex;align-items:center;gap:6px;justify-content:flex-end}
@@ -668,6 +668,30 @@ function updateNav(){
     const allowed=canAccess(pageId);
     ni.style.display=allowed?'flex':'none';
   });
+  // Per-role primary nav: further simplify menu to core pages only
+  // (applied on top of canAccess permission check)
+  const primaryNav={
+    admin:null,  // show all allowed pages (no extra filter)
+    ceo:       ['health','pl','branches','customers','action'],
+    cfo:       ['health','pl','cashflow','gp','balancesheet'],
+    director:  ['health','pl','branches','customers','action'],
+    sales_mgr: ['branches','inventory','customers','expenses'],
+    branch_mgr:['branches','customers','quicklinks'],
+    hr:        ['expenses','quicklinks'],
+    warehouse: ['inventory','quicklinks'],
+    marketing: ['customers','quicklinks'],
+    employee:  ['branchhub','quicklinks'],
+  };
+  const role=currentUser&&currentUser.role;
+  const allowedPrimary=role?primaryNav[role]:null;
+  if(allowedPrimary){
+    document.querySelectorAll('.ni').forEach(ni=>{
+      const oc=ni.getAttribute('onclick')||'';
+      const m=oc.match(/nav\('(\w+)'\)/);
+      if(!m) return;
+      if(!allowedPrimary.includes(m[1])) ni.style.display='none';
+    });
+  }
   // Hide section headers if all items in section are hidden
   // (section headers have class .ns)
   document.querySelectorAll('.ns').forEach(ns=>{
@@ -942,7 +966,7 @@ const CUST26 = {
   },
 };
 
-// Per-branch data (YTD 2026 Jan+Feb combined)
+// Per-branch data (YTD 2026 Jan+Feb+Mar combined)
 const BR = {
   W01:{name_en:'W01 Pandan Indah',   name_zh:'W01 班达英达',   rent:13000,
     feb:{ns:38371,cogs:19636,gp:18735,adm:7465,hr:8811,salary:6518,statutory:1793,fin:211,mkt:16,total_exp:16486,net:2248,gp_pct:.488},
@@ -964,7 +988,7 @@ const BR = {
     mar:{ns: 29255, cogs: 15027, gp: 14228, adm: 7489, hr: 0, salary: 0, statutory: 0, fin: 0, mkt: 0, total_exp: 7489, net: 6739, gp_pct: 0.486},jan:{ns:36049,cogs:18572,gp:17477,adm:8868,hr:5964,salary:4537,statutory:1426,fin:308,mkt:0,total_exp:15140,net:2337,gp_pct:.485}},
 };
 
-// YTD Jan+Feb 2026 combined
+// YTD Jan+Feb+Mar 2026 combined
 const BR_YTD = {
   // YTD Jan+Feb+Mar 2026
   W01:{ns:174675,cogs:97732,gp:76944,adm:33494,hr:16308,salary:12147,statutory:3661,fin:691,mkt:16,total_exp:50492,net:26451,gp_pct:.441},
@@ -1320,7 +1344,7 @@ function renderPL(m,prev,i){
     {en:'— Online Marketing',zh:'— 线上营销',cur:onl,prv:ph?d('online_total',ph):null,cls:'cr',bold:false,indent:true,arr:'online_total'},
     {en:'— Logistics',zh:'— 物流',cur:log,prv:ph?d('log_total',ph):null,cls:'cr',bold:false,indent:true},
     {en:'TOTAL EXPENSES',zh:'总费用',cur:totalExp,prv:null,cls:'cr',bold:true,pct:totalExp/ns},
-    {en:'NET PROFIT',zh:'净利润',cur:netProfit,prv:ph?d('br_net',ph):null,cls:netProfit>=0?'cg':'cr',bold:true,pct:netPct,isTR:true},
+    {en:'NET PROFIT',zh:'净利润',cur:netProfit,prv:ph?d('br_net',ph):null,cls:netProfit>=0?'cg':'neg',bold:true,pct:netPct,isTR:true},
   ];
 
   const hdr=document.getElementById('pl-thead');
@@ -2133,7 +2157,7 @@ function renderBranchHub(){
   const visibleBranches=userPerms&&!userPerms.allBranches&&userPerms.branch?branches.filter(b=>b.code===userPerms.branch):branches;
   document.getElementById('hub-cards').innerHTML=visibleBranches.map(b=>{
     const ytd=BR_YTD[b.code];
-    const netCls=ytd.net<0?'cr':ytd.net<10000?'cy':'cg';
+    const netCls=ytd.net<0?'neg':ytd.net<10000?'cy':'cg';
     return `<div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="nav('branches')" title="${en?'View Branch P&L':'查看门市盈亏'}: ${b.code}">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${b.color}"></div>
       <div class="kl" style="color:${b.color}">${b.code} · ${en?b.name_en:b.name_zh}</div>
@@ -2156,7 +2180,7 @@ function renderBranchHub(){
     return `<tr>
       <td class="la">${rank} <span style="color:${br.color}">${k}</span> ${en?br.name_en:br.name_zh}</td>
       <td>${b.ns.toLocaleString()}</td>
-      <td class="${b.net>=0?'cg':'cr'}" style="font-weight:700">${b.net.toLocaleString()}</td>
+      <td class="${b.net>=0?'cg':'neg'}" style="font-weight:700">${b.net.toLocaleString()}</td>
       <td class="${netp>=.15?'cg':netp>=.05?'cy':'cr'}">${(netp*100).toFixed(1)}%</td>
       <td class="${gpp>=.47?'cg':gpp>=.4?'cy':'cr'}">${(gpp*100).toFixed(1)}%</td>
       <td>${b.net<0?`<span class="pl dn">${en?'Loss':'亏损'}</span>`:b.net<10000?`<span class="pl wa">${en?'Watch':'关注'}</span>`:`<span class="pl up">${en?'Healthy':'健康'}</span>`}</td>
