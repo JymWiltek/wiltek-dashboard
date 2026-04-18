@@ -2127,29 +2127,23 @@ function renderCustomers(){
 function renderBranchHub(){
   const en=lang==='en';
   txt(document.getElementById('hub-ph'),'🗂️ Branch Hub — All 6 Branches','🗂️ 分行总览 — 全部6家分行');
-  txt(document.getElementById('hub-ps'), 'Click any branch card to open its full operational dashboard', '点击分行卡片打开完整运营仪表板');
+  txt(document.getElementById('hub-ps'), 'Click any branch card to jump to its P&L view', '点击分行卡片跳转到该分行损益页面');
   txt(document.getElementById('hub-sec1'),'BRANCH OPERATIONAL DASHBOARDS','分行运营仪表板');
   txt(document.getElementById('hub-sec2'),'YTD 2026 PERFORMANCE SUMMARY (Jan–Mar)','2026年度表现摘要（1–3月）');
 
   const ins=document.getElementById('hub-ins');
   txt(ins,
-    `<strong>ℹ️ How to use:</strong> Each branch card shows YTD net profit and links to the full branch dashboard. The branch dashboards contain sales entry, customer tracking, task management, and race breakdown data. Open them in a separate tab for detailed operational management.`,
-    `<strong>ℹ️ 使用说明：</strong>每个分行卡片显示年初至今净利润，并链接到完整分行仪表板。分行仪表板包含销售录入、顾客追踪、任务管理和种族分析数据。在新标签中打开以进行详细运营管理。`
+    `<strong>ℹ️ How to use:</strong> Each branch card shows YTD net profit. Click a card to open the Branch P&L page filtered to that branch — sales, expenses, GP%, net margin all in one view.`,
+    `<strong>ℹ️ 使用说明：</strong>每个分行卡片显示年初至今净利润。点击卡片打开该分行的损益页面 — 销售、费用、毛利率、净利率一目了然。`
   );
 
   const branches=[
-    {code:'W01',name_en:'Pandan Indah',name_zh:'班达英达',color:'#00e5c4',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W01%20-%202604%20-%20Dashboard.html'},
-    {code:'W02',name_en:'Ampang Waterfront',name_zh:'安邦水岸',color:'#4d9fff',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W02%20-%202604%20-%20Dashboard.html'},
-    {code:'W03',name_en:'Wangsa Maju',name_zh:'旺沙玛珠',color:'#f5c842',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W03%20-%202604%20-%20Dashboard.html'},
-    {code:'W05',name_en:'Bangi',name_zh:'万宜',color:'#b87cff',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W05%20-%202604%20-%20Dashboard.html'},
-    {code:'W07',name_en:'Pandan Jaya',name_zh:'班达再也',color:'#ff8c42',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W07%20-%202604%20-%20Dashboard.html'},
-    {code:'W11',name_en:'Taman Midah',name_zh:'道明苑',color:'#ff4d6d',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W11%20-%202604%20-%20Dashboard.html'},
+    {code:'W01',name_en:'Pandan Indah',     name_zh:'班达英达', color:'#00e5c4'},
+    {code:'W02',name_en:'Ampang Waterfront',name_zh:'安邦水岸', color:'#4d9fff'},
+    {code:'W03',name_en:'Wangsa Maju',      name_zh:'旺沙玛珠', color:'#f5c842'},
+    {code:'W05',name_en:'Bangi',            name_zh:'万宜',     color:'#b87cff'},
+    {code:'W07',name_en:'Pandan Jaya',      name_zh:'班达再也', color:'#ff8c42'},
+    {code:'W11',name_en:'Taman Midah',      name_zh:'道明苑',   color:'#ff4d6d'},
   ];
 
   const rm2=v=>'RM '+(+v).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});
@@ -2191,55 +2185,98 @@ function renderBranchHub(){
 // ─────────── QUICK LINKS ───────────
 function renderQuickLinks(){
   const en=lang==='en';
-  txt(document.getElementById('ql-ph'),'🔗 Quick Links — All Dashboards','🔗 快速链接 — 全部仪表板');
-  txt(document.getElementById('ql-ps'), 'Open any specialized dashboard in a new tab', '在新标签打开任何专用仪表板');
+  txt(document.getElementById('ql-ph'),'🔗 Quick Links — All Pages','🔗 快速链接 — 所有页面');
+  txt(document.getElementById('ql-ps'), 'Jump to any dashboard page — filtered by your permissions', '快速跳转到任何仪表板页面 — 根据您的权限过滤');
   txt(document.getElementById('ql-sec1'),'SPECIALIZED DASHBOARDS','专用仪表板');
   txt(document.getElementById('ql-sec2'),'BRANCH DASHBOARDS','分行仪表板');
 
+  // All links are INTERNAL nav() calls — no external file:// URLs.
+  // Each card is filtered by canAccess() so users only see what they can open.
   const mainDash=[
-    {title_en:'FMM Executive Dashboard',title_zh:'FMM财务管理仪表板',
-     desc_en:'Full financial management: P&L, Cash Flow, Gross Profit, Expenses, Inventory',
-     desc_zh:'完整财务管理：损益表、现金流、毛利分析、费用明细、库存',
-     file:'file:///Users/jymchee/Downloads/FMM_Dashboard_v5_1.html',
+    {page:'health',    title_en:'CEO Overview',      title_zh:'CEO总览',
+     desc_en:'Executive KPIs, 15-month revenue trend, branch status summary',
+     desc_zh:'高管KPI、15个月营收趋势、分行状态汇总',
      color:'#00e5c4',icon:'📊'},
-    {title_en:'BI Analytics Dashboard',title_zh:'商业智能分析仪表板',
-     desc_en:'27M sales data, 1,313 SKUs, customer loyalty, product mix, category analysis',
-     desc_zh:'27个月销售数据，1313个SKU，顾客忠诚度，产品组合，类别分析',
-     file:'file:///Users/jymchee/Downloads/Wiltek_BI_v4_2.html',
-     color:'#4d9fff',icon:'📈'},
-  ];
+    {page:'pl',        title_en:'Profit & Loss',     title_zh:'损益表',
+     desc_en:'Full P&L with expense breakdown, month-over-month comparison',
+     desc_zh:'完整损益表含费用明细，月对月对比',
+     color:'#4d9fff',icon:'📋'},
+    {page:'cashflow',  title_en:'Cash Flow',         title_zh:'现金流',
+     desc_en:'Operating cash flow, collections, payables, working capital',
+     desc_zh:'经营现金流、应收、应付、营运资金',
+     color:'#00e5c4',icon:'💵'},
+    {page:'gp',        title_en:'Gross Profit',      title_zh:'毛利分析',
+     desc_en:'Gross profit by channel, GP% trend vs target',
+     desc_zh:'各渠道毛利分析，毛利率趋势对比目标',
+     color:'#f5c842',icon:'📈'},
+    {page:'branches',  title_en:'Branch P&L',        title_zh:'分行损益',
+     desc_en:'P&L for all 6 branches with rank, benchmarks, W05 analysis',
+     desc_zh:'6间分行损益表，排名、基准、W05分析',
+     color:'#ff8c42',icon:'🏪'},
+    {page:'inventory', title_en:'Inventory',         title_zh:'库存',
+     desc_en:'Stock cover days, excess inventory, purchasing recommendations',
+     desc_zh:'库存周转天数、过剩库存、采购建议',
+     color:'#b87cff',icon:'📦'},
+    {page:'expenses',  title_en:'Expenses',          title_zh:'费用明细',
+     desc_en:'HR, admin, marketing, finance — detailed expense drill-down',
+     desc_zh:'人事、行政、营销、财务 — 费用细项分析',
+     color:'#ff4d6d',icon:'💰'},
+    {page:'action',    title_en:'Action Plan',       title_zh:'行动计划',
+     desc_en:'Priority initiatives, W11 decision, cost reduction targets',
+     desc_zh:'重点行动、W11决策、成本控制目标',
+     color:'#f5c842',icon:'🎯'},
+    {page:'balancesheet',title_en:'Balance Sheet',   title_zh:'资产负债表',
+     desc_en:'Assets, liabilities, equity — snapshot at 31 Mar 2026',
+     desc_zh:'资产、负债、权益 — 2026年3月31日快照',
+     color:'#4d9fff',icon:'🧾'},
+    {page:'customers', title_en:'Customer Analysis', title_zh:'顾客分析',
+     desc_en:'Top customers, loyalty segments, retention metrics',
+     desc_zh:'核心顾客、忠诚度分层、留存指标',
+     color:'#00e5c4',icon:'👥'},
+    {page:'branchhub', title_en:'Branch Hub',        title_zh:'分行中心',
+     desc_en:'All 6 branches at-a-glance, YTD performance summary',
+     desc_zh:'6间分行一览、年初至今绩效汇总',
+     color:'#ff8c42',icon:'🗂️'},
+  ].filter(d=>canAccess(d.page));
 
   document.getElementById('ql-cards').innerHTML=mainDash.map(d=>`
-    <div class="kpi" style="cursor:pointer;padding:18px;border-color:${d.color}33;" onclick="window.open('${d.file}','_blank')">
+    <div class="kpi" style="cursor:pointer;padding:18px;border-color:${d.color}33;" onclick="nav('${d.page}')" title="${en?'Go to':'前往'}: ${en?d.title_en:d.title_zh}">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${d.color}"></div>
       <div style="font-size:22px;margin-bottom:10px;">${d.icon}</div>
       <div class="kl" style="color:${d.color};font-size:11px;margin-bottom:6px;">${en?d.title_en:d.title_zh}</div>
       <div style="font-size:12px;color:var(--txt);line-height:1.5;margin-bottom:12px;">${en?d.desc_en:d.desc_zh}</div>
-      <div style="font-size:10px;color:${d.color};font-family:'JetBrains Mono',monospace;">→ Open in new tab ↗</div>
+      <div style="font-size:10px;color:${d.color};font-family:'JetBrains Mono',monospace;">→ ${en?'Open page':'打开页面'}</div>
     </div>`).join('');
 
   const branches=[
-    {code:'W01',name_en:'Pandan Indah',name_zh:'班达英达',color:'#00e5c4',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W01%20-%202604%20-%20Dashboard.html'},
-    {code:'W02',name_en:'Ampang Waterfront',name_zh:'安邦水岸',color:'#4d9fff',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W02%20-%202604%20-%20Dashboard.html'},
-    {code:'W03',name_en:'Wangsa Maju',name_zh:'旺沙玛珠',color:'#f5c842',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W03%20-%202604%20-%20Dashboard.html'},
-    {code:'W05',name_en:'Bangi',name_zh:'万宜',color:'#b87cff',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W05%20-%202604%20-%20Dashboard.html'},
-    {code:'W07',name_en:'Pandan Jaya',name_zh:'班达再也',color:'#ff8c42',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W07%20-%202604%20-%20Dashboard.html'},
-    {code:'W11',name_en:'Taman Midah',name_zh:'道明苑',color:'#ff4d6d',
-     file:'file:///Users/jymchee/Google%20Drive/BMM/W11%20-%202604%20-%20Dashboard.html'},
+    {code:'W01',name_en:'Pandan Indah',      name_zh:'班达英达', color:'#00e5c4'},
+    {code:'W02',name_en:'Ampang Waterfront', name_zh:'安邦水岸', color:'#4d9fff'},
+    {code:'W03',name_en:'Wangsa Maju',       name_zh:'旺沙玛珠', color:'#f5c842'},
+    {code:'W05',name_en:'Bangi',             name_zh:'万宜',     color:'#b87cff'},
+    {code:'W07',name_en:'Pandan Jaya',       name_zh:'班达再也', color:'#ff8c42'},
+    {code:'W11',name_en:'Taman Midah',       name_zh:'道明苑',   color:'#ff4d6d'},
   ];
-
-  document.getElementById('ql-branch-cards').innerHTML=branches.map(b=>`
-    <div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="window.open('${b.file}','_blank')">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${b.color}"></div>
-      <div class="kl" style="color:${b.color}">${b.code}</div>
-      <div class="kv" style="color:${b.color};font-size:14px;">${en?b.name_en:b.name_zh}</div>
-      <div style="margin-top:8px;font-size:10px;color:${b.color};font-family:'JetBrains Mono',monospace;">→ Open ↗</div>
-    </div>`).join('');
+  // Branch-scoped users only see their own branch; also require branches page access
+  const visibleBr=canAccess('branches')
+    ? (userPerms&&!userPerms.allBranches&&userPerms.branch?branches.filter(b=>b.code===userPerms.branch):branches)
+    : [];
+  const brSec=document.getElementById('ql-sec2');
+  const brCards=document.getElementById('ql-branch-cards');
+  if(visibleBr.length===0){
+    // Hide the whole section if user has no branch access at all
+    if(brSec) brSec.style.display='none';
+    if(brCards){ brCards.innerHTML=''; brCards.style.display='none'; }
+  } else {
+    if(brSec) brSec.style.display='';
+    if(brCards) brCards.style.display='';
+    brCards.innerHTML=visibleBr.map(b=>`
+      <div class="kpi" style="cursor:pointer;border-color:${b.color}22;" onclick="nav('branches')" title="${en?'View Branch P&L':'查看门市盈亏'}: ${b.code}">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${b.color}"></div>
+        <div class="kl" style="color:${b.color}">${b.code}</div>
+        <div class="kv" style="color:${b.color};font-size:14px;">${en?b.name_en:b.name_zh}</div>
+        <div style="margin-top:8px;font-size:10px;color:${b.color};font-family:'JetBrains Mono',monospace;">→ ${en?'View Branch P&L':'查看门市盈亏'}</div>
+      </div>`).join('');
+  }
 }
 
 // ═══════════════════════════════════════════
