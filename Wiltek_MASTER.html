@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wiltek Portal (WP)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="./users.js"></script>
+<script src="./session.js"></script>
+<script src="./auditlog.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#07090f;--s1:#0d1117;--s2:#111827;--s3:#1a2235;--bdr:#1e2d42;--g:#00e5c4;--g2:#00b89e;--r:#ff4d6d;--y:#f5c842;--b:#4d9fff;--p:#b87cff;--o:#ff8c42;--txt:#dce8f5;--mu:#5a738a;--w:#ff8c42}
@@ -768,51 +771,43 @@ td:not(.la):not(.la2){text-align:right}
 // MULTI-USER RBAC SYSTEM
 // ═══════════════════════════════════════
 
-// ── Default user accounts ──
-// Admin can add/edit/remove users via the User Management panel.
-// Changes are stored in localStorage. Passwords are plain text —
-// this dashboard should only be served on a trusted internal network.
-const DEFAULT_USERS = [
-  { id:'admin',  pw:'Wiltek888',  name:'Administrator',     role:'admin',      branch:null },
-  { id:'ceo',    pw:'CEO2026',    name:'CEO',               role:'ceo',        branch:null },
-  { id:'cfo',    pw:'CFO2026',    name:'CFO',               role:'cfo',        branch:null },
-  { id:'dir',    pw:'DIR2026',    name:'Director',          role:'director',   branch:null },
-  { id:'sm',     pw:'SM2026',     name:'Sales Manager',     role:'sales_mgr',  branch:null },
-  { id:'w01',    pw:'W01_2026',   name:'W01 Manager',       role:'branch_mgr', branch:'W01' },
-  { id:'w02',    pw:'W02_2026',   name:'W02 Manager',       role:'branch_mgr', branch:'W02' },
-  { id:'w03',    pw:'W03_2026',   name:'W03 Manager',       role:'branch_mgr', branch:'W03' },
-  { id:'w05',    pw:'W05_2026',   name:'W05 Manager',       role:'branch_mgr', branch:'W05' },
-  { id:'w07',    pw:'W07_2026',   name:'W07 Manager',       role:'branch_mgr', branch:'W07' },
-  { id:'w11',    pw:'W11_2026',   name:'W11 Manager',       role:'branch_mgr', branch:'W11' },
-  { id:'hr',     pw:'HR2026',     name:'HR',                role:'hr',         branch:null },
-  { id:'wh',     pw:'WH2026',     name:'Warehouse',         role:'warehouse',  branch:null },
-  { id:'mkt',    pw:'MKT2026',    name:'Marketing',         role:'marketing',  branch:null },
-  { id:'emp',    pw:'EMP2026',    name:'Employee',          role:'employee',   branch:null },
-];
+// ── User accounts (Phase 1: from users.js, hashed SHA-256 + salt) ──
+// Users, salts and hashes are defined in external users.js (window.WP_USERS).
+// To change a password, regenerate users.js via tools/set-password.js.
+// localStorage can ONLY contain per-user metadata overrides (role / branch /
+// name), NOT passwords. Passwords are never stored client-side unhashed.
+const DEFAULT_USERS = (window.WP_USERS || []).map(u => ({
+  id: u.id, role: u.role, branch: u.branch || null, name: u.name
+  // pw / hash / salt intentionally excluded from this public view
+}));
 
-// ── Default permissions per role ──
+// ── Default permissions per role (12 roles per SPEC §5.1/§5.2) ──
 const ROLE_DEFAULTS = {
-  admin:      { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:true  },
-  ceo:        { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
-  cfo:        { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
-  director:   { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
-  sales_mgr:  { pages:['health','pl','gp','branches','inventory','expenses','action','customers','branchhub','quicklinks','bistrat','gtd','proposals'], showNet:true,  showGPpct:true,  showCF:false, showBS:false, allBranches:true,  canRefresh:false, canManageUsers:false },
-  branch_mgr: { pages:['health','branches','inventory','action','customers','branchhub','quicklinks','biwh','gtd','proposals'],                         showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  hr:         { pages:['expenses','quicklinks','gtd','proposals'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  warehouse:  { pages:['inventory','quicklinks','biwh','inv360','gtd','proposals'],                                                                     showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  marketing:  { pages:['customers','branchhub','quicklinks','bistrat','gtd','proposals'],                                                               showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  employee:   { pages:['branchhub','quicklinks','gtd'],                                                                                                 showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  owner:         { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:true  },
+  finance:       { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','gtd','proposals'],                                     showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
+  bi_consultant: { pages:['inventory','customers','quicklinks','bistrat','biwh','inv360','action','gtd','proposals'],                                                                                          showNet:false, showGPpct:true,  showCF:false, showBS:false, allBranches:true,  canRefresh:false, canManageUsers:false },
+  warehouse:     { pages:['inventory','quicklinks','biwh','inv360','gtd','proposals','action'],                                                                                                                showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  hr:            { pages:['expenses','quicklinks','gtd','proposals'],                                                                                                                                          showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  marketing:     { pages:['customers','branchhub','quicklinks','bistrat','gtd','proposals','action'],                                                                                                          showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w01_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w02_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w03_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w05_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w07_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w11_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
 };
 
-// ── localStorage helpers ──
+// ── Helpers (public users list only; secrets never exposed) ──
 function loadUsers(){
-  try{
-    const s=localStorage.getItem('wiltek_users');
-    return s?JSON.parse(s):[...DEFAULT_USERS];
-  }catch(e){return[...DEFAULT_USERS];}
+  // Intentionally returns the public metadata only. The login flow consults
+  // window.WP_USERS directly for salt/hash comparison.
+  return [...DEFAULT_USERS];
 }
 function saveUsers(arr){
-  localStorage.setItem('wiltek_users',JSON.stringify(arr));
+  // No-op in Phase 1. User management moves server-side (or via users.js
+  // regeneration) in a later phase. Kept as a stub so legacy call sites do
+  // not throw.
+  console.warn('[auth] saveUsers() is a no-op in Phase 1 — passwords are in users.js');
 }
 function loadPermOverrides(){
   try{const s=localStorage.getItem('wiltek_perm_overrides');return s?JSON.parse(s):{};}
@@ -829,7 +824,8 @@ let adminMode   = false;
 let adminEditTarget = null;
 
 function getPerms(user){
-  const base = {...(ROLE_DEFAULTS[user.role]||ROLE_DEFAULTS.employee)};
+  // Fallback to owner-less minimum if role is unknown: empty pages = user sees nothing.
+  const base = {...(ROLE_DEFAULTS[user.role] || { pages:[], showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false })};
   const overrides = loadPermOverrides()[user.id]||{};
   // Merge page list override if present
   const merged = {...base,...overrides};
@@ -840,29 +836,83 @@ function getPerms(user){
 
 function canAccess(page){ return userPerms.pages&&userPerms.pages.includes(page); }
 
-// ── Login ──
-function checkPw(){
+// ── Login (async SHA-256 + salt, with lockout + audit) ──
+async function checkPw(){
+  const errEl = document.getElementById('pwErr');
+  const showErr = msg => {
+    errEl.textContent = msg;
+    document.getElementById('loginPw').value = '';
+    setTimeout(()=>{ if(errEl.textContent===msg) errEl.textContent=''; }, 4000);
+  };
+
   const uid = (document.getElementById('loginUser').value||'').trim().toLowerCase();
   const pw  = (document.getElementById('loginPw').value||'');
-  const users = loadUsers();
-  const user  = users.find(u=>u.id===uid && u.pw===pw);
-  if(user){
-    currentUser = user;
-    userPerms   = getPerms(user);
-    unlock();
-  } else {
-    const err=document.getElementById('pwErr');
-    err.textContent='Invalid username or password.';
-    document.getElementById('loginPw').value='';
-    setTimeout(()=>err.textContent='',3000);
+
+  if (!uid || !pw) { showErr('Enter username and password.'); return; }
+
+  // Lockout check
+  const lock = (window.WP_SESSION && window.WP_SESSION.lockStatus(uid)) || {locked:false};
+  if (lock.locked) {
+    const mins = Math.ceil(lock.remainingMs / 60000);
+    showErr('Locked. Try again in ' + mins + ' minute' + (mins===1?'':'s') + '.');
+    try { window.AuditLog && AuditLog.log('login_locked', uid, 'remainingMs=' + lock.remainingMs); } catch(e){}
+    return;
   }
+
+  // Lookup in users.js (window.WP_USERS) — the only place with hash + salt
+  const secret = (window.WP_USERS || []).find(u => u.id === uid);
+  if (!secret) {
+    window.WP_SESSION && WP_SESSION.recordFail(uid);
+    try { AuditLog.log('login_fail', uid, 'unknown_user'); } catch(e){}
+    showErr('Invalid username or password.');
+    return;
+  }
+
+  // Compute SHA-256(salt + password)
+  let computed;
+  try {
+    computed = await WP_SESSION.sha256Hex(secret.salt + pw);
+  } catch(e) {
+    showErr('Crypto error — use HTTPS or localhost.');
+    try { AuditLog.log('login_fail', uid, 'crypto_unavailable'); } catch(e2){}
+    return;
+  }
+
+  if (computed !== secret.hash) {
+    const l = WP_SESSION.recordFail(uid);
+    try { AuditLog.log('login_fail', uid, 'bad_password tries=' + l.tries); } catch(e){}
+    if (l.tries >= WP_SESSION.MAX_FAILS) {
+      showErr('Too many attempts. Locked for 15 minutes.');
+    } else {
+      const left = WP_SESSION.MAX_FAILS - l.tries;
+      showErr('Invalid. ' + left + ' attempt' + (left===1?'':'s') + ' before lockout.');
+    }
+    return;
+  }
+
+  // SUCCESS
+  WP_SESSION.recordSuccess(uid);
+  const pub = {
+    id: secret.id, role: secret.role, branch: secret.branch || null,
+    name: secret.name || secret.id
+  };
+  window.__wp_currentUser = pub;   // for AuditLog
+  currentUser = pub;
+  userPerms   = getPerms(pub);
+  WP_SESSION.start(pub);
+  WP_SESSION.onExpire(() => {
+    try { AuditLog.log('session_expired', pub.id, ''); } catch(e){}
+    logout();
+  });
+  try { AuditLog.log('login_success', uid, 'role=' + pub.role); } catch(e){}
+  unlock();
 }
 
 function unlock(){
   document.getElementById('lockScreen').style.display='none';
-  // Admin badge
+  // Owner badge (was "admin" — consolidated to owner per SPEC §5.1)
   const ab=document.getElementById('adminBadge');
-  if(currentUser.role==='admin'&&ab){ ab.style.display='flex'; }
+  if(currentUser.role==='owner'&&ab){ ab.style.display='flex'; }
   // User badge
   const ub=document.getElementById('userBadge');
   if(ub){
@@ -870,9 +920,9 @@ function unlock(){
     ub.innerHTML=`<span style="color:#5a738a">●</span> ${currentUser.name} <span style="color:#5a738a;margin-left:4px;">${roleLabel}</span>`;
     ub.style.display='flex';
   }
-  // User management button (admin only)
+  // User management button (owner only)
   const umBtn=document.getElementById('userMgmtBtn');
-  if(umBtn&&currentUser.role==='admin') umBtn.style.display='flex';
+  if(umBtn&&currentUser.role==='owner') umBtn.style.display='flex';
   // Logout button
   const lb2=document.getElementById('logoutBtn');
   if(lb2) lb2.style.display='flex';
@@ -888,6 +938,13 @@ function unlock(){
 }
 
 function logout(){
+  // Audit + session teardown before clearing state
+  try {
+    const uid = currentUser && currentUser.id;
+    if (uid && window.AuditLog) AuditLog.log('logout', uid, '');
+  } catch(e){}
+  try { window.WP_SESSION && WP_SESSION.end(); } catch(e){}
+  window.__wp_currentUser = null;
   currentUser=null;
   userPerms={};
   adminMode=false;
@@ -928,17 +985,20 @@ function updateNav(){
   });
   // Per-role primary nav: further simplify menu to core pages only
   // (applied on top of canAccess permission check)
+  // SPEC §5.1 — 12 roles: owner, finance, bi_consultant, warehouse, hr, marketing, W01/W02/W03/W05/W07/W11 managers
   const primaryNav={
-    admin:null,  // show all allowed pages (no extra filter)
-    ceo:       ['health','bistrat','pl','branches','customers','action','gtd','proposals','valuation'],
-    cfo:       ['health','pl','cashflow','gp','balancesheet','bistrat','valuation','gtd','proposals'],
-    director:  ['health','bistrat','pl','branches','customers','action','gtd','proposals'],
-    sales_mgr: ['branches','inventory','customers','expenses','bistrat','gtd','proposals'],
-    branch_mgr:['branches','customers','inventory','biwh','gtd','proposals','quicklinks'],
-    hr:        ['expenses','gtd','proposals','quicklinks'],
-    warehouse: ['biwh','inv360','inventory','gtd','proposals','quicklinks'],
-    marketing: ['customers','bistrat','gtd','proposals','quicklinks'],
-    employee:  ['branchhub','gtd','quicklinks'],
+    owner:         null,  // show all allowed pages (no extra filter)
+    finance:       ['health','pl','cashflow','gp','balancesheet','expenses','branches','inventory','customers','action','gtd','proposals'],
+    bi_consultant: ['inventory','customers','quicklinks','bistrat','biwh','inv360','action','gtd','proposals'],
+    warehouse:     ['inventory','quicklinks','biwh','inv360','gtd','proposals','action'],
+    hr:            ['expenses','quicklinks','gtd','proposals'],
+    marketing:     ['customers','branchhub','quicklinks','bistrat','gtd','proposals','action'],
+    w01_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
+    w02_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
+    w03_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
+    w05_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
+    w07_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
+    w11_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
   };
   const role=currentUser&&currentUser.role;
   const allowedPrimary=role?primaryNav[role]:null;
@@ -961,11 +1021,12 @@ function updateNav(){
     }
     ns.style.display=anyVisible?'':'none';
   });
-  // Navigate to role-appropriate landing page
+  // Navigate to role-appropriate landing page (SPEC §5.1 — 12 roles)
   const roleLanding={
-    admin:'health', ceo:'health', cfo:'cashflow', director:'health',
-    sales_mgr:'health', branch_mgr:'branches',
-    hr:'expenses', warehouse:'inventory', marketing:'customers', employee:'branchhub'
+    owner:'health', finance:'cashflow', bi_consultant:'bistrat',
+    warehouse:'biwh', hr:'expenses', marketing:'customers',
+    w01_mgr:'branches', w02_mgr:'branches', w03_mgr:'branches',
+    w05_mgr:'branches', w07_mgr:'branches', w11_mgr:'branches'
   };
   const landing = roleLanding[currentUser&&currentUser.role] || (userPerms.pages&&userPerms.pages[0]) || 'health';
   if(canAccess(landing)) nav(landing);
@@ -975,7 +1036,7 @@ function updateNav(){
 let isAdmin = false; // kept for legacy adminMode edits compatibility
 
 function toggleAdminMode(){
-  if(currentUser?.role!=='admin') return;
+  if(currentUser?.role!=='owner') return;
   adminMode = !adminMode;
   isAdmin = adminMode;
   const badge = document.getElementById('adminBadge');
@@ -1238,8 +1299,33 @@ const BI_ITEMS = [{"code":"AIR-AA/FD4/10","group":"Accessories","sub":"Acc-appli
 // tier T1: <RM500 (dept) · T2: RM500-5K (CEO) · T3: >RM5K (CEO)
 // ══════════════════════════════════════════════════════════
 const GTD_SEED = [{"id":"G-2026-0001","type":"task","title":"Pull W03 dead-stock list for clearance review","owner":"warehouse","dept":"warehouse","due":"2026-04-22","status":"todo","tier":null,"amount":0,"approver":null,"approvedAt":null,"note":"From BI Kill List push \u2014 cross-check physical stock"},{"id":"G-2026-0002","type":"task","title":"Update Chinese customer SMS list for April voucher","owner":"mkt","dept":"marketing","due":"2026-04-20","status":"doing","tier":null,"amount":0,"approver":null,"approvedAt":null,"note":"Target: 700+ Chinese walk-ins based on BI race data"},{"id":"G-2026-0003","type":"task","title":"Train W05 cashier on new POS voucher flow","owner":"w05","dept":"branch","due":"2026-04-25","status":"todo","tier":null,"amount":0,"approver":null,"approvedAt":null,"note":""},{"id":"G-2026-0004","type":"proposal","title":"Discount 15% on Dead Stock Wiltek BC60475","owner":"wh","dept":"warehouse","due":"2026-04-30","status":"todo","tier":"T2","amount":1200,"approver":"jym","approvedAt":null,"note":"30 units \u00d7 RM207 stock value; clear to recover ~RM4K cash"},{"id":"G-2026-0005","type":"proposal","title":"New shop signage for W02 (facade refresh)","owner":"w02","dept":"branch","due":"2026-05-15","status":"todo","tier":"T3","amount":7800,"approver":"jym","approvedAt":null,"note":"Current signage 6y old; faded. Quote attached"},{"id":"G-2026-0006","type":"proposal","title":"Replace W11 printer ink cartridge (urgent)","owner":"w11","dept":"branch","due":"2026-04-19","status":"done","tier":"T1","amount":320,"approver":"branch_mgr","approvedAt":"2026-04-18","note":"Auto-approved T1"},{"id":"G-2026-0007","type":"task","title":"Reconcile April payroll with HR2026 system","owner":"hr","dept":"hr","due":"2026-04-30","status":"todo","tier":null,"amount":0,"approver":null,"approvedAt":null,"note":""},{"id":"G-2026-0008","type":"task","title":"Follow up Docasa WCA890 restock ETA","owner":"wh","dept":"warehouse","due":"2026-04-21","status":"waiting","tier":null,"amount":0,"approver":null,"approvedAt":null,"note":"Supplier estimate 3.9d lead; cover is 0.1m \u2014 risk"},{"id":"G-2026-0009","type":"task","title":"Review Q1 P&L with CFO \u2014 gross margin leakage","owner":"cfo","dept":"finance","due":"2026-04-25","status":"doing","tier":null,"amount":0,"approver":null,"approvedAt":null,"note":"GP below 47% target 3 months straight"},{"id":"G-2026-0010","type":"proposal","title":"Google Ads budget RM3000/mo for Chinese segment","owner":"mkt","dept":"marketing","due":"2026-05-01","status":"todo","tier":"T2","amount":3000,"approver":"jym","approvedAt":null,"note":"Chinese = 72% of walk-in; underinvested digitally"}];
-function gtdLoad(){ try{ const s=localStorage.getItem('wtk_gtd'); return s?JSON.parse(s):[...GTD_SEED]; }catch(e){return [...GTD_SEED];} }
-function gtdSave(arr){ localStorage.setItem('wtk_gtd',JSON.stringify(arr)); }
+// SPEC §7.4 schema migration: ensure every record has {assignee, source, linked_entities, proof, created_at, priority}
+function gtdMigrate(arr){
+  if(!Array.isArray(arr)) return [];
+  let changed = false;
+  arr.forEach(r => {
+    if(!r || typeof r !== 'object') return;
+    if(r.assignee        === undefined){ r.assignee        = 'owner';       changed = true; }
+    if(r.source          === undefined){ r.source          = 'legacy';      changed = true; }
+    if(r.linked_entities === undefined){ r.linked_entities = null;          changed = true; }
+    if(r.proof           === undefined){ r.proof           = null;          changed = true; }
+    if(r.created_at      === undefined){ r.created_at      = r.createdAt || r.created || null; changed = true; }
+    if(r.priority        === undefined){ r.priority        = 'medium';      changed = true; }
+  });
+  if(changed){
+    try { localStorage.setItem('wtk_gtd', JSON.stringify(arr)); } catch(e){}
+    try { window.AuditLog && AuditLog.log('gtd_migrate', 'wtk_gtd', 'records=' + arr.length); } catch(e){}
+  }
+  return arr;
+}
+function gtdLoad(){
+  try {
+    const s = localStorage.getItem('wtk_gtd');
+    const arr = s ? JSON.parse(s) : [...GTD_SEED];
+    return gtdMigrate(arr);
+  } catch(e){ return gtdMigrate([...GTD_SEED]); }
+}
+function gtdSave(arr){ localStorage.setItem('wtk_gtd', JSON.stringify(arr)); }
 function gtdTier(amt){ amt=+amt||0; if(amt<500)return 'T1'; if(amt<5000)return 'T2'; return 'T3'; }
 function gtdTierApprover(tier){ return tier==='T1'?'dept':'ceo'; }
 function gtdNextId(){ const arr=gtdLoad(); const nums=arr.map(r=>+((r.id||'').split('-').pop())||0); const nxt=Math.max(0,...nums)+1; return 'G-2026-'+String(nxt).padStart(4,'0'); }
@@ -2593,13 +2679,14 @@ function applyRoleCSS(){
 // ═══════════════════════════════════════════
 // USER MANAGEMENT PANEL
 // ═══════════════════════════════════════════
-const ALL_ROLES=['admin','ceo','cfo','director','sales_mgr','branch_mgr','hr','warehouse','marketing','employee'];
+// SPEC §5.1 — 12 roles
+const ALL_ROLES=['owner','finance','bi_consultant','warehouse','hr','marketing','w01_mgr','w02_mgr','w03_mgr','w05_mgr','w07_mgr','w11_mgr'];
 const BRANCHES=['W01','W02','W03','W05','W07','W11'];
-const PAGE_IDS=['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks'];
-const PAGE_LABELS={health:'CEO Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',quicklinks:'Quick Links'};
+const PAGE_IDS=['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'];
+const PAGE_LABELS={health:'Exec Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',quicklinks:'Quick Links',bistrat:'BI Strategy',biwh:'BI Warehouse',inv360:'Inventory 360',gtd:'GTD Tasks',proposals:'Proposals',valuation:'Valuation'};
 
 function openUserMgmt(){
-  if(currentUser?.role!=='admin') return;
+  if(currentUser?.role!=='owner') return;
   renderUserMgmtTable();
   const m=document.getElementById('userMgmtModal');
   if(m){m.style.display='flex';}
@@ -2618,7 +2705,7 @@ function renderUserMgmtTable(){
   tbl.innerHTML=users.map((u,ui)=>{
     const perms=getPerms(u);
     const ro=overrides[u.id]||{};
-    const roleColor={admin:'#b87cff',ceo:'#00e5c4',cfo:'#4d9fff',director:'#00e5c4',sales_mgr:'#f5c842',branch_mgr:'#ff8c42',hr:'#4d9fff',warehouse:'#4d9fff',marketing:'#ff8c42',employee:'#5a738a'};
+    const roleColor={owner:'#b87cff',finance:'#4d9fff',bi_consultant:'#00e5c4',warehouse:'#4d9fff',hr:'#f5c842',marketing:'#ff8c42',w01_mgr:'#ff8c42',w02_mgr:'#ff8c42',w03_mgr:'#ff8c42',w05_mgr:'#ff8c42',w07_mgr:'#ff8c42',w11_mgr:'#ff8c42'};
     const pagesHtml=PAGE_IDS.map(pid=>{
       const hasPerm=(ro.pages?ro.pages:ROLE_DEFAULTS[u.role]?.pages||[]).includes(pid);
       return `<label style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:${hasPerm?'#dce8f5':'#5a738a'};cursor:pointer;margin:1px 3px 1px 0;white-space:nowrap;">
@@ -2640,9 +2727,9 @@ function renderUserMgmtTable(){
         </div>
         <div style="min-width:140px;">
           <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Password</div>
-          <input value="${u.pw}" onchange="updateUserField(${ui},'pw',this.value)" type="text"
-            style="background:#0d1117;border:1px solid #1e2d42;color:#dce8f5;padding:4px 8px;border-radius:6px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%;outline:none;"
-            onfocus="this.style.borderColor='#00e5c4'" onblur="this.style.borderColor='#1e2d42'">
+          <div style="font-size:10px;color:#5a738a;padding:4px 8px;background:#0d1117;border:1px dashed #1e2d42;border-radius:6px;font-family:'JetBrains Mono',monospace;">
+            hashed · edit users.js
+          </div>
         </div>
         <div style="min-width:130px;">
           <div style="font-size:11px;color:#5a738a;margin-bottom:3px;">Role</div>
@@ -2663,7 +2750,7 @@ function renderUserMgmtTable(){
           <div style="font-size:11px;color:#5a738a;margin-bottom:4px;">Page Access <span style="color:#2a3d52;font-size:9px;">(click to toggle)</span></div>
           <div style="display:flex;flex-wrap:wrap;gap:2px;">${pagesHtml}</div>
         </div>
-        ${u.id!=='admin'?`<button onclick="deleteUser(${ui})" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.2);color:#ff4d6d;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;align-self:flex-start;margin-top:20px;flex-shrink:0;">✕ Remove</button>`:''}
+        ${u.id!=='owner'?`<button onclick="deleteUser(${ui})" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.2);color:#ff4d6d;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;align-self:flex-start;margin-top:20px;flex-shrink:0;" title="Phase 1: edit users.js to remove.">✕ Remove</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -2713,11 +2800,7 @@ function deleteUser(idx){
 }
 
 function addNewUser(){
-  const users=loadUsers();
-  const newUser={id:'user'+(users.length+1),pw:'newpass',name:'New User',role:'employee',branch:null};
-  users.push(newUser);
-  saveUsers(users);
-  renderUserMgmtTable();
+  alert('Phase 1: users are defined in users.js with SHA-256 hashes.\nTo add a new user, edit users.js (see header comment) and redeploy.');
 }
 
 function resetAllUsers(){
@@ -2730,8 +2813,9 @@ function resetAllUsers(){
 // ═══════════════════════════════════════════
 // GOOGLE DRIVE LIVE DATA CONNECTION
 // ═══════════════════════════════════════════
-const GD_API_URL = 'https://script.google.com/macros/s/AKfycbwBM3U_ck0s1LLLBCrJ1x1Btim5owb67HI53fyIy3mhNpPTJvG3byrALjUPNOdWFQLEWg/exec';
-const GD_API_KEY = 'WiltekAPI2026';
+// NOTE: All fetches go through /api/proxy (Vercel serverless); Apps Script URL + key
+// are NOT embedded here for security — they live in Vercel env vars.
+// Legacy GD_API_URL / GD_API_KEY constants removed in Phase 1 (SPEC §4.1).
 
 let gdLastFetch = null;
 let gdStatus = 'offline'; // 'offline' | 'loading' | 'live' | 'error'
@@ -3441,11 +3525,12 @@ function prApprove(id){
   var r = arr.find(function(x){return x.id===id;});
   if(!r)return;
   // Check approver role
-  if(r.tier==='T1' && !['admin','ceo','cfo','director','sales_mgr','branch_mgr','hr','warehouse','marketing'].includes(currentUser.role)){
+  // SPEC §5.1 roles: T1 approvable by any non-employee manager; T2/T3 by owner or finance only.
+  if(r.tier==='T1' && !['owner','finance','bi_consultant','hr','warehouse','marketing','w01_mgr','w02_mgr','w03_mgr','w05_mgr','w07_mgr','w11_mgr'].includes(currentUser.role)){
     alert(lang==='en'?'You cannot approve T1 proposals.':'你无权审批 T1 提案');return;
   }
-  if((r.tier==='T2'||r.tier==='T3') && !['admin','ceo','cfo'].includes(currentUser.role)){
-    alert(lang==='en'?'Only CEO/CFO can approve T2/T3 (>RM500) proposals.':'仅 CEO/CFO 可审批 T2/T3 (>RM500) 提案');return;
+  if((r.tier==='T2'||r.tier==='T3') && !['owner','finance'].includes(currentUser.role)){
+    alert(lang==='en'?'Only Owner / Finance can approve T2/T3 (>RM500) proposals.':'仅 Owner / Finance 可审批 T2/T3 (>RM500) 提案');return;
   }
   r.status='done'; r.approver=currentUser.id; r.approvedAt = new Date().toISOString().slice(0,10);
   gtdSave(arr); render();
@@ -3479,7 +3564,7 @@ function renderProposals(){
 
   var all = gtdLoad().filter(function(x){return x.type==='proposal';});
   var myPending = all.filter(function(x){return x.status==='todo';}).length;
-  var canApproveCeo = currentUser && ['admin','ceo','cfo'].includes(currentUser.role);
+  var canApproveCeo = currentUser && ['owner','finance'].includes(currentUser.role);
   var awaitingMe = canApproveCeo ? all.filter(function(x){return x.status==='todo' && (x.tier==='T2'||x.tier==='T3');}).length : 0;
 
   document.getElementById('pr-ins').innerHTML = '<strong>'+(en?'Approval routing':'审批流程')+':</strong> '+
@@ -3509,7 +3594,7 @@ function renderProposals(){
     '<div style="padding:20px;text-align:center;color:var(--mu);">'+(en?'No proposals in this tab.':'此标签下无提案')+'</div>' :
     filt.map(function(p){
       var tierCol = p.tier==='T3'?'var(--r)':p.tier==='T2'?'var(--b)':'var(--g)';
-      var canSign = currentUser && (p.tier==='T1' || ['admin','ceo','cfo'].includes(currentUser.role));
+      var canSign = currentUser && (p.tier==='T1' || ['owner','finance'].includes(currentUser.role));
       return '<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:12px 14px;margin:8px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">'+
         '<div style="flex:1;">'+
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'+
