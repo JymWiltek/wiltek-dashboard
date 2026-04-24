@@ -256,6 +256,7 @@ td:not(.la):not(.la2){text-align:right}
   <div class="ni" onclick="nav('customers')"><span class="nx">👥</span><span id="nav-cust"></span></div>
   <div class="ns" id="nav-s6"></div>
   <div class="ni" onclick="nav('branchhub')"><span class="nx">🗂️</span><span id="nav-hub"></span></div>
+  <div class="ni" onclick="nav('branchtoday')"><span class="nx">📅</span><span id="nav-bt"></span></div>
   <div class="ni" onclick="nav('quicklinks')"><span class="nx">🔗</span><span id="nav-links"></span></div>
   <div class="ns" id="nav-s7"></div>
   <div class="ni" onclick="nav('bistrat')"><span class="nx">🎯</span><span id="nav-bistrat"></span></div>
@@ -503,6 +504,68 @@ td:not(.la):not(.la2){text-align:right}
       </tr></thead>
       <tbody id="hub-ranking"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ══════════ BRANCH TODAY (Phase 3.1) ══════════ -->
+<div class="page" id="p-branchtoday">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:12px;flex-wrap:wrap;">
+    <div class="ph" id="bt-ph">📅 Branch Today</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <label style="font-size:11px;color:var(--mu);" id="bt-branch-lbl">Branch:</label>
+      <select id="bt-branch" onchange="btSelectBranch(this.value)" style="background:var(--s2);border:1px solid var(--bdr);color:var(--fg);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:6px;"></select>
+      <label style="font-size:11px;color:var(--mu);" id="bt-date-lbl">Date:</label>
+      <input type="date" id="bt-date" onchange="btSelectDate(this.value)" style="background:var(--s2);border:1px solid var(--bdr);color:var(--fg);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:6px;">
+    </div>
+  </div>
+  <div class="ps" id="bt-ps">Daily walk-in · purchases · race · channel attribution</div>
+
+  <div id="bt-nudge" style="display:none;background:rgba(245,200,66,.10);border:1px solid rgba(245,200,66,.35);border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:12px;color:#f5c842;"></div>
+  <div id="bt-warnings" style="display:none;background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.25);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:11px;color:#ff4d6d;"></div>
+
+  <div id="bt-ins" class="ins info"></div>
+
+  <!-- Today KPI band -->
+  <div class="sec"><span id="bt-sec1-l">Today</span></div>
+  <div class="kr c4" id="bt-today-kpis"></div>
+
+  <!-- Today race split -->
+  <div class="sec"><span id="bt-sec2-l">Today · by Race</span></div>
+  <div class="kr c4" id="bt-today-race"></div>
+
+  <!-- Missing days + 7-day trend -->
+  <div class="gr g11">
+    <div class="card">
+      <div class="ch" id="bt-c1t">📋 <span id="bt-c1l">Missing Days This Month</span></div>
+      <div class="cs" id="bt-c1s"></div>
+      <div id="bt-missing-content" style="padding:12px 16px;font-size:12px;min-height:200px;"></div>
+    </div>
+    <div class="card">
+      <div class="ch" id="bt-c2t">📈 <span id="bt-c2l">Last 7 Days · Walk-in vs Purchase</span></div>
+      <div class="cs" id="bt-c2s"></div>
+      <div class="cv h220"><canvas id="bt7dChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Month aggregate race table -->
+  <div class="sec"><span id="bt-sec3-l">This Month · Cumulative</span></div>
+  <div class="tc">
+    <div class="th">📊 <span id="bt-monthtab-title">This Month by Race</span></div>
+    <table><thead><tr id="bt-monthtab-head"></tr></thead><tbody id="bt-monthtab-body"></tbody></table>
+  </div>
+
+  <!-- Channel attribution + YTD trend -->
+  <div class="gr g11">
+    <div class="card">
+      <div class="ch" id="bt-c3t">🎯 <span id="bt-c3l">Customer Source Attribution · This Month</span></div>
+      <div class="cs" id="bt-c3s"></div>
+      <div class="cv h220"><canvas id="btChannelChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ch" id="bt-c4t">📆 <span id="bt-c4l">YTD Monthly Walk-in Trend</span></div>
+      <div class="cs" id="bt-c4s"></div>
+      <div class="cv h220"><canvas id="btYtdChart"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -1460,6 +1523,7 @@ const T = {
   nav_cust:  {en:'Customers 2026',zh:'顾客分析'},
   nav_s6:    {en:'Hub & Links',zh:'总览与链接'},
   nav_hub:   {en:'Branch Hub',zh:'分行总览'},
+  nav_bt:    {en:'Branch Today',zh:'今日战报'},
   nav_links: {en:'Quick Links',zh:'快速链接'},
   nav_s7:{en:'BI WAR ROOM',zh:'BI 作战室'},
   nav_bistrat:{en:'BI Strategic',zh:'BI 战略'},
@@ -1522,7 +1586,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
   document.getElementById('pb').textContent='📅 '+mLabel(m);
 
   // Nav labels
-  ['s1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','links','s7','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
+  ['s1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
     const el=document.getElementById('nav-'+k);
     if(el) el.textContent=t('nav_'+k);
   });
@@ -1539,6 +1603,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
     ()=>renderBalanceSheet(),
     ()=>renderCustomers(),
     ()=>renderBranchHub(),
+    ()=>renderBranchToday(),
     ()=>renderQuickLinks(),
     ()=>renderBIStrategic(),
     ()=>renderBIWarehouse(),
@@ -2700,6 +2765,348 @@ function renderBranchHub(){
   }).join('');
 }
 
+// ─────────── BRANCH TODAY (Phase 3.1) ───────────
+// Daily store ops: live Floatation walk-in / purchase / race / channel data.
+// Data flows: browser → /api/proxy?type=branch_today&branch=Wxx&date=YYYY-MM-DD
+//           → Apps Script getBranchTodayData() → Floatation sheet (per-branch).
+// Branch-scoped roles (w01..w11_mgr) are locked to their own branch.
+// BT_STATE caches the latest payload; re-fetch only when branch/date changes.
+const BT_STATE = { branch:'', date:'', data:null, loading:false, error:'' };
+
+function _btToday(){
+  // Malaysia local date (YYYY-MM-DD). We render on behalf of KL stores.
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Kuala_Lumpur',
+    year:'numeric', month:'2-digit', day:'2-digit' });
+  return fmt.format(now); // en-CA gives YYYY-MM-DD
+}
+
+function btSelectBranch(b){
+  if (!b || b === BT_STATE.branch) return;
+  BT_STATE.branch = b;
+  BT_STATE.data = null;
+  fetchBranchToday();
+}
+function btSelectDate(d){
+  if (!d || d === BT_STATE.date) return;
+  BT_STATE.date = d;
+  BT_STATE.data = null;
+  fetchBranchToday();
+}
+
+async function fetchBranchToday(){
+  if (BT_STATE.loading) return;
+  if (!BT_STATE.branch || !BT_STATE.date) return;
+  BT_STATE.loading = true;
+  BT_STATE.error = '';
+  try {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(()=>ctrl.abort(), 20000);
+    const url  = `/api/proxy?type=branch_today&branch=${encodeURIComponent(BT_STATE.branch)}&date=${encodeURIComponent(BT_STATE.date)}`;
+    const res  = await fetch(url, {signal:ctrl.signal});
+    clearTimeout(tid);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const json = await res.json();
+    if (json.ok !== true) throw new Error(json.error || 'API ok:false');
+    BT_STATE.data = json.data || null;
+    BT_STATE.data._key = BT_STATE.branch + '|' + BT_STATE.date;
+  } catch(e) {
+    BT_STATE.error = e.message || String(e);
+    BT_STATE.data = null;
+  } finally {
+    BT_STATE.loading = false;
+    // Re-draw with either the new payload or the error state.
+    try { drawBranchToday(); } catch(err) { console.error('drawBranchToday', err); }
+  }
+}
+
+function renderBranchToday(){
+  const en = lang === 'en';
+  const page = document.getElementById('p-branchtoday');
+  if (!page) return;
+
+  // Labels (i18n refresh on every render)
+  txt(document.getElementById('bt-ph'),
+      '📅 Branch Today', '📅 今日战报');
+  txt(document.getElementById('bt-ps'),
+      'Daily walk-in · purchases · race · channel attribution',
+      '每日客流 · 购买 · 族群 · 渠道归因');
+  txt(document.getElementById('bt-branch-lbl'), 'Branch:',  '分行：');
+  txt(document.getElementById('bt-date-lbl'),   'Date:',    '日期：');
+  txt(document.getElementById('bt-sec1-l'),     'TODAY',    '今日');
+  txt(document.getElementById('bt-sec2-l'),     'TODAY · BY RACE', '今日 · 分族群');
+  txt(document.getElementById('bt-sec3-l'),     'THIS MONTH · CUMULATIVE', '本月累计');
+  txt(document.getElementById('bt-c1l'),        'Missing Days This Month', '本月缺录日');
+  txt(document.getElementById('bt-c2l'),        'Last 7 Days · Walk-in vs Purchase', '近7日 · 客流 vs 购买');
+  txt(document.getElementById('bt-c3l'),        'Customer Source Attribution · This Month', '客户来源归因 · 本月');
+  txt(document.getElementById('bt-c4l'),        'YTD Monthly Walk-in Trend', '年度月度客流趋势');
+  txt(document.getElementById('bt-monthtab-title'), 'This Month by Race', '本月 · 分族群');
+
+  // Initialize branch: scoped users are pinned, others default to W01 or their saved branch
+  const allowed = (window.WP_PERMS && currentUser)
+    ? WP_PERMS.allowedBranches(currentUser.role, userPerms.branch)
+    : ['W01','W02','W03','W05','W07','W11'];
+  if (!BT_STATE.branch) {
+    BT_STATE.branch = userPerms.branch || allowed[0] || 'W01';
+  }
+  if (!BT_STATE.date) {
+    BT_STATE.date = _btToday();
+  }
+
+  // Populate branch dropdown + lock if scoped
+  const sel = document.getElementById('bt-branch');
+  if (sel) {
+    const locked = currentUser && window.WP_PERMS
+      && WP_PERMS.shouldLockBranchSelector(currentUser.role, 'branchtoday');
+    const opts = allowed.map(b => `<option value="${b}"${b===BT_STATE.branch?' selected':''}>${b}</option>`).join('');
+    if (sel.innerHTML !== opts) sel.innerHTML = opts;
+    sel.disabled = !!locked;
+    if (sel.value !== BT_STATE.branch) sel.value = BT_STATE.branch;
+  }
+  const dateInp = document.getElementById('bt-date');
+  if (dateInp) {
+    if (dateInp.value !== BT_STATE.date) dateInp.value = BT_STATE.date;
+    dateInp.max = _btToday();
+  }
+
+  // Insight box — always visible
+  const ins = document.getElementById('bt-ins');
+  if (BT_STATE.loading) {
+    txt(ins,
+      `⏳ <strong>Loading ${BT_STATE.branch} · ${BT_STATE.date}</strong> — fetching daily walk-in, purchase and channel data from the Floatation sheet…`,
+      `⏳ <strong>加载 ${BT_STATE.branch} · ${BT_STATE.date}</strong> — 正在从客流表拉取当日客流、购买、渠道数据…`);
+  } else if (BT_STATE.error) {
+    txt(ins,
+      `⚠️ <strong>Could not load data</strong>: ${BT_STATE.error}. Verify the Floatation sheet for ${BT_STATE.branch} and try again.`,
+      `⚠️ <strong>加载失败</strong>：${BT_STATE.error}。请检查 ${BT_STATE.branch} 客流表后重试。`);
+  } else if (!BT_STATE.data) {
+    txt(ins,
+      `ℹ️ <strong>Branch Today</strong> shows live daily data from the per-branch Customer Floatation sheet. Pick a branch and date above to start.`,
+      `ℹ️ <strong>今日战报</strong> 显示各分行客流表的每日实时数据。请选择分行与日期开始。`);
+  }
+
+  // Decide whether to fetch
+  const wantKey = BT_STATE.branch + '|' + BT_STATE.date;
+  const haveKey = (BT_STATE.data && BT_STATE.data._key) || '';
+  if (wantKey !== haveKey && !BT_STATE.loading && !BT_STATE.error) {
+    // Fire async fetch; drawBranchToday() will run on completion.
+    fetchBranchToday();
+  }
+
+  // Draw with whatever we currently have (may be empty first time)
+  drawBranchToday();
+}
+
+function drawBranchToday(){
+  const en = lang === 'en';
+  const data = BT_STATE.data;
+  const rm  = v => 'RM '+(+v||0).toLocaleString('en-MY',{maximumFractionDigits:0});
+  const pctStr = (num, den) => den > 0 ? ((num/den)*100).toFixed(1)+'%' : '—';
+  const safe = (n) => (+n || 0);
+
+  // ── If no data yet, blank out the dynamic regions so stale content isn't shown.
+  if (!data) {
+    ['bt-today-kpis','bt-today-race','bt-missing-content','bt-monthtab-head','bt-monthtab-body']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    const nudge = document.getElementById('bt-nudge');
+    if (nudge) nudge.style.display = 'none';
+    const warn = document.getElementById('bt-warnings');
+    if (warn) warn.style.display = 'none';
+    // Blank out canvases
+    ['bt7dChart','btChannelChart','btYtdChart'].forEach(id=>{
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    });
+    return;
+  }
+
+  // ── Insight (when we have data) ──────────────────────────────
+  const ins = document.getElementById('bt-ins');
+  const t = data.today || {};
+  const m = data.this_month || {};
+  const todayConv = safe(t.walk_in) > 0 ? (safe(t.purchase)/safe(t.walk_in))*100 : 0;
+  const monthConv = safe(m.walk_in) > 0 ? (safe(m.purchase)/safe(m.walk_in))*100 : 0;
+  txt(ins,
+    `💡 <strong>${BT_STATE.branch} · ${BT_STATE.date}</strong> — ${safe(t.walk_in)} walk-ins, ${safe(t.purchase)} purchased (${todayConv.toFixed(1)}% conversion). Month-to-date: ${safe(m.walk_in).toLocaleString()} walk-ins · ${safe(m.purchase).toLocaleString()} purchases (${monthConv.toFixed(1)}%).`,
+    `💡 <strong>${BT_STATE.branch} · ${BT_STATE.date}</strong> — 客流 ${safe(t.walk_in)} 人,成交 ${safe(t.purchase)} 单(转化率 ${todayConv.toFixed(1)}%)。本月累计:客流 ${safe(m.walk_in).toLocaleString()} 人 · 成交 ${safe(m.purchase).toLocaleString()} 单(${monthConv.toFixed(1)}%)。`);
+
+  // ── Today KPI band ──────────────────────────────────────────
+  const kpis = [
+    { lbl_en:'Walk-in',     lbl_zh:'客流',       val: safe(t.walk_in),  color:'#4d9fff' },
+    { lbl_en:'Purchased',   lbl_zh:'成交',       val: safe(t.purchase), color:'#00e5c4' },
+    { lbl_en:'Conversion',  lbl_zh:'转化率',     val: todayConv.toFixed(1)+'%', color: todayConv>=30?'#00e5c4':todayConv>=15?'#f5c842':'#ff4d6d', raw:true },
+    { lbl_en:'Month Avg Conv', lbl_zh:'月均转化', val: monthConv.toFixed(1)+'%', color:'#b87cff', raw:true },
+  ];
+  document.getElementById('bt-today-kpis').innerHTML = kpis.map(k=>`
+    <div class="kpi" style="border-color:${k.color}22;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${k.color}"></div>
+      <div class="kl" style="color:${k.color}">${en?k.lbl_en:k.lbl_zh}</div>
+      <div class="kv" style="color:${k.color}">${k.raw?k.val:(+k.val).toLocaleString()}</div>
+    </div>`).join('');
+
+  // ── Today · by Race ─────────────────────────────────────────
+  const races = [
+    { key:'chinese', en:'Chinese',  zh:'华裔',   color:'#f5c842' },
+    { key:'malay',   en:'Malay',    zh:'马来裔', color:'#00e5c4' },
+    { key:'india',   en:'Indian',   zh:'印度裔', color:'#ff8c42' },
+    { key:'others',  en:'Others',   zh:'其他',   color:'#b87cff' },
+  ];
+  document.getElementById('bt-today-race').innerHTML = races.map(r=>{
+    const row = t[r.key] || {walk_in:0, purchase:0};
+    const wi  = safe(row.walk_in), pu = safe(row.purchase);
+    const cvr = wi > 0 ? ((pu/wi)*100).toFixed(1)+'%' : '—';
+    return `<div class="kpi" style="border-color:${r.color}22;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${r.color}"></div>
+      <div class="kl" style="color:${r.color}">${en?r.en:r.zh}</div>
+      <div class="kv" style="color:${r.color}">${wi} / ${pu}</div>
+      <div class="ks">${en?'walk-in / purchase':'客流 / 成交'} · ${cvr}</div>
+    </div>`;
+  }).join('');
+
+  // ── Nudge: missing days ─────────────────────────────────────
+  const nudge = document.getElementById('bt-nudge');
+  const missing = Array.isArray(data.missing_days) ? data.missing_days : [];
+  if (nudge) {
+    if (missing.length > 0) {
+      nudge.style.display = '';
+      nudge.innerHTML = en
+        ? `🟡 <strong>${missing.length} day${missing.length===1?'':'s'} missing this month</strong> — daily log is incomplete for: ${missing.join(', ')}. Ask the branch to back-fill to restore month-to-date accuracy.`
+        : `🟡 <strong>本月有 ${missing.length} 天未录入</strong> — 缺录日期:${missing.join(', ')}。请分行补录以确保本月累计准确。`;
+    } else {
+      nudge.style.display = 'none';
+    }
+  }
+
+  // ── Data quality warnings ───────────────────────────────────
+  const warn = document.getElementById('bt-warnings');
+  const warnings = Array.isArray(data.data_quality_warnings) ? data.data_quality_warnings : [];
+  if (warn) {
+    if (warnings.length > 0) {
+      warn.style.display = '';
+      const items = warnings.slice(0,8).map(w=>{
+        const detail = w.detail || '';
+        if (w.type === 'future_channel') {
+          return en
+            ? `<li>${w.date}: channel marked without walk-in (future date) — ${detail}</li>`
+            : `<li>${w.date}:未有客流但已录渠道(未来日期) — ${detail}</li>`;
+        }
+        if (w.type === 'channel_without_walkin') {
+          return en
+            ? `<li>${w.date}: channel attributed but walk-in = 0 — ${detail}</li>`
+            : `<li>${w.date}:记录了渠道但客流 = 0 — ${detail}</li>`;
+        }
+        return `<li>${w.date}: ${w.type} ${detail}</li>`;
+      }).join('');
+      warn.innerHTML = (en
+        ? `🔴 <strong>Data quality:</strong> ${warnings.length} anomal${warnings.length===1?'y':'ies'} detected —`
+        : `🔴 <strong>数据质量:</strong> 发现 ${warnings.length} 处异常 —`)
+        + `<ul style="margin:6px 0 0 18px;padding:0;">${items}</ul>`;
+    } else {
+      warn.style.display = 'none';
+    }
+  }
+
+  // ── Missing days card ───────────────────────────────────────
+  const mc = document.getElementById('bt-missing-content');
+  if (mc) {
+    if (missing.length === 0) {
+      mc.innerHTML = `<div style="color:#00e5c4;padding:60px 0;text-align:center;">
+        ✅ ${en?'All days logged — nice job.':'本月已全部录入 — 很棒。'}
+      </div>`;
+    } else {
+      mc.innerHTML = `<div style="color:#f5c842;font-weight:700;margin-bottom:8px;">
+        ${missing.length} ${en?'day'+(missing.length===1?'':'s')+' missing':'天缺录'}
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;line-height:1.8;font-size:11px;color:var(--mu);">
+        ${missing.map(d=>`<span style="display:inline-block;min-width:28px;text-align:center;background:rgba(245,200,66,.12);color:#f5c842;border:1px solid rgba(245,200,66,.3);border-radius:4px;padding:2px 4px;margin:2px 3px 0 0;">${d}</span>`).join('')}
+      </div>
+      <div style="margin-top:12px;font-size:10px;color:var(--mu);line-height:1.5;">
+        ${en?'Per SPEC §2.2 the branch logs walk-in + race + channel daily. Ask the manager to back-fill from their paper tally or CCTV review.':'依据 SPEC §2.2,分行每日需记录客流、族群、渠道。请店长参考纸本/监控回补。'}
+      </div>`;
+    }
+  }
+
+  // ── 7-day chart ─────────────────────────────────────────────
+  const last7 = Array.isArray(data.last_7_days) ? data.last_7_days : [];
+  mkChart('bt7dChart',{
+    type:'bar',
+    data:{
+      labels: last7.map(d=>(d.date||'').slice(5)), // MM-DD
+      datasets:[
+        { label: en?'Walk-in':'客流',  data:last7.map(d=>safe(d.walk_in)),  backgroundColor:C.b2, borderColor:C.b,  borderWidth:1 },
+        { label: en?'Purchase':'成交', data:last7.map(d=>safe(d.purchase)), backgroundColor:C.g2, borderColor:C.g,  borderWidth:1 },
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}},
+      scales:{y:{beginAtZero:true, ticks:{precision:0}}} }
+  });
+
+  // ── Month by Race table ─────────────────────────────────────
+  const headEl = document.getElementById('bt-monthtab-head');
+  const bodyEl = document.getElementById('bt-monthtab-body');
+  if (headEl && bodyEl) {
+    headEl.innerHTML = `
+      <th class="la">${en?'Race':'族群'}</th>
+      <th>${en?'Walk-in':'客流'}</th>
+      <th>${en?'Purchase':'成交'}</th>
+      <th>${en?'Conversion':'转化率'}</th>
+      <th>${en?'Walk-in %':'客流占比'}</th>`;
+    const tot = Math.max(1, safe(m.walk_in));
+    bodyEl.innerHTML = races.map(r=>{
+      const row = m[r.key] || {walk_in:0, purchase:0};
+      const wi  = safe(row.walk_in), pu = safe(row.purchase);
+      const cvr = wi > 0 ? ((pu/wi)*100).toFixed(1)+'%' : '—';
+      const sharePct = (wi/tot*100).toFixed(1)+'%';
+      return `<tr>
+        <td class="la"><span style="color:${r.color};font-weight:700">${en?r.en:r.zh}</span></td>
+        <td>${wi.toLocaleString()}</td>
+        <td>${pu.toLocaleString()}</td>
+        <td>${cvr}</td>
+        <td>${sharePct}</td>
+      </tr>`;
+    }).join('') + `<tr style="border-top:2px solid var(--bdr);font-weight:700">
+      <td class="la">${en?'Total':'合计'}</td>
+      <td>${safe(m.walk_in).toLocaleString()}</td>
+      <td>${safe(m.purchase).toLocaleString()}</td>
+      <td>${monthConv.toFixed(1)}%</td>
+      <td>100.0%</td>
+    </tr>`;
+  }
+
+  // ── Channel attribution (month-to-date) ─────────────────────
+  const chMap = (m && m.channels && typeof m.channels === 'object') ? m.channels : {};
+  const chEntries = Object.entries(chMap)
+    .map(([k,v])=>[k, safe(v)])
+    .filter(([,v])=>v>0)
+    .sort((a,b)=>b[1]-a[1]);
+  const chColors = ['#00e5c4','#4d9fff','#f5c842','#ff8c42','#b87cff','#ff4d6d','#5a738a','#7ac24d','#c47cff','#42c9e0'];
+  mkChart('btChannelChart',{
+    type:'doughnut',
+    data:{
+      labels: chEntries.map(e=>e[0]),
+      datasets:[{ data: chEntries.map(e=>e[1]),
+        backgroundColor: chEntries.map((_,i)=>chColors[i%chColors.length]),
+        borderWidth:0 }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{boxWidth:10, padding:7}}} }
+  });
+
+  // ── YTD monthly trend ───────────────────────────────────────
+  const ytd = Array.isArray(data.ytd_by_month) ? data.ytd_by_month : [];
+  mkChart('btYtdChart',{
+    type:'line',
+    data:{
+      labels: ytd.map(r=>r.month),
+      datasets:[{ label: en?'Walk-in':'客流', data: ytd.map(r=>safe(r.walk_in)),
+        borderColor:C.b, backgroundColor:C.b2, tension:.35, fill:true }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}},
+      scales:{y:{beginAtZero:true, ticks:{precision:0}}} }
+  });
+}
+
 // ─────────── QUICK LINKS ───────────
 function renderQuickLinks(){
   const en=lang==='en';
@@ -2821,7 +3228,7 @@ function applyRoleCSS(){
 const ALL_ROLES=['owner','finance','bi_consultant','warehouse','hr','marketing','w01_mgr','w02_mgr','w03_mgr','w05_mgr','w07_mgr','w11_mgr'];
 const BRANCHES=['W01','W02','W03','W05','W07','W11'];
 const PAGE_IDS=['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'];
-const PAGE_LABELS={health:'Exec Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',quicklinks:'Quick Links',bistrat:'BI Strategy',biwh:'BI Warehouse',inv360:'Inventory 360',gtd:'GTD Tasks',proposals:'Proposals',valuation:'Valuation'};
+const PAGE_LABELS={health:'Exec Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',branchtoday:'Branch Today',quicklinks:'Quick Links',bistrat:'BI Strategy',biwh:'BI Warehouse',inv360:'Inventory 360',gtd:'GTD Tasks',proposals:'Proposals',valuation:'Valuation'};
 
 function openUserMgmt(){
   if(currentUser?.role!=='owner') return;

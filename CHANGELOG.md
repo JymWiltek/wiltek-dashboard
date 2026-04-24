@@ -1,5 +1,90 @@
 # Wiltek Portal — Changelog
 
+## Phase 3.1 — Branch Today + audit_write fix (2026-04-24)
+
+First Phase 3 data pull — live per-branch daily Floatation data surfaces on a
+new `Branch Today` page. Branch managers land here instead of `branches`.
+Also wires the audit-log POST round-trip end-to-end (Apps Script `doPost`).
+
+### Added
+- **`Wiltek_MASTER.html` — `p-branchtoday` page** (new SPEC §5.1 L1 landing
+  for branch managers). UI blocks:
+  - Header row with branch `<select>` + date `<input type="date">` (date
+    capped at today in `Asia/Kuala_Lumpur`).
+  - Nudge banner when days are missing this month.
+  - Amber/red data-quality warning block (future-dated rows, channel
+    attributed without walk-in).
+  - Today KPIs (walk-in / purchase / conversion / month-average conversion).
+  - Today-by-race KPI row (Chinese / Malay / Indian / Others).
+  - Missing-days card + 7-day walk-in vs purchase bar chart.
+  - This-Month-by-Race cumulative table.
+  - Channel-attribution doughnut + YTD monthly walk-in trend line chart.
+- **`renderBranchToday()` + `fetchBranchToday()`** in `Wiltek_MASTER.html`:
+  - State held in `BT_STATE = {branch, date, data, loading, error}`.
+  - Fetch URL: `/api/proxy?type=branch_today&branch=Wxx&date=YYYY-MM-DD`,
+    20 s abort timeout, key-cached so idempotent re-renders don't refetch.
+  - Dropdown options sourced from `WP_PERMS.allowedBranches()`; disabled
+    when `WP_PERMS.shouldLockBranchSelector(role, 'branchtoday')` is true.
+  - Bilingual labels (EN + ZH).
+- **Sidenav** — new entry "📅 Branch Today" (`nav-bt`) between Branch Hub
+  and Quick Links.
+- `T.nav_bt` translation map entry.
+- `PAGE_LABELS.branchtoday = 'Branch Today'`.
+
+### Changed
+- **`permissions.js`**:
+  - `rolePages` — added `'branchtoday'` to: `owner`, `finance`,
+    `bi_consultant`, and all six branch managers (`w01..w11_mgr`).
+  - `roleLanding` — all six branch managers now land on `branchtoday`
+    (was `branches`).
+  - `branchScopedPages` — added `'branchtoday'` so the page-level branch
+    selector is auto-locked for branch-scoped roles.
+  - Header comment updated to reflect Phase 3.1 completion.
+
+### Server-side (Apps Script, NOT in git)
+Jym pastes the following into Code.gs manually; these changes never ship
+to the repo because they contain the Floatation sheet IDs and API secret.
+- **New constants**: `AUDIT_LOG_SHEET_ID`, `AUDIT_LOG_TAB`, `FLOATATION_IDS`.
+- **New `doGet` case**: `branch_today` → `getBranchTodayData(branch, date)`.
+- **New `doPost` handler**: accepts `?type=audit_write`, validates API key,
+  appends events to the Audit_Log sheet per SPEC §4.3 schema:
+  `timestamp | userId | role | action | target | details | ipRegion | userAgent`.
+  Maps auditlog.js field names (`t/uid/role/action/target/details/ua`) →
+  SPEC schema. Fixes the 401 loop previously logged on every flush.
+- **`getBranchTodayData(branch, date)`**: opens the per-branch Floatation
+  sheet, reads the month-of-date tab (Jan..Dec), parses 31 daily rows +
+  aggregate row, extracts total + race split (chinese / malay / india /
+  others — cols 7-10, 12-15, 17-20, 22-25), dynamically reads channel
+  names from row-4 header at col 27+, returns `today / this_month /
+  last_7_days / ytd_by_month / missing_days / data_quality_warnings`.
+
+### Fixed
+- **audit_write 401** — auditlog.js flushes to
+  `/api/proxy?type=audit_write` every 60 s. Apps Script previously had no
+  `doPost`, so every flush returned 401 and re-queued the events. The new
+  `doPost` drains the queue on first success.
+
+### Validation
+- `node --check permissions.js` passes.
+- All inline `<script>` blocks in `Wiltek_MASTER.html` parse via
+  `new Function()`.
+- `<div>` open/close balance holds (one new `p-branchtoday` wrapper +
+  child divs accounted for in both the HTML section and any chart cards).
+- Simulated `renderBranchToday()` with no payload → dynamic regions
+  cleared, insight shows "ready to load" message.
+- `WP_PERMS.allowedBranches('w05_mgr','W05')` returns `['W05']`.
+- `WP_PERMS.shouldLockBranchSelector('w05_mgr','branchtoday')` returns `true`.
+
+### Known gaps / next phase
+- **Phase 3.2**: SKU-level dead stock activation (must land before the
+  Ampang flagship opens in May 2026).
+- **Phase 3.3**: Loyalty segmentation → phone-call lists.
+- **Phase 3.4**: Lead-time analysis (procurement negotiation data).
+- **Data quality**: Floatation channel columns drift month-to-month
+  (Mar had 9 channels, Apr has 7 different ones). The parser reads the
+  row-4 header dynamically, but if a branch adds an entirely new column
+  mid-month the frontend will accept it verbatim — no validation yet.
+
 ## Phase 2 — Role-Based Menu System (2026-04-24)
 
 Implements SPEC §5 (page × role matrix + default landings) with DOM removal

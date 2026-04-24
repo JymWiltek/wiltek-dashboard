@@ -18,13 +18,17 @@
 //   - allowedBranches(role, userBranch)      : array of branch IDs
 //
 // Pages that SPEC lists but don't yet exist in the HTML (Phase 4/6/10 deliverables):
-//   - "Branch Today" (L1 per-branch page)  → branch managers fall back to `branches`
 //   - "HR Dashboard"                       → hr falls back to `expenses`
 //   - "Marketing Dashboard"                → marketing falls back to `customers`
 //   - "Audit Log"                          → owner-only, page not built yet
 //   - "CEO Cockpit"                        → SPEC distinguishes it from Financial
 //                                            Health; current HTML collapses both
 //                                            onto page id `health`. Phase 4 will split.
+//
+// Phase 3.1 built pages:
+//   - "Branch Today" (`branchtoday`)       → live Floatation daily data.
+//                                            Default landing for w01..w11_mgr.
+//                                            Branch-scoped (dropdown locked to own branch).
 // ═══════════════════════════════════════════════════════════════════════
 (function(){
   "use strict";
@@ -34,15 +38,15 @@
     owner: [
       'health','pl','cashflow','gp','branches','balancesheet','expenses',
       'inventory','customers','bistrat','biwh','inv360',
-      'gtd','proposals','action','valuation','branchhub','quicklinks'
+      'gtd','proposals','action','valuation','branchhub','branchtoday','quicklinks'
     ],
     finance: [
       'health','pl','cashflow','gp','branches','balancesheet','expenses',
-      'inventory','customers',
+      'inventory','customers','branchtoday',
       'gtd','proposals','action','quicklinks'
     ],
     bi_consultant: [
-      'inventory','customers','bistrat','biwh','inv360',
+      'inventory','customers','bistrat','biwh','inv360','branchtoday',
       'gtd','proposals','action','quicklinks'
     ],
     warehouse: [
@@ -59,12 +63,12 @@
     ],
     // Branch managers share the same page set; data scoping is handled
     // via shouldLockBranchSelector() + Phase 4 server-side filters.
-    w01_mgr: ['branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w02_mgr: ['branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w03_mgr: ['branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w05_mgr: ['branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w07_mgr: ['branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w11_mgr: ['branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w01_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w02_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w03_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w05_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w07_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w11_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
   };
 
   // ── Default landing page (SPEC §5.1, with Phase 2 fallbacks) ───────
@@ -75,12 +79,12 @@
     warehouse:     'biwh',
     hr:            'expenses', // "HR Dashboard" unbuilt → fallback
     marketing:     'customers',// "Customer Intel" is the customers page
-    w01_mgr:       'branches', // "Wxx Today" unbuilt → fallback
-    w02_mgr:       'branches',
-    w03_mgr:       'branches',
-    w05_mgr:       'branches',
-    w07_mgr:       'branches',
-    w11_mgr:       'branches',
+    w01_mgr:       'branchtoday', // Phase 3.1 — live Floatation dashboard
+    w02_mgr:       'branchtoday',
+    w03_mgr:       'branchtoday',
+    w05_mgr:       'branchtoday',
+    w07_mgr:       'branchtoday',
+    w11_mgr:       'branchtoday',
   };
 
   // ── Branch scoping (Jym's Phase 2 addendum) ────────────────────────
@@ -89,7 +93,7 @@
 
   // These pages contain a branch selector / dropdown that must be locked
   // (disabled, preselected to currentUser.branch) for branch-scoped users.
-  const branchScopedPages = ['branches','inventory','customers','branchhub'];
+  const branchScopedPages = ['branches','inventory','customers','branchhub','branchtoday'];
 
   // Every operating branch. Matches the `branch` field in users.js.
   const ALL_BRANCHES = ['W01','W02','W03','W05','W07','W11'];
