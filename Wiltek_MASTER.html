@@ -2766,9 +2766,21 @@ function renderBranchHub(){
 }
 
 // ─────────── BRANCH TODAY (Phase 3.1) ───────────
-// Daily store ops: live Floatation walk-in / purchase / race / channel data.
-// Data flows: browser → /api/proxy?type=branch_today&branch=Wxx&date=YYYY-MM-DD
-//           → Apps Script getBranchTodayData() → Floatation sheet (per-branch).
+// Store-ops view: month-to-date walk-in + race mix + YTD trend.
+//
+// Mode matrix:
+//   AGGREGATE MODE (current production) — `type=branch_today` Apps Script
+//     handler NOT deployed. We read `type=floatation` (Summary tab, ~6s,
+//     already deployed) and derive month + YTD aggregates. Daily detail
+//     (today KPIs, last-7-days, missing-days, channel attribution) is shown
+//     as "Aggregate mode · deploy Phase 3.1 Apps Script to enable".
+//
+//   DAILY MODE (pending) — once PHASE_3_1_APPS_SCRIPT_PASTE.gs is deployed,
+//     `type=branch_today&branch=Wxx&date=YYYY-MM-DD` returns the full
+//     {today, this_month, last_7_days, ytd_by_month, missing_days,
+//     data_quality_warnings} shape. Swap fetchBranchToday() back to that
+//     endpoint and drawBranchToday() will light up all sections.
+//
 // Branch-scoped roles (w01..w11_mgr) are locked to their own branch.
 // BT_STATE caches the latest payload; re-fetch only when branch/date changes.
 const BT_STATE = { branch:'', date:'', data:null, loading:false, error:'' };
@@ -2800,9 +2812,24 @@ async function fetchBranchToday(){
   BT_STATE.loading = true;
   BT_STATE.error = '';
   try {
+    // Phase 3.1 — aggregate-mode fallback.
+    // The dedicated `type=branch_today` Apps Script handler (daily detail,
+    // last-7-days, missing-days, channel attribution) is not yet deployed.
+    // Until then we derive a month-to-date + YTD view straight from the
+    // already-deployed `type=floatation` endpoint (Summary tab, ~6s).
+    //
+    // Floatation Summary rows per branch:
+    //   All / Chinese / Malay / India / Others
+    //     values = [channelLabel, Jan..Dec, ?]   ← monthly walk-in counts
+    //   YTD (AVerage) Customer Quantity / Closing Rate / Basket Size
+    //     values = [Jan..Dec]                    ← 12 items, 0-indexed
+    //
+    // What we can populate:   this_month (by race), ytd_by_month, ytd_avg
+    // What stays empty:       today.*, last_7_days, missing_days, channels
+    //                         (requires daily tab reads — Phase 3.1 paste)
     const ctrl = new AbortController();
-    const tid  = setTimeout(()=>ctrl.abort(), 20000);
-    const url  = `/api/proxy?type=branch_today&branch=${encodeURIComponent(BT_STATE.branch)}&date=${encodeURIComponent(BT_STATE.date)}`;
+    const tid  = setTimeout(()=>ctrl.abort(), 45000); // floatation is ~6s, but give margin for cold Apps Script.
+    const url  = `/api/proxy?type=floatation`;
     const res  = await fetch(url, {signal:ctrl.signal});
     clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP '+res.status);
@@ -2812,16 +2839,13 @@ async function fetchBranchToday(){
       // issue). Surface the friendly message instead of 'API ok:false'.
       throw new Error(json.error || 'API ok:false');
     }
-    // Normalize response shape. The legacy doGet in Apps Script wraps whatever
-    // a handler returns: `jsonResponse({ok:true, type, data: result})`. If the
-    // handler itself returns `{ok:true, data:{...}}`, we get a double-wrapped
-    // payload `{ok:true, data:{ok:true, data:{...inner...}}}` — unwrap it.
-    let payload = json.data || null;
-    if (payload && payload.ok === true && payload.data && typeof payload.data === 'object') {
-      payload = payload.data;
+    const all = json.data || {};
+    const bDat = all[BT_STATE.branch] || null;
+    if (!bDat || !Array.isArray(bDat.rows) || bDat.rows.length === 0) {
+      throw new Error('No Floatation data returned for ' + BT_STATE.branch);
     }
-    BT_STATE.data = payload;
-    if (BT_STATE.data) BT_STATE.data._key = BT_STATE.branch + '|' + BT_STATE.date;
+    BT_STATE.data = _btTransformFloatation(bDat, BT_STATE.date);
+    BT_STATE.data._key = BT_STATE.branch + '|' + BT_STATE.date;
   } catch(e) {
     BT_STATE.error = e.message || String(e);
     BT_STATE.data = null;
@@ -2832,22 +2856,88 @@ async function fetchBranchToday(){
   }
 }
 
+// Transform one branch's Floatation Summary rows into the Branch Today data
+// shape. Summary tab only exposes monthly aggregates — no daily detail, no
+// purchase column, no channel attribution. Keep `today`, `last_7_days`,
+// `missing_days`, and `this_month.channels` empty so drawBranchToday() renders
+// the "aggregate mode" placeholders for those sections.
+function _btTransformFloatation(bDat, dateStr){
+  const rows = bDat.rows || [];
+  const findRow = (lbl) => rows.find(r => (r.label || '').trim() === lbl);
+  const toNum = (v) => { const n = +v; return isFinite(n) ? n : 0; };
+  const numOrNull = (v) => { const n = +v; return isFinite(n) ? n : null; };
+
+  // Parse target month index from YYYY-MM-DD (1..12).
+  const dt = new Date((dateStr || '') + 'T00:00:00');
+  const mIdx = isFinite(dt.valueOf()) ? (dt.getMonth() + 1) : (new Date().getMonth() + 1);
+
+  // Race rows: values[0] = 'Walk-in' label, values[1..12] = Jan..Dec counts.
+  const monthVal = (row, m) => row ? toNum(row.values[m]) : 0;
+
+  const rAll = findRow('All');
+  const rCh  = findRow('Chinese');
+  const rMy  = findRow('Malay');
+  const rIn  = findRow('India');
+  const rOt  = findRow('Others');
+
+  const this_month = {
+    walk_in:  monthVal(rAll, mIdx),
+    purchase: 0,     // not in Summary tab
+    chinese:  { walk_in: monthVal(rCh, mIdx), purchase: 0 },
+    malay:    { walk_in: monthVal(rMy, mIdx), purchase: 0 },
+    india:    { walk_in: monthVal(rIn, mIdx), purchase: 0 },
+    others:   { walk_in: monthVal(rOt, mIdx), purchase: 0 },
+    channels: {}     // not in Summary tab
+  };
+
+  const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const ytd_by_month = MONS.map((mn, i) => ({
+    month:   mn,
+    walk_in: monthVal(rAll, i + 1)
+  }));
+
+  // YTD-average rows are 0-indexed (12 items). '#DIV/0!' shows up for months
+  // with no data — coerce to null so the UI can render '—'.
+  const rQty = findRow('YTD (AVerage) Customer Quantity');
+  const rCls = findRow('YTD (AVerage) Closing Rate');
+  const rBsk = findRow('YTD (AVerage) Basket Size');
+  const ytd_avg = {
+    cust_qty:    rQty ? numOrNull(rQty.values[mIdx - 1]) : null,
+    closing_rt:  rCls ? numOrNull(rCls.values[mIdx - 1]) : null,
+    basket_size: rBsk ? numOrNull(rBsk.values[mIdx - 1]) : null
+  };
+
+  return {
+    today:                 null,   // daily detail pending Phase 3.1 paste
+    this_month:            this_month,
+    last_7_days:           [],     // pending Phase 3.1
+    missing_days:          null,   // pending Phase 3.1
+    data_quality_warnings: [],
+    ytd_by_month:          ytd_by_month,
+    ytd_avg:               ytd_avg,
+    _source:               'floatation_summary'
+  };
+}
+
 function renderBranchToday(){
   const en = lang === 'en';
   const page = document.getElementById('p-branchtoday');
   if (!page) return;
 
-  // Labels (i18n refresh on every render)
+  // Labels (i18n refresh on every render).
+  // Phase 3.1 is running in aggregate mode: the page reads Floatation Summary
+  // (monthly totals) until the daily `branch_today` Apps Script handler is
+  // deployed. Section titles stay sharp but sub-copy is honest about scope.
   txt(document.getElementById('bt-ph'),
       '📅 Branch Today', '📅 今日战报');
   txt(document.getElementById('bt-ps'),
-      'Daily walk-in · purchases · race · channel attribution',
-      '每日客流 · 购买 · 族群 · 渠道归因');
+      'Month-to-date walk-in · race mix · YTD trend (aggregate mode)',
+      '本月累计客流 · 族群占比 · 年度趋势(聚合模式)');
   txt(document.getElementById('bt-branch-lbl'), 'Branch:',  '分行：');
   txt(document.getElementById('bt-date-lbl'),   'Date:',    '日期：');
-  txt(document.getElementById('bt-sec1-l'),     'TODAY',    '今日');
-  txt(document.getElementById('bt-sec2-l'),     'TODAY · BY RACE', '今日 · 分族群');
-  txt(document.getElementById('bt-sec3-l'),     'THIS MONTH · CUMULATIVE', '本月累计');
+  txt(document.getElementById('bt-sec1-l'),     'THIS MONTH',          '本月');
+  txt(document.getElementById('bt-sec2-l'),     'THIS MONTH · BY RACE', '本月 · 分族群');
+  txt(document.getElementById('bt-sec3-l'),     'YTD AVERAGES',         '年度均值');
   txt(document.getElementById('bt-c1l'),        'Missing Days This Month', '本月缺录日');
   txt(document.getElementById('bt-c2l'),        'Last 7 Days · Walk-in vs Purchase', '近7日 · 客流 vs 购买');
   txt(document.getElementById('bt-c3l'),        'Customer Source Attribution · This Month', '客户来源归因 · 本月');
@@ -2932,53 +3022,64 @@ function drawBranchToday(){
   }
 
   // ── Insight (when we have data) ──────────────────────────────
+  // Aggregate mode: `today` is null, `this_month.purchase` and channel map
+  // aren't populated. Insight is therefore scoped to month walk-in + YTD avg.
   const ins = document.getElementById('bt-ins');
-  const t = data.today || {};
   const m = data.this_month || {};
-  const todayConv = safe(t.walk_in) > 0 ? (safe(t.purchase)/safe(t.walk_in))*100 : 0;
-  const monthConv = safe(m.walk_in) > 0 ? (safe(m.purchase)/safe(m.walk_in))*100 : 0;
+  const ytdAvg = data.ytd_avg || {};
+  const mWalk = safe(m.walk_in);
+  const closing = (ytdAvg.closing_rt != null) ? ytdAvg.closing_rt : null;
+  const basket  = (ytdAvg.basket_size != null) ? ytdAvg.basket_size : null;
+  const closingStr = closing != null ? (closing*100).toFixed(1)+'%' : '—';
+  const basketStr  = basket  != null ? 'RM '+(+basket).toFixed(0) : '—';
+  const monName = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][
+    ((new Date((BT_STATE.date||'')+'T00:00:00')).getMonth()) || (new Date()).getMonth()
+  ];
   txt(ins,
-    `💡 <strong>${BT_STATE.branch} · ${BT_STATE.date}</strong> — ${safe(t.walk_in)} walk-ins, ${safe(t.purchase)} purchased (${todayConv.toFixed(1)}% conversion). Month-to-date: ${safe(m.walk_in).toLocaleString()} walk-ins · ${safe(m.purchase).toLocaleString()} purchases (${monthConv.toFixed(1)}%).`,
-    `💡 <strong>${BT_STATE.branch} · ${BT_STATE.date}</strong> — 客流 ${safe(t.walk_in)} 人,成交 ${safe(t.purchase)} 单(转化率 ${todayConv.toFixed(1)}%)。本月累计:客流 ${safe(m.walk_in).toLocaleString()} 人 · 成交 ${safe(m.purchase).toLocaleString()} 单(${monthConv.toFixed(1)}%)。`);
+    `💡 <strong>${BT_STATE.branch} · ${monName}</strong> — ${mWalk.toLocaleString()} walk-ins month-to-date. YTD averages: closing rate ${closingStr}, basket ${basketStr}. Daily detail is pending the Phase 3.1 Apps Script paste.`,
+    `💡 <strong>${BT_STATE.branch} · ${monName}</strong> — 本月累计客流 ${mWalk.toLocaleString()} 人。年度均值:成交率 ${closingStr}、客单价 ${basketStr}。每日明细需 Phase 3.1 Apps Script 上线后显示。`);
 
-  // ── Today KPI band ──────────────────────────────────────────
+  // ── THIS MONTH KPI band (replaces Today KPIs in aggregate mode) ──
   const kpis = [
-    { lbl_en:'Walk-in',     lbl_zh:'客流',       val: safe(t.walk_in),  color:'#4d9fff' },
-    { lbl_en:'Purchased',   lbl_zh:'成交',       val: safe(t.purchase), color:'#00e5c4' },
-    { lbl_en:'Conversion',  lbl_zh:'转化率',     val: todayConv.toFixed(1)+'%', color: todayConv>=30?'#00e5c4':todayConv>=15?'#f5c842':'#ff4d6d', raw:true },
-    { lbl_en:'Month Avg Conv', lbl_zh:'月均转化', val: monthConv.toFixed(1)+'%', color:'#b87cff', raw:true },
+    { lbl_en:'Month Walk-in',    lbl_zh:'本月客流', val: mWalk,                                             color:'#4d9fff' },
+    { lbl_en:'YTD Avg Customers',lbl_zh:'YTD 日均客', val: ytdAvg.cust_qty != null ? Math.round(ytdAvg.cust_qty) : '—', color:'#00e5c4' },
+    { lbl_en:'YTD Closing Rate', lbl_zh:'YTD 成交率', val: closingStr,                                      color: closing != null && closing >= 0.90 ? '#00e5c4' : closing != null && closing >= 0.75 ? '#f5c842' : '#b87cff', raw:true },
+    { lbl_en:'YTD Basket',       lbl_zh:'YTD 客单价', val: basketStr,                                       color:'#ff8c42', raw:true },
   ];
   document.getElementById('bt-today-kpis').innerHTML = kpis.map(k=>`
     <div class="kpi" style="border-color:${k.color}22;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${k.color}"></div>
       <div class="kl" style="color:${k.color}">${en?k.lbl_en:k.lbl_zh}</div>
-      <div class="kv" style="color:${k.color}">${k.raw?k.val:(+k.val).toLocaleString()}</div>
+      <div class="kv" style="color:${k.color}">${k.raw ? k.val : (typeof k.val==='number' ? (+k.val).toLocaleString() : k.val)}</div>
     </div>`).join('');
 
-  // ── Today · by Race ─────────────────────────────────────────
+  // ── THIS MONTH · by Race ─────────────────────────────────────
+  // Summary tab has walk-in counts only (no purchase column), so we render
+  // walk-in + share-of-total in place of the daily walk-in/purchase KPI.
   const races = [
     { key:'chinese', en:'Chinese',  zh:'华裔',   color:'#f5c842' },
     { key:'malay',   en:'Malay',    zh:'马来裔', color:'#00e5c4' },
     { key:'india',   en:'Indian',   zh:'印度裔', color:'#ff8c42' },
     { key:'others',  en:'Others',   zh:'其他',   color:'#b87cff' },
   ];
+  const mTot = Math.max(1, mWalk);
   document.getElementById('bt-today-race').innerHTML = races.map(r=>{
-    const row = t[r.key] || {walk_in:0, purchase:0};
-    const wi  = safe(row.walk_in), pu = safe(row.purchase);
-    const cvr = wi > 0 ? ((pu/wi)*100).toFixed(1)+'%' : '—';
+    const row = m[r.key] || {walk_in:0};
+    const wi  = safe(row.walk_in);
+    const sharePct = (wi / mTot * 100).toFixed(1) + '%';
     return `<div class="kpi" style="border-color:${r.color}22;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${r.color}"></div>
       <div class="kl" style="color:${r.color}">${en?r.en:r.zh}</div>
-      <div class="kv" style="color:${r.color}">${wi} / ${pu}</div>
-      <div class="ks">${en?'walk-in / purchase':'客流 / 成交'} · ${cvr}</div>
+      <div class="kv" style="color:${r.color}">${wi.toLocaleString()}</div>
+      <div class="ks">${en?'walk-in · share ':'客流 · 占比 '}${sharePct}</div>
     </div>`;
   }).join('');
 
-  // ── Nudge: missing days ─────────────────────────────────────
+  // ── Nudge: missing days (aggregate mode cannot detect them) ──
   const nudge = document.getElementById('bt-nudge');
-  const missing = Array.isArray(data.missing_days) ? data.missing_days : [];
+  const missing = Array.isArray(data.missing_days) ? data.missing_days : null;
   if (nudge) {
-    if (missing.length > 0) {
+    if (missing && missing.length > 0) {
       nudge.style.display = '';
       nudge.innerHTML = en
         ? `🟡 <strong>${missing.length} day${missing.length===1?'':'s'} missing this month</strong> — daily log is incomplete for: ${missing.join(', ')}. Ask the branch to back-fill to restore month-to-date accuracy.`
@@ -3017,10 +3118,18 @@ function drawBranchToday(){
     }
   }
 
-  // ── Missing days card ───────────────────────────────────────
+  // ── Missing days card (aggregate mode: detection pending) ──
   const mc = document.getElementById('bt-missing-content');
   if (mc) {
-    if (missing.length === 0) {
+    if (missing == null) {
+      mc.innerHTML = `<div style="color:var(--mu);padding:40px 10px;text-align:center;line-height:1.6;">
+        <div style="font-size:22px;margin-bottom:10px;">🧩</div>
+        <div style="color:#f5c842;font-weight:700;margin-bottom:6px;">${en?'Aggregate mode':'聚合模式'}</div>
+        <div style="font-size:11px;">${en
+          ? 'Missing-day detection reads daily month tabs. Deploy the Phase 3.1 Apps Script paste to enable it.'
+          : '缺录日检测需读取每日明细。请上线 Phase 3.1 Apps Script 后启用。'}</div>
+      </div>`;
+    } else if (missing.length === 0) {
       mc.innerHTML = `<div style="color:#00e5c4;padding:60px 0;text-align:center;">
         ✅ ${en?'All days logged — nice job.':'本月已全部录入 — 很棒。'}
       </div>`;
@@ -3037,72 +3146,135 @@ function drawBranchToday(){
     }
   }
 
-  // ── 7-day chart ─────────────────────────────────────────────
+  // ── 7-day chart (aggregate mode: daily series unavailable) ──
+  // Drop the last-7 chart in aggregate mode and show an inline note in its
+  // canvas parent, so the grid doesn't collapse.
   const last7 = Array.isArray(data.last_7_days) ? data.last_7_days : [];
-  mkChart('bt7dChart',{
-    type:'bar',
-    data:{
-      labels: last7.map(d=>(d.date||'').slice(5)), // MM-DD
-      datasets:[
-        { label: en?'Walk-in':'客流',  data:last7.map(d=>safe(d.walk_in)),  backgroundColor:C.b2, borderColor:C.b,  borderWidth:1 },
-        { label: en?'Purchase':'成交', data:last7.map(d=>safe(d.purchase)), backgroundColor:C.g2, borderColor:C.g,  borderWidth:1 },
-      ]
-    },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom'}},
-      scales:{y:{beginAtZero:true, ticks:{precision:0}}} }
-  });
+  const bt7 = document.getElementById('bt7dChart');
+  if (last7.length === 0 && bt7) {
+    if (charts['bt7dChart']) { charts['bt7dChart'].destroy(); delete charts['bt7dChart']; }
+    const ctxParent = bt7.parentElement;
+    if (ctxParent && !ctxParent.querySelector('.bt-nodaily')) {
+      const note = document.createElement('div');
+      note.className = 'bt-nodaily';
+      note.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--mu);font-size:11px;line-height:1.6;';
+      note.innerHTML = en
+        ? '🧩 <strong style="color:#f5c842;">Aggregate mode</strong><br>Last-7-days chart reads daily tabs.<br>Deploy Phase 3.1 Apps Script to enable.'
+        : '🧩 <strong style="color:#f5c842;">聚合模式</strong><br>近7日图表需读取每日明细。<br>请上线 Phase 3.1 Apps Script 后启用。';
+      if (ctxParent.style) ctxParent.style.position = ctxParent.style.position || 'relative';
+      ctxParent.appendChild(note);
+    }
+  } else if (bt7) {
+    const ctxParent = bt7.parentElement;
+    const note = ctxParent && ctxParent.querySelector('.bt-nodaily');
+    if (note) note.remove();
+    mkChart('bt7dChart',{
+      type:'bar',
+      data:{
+        labels: last7.map(d=>(d.date||'').slice(5)), // MM-DD
+        datasets:[
+          { label: en?'Walk-in':'客流',  data:last7.map(d=>safe(d.walk_in)),  backgroundColor:C.b2, borderColor:C.b,  borderWidth:1 },
+          { label: en?'Purchase':'成交', data:last7.map(d=>safe(d.purchase)), backgroundColor:C.g2, borderColor:C.g,  borderWidth:1 },
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom'}},
+        scales:{y:{beginAtZero:true, ticks:{precision:0}}} }
+    });
+  }
 
   // ── Month by Race table ─────────────────────────────────────
+  // Purchase/conversion columns are hidden in aggregate mode (Summary tab has
+  // walk-in only). We keep the table but drop those columns, and add Share-%.
   const headEl = document.getElementById('bt-monthtab-head');
   const bodyEl = document.getElementById('bt-monthtab-body');
   if (headEl && bodyEl) {
-    headEl.innerHTML = `
-      <th class="la">${en?'Race':'族群'}</th>
-      <th>${en?'Walk-in':'客流'}</th>
-      <th>${en?'Purchase':'成交'}</th>
-      <th>${en?'Conversion':'转化率'}</th>
-      <th>${en?'Walk-in %':'客流占比'}</th>`;
+    const hasPurchase = safe(m.purchase) > 0;
+    if (hasPurchase) {
+      headEl.innerHTML = `
+        <th class="la">${en?'Race':'族群'}</th>
+        <th>${en?'Walk-in':'客流'}</th>
+        <th>${en?'Purchase':'成交'}</th>
+        <th>${en?'Conversion':'转化率'}</th>
+        <th>${en?'Walk-in %':'客流占比'}</th>`;
+    } else {
+      headEl.innerHTML = `
+        <th class="la">${en?'Race':'族群'}</th>
+        <th>${en?'Walk-in':'客流'}</th>
+        <th>${en?'Walk-in %':'客流占比'}</th>`;
+    }
     const tot = Math.max(1, safe(m.walk_in));
     bodyEl.innerHTML = races.map(r=>{
       const row = m[r.key] || {walk_in:0, purchase:0};
       const wi  = safe(row.walk_in), pu = safe(row.purchase);
       const cvr = wi > 0 ? ((pu/wi)*100).toFixed(1)+'%' : '—';
       const sharePct = (wi/tot*100).toFixed(1)+'%';
+      if (hasPurchase) {
+        return `<tr>
+          <td class="la"><span style="color:${r.color};font-weight:700">${en?r.en:r.zh}</span></td>
+          <td>${wi.toLocaleString()}</td>
+          <td>${pu.toLocaleString()}</td>
+          <td>${cvr}</td>
+          <td>${sharePct}</td>
+        </tr>`;
+      }
       return `<tr>
         <td class="la"><span style="color:${r.color};font-weight:700">${en?r.en:r.zh}</span></td>
         <td>${wi.toLocaleString()}</td>
-        <td>${pu.toLocaleString()}</td>
-        <td>${cvr}</td>
         <td>${sharePct}</td>
       </tr>`;
-    }).join('') + `<tr style="border-top:2px solid var(--bdr);font-weight:700">
-      <td class="la">${en?'Total':'合计'}</td>
-      <td>${safe(m.walk_in).toLocaleString()}</td>
-      <td>${safe(m.purchase).toLocaleString()}</td>
-      <td>${monthConv.toFixed(1)}%</td>
-      <td>100.0%</td>
-    </tr>`;
+    }).join('') + (hasPurchase
+      ? `<tr style="border-top:2px solid var(--bdr);font-weight:700">
+          <td class="la">${en?'Total':'合计'}</td>
+          <td>${safe(m.walk_in).toLocaleString()}</td>
+          <td>${safe(m.purchase).toLocaleString()}</td>
+          <td>${safe(m.walk_in)>0 ? ((safe(m.purchase)/safe(m.walk_in))*100).toFixed(1)+'%' : '—'}</td>
+          <td>100.0%</td>
+        </tr>`
+      : `<tr style="border-top:2px solid var(--bdr);font-weight:700">
+          <td class="la">${en?'Total':'合计'}</td>
+          <td>${safe(m.walk_in).toLocaleString()}</td>
+          <td>100.0%</td>
+        </tr>`);
   }
 
-  // ── Channel attribution (month-to-date) ─────────────────────
+  // ── Channel attribution (aggregate mode: not available) ─────
   const chMap = (m && m.channels && typeof m.channels === 'object') ? m.channels : {};
   const chEntries = Object.entries(chMap)
     .map(([k,v])=>[k, safe(v)])
     .filter(([,v])=>v>0)
     .sort((a,b)=>b[1]-a[1]);
   const chColors = ['#00e5c4','#4d9fff','#f5c842','#ff8c42','#b87cff','#ff4d6d','#5a738a','#7ac24d','#c47cff','#42c9e0'];
-  mkChart('btChannelChart',{
-    type:'doughnut',
-    data:{
-      labels: chEntries.map(e=>e[0]),
-      datasets:[{ data: chEntries.map(e=>e[1]),
-        backgroundColor: chEntries.map((_,i)=>chColors[i%chColors.length]),
-        borderWidth:0 }]
-    },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom', labels:{boxWidth:10, padding:7}}} }
-  });
+  const chEl = document.getElementById('btChannelChart');
+  if (chEntries.length === 0 && chEl) {
+    if (charts['btChannelChart']) { charts['btChannelChart'].destroy(); delete charts['btChannelChart']; }
+    const parent = chEl.parentElement;
+    if (parent && !parent.querySelector('.bt-nochan')) {
+      const note = document.createElement('div');
+      note.className = 'bt-nochan';
+      note.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--mu);font-size:11px;line-height:1.6;';
+      note.innerHTML = en
+        ? '🧩 <strong style="color:#f5c842;">Aggregate mode</strong><br>Channel attribution reads daily tabs.<br>Deploy Phase 3.1 Apps Script to enable.'
+        : '🧩 <strong style="color:#f5c842;">聚合模式</strong><br>渠道归因需读取每日明细。<br>请上线 Phase 3.1 Apps Script 后启用。';
+      parent.style.position = parent.style.position || 'relative';
+      parent.appendChild(note);
+    }
+  } else if (chEl) {
+    const parent = chEl.parentElement;
+    const note = parent && parent.querySelector('.bt-nochan');
+    if (note) note.remove();
+    mkChart('btChannelChart',{
+      type:'doughnut',
+      data:{
+        labels: chEntries.map(e=>e[0]),
+        datasets:[{ data: chEntries.map(e=>e[1]),
+          backgroundColor: chEntries.map((_,i)=>chColors[i%chColors.length]),
+          borderWidth:0 }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom', labels:{boxWidth:10, padding:7}}} }
+    });
+  }
 
   // ── YTD monthly trend ───────────────────────────────────────
   const ytd = Array.isArray(data.ytd_by_month) ? data.ytd_by_month : [];

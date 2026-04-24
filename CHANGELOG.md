@@ -1,5 +1,46 @@
 # Wiltek Portal — Changelog
 
+## Phase 3.1-hotfix2 — Branch Today aggregate-mode fallback (2026-04-24)
+
+Root cause of the "⚠️ signal is aborted without reason" error on Branch Today:
+the dedicated `type=branch_today` Apps Script handler from
+`PHASE_3_1_APPS_SCRIPT_PASTE.gs` was never actually deployed — unknown types
+fall through to legacy `type=all` (19–27 s, 75 KB, wrong shape), blowing past
+the 20 s `AbortController` timeout. Even when the fetch completed, the payload
+had no `today/this_month/last_7_days/ytd_by_month` keys, so the page rendered
+zeros.
+
+### Changed
+- **`Wiltek_MASTER.html` — `fetchBranchToday()`** now calls
+  `/api/proxy?type=floatation` (already deployed, ~6 s) and derives a
+  month-to-date + YTD view from Floatation Summary-tab rows. Timeout extended
+  to 45 s as safety margin. No Apps Script deploy needed to render real data.
+- **New `_btTransformFloatation()`** maps Summary rows
+  (`All / Chinese / Malay / India / Others` × Jan..Dec + YTD-average rows)
+  into the page's data shape. `today`, `last_7_days`, `missing_days`, and
+  `this_month.channels` stay empty — those need daily tab reads.
+- **`drawBranchToday()`** swaps the Today KPI band for a Month + YTD KPI band
+  (Month Walk-in · YTD Avg Customers · YTD Closing Rate · YTD Basket). The
+  by-race KPI row shows walk-in + share-of-month. Daily-only sections
+  (last-7-days chart, missing-days card, channel doughnut) render an
+  "Aggregate mode · deploy Phase 3.1 Apps Script to enable" placeholder.
+- **Page labels** — sub-title now reads
+  "Month-to-date walk-in · race mix · YTD trend (aggregate mode)",
+  section headers relabeled to `THIS MONTH / THIS MONTH · BY RACE /
+  YTD AVERAGES`.
+- Comment block at the top of the Branch Today JS documents the two modes
+  (aggregate / daily) so a future deploy of the Phase 3.1 Apps Script just
+  needs to flip the fetch URL back to `type=branch_today`.
+
+### Why this route (over an Apps Script deploy)
+Per the standing Jym-constraint: *"push to GitHub, tell Jym to Shift+Cmd+R,
+he should see real data — don't make him Deploy Apps Script unless absolutely
+necessary."* The Floatation Summary tab already carries the aggregate signal
+that matters for the month view; daily drill-down remains a one-time Apps
+Script paste away (PHASE_3_1_APPS_SCRIPT_PASTE.gs still lives in the repo).
+
+---
+
 ## Phase 3.1 — Branch Today + audit_write fix (2026-04-24)
 
 First Phase 3 data pull — live per-branch daily Floatation data surfaces on a
