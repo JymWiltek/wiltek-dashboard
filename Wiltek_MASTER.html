@@ -8,6 +8,7 @@
 <script src="./users.js"></script>
 <script src="./session.js"></script>
 <script src="./auditlog.js"></script>
+<script src="./permissions.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#07090f;--s1:#0d1117;--s2:#111827;--s3:#1a2235;--bdr:#1e2d42;--g:#00e5c4;--g2:#00b89e;--r:#ff4d6d;--y:#f5c842;--b:#4d9fff;--p:#b87cff;--o:#ff8c42;--txt:#dce8f5;--mu:#5a738a;--w:#ff8c42}
@@ -224,7 +225,7 @@ td:not(.la):not(.la2){text-align:right}
     <div class="pb" id="pb">📅 Mar 2026</div>
     <div id="gd-status" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a738a;padding:3px 10px;border-radius:99px;background:rgba(90,115,138,.08);border:1px solid rgba(90,115,138,.2);">⚫ Local Data</div>
     <button onclick="fetchFromGoogleDrive()" style="background:rgba(0,229,196,.1);border:1px solid rgba(0,229,196,.25);color:#00e5c4;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;" title="Sync from Google Drive">🔄 Sync GD</button>
-    <div id="adminBadge" style="display:none;background:rgba(184,124,255,.15);border:1px solid rgba(184,124,255,.3);color:#b87cff;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="toggleAdminMode()">ADMIN ✎</div>
+    <div id="adminBadge" title="Edit mode (owner only)" style="display:none;background:rgba(184,124,255,.15);border:1px solid rgba(184,124,255,.3);color:#b87cff;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="toggleAdminMode()">✎ EDIT</div>
     <div id="saveBtn" style="display:none;background:rgba(0,229,196,.15);border:1px solid rgba(0,229,196,.3);color:#00e5c4;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="saveEdits()">💾 SAVE</div>
     <div id="userBadge" style="display:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:#dce8f5;background:rgba(30,45,66,.6);border:1px solid #1e2d42;padding:3px 10px;border-radius:99px;align-items:center;gap:6px;"></div>
     <button id="userMgmtBtn" onclick="openUserMgmt()" style="display:none;background:rgba(184,124,255,.1);border:1px solid rgba(184,124,255,.25);color:#b87cff;padding:3px 10px;border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;" title="User Management">⚙ Users</button>
@@ -398,6 +399,8 @@ td:not(.la):not(.la2){text-align:right}
 <div class="page" id="p-inventory">
   <div class="ph" id="inv-ph"></div>
   <div class="ps" id="inv-ps"></div>
+  <!-- Phase 2: only shown to branch managers (w01..w11_mgr); hidden for everyone else. -->
+  <div id="inv-scope-notice" style="display:none;background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#f5c842;"></div>
   <div id="inv-ins" class="ins ba"></div>
   <div id="inv-gauge" class="gauge"></div>
   <div class="kr c4" id="inv-kpis"></div>
@@ -781,21 +784,46 @@ const DEFAULT_USERS = (window.WP_USERS || []).map(u => ({
   // pw / hash / salt intentionally excluded from this public view
 }));
 
-// ── Default permissions per role (12 roles per SPEC §5.1/§5.2) ──
+// ── Default UI flags per role (SPEC §5.2) ──
+// Page access lives in permissions.js (window.WP_PERMS.rolePages) — single source
+// of truth. The flags below control per-role UI affordances ORTHOGONAL to page
+// access: which KPIs show, which controls are enabled, whether "all branches"
+// view is allowed, etc. Read by getPerms() + applyRoleCSS().
 const ROLE_DEFAULTS = {
-  owner:         { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'], showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:true  },
-  finance:       { pages:['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','gtd','proposals'],                                     showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
-  bi_consultant: { pages:['inventory','customers','quicklinks','bistrat','biwh','inv360','action','gtd','proposals'],                                                                                          showNet:false, showGPpct:true,  showCF:false, showBS:false, allBranches:true,  canRefresh:false, canManageUsers:false },
-  warehouse:     { pages:['inventory','quicklinks','biwh','inv360','gtd','proposals','action'],                                                                                                                showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  hr:            { pages:['expenses','quicklinks','gtd','proposals'],                                                                                                                                          showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  marketing:     { pages:['customers','branchhub','quicklinks','bistrat','gtd','proposals','action'],                                                                                                          showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  w01_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  w02_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  w03_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  w05_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  w07_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
-  w11_mgr:       { pages:['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],                                                                                      showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  owner:         { showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:true  },
+  finance:       { showNet:true,  showGPpct:true,  showCF:true,  showBS:true,  allBranches:true,  canRefresh:true,  canManageUsers:false },
+  bi_consultant: { showNet:false, showGPpct:true,  showCF:false, showBS:false, allBranches:true,  canRefresh:false, canManageUsers:false },
+  warehouse:     { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  hr:            { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  marketing:     { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w01_mgr:       { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w02_mgr:       { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w03_mgr:       { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w05_mgr:       { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w07_mgr:       { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
+  w11_mgr:       { showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false },
 };
+
+// ── Friendly role labels (SPEC §5.1 — shown in the userBadge pill) ──
+const ROLE_LABELS = {
+  owner:         { en:'Owner',         zh:'老板'         },
+  finance:       { en:'Finance',       zh:'财务'         },
+  bi_consultant: { en:'BI Consultant', zh:'BI顾问'       },
+  warehouse:     { en:'Warehouse',     zh:'仓储'         },
+  hr:            { en:'HR',            zh:'人事'         },
+  marketing:     { en:'Marketing',     zh:'市场'         },
+  w01_mgr:       { en:'W01 Manager',   zh:'W01经理'      },
+  w02_mgr:       { en:'W02 Manager',   zh:'W02经理'      },
+  w03_mgr:       { en:'W03 Manager',   zh:'W03经理'      },
+  w05_mgr:       { en:'W05 Manager',   zh:'W05经理'      },
+  w07_mgr:       { en:'W07 Manager',   zh:'W07经理'      },
+  w11_mgr:       { en:'W11 Manager',   zh:'W11经理'      },
+};
+function roleLabel(role){
+  const L = ROLE_LABELS[role];
+  if (!L) return role || '';
+  return (typeof lang !== 'undefined' && lang === 'zh') ? L.zh : L.en;
+}
 
 // ── Helpers (public users list only; secrets never exposed) ──
 function loadUsers(){
@@ -824,12 +852,20 @@ let adminMode   = false;
 let adminEditTarget = null;
 
 function getPerms(user){
-  // Fallback to owner-less minimum if role is unknown: empty pages = user sees nothing.
-  const base = {...(ROLE_DEFAULTS[user.role] || { pages:[], showNet:false, showGPpct:false, showCF:false, showBS:false, allBranches:false, canRefresh:false, canManageUsers:false })};
-  const overrides = loadPermOverrides()[user.id]||{};
-  // Merge page list override if present
-  const merged = {...base,...overrides};
-  if(overrides.pages) merged.pages=[...overrides.pages];
+  // Flags: from ROLE_DEFAULTS (showNet / allBranches / canRefresh / ...)
+  // Pages: from permissions.js (window.WP_PERMS.rolePages) — single source of truth
+  const flagBase = ROLE_DEFAULTS[user.role] || {
+    showNet:false, showGPpct:false, showCF:false, showBS:false,
+    allBranches:false, canRefresh:false, canManageUsers:false
+  };
+  const pagesBase = (window.WP_PERMS && Array.isArray(WP_PERMS.rolePages[user.role]))
+    ? [...WP_PERMS.rolePages[user.role]]
+    : [];
+  const base = { ...flagBase, pages: pagesBase };
+  const overrides = loadPermOverrides()[user.id] || {};
+  // Per-user override support (unchanged behavior from Phase 1).
+  const merged = { ...base, ...overrides };
+  if (overrides.pages) merged.pages = [...overrides.pages];
   merged.branch = user.branch;
   return merged;
 }
@@ -913,11 +949,11 @@ function unlock(){
   // Owner badge (was "admin" — consolidated to owner per SPEC §5.1)
   const ab=document.getElementById('adminBadge');
   if(currentUser.role==='owner'&&ab){ ab.style.display='flex'; }
-  // User badge
+  // User badge — friendly role label (SPEC §5.1 names, bilingual).
   const ub=document.getElementById('userBadge');
   if(ub){
-    const roleLabel = currentUser.role.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-    ub.innerHTML=`<span style="color:#5a738a">●</span> ${currentUser.name} <span style="color:#5a738a;margin-left:4px;">${roleLabel}</span>`;
+    const label = roleLabel(currentUser.role);
+    ub.innerHTML=`<span style="color:#5a738a">●</span> ${currentUser.name} <span style="color:#5a738a;margin-left:4px;">${label}</span>`;
     ub.style.display='flex';
   }
   // User management button (owner only)
@@ -974,64 +1010,87 @@ const NAV_MAP = {
   gtd:'gtd', proposals:'proposals', valuation:'valuation'
 };
 
+// Phase 2 (SPEC §5): menu items the user can't access are .remove()'d from the
+// DOM, not merely hidden. Logout→login must restore the full sidenav so the
+// next user starts from a clean slate — we snapshot the original markup on the
+// first call and re-inject it on every subsequent call.
 function updateNav(){
-  document.querySelectorAll('.ni').forEach(ni=>{
-    const oc=ni.getAttribute('onclick')||'';
-    const m=oc.match(/nav\('(\w+)'\)/);
-    if(!m) return;
-    const pageId=m[1];
-    const allowed=canAccess(pageId);
-    ni.style.display=allowed?'flex':'none';
-  });
-  // Per-role primary nav: further simplify menu to core pages only
-  // (applied on top of canAccess permission check)
-  // SPEC §5.1 — 12 roles: owner, finance, bi_consultant, warehouse, hr, marketing, W01/W02/W03/W05/W07/W11 managers
-  const primaryNav={
-    owner:         null,  // show all allowed pages (no extra filter)
-    finance:       ['health','pl','cashflow','gp','balancesheet','expenses','branches','inventory','customers','action','gtd','proposals'],
-    bi_consultant: ['inventory','customers','quicklinks','bistrat','biwh','inv360','action','gtd','proposals'],
-    warehouse:     ['inventory','quicklinks','biwh','inv360','gtd','proposals','action'],
-    hr:            ['expenses','quicklinks','gtd','proposals'],
-    marketing:     ['customers','branchhub','quicklinks','bistrat','gtd','proposals','action'],
-    w01_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
-    w02_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
-    w03_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
-    w05_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
-    w07_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
-    w11_mgr:       ['branches','inventory','customers','branchhub','quicklinks','biwh','gtd','proposals','action'],
-  };
-  const role=currentUser&&currentUser.role;
-  const allowedPrimary=role?primaryNav[role]:null;
-  if(allowedPrimary){
-    document.querySelectorAll('.ni').forEach(ni=>{
-      const oc=ni.getAttribute('onclick')||'';
-      const m=oc.match(/nav\('(\w+)'\)/);
-      if(!m) return;
-      if(!allowedPrimary.includes(m[1])) ni.style.display='none';
-    });
+  const side = document.getElementById('sidenav');
+  if (!side) return;
+
+  // Snapshot once, restore every call (role changes mutate the DOM).
+  if (!window.__wp_sidenavTemplate) {
+    window.__wp_sidenavTemplate = side.innerHTML;
+  } else {
+    side.innerHTML = window.__wp_sidenavTemplate;
   }
-  // Hide section headers if all items in section are hidden
-  // (section headers have class .ns)
-  document.querySelectorAll('.ns').forEach(ns=>{
-    let sib=ns.nextElementSibling;
-    let anyVisible=false;
-    while(sib&&!sib.classList.contains('ns')){
-      if(sib.classList.contains('ni')&&sib.style.display!=='none') anyVisible=true;
-      sib=sib.nextElementSibling;
-    }
-    ns.style.display=anyVisible?'':'none';
+
+  const role = currentUser && currentUser.role;
+  if (!role) return;
+
+  // Authoritative allow-list: permissions.js → WP_PERMS.rolePages.
+  // canAccess() already consults WP_PERMS via getPerms(), so it's the same check.
+  side.querySelectorAll('.ni').forEach(ni => {
+    const oc = ni.getAttribute('onclick') || '';
+    const m  = oc.match(/nav\('(\w+)'\)/);
+    if (!m) return;
+    if (!canAccess(m[1])) ni.remove();
   });
-  // Navigate to role-appropriate landing page (SPEC §5.1 — 12 roles)
-  const roleLanding={
-    owner:'health', finance:'cashflow', bi_consultant:'bistrat',
-    warehouse:'biwh', hr:'expenses', marketing:'customers',
-    w01_mgr:'branches', w02_mgr:'branches', w03_mgr:'branches',
-    w05_mgr:'branches', w07_mgr:'branches', w11_mgr:'branches'
-  };
-  const landing = roleLanding[currentUser&&currentUser.role] || (userPerms.pages&&userPerms.pages[0]) || 'health';
-  if(canAccess(landing)) nav(landing);
-  else { const first=userPerms.pages&&userPerms.pages[0]; if(first) nav(first); }
+
+  // Strip section headers (.ns) whose entire section is now empty.
+  side.querySelectorAll('.ns').forEach(ns => {
+    let sib = ns.nextElementSibling;
+    let anyLeft = false;
+    while (sib && !sib.classList.contains('ns')) {
+      if (sib.classList.contains('ni')) { anyLeft = true; break; }
+      sib = sib.nextElementSibling;
+    }
+    if (!anyLeft) ns.remove();
+  });
+
+  // Navigate to role's default landing (SPEC §5.1 via WP_PERMS).
+  const landing = (window.WP_PERMS && WP_PERMS.getLandingPage(role))
+               || (userPerms.pages && userPerms.pages[0])
+               || 'health';
+  if (canAccess(landing)) nav(landing);
+  else {
+    const first = userPerms.pages && userPerms.pages[0];
+    if (first) nav(first);
+  }
 }
+
+// ══════════════════════════════════════════════════════════════════
+// DEV ONLY — preview any role's menu without logging out.
+// Usage in browser DevTools: _testRole('w01_mgr')
+// Phase 3 TODO: DELETE this block before opening Phase 3.
+// ══════════════════════════════════════════════════════════════════
+window._testRole = function(roleId){
+  console.warn('[dev only] _testRole() — remove before Phase 3.');
+  if (!currentUser) { console.warn('No user logged in; log in first.'); return; }
+  if (!window.WP_PERMS || !WP_PERMS.rolePages[roleId]) {
+    console.warn('Unknown role:', roleId, '— valid roles:', Object.keys(WP_PERMS.rolePages));
+    return;
+  }
+  // Pull default branch from WP_USERS (so w0x_mgr roles carry the right branch).
+  const seed = (window.WP_USERS || []).find(u => u.role === roleId);
+  currentUser.role   = roleId;
+  currentUser.branch = seed ? (seed.branch || null) : null;
+  currentUser.name   = (typeof roleLabel === 'function') ? roleLabel(roleId) : roleId;
+  userPerms = getPerms(currentUser);
+  // Mirror unlock() side-effects so the UI reflects the new role.
+  const ub = document.getElementById('userBadge');
+  if (ub) ub.innerHTML = `<span style="color:#5a738a">●</span> ${currentUser.name} <span style="color:#5a738a;margin-left:4px;">${roleLabel(roleId)}</span>`;
+  const ab = document.getElementById('adminBadge');
+  if (ab) ab.style.display = roleId === 'owner' ? 'flex' : 'none';
+  const umBtn = document.getElementById('userMgmtBtn');
+  if (umBtn) umBtn.style.display = roleId === 'owner' ? 'flex' : 'none';
+  const syncBtn = document.querySelector('button[onclick="fetchFromGoogleDrive()"]');
+  if (syncBtn) syncBtn.style.display = userPerms.canRefresh ? '' : 'none';
+  updateNav();
+  applyRoleCSS();
+  render();
+  console.log('[dev] now previewing role:', roleId, '· branch:', currentUser.branch, '· pages:', userPerms.pages);
+};
 
 let isAdmin = false; // kept for legacy adminMode edits compatibility
 
@@ -1043,7 +1102,7 @@ function toggleAdminMode(){
   const saveBtn = document.getElementById('saveBtn');
   if(badge){
     badge.style.background = adminMode ? 'rgba(184,124,255,.3)' : 'rgba(184,124,255,.15)';
-    badge.textContent = adminMode ? 'ADMIN ✎ ON' : 'ADMIN ✎';
+    badge.textContent = adminMode ? '✎ EDIT ON' : '✎ EDIT';
     badge.style.color = adminMode ? '#e0b4ff' : '#b87cff';
   }
   if(saveBtn) saveBtn.style.display = adminMode ? 'flex' : 'none';
@@ -2066,6 +2125,23 @@ function renderInventory(m,i){
   txt(document.getElementById('inv-ph'),`📦 Inventory Analysis`,`📦 库存分析`);
   txt(document.getElementById('inv-ps'),`Stock level · Days cover · Ideal range · Purchasing plan`,`库存水平 · 覆盖天数 · 理想区间 · 采购计划`);
 
+  // Phase 2 (SPEC §5 addendum) — branch managers see the *company-wide*
+  // inventory figures because per-branch stock data doesn't exist yet in the
+  // data source. Show a subtle notice only for w01..w11_mgr; hide otherwise.
+  // TODO Phase 4+: replace with per-branch stock snapshot + remove notice.
+  const _invNotice = document.getElementById('inv-scope-notice');
+  if (_invNotice) {
+    if (userPerms && !userPerms.allBranches && userPerms.branch) {
+      _invNotice.innerHTML = en
+        ? 'Inventory data shown is company-wide. Branch-level stock snapshot will be added in the next phase.'
+        : '当前库存数据为公司整体视图。分行级库存明细将在下阶段加入。';
+      _invNotice.style.display = 'block';
+    } else {
+      _invNotice.style.display = 'none';
+      _invNotice.innerHTML = '';
+    }
+  }
+
   const stock=d('stock_close',m), avgCogs=D.br_cogs.reduce((a,b)=>a+b,0)/14;
   const daily=avgCogs/30, days=Math.round(stock/daily);
   const ideal75=Math.round(daily*75), ideal60=Math.round(daily*60), ideal90=Math.round(daily*90);
@@ -2410,84 +2486,146 @@ function renderBalanceSheet(){
 // ─────────── CUSTOMERS 2026 ───────────
 function renderCustomers(){
   const en=lang==='en';
-  txt(document.getElementById('cu-ph'),'👥 Customer Insights — 2026 YTD','👥 顾客分析 — 2026年累计');
-  txt(document.getElementById('cu-ps'), 'Jan–Mar 2026 · Walk-in · Closing Rate · Basket Size · Race Breakdown', '2026年1-3月 · 进店人数 · 成交率 · 均消费 · 种族分布');
+  // Phase 2 (SPEC §5 addendum) — branch managers see only their own branch.
+  const onlyBranch = (userPerms && !userPerms.allBranches && userPerms.branch) ? userPerms.branch : null;
 
-  const ins=document.getElementById('cu-ins');
-  ins.className='ins ok';
+  // Company-wide aggregates (always computed — cheap, and the race-share
+  // denominator still uses totalAmt when the race table is rendered).
   const totalWI=CUST26.total.walkin.reduce((a,b)=>a+b,0);
   const totalPur=CUST26.total.purchase.reduce((a,b)=>a+b,0);
   const totalAmt=CUST26.total.amount.reduce((a,b)=>a+b,0);
-  const avgCR=(CUST26.total.cr.reduce((a,b)=>a+b,0)/3).toFixed(1)+'%';
   const avgBasket=(totalAmt/totalPur).toFixed(0);
-  txt(ins,
+
+  if (onlyBranch) {
+    txt(document.getElementById('cu-ph'),
+      `👥 Customer Insights — ${onlyBranch} · 2026 YTD`,
+      `👥 顾客分析 — ${onlyBranch} · 2026年累计`);
+    txt(document.getElementById('cu-ps'),
+      `Jan–Mar 2026 · ${onlyBranch} branch only · Walk-in · Closing Rate · Basket Size`,
+      `2026年1-3月 · 仅${onlyBranch}分行 · 进店人数 · 成交率 · 均消费`);
+  } else {
+    txt(document.getElementById('cu-ph'),'👥 Customer Insights — 2026 YTD','👥 顾客分析 — 2026年累计');
+    txt(document.getElementById('cu-ps'), 'Jan–Mar 2026 · Walk-in · Closing Rate · Basket Size · Race Breakdown', '2026年1-3月 · 进店人数 · 成交率 · 均消费 · 种族分布');
+  }
+
+  const ins=document.getElementById('cu-ins');
+  ins.className='ins ok';
+  if (onlyBranch) {
+    const b = CUST26.branches[onlyBranch];
+    if (b) {
+      txt(ins,
+        `<strong>✅ YTD Jan–Mar 2026 · ${onlyBranch}:</strong> Walk-in <b>${b.walkin.toLocaleString()}</b> customers · <b>${b.purchase.toLocaleString()}</b> purchases · Average basket <b>RM ${b.basket.toFixed(0)}</b> · Closing rate <b>${(b.cr*100).toFixed(1)}%</b> · Revenue <b>${rm(b.amount)}</b>.`,
+        `<strong>✅ 2026年1-3月累计 · ${onlyBranch}：</strong>进店<b>${b.walkin.toLocaleString()}</b>人 · <b>${b.purchase.toLocaleString()}</b>次购买 · 均消费<b>RM ${b.basket.toFixed(0)}</b> · 成交率<b>${(b.cr*100).toFixed(1)}%</b> · 收入<b>${rm(b.amount)}</b>。`);
+      document.getElementById('cu-kpis').innerHTML=[
+        kpiHtml('b',en?'Walk-in (YTD)':'总进店人数',b.walkin.toLocaleString(),en?`${onlyBranch} · Jan–Mar 2026`:`${onlyBranch} · 2026年1-3月`,pilll('up','YTD')),
+        kpiHtml('g',en?'Closing Rate':'成交率',(b.cr*100).toFixed(1)+'%',en?`${onlyBranch} YTD`:`${onlyBranch} 累计`,pilll('up','YTD')),
+        kpiHtml('y',en?'Avg Basket Size':'均消费额','RM '+b.basket.toFixed(0),en?`${onlyBranch} YTD`:`${onlyBranch} 累计`,pilll('up','YTD')),
+        kpiHtml('p',en?'Revenue':'营收',rm(b.amount),en?`${onlyBranch} · YTD`:`${onlyBranch} · 累计`,pilll('up','YTD')),
+      ].join('');
+    } else {
+      txt(ins, `<strong>ℹ️</strong> No customer data for ${onlyBranch}.`, `<strong>ℹ️</strong> ${onlyBranch} 暂无顾客数据。`);
+      document.getElementById('cu-kpis').innerHTML='';
+    }
+  } else {
+    txt(ins,
     `<strong>✅ YTD Jan–Mar 2026:</strong> Total walk-in <b>${totalWI.toLocaleString()}</b> customers · <b>${totalPur.toLocaleString()}</b> purchases · Average basket <b>RM ${avgBasket}</b> · Avg closing rate <b>${(totalPur/totalWI*100).toFixed(1)}%</b>. Malay segment drives 61% of revenue (RM ${rm(CUST26.malay.amount.reduce((a,b)=>a+b,0))}). Indian segment has highest closing rate (85%+). W05 Bangi leads with 89.5% closing rate — replicate this model.`,
     `<strong>✅ 2026年1-3月累计：</strong>总进店<b>${totalWI.toLocaleString()}</b>人 · <b>${totalPur.toLocaleString()}</b>次购买 · 均消费<b>RM ${avgBasket}</b> · 均成交率<b>${(totalPur/totalWI*100).toFixed(1)}%</b>。马来族贡献61%收入（${rm(CUST26.malay.amount.reduce((a,b)=>a+b,0))}）。印度族成交率最高（85%+）。W05万宜成交率89.5%领先——复制此模式。`
   );
 
-  document.getElementById('cu-kpis').innerHTML=[
-    kpiHtml('b',en?'Total Walk-in':'总进店人数',totalWI.toLocaleString(),en?'Jan–Mar 2026':'2026年1-3月',pilll('up','YTD')),
-    kpiHtml('g',en?'Avg Closing Rate':'均成交率',(totalPur/totalWI*100).toFixed(1)+'%',en?'2024 ref: 67.7%':'2024参考：67.7%',pilll('up',en?'▲ Improved':'▲ 提升')),
-    kpiHtml('y',en?'Avg Basket Size':'均消费额','RM '+avgBasket,en?'2024 ref: RM 346':'2024参考：346',pilll('up',en?'▲ Higher':'▲ 提升')),
-    kpiHtml('p',en?'Total Revenue':'总营业额',rm(totalAmt),en?'6 branches YTD':'6家分行累计',pilll('up','YTD')),
-  ].join('');
+    document.getElementById('cu-kpis').innerHTML=[
+      kpiHtml('b',en?'Total Walk-in':'总进店人数',totalWI.toLocaleString(),en?'Jan–Mar 2026':'2026年1-3月',pilll('up','YTD')),
+      kpiHtml('g',en?'Avg Closing Rate':'均成交率',(totalPur/totalWI*100).toFixed(1)+'%',en?'2024 ref: 67.7%':'2024参考：67.7%',pilll('up',en?'▲ Improved':'▲ 提升')),
+      kpiHtml('y',en?'Avg Basket Size':'均消费额','RM '+avgBasket,en?'2024 ref: RM 346':'2024参考：346',pilll('up',en?'▲ Higher':'▲ 提升')),
+      kpiHtml('p',en?'Total Revenue':'总营业额',rm(totalAmt),en?'6 branches YTD':'6家分行累计',pilll('up','YTD')),
+    ].join('');
+  }
 
-  txt(document.getElementById('cu-c1t'), 'Monthly Walk-in & Closing Rate', '月度进店及成交率');
-  txt(document.getElementById('cu-c1s'), 'Jan–Mar 2026 · All branches', '2026年1-3月 · 全分行');
-  mkChart('cuWalkin',{type:'bar',data:{labels:CUST26.months,datasets:[
-    {label:en?'Walk-in':'进店',data:CUST26.total.walkin,backgroundColor:'rgba(77,159,255,.5)',borderColor:'#4d9fff',borderWidth:1.5,yAxisID:'y'},
-    {label:en?'Purchase':'购买',data:CUST26.total.purchase,backgroundColor:'rgba(0,229,196,.5)',borderColor:'#00e5c4',borderWidth:1.5,yAxisID:'y'},
-    {label:en?'Closing Rate %':'成交率%',data:CUST26.total.cr.map(v=>+(v*100).toFixed(1)),type:'line',borderColor:'#f5c842',backgroundColor:'transparent',pointRadius:5,borderWidth:2,yAxisID:'y2'},
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
-    scales:{y:{ticks:{callback:v=>v},grid:{color:'rgba(30,45,66,.5)'}},y2:{position:'right',min:60,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}},x:{grid:{display:false}}}}});
+  // ── Chart 1: Monthly Walk-in + Closing Rate.
+  // Per-branch monthly series is not in CUST26 (only company monthly + per-
+  // branch YTD aggregates). Dash out for branch managers.
+  if (onlyBranch) {
+    txt(document.getElementById('cu-c1t'), 'Monthly Walk-in & Closing Rate', '月度进店及成交率');
+    txt(document.getElementById('cu-c1s'), '— branch monthly data not available', '— 分行月度数据暂缺');
+    if (charts['cuWalkin']) { charts['cuWalkin'].destroy(); delete charts['cuWalkin']; }
+  } else {
+    txt(document.getElementById('cu-c1t'), 'Monthly Walk-in & Closing Rate', '月度进店及成交率');
+    txt(document.getElementById('cu-c1s'), 'Jan–Mar 2026 · All branches', '2026年1-3月 · 全分行');
+    mkChart('cuWalkin',{type:'bar',data:{labels:CUST26.months,datasets:[
+      {label:en?'Walk-in':'进店',data:CUST26.total.walkin,backgroundColor:'rgba(77,159,255,.5)',borderColor:'#4d9fff',borderWidth:1.5,yAxisID:'y'},
+      {label:en?'Purchase':'购买',data:CUST26.total.purchase,backgroundColor:'rgba(0,229,196,.5)',borderColor:'#00e5c4',borderWidth:1.5,yAxisID:'y'},
+      {label:en?'Closing Rate %':'成交率%',data:CUST26.total.cr.map(v=>+(v*100).toFixed(1)),type:'line',borderColor:'#f5c842',backgroundColor:'transparent',pointRadius:5,borderWidth:2,yAxisID:'y2'},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
+      scales:{y:{ticks:{callback:v=>v},grid:{color:'rgba(30,45,66,.5)'}},y2:{position:'right',min:60,max:100,ticks:{callback:v=>v+'%'},grid:{display:false}},x:{grid:{display:false}}}}});
+  }
 
-  txt(document.getElementById('cu-c2t'), 'Avg Basket Size by Race — Jan–Mar 2026', '各种族均消费 — 2026年1-3月');
-  txt(document.getElementById('cu-c2s'), 'Malay highest basket · Indian highest closing rate', '马来族均消费最高 · 印度族成交率最高');
-  const races=[en?'Chinese':'华族',en?'Malay':'马来族',en?'Indian':'印度族',en?'Others':'其他'];
-  const baskets=[
-    CUST26.chinese.amount.reduce((a,b)=>a+b,0)/CUST26.chinese.purchase.reduce((a,b)=>a+b,0),
-    CUST26.malay.amount.reduce((a,b)=>a+b,0)/CUST26.malay.purchase.reduce((a,b)=>a+b,0),
-    CUST26.indian.amount.reduce((a,b)=>a+b,0)/CUST26.indian.purchase.reduce((a,b)=>a+b,0),
-    CUST26.others.amount.reduce((a,b)=>a+b,0)/CUST26.others.purchase.reduce((a,b)=>a+b,0),
-  ];
-  mkChart('cuBasket',{type:'bar',data:{labels:races,datasets:[
-    {label:en?'Avg Basket (RM)':'均消费（令吉）',data:baskets.map(v=>+v.toFixed(0)),
-     backgroundColor:['rgba(245,200,66,.5)','rgba(0,229,196,.5)','rgba(77,159,255,.5)','rgba(184,124,255,.5)'],
-     borderColor:['#f5c842','#00e5c4','#4d9fff','#b87cff'],borderWidth:1.5}
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RM '+ctx.parsed.y.toFixed(0)}}},
-    scales:{y:{ticks:{callback:v=>'RM'+v},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false}}}}});
+  // ── Chart 2: Avg Basket by Race.
+  // Race split is company-wide only — dash out for branch managers.
+  if (onlyBranch) {
+    txt(document.getElementById('cu-c2t'), 'Avg Basket Size by Race', '各种族均消费');
+    txt(document.getElementById('cu-c2s'), '— branch data not available', '— 分行数据暂缺');
+    if (charts['cuBasket']) { charts['cuBasket'].destroy(); delete charts['cuBasket']; }
+  } else {
+    txt(document.getElementById('cu-c2t'), 'Avg Basket Size by Race — Jan–Mar 2026', '各种族均消费 — 2026年1-3月');
+    txt(document.getElementById('cu-c2s'), 'Malay highest basket · Indian highest closing rate', '马来族均消费最高 · 印度族成交率最高');
+    const races=[en?'Chinese':'华族',en?'Malay':'马来族',en?'Indian':'印度族',en?'Others':'其他'];
+    const baskets=[
+      CUST26.chinese.amount.reduce((a,b)=>a+b,0)/CUST26.chinese.purchase.reduce((a,b)=>a+b,0),
+      CUST26.malay.amount.reduce((a,b)=>a+b,0)/CUST26.malay.purchase.reduce((a,b)=>a+b,0),
+      CUST26.indian.amount.reduce((a,b)=>a+b,0)/CUST26.indian.purchase.reduce((a,b)=>a+b,0),
+      CUST26.others.amount.reduce((a,b)=>a+b,0)/CUST26.others.purchase.reduce((a,b)=>a+b,0),
+    ];
+    mkChart('cuBasket',{type:'bar',data:{labels:races,datasets:[
+      {label:en?'Avg Basket (RM)':'均消费（令吉）',data:baskets.map(v=>+v.toFixed(0)),
+       backgroundColor:['rgba(245,200,66,.5)','rgba(0,229,196,.5)','rgba(77,159,255,.5)','rgba(184,124,255,.5)'],
+       borderColor:['#f5c842','#00e5c4','#4d9fff','#b87cff'],borderWidth:1.5}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RM '+ctx.parsed.y.toFixed(0)}}},
+      scales:{y:{ticks:{callback:v=>'RM'+v},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false}}}}});
+  }
 
-  // Race table
-  txt(document.getElementById('cu-race-title'), 'Race Breakdown — Jan–Mar 2026', '种族分布 — 2026年1-3月');
-  document.getElementById('cu-race-head').innerHTML=`<th>${en?'Race':'种族'}</th><th>${en?'Walk-in':'进店'}</th><th>${en?'Purchase':'购买'}</th><th>${en?'Closing Rate':'成交率'}</th><th>${en?'Total Revenue':'总营收'}</th><th>${en?'Avg Basket':'均消费'}</th><th>${en?'Revenue Share':'营收占比'}</th>`;
-  const raceData=[
-    {en:'Chinese',zh:'华族',d:CUST26.chinese,color:'#f5c842'},
-    {en:'Malay',  zh:'马来族',d:CUST26.malay,  color:'#00e5c4'},
-    {en:'Indian', zh:'印度族',d:CUST26.indian,color:'#4d9fff'},
-    {en:'Others', zh:'其他',  d:CUST26.others,color:'#b87cff'},
-  ];
-  document.getElementById('cu-race-body').innerHTML=raceData.map(r=>{
-    const wi=r.d.walkin.reduce((a,b)=>a+b,0);
-    const pu=r.d.purchase.reduce((a,b)=>a+b,0);
-    const amt=r.d.amount.reduce((a,b)=>a+b,0);
-    const cr=(pu/wi*100).toFixed(1)+'%';
-    const bk='RM '+(amt/pu).toFixed(0);
-    const share=(amt/totalAmt*100).toFixed(1)+'%';
-    return `<tr>
-      <td class="la"><span style="color:${r.color}">●</span> ${en?r.en:r.zh}</td>
-      <td>${wi.toLocaleString()}</td><td>${pu.toLocaleString()}</td>
-      <td class="cg">${cr}</td><td class="cy">${rm(amt)}</td>
-      <td class="cb">${bk}</td>
-      <td><div class="mb"><span>${share}</span><div class="mbr"><div class="mbf" style="width:${(amt/totalAmt*100).toFixed(0)}%;background:${r.color}"></div></div></div></td>
-    </tr>`;
-  }).join('');
+  // ── Race table. Race split is company-wide only — dash out for branch managers.
+  if (onlyBranch) {
+    txt(document.getElementById('cu-race-title'), 'Race Breakdown', '种族分布');
+    document.getElementById('cu-race-head').innerHTML=`<th>${en?'Race':'种族'}</th><th>${en?'Walk-in':'进店'}</th><th>${en?'Purchase':'购买'}</th><th>${en?'Closing Rate':'成交率'}</th><th>${en?'Total Revenue':'总营收'}</th><th>${en?'Avg Basket':'均消费'}</th><th>${en?'Revenue Share':'营收占比'}</th>`;
+    document.getElementById('cu-race-body').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;color:var(--mu);font-size:11px;padding:18px;">—&nbsp; ${en?'branch-level race breakdown not available':'分行种族数据暂缺'} &nbsp;—</td></tr>`;
+  } else {
+    txt(document.getElementById('cu-race-title'), 'Race Breakdown — Jan–Mar 2026', '种族分布 — 2026年1-3月');
+    document.getElementById('cu-race-head').innerHTML=`<th>${en?'Race':'种族'}</th><th>${en?'Walk-in':'进店'}</th><th>${en?'Purchase':'购买'}</th><th>${en?'Closing Rate':'成交率'}</th><th>${en?'Total Revenue':'总营收'}</th><th>${en?'Avg Basket':'均消费'}</th><th>${en?'Revenue Share':'营收占比'}</th>`;
+    const raceData=[
+      {en:'Chinese',zh:'华族',d:CUST26.chinese,color:'#f5c842'},
+      {en:'Malay',  zh:'马来族',d:CUST26.malay,  color:'#00e5c4'},
+      {en:'Indian', zh:'印度族',d:CUST26.indian,color:'#4d9fff'},
+      {en:'Others', zh:'其他',  d:CUST26.others,color:'#b87cff'},
+    ];
+    document.getElementById('cu-race-body').innerHTML=raceData.map(r=>{
+      const wi=r.d.walkin.reduce((a,b)=>a+b,0);
+      const pu=r.d.purchase.reduce((a,b)=>a+b,0);
+      const amt=r.d.amount.reduce((a,b)=>a+b,0);
+      const cr=(pu/wi*100).toFixed(1)+'%';
+      const bk='RM '+(amt/pu).toFixed(0);
+      const share=(amt/totalAmt*100).toFixed(1)+'%';
+      return `<tr>
+        <td class="la"><span style="color:${r.color}">●</span> ${en?r.en:r.zh}</td>
+        <td>${wi.toLocaleString()}</td><td>${pu.toLocaleString()}</td>
+        <td class="cg">${cr}</td><td class="cy">${rm(amt)}</td>
+        <td class="cb">${bk}</td>
+        <td><div class="mb"><span>${share}</span><div class="mbr"><div class="mbf" style="width:${(amt/totalAmt*100).toFixed(0)}%;background:${r.color}"></div></div></div></td>
+      </tr>`;
+    }).join('');
+  }
 
-  txt(document.getElementById('cu-c3t'), '27-Month Branch Revenue (Jan 2024 – Mar 2026)', '27个月分行营业额（2024年1月–2026年3月）');
-  txt(document.getElementById('cu-c3s'), 'From customer transaction data', '来自顾客交易数据');
-  const brColors=['#00e5c4','#4d9fff','#f5c842','#b87cff','#ff8c42','#ff4d6d'];
-  const bkeys=['W01','W02','W03','W05','W07','W11'];
+  // ── Chart 3: 27-month branch revenue. Filter to one line for branch managers.
+  const brColorMap = {W01:'#00e5c4', W02:'#4d9fff', W03:'#f5c842', W05:'#b87cff', W07:'#ff8c42', W11:'#ff4d6d'};
+  const c3Keys = onlyBranch ? [onlyBranch] : ['W01','W02','W03','W05','W07','W11'];
+  if (onlyBranch) {
+    txt(document.getElementById('cu-c3t'), `27-Month Revenue — ${onlyBranch}`, `27个月营业额 — ${onlyBranch}`);
+    txt(document.getElementById('cu-c3s'), `${onlyBranch} · Jan 2024 – Mar 2026 · From customer transaction data`, `${onlyBranch} · 2024年1月–2026年3月 · 来自顾客交易数据`);
+  } else {
+    txt(document.getElementById('cu-c3t'), '27-Month Branch Revenue (Jan 2024 – Mar 2026)', '27个月分行营业额（2024年1月–2026年3月）');
+    txt(document.getElementById('cu-c3s'), 'From customer transaction data', '来自顾客交易数据');
+  }
   mkChart('cuBranchRev',{type:'line',data:{labels:CUST26.branch_27m.labels,datasets:
-    bkeys.map((k,i)=>({label:k,data:CUST26.branch_27m[k],borderColor:brColors[i],backgroundColor:'transparent',tension:.3,pointRadius:0,borderWidth:1.5}))
+    c3Keys.filter(k=>Array.isArray(CUST26.branch_27m[k])).map(k=>({label:k,data:CUST26.branch_27m[k],borderColor:brColorMap[k]||'#888',backgroundColor:'transparent',tension:.3,pointRadius:0,borderWidth:1.5}))
   },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}}},
     scales:{y:{ticks:{callback:v=>'RM'+(v/1000).toFixed(0)+'K'},grid:{color:'rgba(30,45,66,.5)'}},x:{grid:{display:false},ticks:{font:{size:8},maxRotation:45}}}}});
 

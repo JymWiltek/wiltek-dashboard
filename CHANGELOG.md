@@ -1,5 +1,83 @@
 # Wiltek Portal — Changelog
 
+## Phase 2 — Role-Based Menu System (2026-04-24)
+
+Implements SPEC §5 (page × role matrix + default landings) with DOM removal
+of unauthorized menu items, plus branch scoping on the Customers page.
+
+### Added
+- **`permissions.js`** — new single source of truth for role → page matrix.
+  Exposes `window.WP_PERMS`:
+  - `rolePages` (SPEC §5.2 — 12 roles × 18 pages)
+  - `roleLanding` (SPEC §5.1 default landing per role, with fallbacks for
+    pages not yet built: owner/finance → `health`, hr → `expenses`,
+    marketing → `customers`, w0x_mgr → `branches`)
+  - `branchScopedRoles` + `branchScopedPages` + `ALL_BRANCHES`
+  - Helpers: `hasAccess / getLandingPage / isBranchScopedRole /
+    isBranchScopedPage / shouldLockBranchSelector / allowedBranches`
+- `<script src="./permissions.js">` loaded right after `auditlog.js`.
+- **Inventory page** — subtle amber notice bar at the top of `p-inventory`,
+  only visible to `w01..w11_mgr`, informing them that current stock data
+  is company-wide (branch-level snapshot is a Phase 4+ deliverable).
+  Bilingual via existing i18n pattern.
+- **`window._testRole(roleId)`** — dev-only helper for the owner to preview
+  any role's menu without logging out. Prints a `console.warn` reminder.
+  Remove before Phase 3.
+
+### Changed
+- **`Wiltek_MASTER.html` — `updateNav()`** rewritten: snapshots the full
+  sidenav on first call, restores it on every subsequent call, then uses
+  `.remove()` (not `display:none`) to delete menu items the current role
+  cannot access (SPEC §5 requirement). Empty section headers (`.ns`) are
+  also removed. Role landing comes from `WP_PERMS.getLandingPage()`.
+- **`ROLE_DEFAULTS`** — `pages:[...]` field stripped from every entry.
+  Page authorization now comes exclusively from `WP_PERMS.rolePages` via
+  `getPerms()`. `ROLE_DEFAULTS` keeps only the orthogonal UI flags
+  (`showNet`, `showGPpct`, `showCF`, `showBS`, `allBranches`,
+  `canRefresh`, `canManageUsers`).
+- **`getPerms(user)`** — reads `pages` from `WP_PERMS.rolePages[role]` and
+  merges with per-user overrides from localStorage.
+- **`renderCustomers()`** — branch-scoped users (w01..w11_mgr) now see:
+  - Page header / KPIs computed from `CUST26.branches[branch]` YTD
+    aggregates only.
+  - Monthly walk-in chart and race-breakdown chart/table replaced with
+    "branch data not available" placeholders (the underlying monthly and
+    race-split data is company-wide in CUST26 — no per-branch version yet).
+  - 27-month branch revenue chart filtered to a single line for that
+    user's branch.
+  Non-scoped roles (owner / finance / bi_consultant) continue to see the
+  full 6-branch view unchanged.
+
+### Fixed (vs Phase 1 permission matrix)
+- `finance` no longer had implicit access to `branchhub` (demoted).
+- `marketing` no longer had `branchhub` or `bistrat` (demoted).
+- `hr` gained `action` (SPEC §5.2 allows it).
+- `w01..w11_mgr` no longer had `biwh` (the BI Warehouse cockpit is
+  unchanged — bi_consultant / warehouse only).
+
+### Validation
+- `node --check permissions.js` passes.
+- All inline `<script>` blocks parse clean via `new Function()`.
+- `<div>` open/close balance holds at 536/536 (one new `inv-scope-notice`
+  wrapper).
+- Simulated `updateNav()` against all 12 roles: rendered menu-item count
+  matches `rolePages.length` exactly for every role; empty section headers
+  correctly collapse (owner: 8 sections, finance: 7, bi_consultant: 6,
+  warehouse: 5, hr/marketing: 4, branch managers: 6).
+
+### Known gaps / next phase
+- **Phase 4+: Branch-level inventory dataset**
+  - Add per-branch SKU stock snapshot to Google Sheets data source.
+  - Update `renderInventory` to filter by `userPerms.branch` for
+    `w01..w11_mgr`.
+  - Remove the "company-wide" notice (`#inv-scope-notice`) once branch
+    data is live.
+- **Phase 3: Remove `window._testRole()`** — it's a convenience for Jym
+  to validate Phase 2 from the console; delete the helper + its
+  registration block before Phase 3 opens.
+- **Phase 4: Split CEO Cockpit from Financial Health** — owner's landing
+  currently collapses both SPEC pages onto `health`.
+
 ## Phase 1 — Security Foundation (2026-04-23)
 
 Implements SPEC §4 (security) and §5.1 (12-role RBAC).
