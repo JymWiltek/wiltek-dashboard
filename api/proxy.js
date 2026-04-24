@@ -55,8 +55,32 @@ export default async function handler(req, res) {
     }
     const r    = await fetch(target, init);
     const text = await r.text();
+    const ct   = (r.headers.get('content-type') || '').toLowerCase();
 
-    // Apps Script returns JSON for /exec; if HTML leaks through, surface it verbatim
+    // Apps Script returns JSON for /exec. If HTML leaks through (most common
+    // cause: Apps Script can't access a Google Sheet → Google's "You do not
+    // have permission to access the requested document" error page), wrap it
+    // in a JSON envelope so the browser gets a useful error instead of a
+    // res.json() parse failure. Detect HTML or Google's permission page.
+    const looksHtml = ct.includes('text/html')
+      || /^\s*<!DOCTYPE\s+html/i.test(text)
+      || text.indexOf('<html') === 0;
+    if (looksHtml) {
+      const isPermErr = /You do not have permission to access/i.test(text)
+                     || /You need access/i.test(text);
+      const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      res.setHeader('Content-Type', 'application/json');
+      res.status(200).json({
+        ok: false,
+        error: isPermErr
+          ? 'Apps Script cannot access a required Google Sheet (permission denied). Verify sheet sharing and script authorization.'
+          : 'Apps Script returned HTML instead of JSON (deployment issue).',
+        apps_script_html: snippet,
+        type: inType
+      });
+      return;
+    }
+
     res.setHeader('Content-Type', r.headers.get('content-type') || 'application/json');
     res.status(r.status).send(text);
   } catch (e) {

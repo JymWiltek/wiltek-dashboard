@@ -2807,9 +2807,21 @@ async function fetchBranchToday(){
     clearTimeout(tid);
     if (!res.ok) throw new Error('HTTP '+res.status);
     const json = await res.json();
-    if (json.ok !== true) throw new Error(json.error || 'API ok:false');
-    BT_STATE.data = json.data || null;
-    BT_STATE.data._key = BT_STATE.branch + '|' + BT_STATE.date;
+    if (json.ok !== true) {
+      // Proxy detected HTML from Apps Script (permission denied / deployment
+      // issue). Surface the friendly message instead of 'API ok:false'.
+      throw new Error(json.error || 'API ok:false');
+    }
+    // Normalize response shape. The legacy doGet in Apps Script wraps whatever
+    // a handler returns: `jsonResponse({ok:true, type, data: result})`. If the
+    // handler itself returns `{ok:true, data:{...}}`, we get a double-wrapped
+    // payload `{ok:true, data:{ok:true, data:{...inner...}}}` — unwrap it.
+    let payload = json.data || null;
+    if (payload && payload.ok === true && payload.data && typeof payload.data === 'object') {
+      payload = payload.data;
+    }
+    BT_STATE.data = payload;
+    if (BT_STATE.data) BT_STATE.data._key = BT_STATE.branch + '|' + BT_STATE.date;
   } catch(e) {
     BT_STATE.error = e.message || String(e);
     BT_STATE.data = null;
@@ -3427,18 +3439,42 @@ async function fetchFromGoogleDrive(){
   const ctrl = new AbortController();
   const tid = setTimeout(()=>ctrl.abort(), 25000);
 
-  try {
-    const res = await fetch('/api/proxy', {
-      signal:ctrl.signal
-    });
-    clearTimeout(tid);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    let json;
-    try { json = await res.json(); }
-    catch(e){ throw new Error('Response not JSON — check Apps Script deployment'); }
-    if(json.ok !== true) throw new Error(json.error||'API ok:false');
+  // Fetch the three endpoints we actually consume in parallel. Historically
+  // we hit `type=all` but that chains into getFloatationData, which fails
+  // when the Apps Script can't read the Floatation sheets — and a single
+  // broken handler took down the whole sync. Fetching per-type lets stock/
+  // customers/financial succeed independently.
+  async function fetchType(t){
+    try {
+      const r = await fetch('/api/proxy?type='+encodeURIComponent(t), {signal:ctrl.signal});
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      const j = await r.json();
+      if (j.ok !== true) throw new Error(j.error || ('API ok:false for '+t));
+      return j.data;
+    } catch(e) {
+      return { _err: e.message || String(e) };
+    }
+  }
 
-    const dat = json.data;
+  try {
+    const [financial, stock, customers] = await Promise.all([
+      fetchType('financial'),
+      fetchType('stock'),
+      fetchType('customers')
+    ]);
+    clearTimeout(tid);
+
+    // At least one handler must have succeeded — otherwise we're completely offline.
+    if (financial._err && stock._err && customers._err) {
+      throw new Error(financial._err || 'All endpoints failed');
+    }
+
+    const dat = {
+      financial: financial._err ? null : financial,
+      stock:     stock._err     ? null : stock,
+      customers: customers._err ? null : customers,
+      _errs: [financial._err, stock._err, customers._err].filter(Boolean)
+    };
 
     // ── 1. financial.current_period.total → D array index 14 (Mar26) ──
     if(dat.financial && dat.financial.current_period && dat.financial.current_period.total){
