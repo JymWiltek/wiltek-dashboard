@@ -25,7 +25,7 @@ export const CREDENTIALS = [
 export const ALL_PAGES = [
   'today', 'settings',
   'health', 'pl', 'cashflow', 'gp', 'branches', 'balancesheet', 'expenses',
-  'inventory', 'customers', 'bistrat', 'biwh', 'inv360',
+  'inventory', 'customers', 'tvb', 'bistrat', 'biwh', 'inv360',
   'gtd', 'proposals', 'action', 'valuation', 'branchhub', 'branchtoday', 'quicklinks',
 ] as const;
 

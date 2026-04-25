@@ -78,11 +78,6 @@
   --line:       1.65;
   --tabular:    "tnum" 1, "lnum" 1;
 
-  /* ── Radii ── */
-  --r-sm:       6px;
-  --r:          10px;
-  --r-lg:       14px;
-
   /* ── Motion (everything ≤ 220ms, soft easing) ── */
   --t-fast:     150ms cubic-bezier(.4,0,.2,1);
   --t-mid:      220ms cubic-bezier(.4,0,.2,1);
@@ -635,6 +630,7 @@ input:focus,select:focus,button:focus-visible{outline:none;box-shadow:0 0 0 2px 
     <div class="ni" onclick="nav('branchtoday')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-calendar-days"/></svg></span><span id="nav-bt"></span></div>
     <div class="ni" onclick="nav('quicklinks')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span><span id="nav-links"></span></div>
     <div class="lv2" id="nav-s7"></div>
+    <div class="ni" onclick="nav('tvb')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg></span><span id="nav-tvb"></span></div>
     <div class="ni" onclick="nav('bistrat')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-target"/></svg></span><span id="nav-bistrat"></span></div>
     <div class="ni" onclick="nav('biwh')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg></span><span id="nav-biwh"></span></div>
     <div class="ni" onclick="nav('inv360')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-microscope"/></svg></span><span id="nav-inv360"></span></div>
@@ -1129,6 +1125,61 @@ input:focus,select:focus,button:focus-visible{outline:none;box-shadow:0 0 0 2px 
       </tr></thead><tbody id="i3-body"></tbody></table>
     </div>
     <div id="i3-pager" style="padding:10px 14px;border-top:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mu);font-family:'Geist Mono','JetBrains Mono',monospace;"></div>
+  </div>
+</div>
+
+<!-- ══════════ TRAFFIC vs BASKET (BI Engine — Cut 1) ══════════ -->
+<!--
+  BI Engine cut #1 — answers the question Jym keeps asking:
+    "Are we losing customers, or losing average spend?"
+
+  Data: BR / BR_YTD (per-month revenue, in-memory) + Floatation Summary
+        (per-month walk-in, fetched via /api/proxy?type=floatation, all 6 branches
+        in one shot, cached for the session via TVB_FLOAT_CACHE).
+
+  Decomposition: revenue = walk_in × basket_per_walk_in. We use the
+  basket-per-walk-in as a basket-size proxy (the same metric Section 3 plots),
+  because per-month conversion + ticket size aren't reliably exposed by the
+  Summary tab — only YTD running averages are. Showing those as "this month"
+  numbers would be dishonest, so we back them out where the math works
+  (walk-in-weighted) and fall back to "—" where it doesn't.
+
+  Diagnostic copy is generated, not templated lookups: each card gets a
+  one-line judgment ("revenue dropped 62%, dominant factor was ___") rather
+  than a wall of raw numbers. That's the whole point of the BI Engine.
+-->
+<div class="page" id="p-tvb">
+  <div class="ph" id="tvb-ph"></div>
+  <div class="ps" id="tvb-ps"></div>
+
+  <!-- Loading / error banner — shown while floatation fetch is in-flight or failed. -->
+  <div id="tvb-status" style="display:none;margin:12px 0 18px;padding:11px 16px;border-radius:10px;font-size:12px;"></div>
+
+  <!-- Section 1 — 6 store cards, this month -->
+  <div style="margin:18px 0 10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div>
+      <div id="tvb-s1-h" style="font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+      <div id="tvb-s1-s" style="font-size:11px;color:var(--text-mu);margin-top:2px;"></div>
+    </div>
+    <div id="tvb-s1-period" style="font-size:10px;font-family:'Geist Mono','JetBrains Mono',monospace;color:var(--text-mu);letter-spacing:.5px;"></div>
+  </div>
+  <div id="tvb-cards" style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:32px;"></div>
+
+  <!-- Section 2 — Top 3 things to watch -->
+  <div style="margin:0 0 10px;">
+    <div id="tvb-s2-h" style="font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+    <div id="tvb-s2-s" style="font-size:11px;color:var(--text-mu);margin-top:2px;"></div>
+  </div>
+  <div id="tvb-watch" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:32px;"></div>
+
+  <!-- Section 3 — 6-line trend, basket proxy -->
+  <div style="margin:0 0 10px;">
+    <div id="tvb-s3-h" style="font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+    <div id="tvb-s3-s" style="font-size:11px;color:var(--text-mu);margin-top:2px;"></div>
+  </div>
+  <div class="card" style="padding:18px 20px 14px;">
+    <div class="cv" style="height:280px;"><canvas id="tvbBasketChart"></canvas></div>
+    <div id="tvb-s3-note" style="font-size:10px;color:var(--text-mu);margin-top:8px;font-family:'Geist Mono','JetBrains Mono',monospace;letter-spacing:.3px;"></div>
   </div>
 </div>
 
@@ -1998,6 +2049,7 @@ const T = {
   nav_bt:    {en:'Branch Today',zh:'今日战报'},
   nav_links: {en:'Quick Links',zh:'快速链接'},
   nav_s7:{en:'BI WAR ROOM',zh:'BI 作战室'},
+  nav_tvb:{en:'Traffic vs Basket',zh:'客流 vs 客单价'},
   nav_bistrat:{en:'BI Strategic',zh:'BI 战略'},
   nav_biwh:{en:'BI Warehouse',zh:'BI 仓库'},
   nav_inv360:{en:'Inventory 360',zh:'库存 360'},
@@ -2119,7 +2171,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
   // L2: s1..s8 section headers (inside Deep Dive).
   // L3: original 18 page leaves.
   ['today','deepdive','settings',
-   's1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
+   's1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','tvb','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
     const el=document.getElementById('nav-'+k);
     if(el) el.textContent=t('nav_'+k);
   });
@@ -2138,6 +2190,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
     ()=>renderBranchHub(),
     ()=>renderBranchToday(),
     ()=>renderQuickLinks(),
+    ()=>renderTrafficVsBasket(),
     ()=>renderBIStrategic(),
     ()=>renderBIWarehouse(),
     ()=>renderInventory360(),
@@ -5076,6 +5129,610 @@ function renderInventory360(){
 
   i3Render();
 }
+
+
+// ═════════════════════════════════════════════════════════════════════
+// TRAFFIC vs BASKET — BI Engine cut #1
+// ═════════════════════════════════════════════════════════════════════
+//
+// Answers the question Jym keeps asking: "are we losing customers, or
+// losing average spend?" — by decomposing each branch's MoM revenue
+// change into walk-in × conversion × basket size.
+//
+// Data:
+//   - BR / BR_YTD               (per-month revenue, in-memory, ground truth)
+//   - /api/proxy?type=floatation (per-month walk-in + YTD running averages
+//                                 of conv + basket; one shot, all 6 branches,
+//                                 session-cached via TVB_FLOAT_CACHE)
+//
+// Math note: conv + basket aren't exposed per-month — only YTD running
+// averages — so we BACK them out (walk-in-weighted) for each branch.
+// When the back-out yields nonsense (negative tx, conv > 100%, etc.) we
+// fall back to "—" rather than fabricate. The cards stay honest.
+//
+// Diagnostic copy is generated by _tvbDiagnose, not templated lookups.
+// The whole point of the BI Engine is one-line judgments ("revenue
+// dropped 62%, conversion crashed, salesfloor problem"), not a wall of
+// raw numbers.
+
+let TVB_FLOAT_CACHE = null;
+let TVB_FLOAT_LOADING = false;
+let TVB_FLOAT_ERROR = null;
+const TVB_BRANCHES = ['W01','W02','W03','W05','W07','W11'];
+
+// Pick the latest [cur, prev] BR period pair that has full data on both
+// sides. Falls back to mar/feb (the current snapshot) when the walk fails.
+function _tvbMonthPair(){
+  const order = ['apr','mar','feb','jan']; // newest -> oldest
+  const idxMap = {jan:1, feb:2, mar:3, apr:4, may:5, jun:6,
+                  jul:7, aug:8, sep:9, oct:10, nov:11, dec:12};
+  for (let k=0;k<order.length-1;k++){
+    const a = order[k], b = order[k+1];
+    if (BR.W01[a] && BR.W01[a].ns && BR.W01[b] && BR.W01[b].ns){
+      return {curName:a, prvName:b, curIdx:idxMap[a], prvIdx:idxMap[b]};
+    }
+  }
+  return {curName:'mar', prvName:'feb', curIdx:3, prvIdx:2};
+}
+
+function _tvbMonthLabel(mn, en){
+  const enMap = {jan:'Jan 2026', feb:'Feb 2026', mar:'Mar 2026', apr:'Apr 2026'};
+  const zhMap = {jan:'1 月',     feb:'2 月',     mar:'3 月',     apr:'4 月'};
+  return en ? (enMap[mn]||mn) : (zhMap[mn]||mn);
+}
+
+function _tvbFindRow(rows, label){
+  if (!Array.isArray(rows)) return null;
+  return rows.find(r => (r.label||'').trim() === label) || null;
+}
+function _tvbNum(v){ const n = +v; return Number.isFinite(n) ? n : null; }
+
+// Per-month back-out from the floatation YTD-running aggregates. Returns
+// {cr, basket, tx} where any/all may be null when the math doesn't
+// reconcile (negative deltas, conv > 1, division by zero).
+function _tvbBackOut(rows, walkPerMonth, monthIdx){
+  const rCR  = _tvbFindRow(rows, 'YTD (AVerage) Closing Rate');
+  const rBSK = _tvbFindRow(rows, 'YTD (AVerage) Basket Size');
+  if (!rCR || !rBSK) return {cr:null, basket:null, tx:null};
+  const crYtd  = _tvbNum(rCR.values[monthIdx-1]);
+  const bskYtd = _tvbNum(rBSK.values[monthIdx-1]);
+  if (crYtd == null || bskYtd == null) return {cr:null, basket:null, tx:null};
+
+  let walkThru = 0;
+  for (let i=0;i<monthIdx;i++) walkThru += walkPerMonth[i] || 0;
+  if (walkThru <= 0) return {cr:null, basket:null, tx:null};
+
+  if (monthIdx === 1){
+    const tx = walkPerMonth[0] * crYtd;
+    return {cr: crYtd, basket: bskYtd, tx: Number.isFinite(tx) ? tx : null};
+  }
+
+  const crYtdPrev  = _tvbNum(rCR.values[monthIdx-2]);
+  const bskYtdPrev = _tvbNum(rBSK.values[monthIdx-2]);
+  if (crYtdPrev == null || bskYtdPrev == null) return {cr:null, basket:null, tx:null};
+
+  let walkThruPrev = 0;
+  for (let i=0;i<monthIdx-1;i++) walkThruPrev += walkPerMonth[i] || 0;
+
+  const totalTxNow  = walkThru * crYtd;
+  const totalTxPrev = walkThruPrev * crYtdPrev;
+  const txIn = totalTxNow - totalTxPrev;
+  const walkIn = walkPerMonth[monthIdx-1];
+  if (!Number.isFinite(txIn) || txIn <= 0 || walkIn <= 0) return {cr:null, basket:null, tx:null};
+
+  const crIn = txIn / walkIn;
+  if (!Number.isFinite(crIn) || crIn <= 0 || crIn > 1) return {cr:null, basket:null, tx:txIn};
+
+  const totalRevNow  = totalTxNow  * bskYtd;
+  const totalRevPrev = totalTxPrev * bskYtdPrev;
+  const basketIn = (totalRevNow - totalRevPrev) / txIn;
+  if (!Number.isFinite(basketIn) || basketIn <= 0) return {cr:crIn, basket:null, tx:txIn};
+
+  return {cr:crIn, basket:basketIn, tx:txIn};
+}
+
+// One-shot fetch of the full floatation payload (all branches in one call).
+async function _tvbLoadFloat(){
+  if (TVB_FLOAT_CACHE) return TVB_FLOAT_CACHE;
+  if (TVB_FLOAT_LOADING) return null;
+  TVB_FLOAT_LOADING = true;
+  TVB_FLOAT_ERROR = null;
+  try {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(()=>ctrl.abort(), 45000);
+    const res  = await fetch('/api/proxy?type=floatation', {signal:ctrl.signal});
+    clearTimeout(tid);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const json = await res.json();
+    if (json.ok !== true) throw new Error(json.error || 'API ok:false');
+    TVB_FLOAT_CACHE = json.data || {};
+    return TVB_FLOAT_CACHE;
+  } catch(e){
+    TVB_FLOAT_ERROR = e.message || String(e);
+    return null;
+  } finally {
+    TVB_FLOAT_LOADING = false;
+  }
+}
+
+// Per-branch metrics for one month-pair. Every numeric is a number-or-null,
+// every "_pct" is a relative change (decimal — multiply by 100 for display).
+function _tvbBranchMetrics(branch, floatAll, pair){
+  const out = {
+    branch,
+    name_en: BR[branch].name_en, name_zh: BR[branch].name_zh,
+    rev_now:null, rev_prev:null, rev_pct:null,
+    walk_now:null, walk_prev:null, walk_pct:null,
+    tx_now:null, tx_prev:null, tx_pct:null,
+    cr_now:null, cr_prev:null, cr_pp:null, cr_rel:null,
+    basket_now:null, basket_prev:null, basket_pct:null,
+    rpw_now:null, rpw_prev:null, rpw_pct:null,
+    has_walk:false,
+  };
+
+  const brC = BR[branch] && BR[branch][pair.curName];
+  const brP = BR[branch] && BR[branch][pair.prvName];
+  out.rev_now  = brC && brC.ns ? brC.ns : null;
+  out.rev_prev = brP && brP.ns ? brP.ns : null;
+  if (out.rev_now != null && out.rev_prev != null && out.rev_prev > 0){
+    out.rev_pct = (out.rev_now - out.rev_prev) / out.rev_prev;
+  }
+
+  const bDat = floatAll && floatAll[branch];
+  const rAll = bDat && _tvbFindRow(bDat.rows, 'All');
+  if (rAll && Array.isArray(rAll.values)){
+    const wAll = [];
+    for (let i=1;i<=12;i++) wAll.push(_tvbNum(rAll.values[i]) || 0);
+    out.walk_now  = wAll[pair.curIdx-1] || null;
+    out.walk_prev = wAll[pair.prvIdx-1] || null;
+    if (out.walk_now > 0 && out.walk_prev > 0){
+      out.walk_pct = (out.walk_now - out.walk_prev) / out.walk_prev;
+      out.has_walk = true;
+    }
+    const bC = _tvbBackOut(bDat.rows, wAll, pair.curIdx);
+    const bP = _tvbBackOut(bDat.rows, wAll, pair.prvIdx);
+    out.tx_now = bC.tx; out.tx_prev = bP.tx;
+    if (out.tx_now != null && out.tx_prev != null && out.tx_prev > 0){
+      out.tx_pct = (out.tx_now - out.tx_prev) / out.tx_prev;
+    }
+    out.cr_now = bC.cr; out.cr_prev = bP.cr;
+    if (out.cr_now != null && out.cr_prev != null){
+      out.cr_pp  = (out.cr_now - out.cr_prev) * 100;
+      if (out.cr_prev > 0) out.cr_rel = (out.cr_now - out.cr_prev) / out.cr_prev;
+    }
+    out.basket_now = bC.basket; out.basket_prev = bP.basket;
+    if (out.basket_now != null && out.basket_prev != null && out.basket_prev > 0){
+      out.basket_pct = (out.basket_now - out.basket_prev) / out.basket_prev;
+    }
+  }
+
+  if (out.rev_now != null && out.walk_now > 0)  out.rpw_now  = out.rev_now / out.walk_now;
+  if (out.rev_prev != null && out.walk_prev > 0) out.rpw_prev = out.rev_prev / out.walk_prev;
+  if (out.rpw_now != null && out.rpw_prev != null && out.rpw_prev > 0){
+    out.rpw_pct = (out.rpw_now - out.rpw_prev) / out.rpw_prev;
+  }
+  return out;
+}
+
+// Pick the dominant factor explaining the revenue move.
+// Tries 3-factor (walk × cr × basket) first; falls back to 2-factor
+// (walk × revenue-per-walk-in) when conv/basket back-out failed.
+function _tvbDominant(m){
+  const cand = [];
+  if (m.walk_pct   != null) cand.push({k:'walk',   v:m.walk_pct});
+  if (m.cr_rel     != null) cand.push({k:'cr',     v:m.cr_rel});
+  if (m.basket_pct != null) cand.push({k:'basket', v:m.basket_pct});
+  if (cand.length < 2 && m.rpw_pct != null) cand.push({k:'rpw', v:m.rpw_pct});
+  if (cand.length === 0) return null;
+  cand.sort((a,b)=>Math.abs(b.v) - Math.abs(a.v));
+  return cand[0];
+}
+
+function _tvbPctTxt(p, en){
+  if (p == null || !Number.isFinite(p)) return en ? 'n/a' : '—';
+  const sign = p >= 0 ? '+' : '';
+  return sign + (p*100).toFixed(0) + '%';
+}
+
+// Generate the diagnostic sentence — short, opinionated, prescriptive.
+function _tvbDiagnose(m, en){
+  if (m.rev_pct == null){
+    return en ? 'Insufficient data — MoM unavailable.' : '数据不足 — 无法对比环比。';
+  }
+  if (!m.has_walk){
+    return en
+      ? 'Walk-in data missing — only revenue tracked. Revenue ' + _tvbPctTxt(m.rev_pct, en) + '.'
+      : '客流数据缺失 — 仅追踪营收。营收' + _tvbPctTxt(m.rev_pct, en) + '。';
+  }
+  const dom = _tvbDominant(m);
+  const revPctTxt = _tvbPctTxt(m.rev_pct, en);
+  const labelOf = (k) => en
+    ? ({walk:'walk-in', cr:'conversion', basket:'basket size', rpw:'spend per visitor'})[k]
+    : ({walk:'进店',     cr:'转化率',     basket:'客单价',     rpw:'人均消费'})[k];
+
+  if (m.rev_pct >= 0.05){
+    if (dom){
+      return en
+        ? `Revenue ${revPctTxt} — driven by ${labelOf(dom.k)} ${_tvbPctTxt(dom.v, en)}, healthy.`
+        : `营收${revPctTxt} — 主因${labelOf(dom.k)}${_tvbPctTxt(dom.v, en)},运营健康。`;
+    }
+    return en ? `Revenue ${revPctTxt} — healthy.` : `营收${revPctTxt} — 运营健康。`;
+  }
+  if (m.rev_pct <= -0.10 && dom){
+    const advice_en = ({
+      walk:   'traffic problem — check marketing / location / external factors, not the salesfloor',
+      cr:     'salesfloor problem — check store staffing / training / pricing, not traffic',
+      basket: 'mix problem — check upsell / bundling / hero-product price, customers buying smaller',
+      rpw:    'spend-per-visitor down — could be conversion or basket; needs a deeper drill',
+    })[dom.k];
+    const advice_zh = ({
+      walk:   '客流问题 — 检查营销 / 位置 / 外部因素,不是销售环节',
+      cr:     '销售环节出事 — 检查门店人手 / 培训 / 价格调整,不是客流问题',
+      basket: '客户买得更少 — 检查推品 / 搭配 / 主推品价格',
+      rpw:    '人均消费下滑 — 可能是转化或客单价,需进一步细查',
+    })[dom.k];
+    return en
+      ? `Revenue ${revPctTxt}, driven by ${labelOf(dom.k)} ${_tvbPctTxt(dom.v, en)} — ${advice_en}.`
+      : `营收${revPctTxt},主因${labelOf(dom.k)}${_tvbPctTxt(dom.v, en)} — ${advice_zh}。`;
+  }
+  if (m.rev_pct < -0.05 && dom){
+    return en
+      ? `Revenue ${revPctTxt} — ${labelOf(dom.k)} ${_tvbPctTxt(dom.v, en)} the main drag, watch.`
+      : `营收${revPctTxt} — 主因${labelOf(dom.k)}${_tvbPctTxt(dom.v, en)},需关注。`;
+  }
+  // Approx flat — surface inverse moves (the "internal imbalance" case).
+  const walk = m.walk_pct;
+  const proxy = m.basket_pct != null ? m.basket_pct : m.rpw_pct;
+  if (walk != null && proxy != null && walk * proxy < 0 && (Math.abs(walk) >= 0.05 || Math.abs(proxy) >= 0.05)){
+    if (walk > 0){
+      return en
+        ? `Revenue flat, but walk-in ${_tvbPctTxt(walk, en)} / basket ${_tvbPctTxt(proxy, en)} — more visitors but smaller tickets, check pricing / mix / staff focus.`
+        : `营收持平,但进店${_tvbPctTxt(walk, en)} / 客单${_tvbPctTxt(proxy, en)} — 客户买得更少,可能搭配不足或主推品价低。`;
+    }
+    return en
+      ? `Revenue flat, but walk-in ${_tvbPctTxt(walk, en)} / basket ${_tvbPctTxt(proxy, en)} — fewer but higher-value customers, repeat / loyalty working.`
+      : `营收持平,但进店${_tvbPctTxt(walk, en)} / 客单${_tvbPctTxt(proxy, en)} — 客户更少但单价更高,回头客 / 忠诚度起作用。`;
+  }
+  return en ? `Revenue ${revPctTxt} — stable.` : `营收${revPctTxt} — 平稳。`;
+}
+
+// Display helpers — pills + cells. Two-color rule: green = good, amber = warn.
+function _tvbDeltaPill(p){
+  if (p == null || !Number.isFinite(p))
+    return '<span style="font-size:10px;color:var(--text-mu);font-family:\'Geist Mono\',\'JetBrains Mono\',monospace;">—</span>';
+  const good = p >= 0;
+  const col = good ? 'var(--emerald)' : 'var(--amber)';
+  const sign = good ? '+' : '';
+  return `<span style="font-size:10px;color:${col};font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;">${sign}${(p*100).toFixed(0)}%</span>`;
+}
+function _tvbDeltaPP(pp){
+  if (pp == null || !Number.isFinite(pp))
+    return '<span style="font-size:10px;color:var(--text-mu);font-family:\'Geist Mono\',\'JetBrains Mono\',monospace;">—</span>';
+  const good = pp >= 0;
+  const col = good ? 'var(--emerald)' : 'var(--amber)';
+  const sign = good ? '+' : '';
+  return `<span style="font-size:10px;color:${col};font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;">${sign}${pp.toFixed(1)}pp</span>`;
+}
+function _tvbCellVal(v, fmt){
+  if (v == null || !Number.isFinite(v)) return '—';
+  if (fmt === 'rm')  return rm(v);
+  if (fmt === 'int') return Math.round(v).toLocaleString('en-MY');
+  if (fmt === 'pct') return (v*100).toFixed(1)+'%';
+  return String(v);
+}
+
+// One branch card for Section 1.
+function _tvbCardHtml(m, en, pairLbl){
+  const name = en ? m.name_en : m.name_zh;
+  const diag = _tvbDiagnose(m, en);
+  const accent = m.rev_pct == null ? 'var(--text-mu)' : (m.rev_pct >= 0 ? 'var(--emerald)' : 'var(--amber)');
+  const rows = [
+    { lbl: en?'Revenue':'营收',     v: _tvbCellVal(m.rev_now,    'rm'),  d: _tvbDeltaPill(m.rev_pct) },
+    { lbl: en?'Walk-in':'进店',     v: _tvbCellVal(m.walk_now,   'int'), d: _tvbDeltaPill(m.walk_pct) },
+    { lbl: en?'Customers':'成交客户', v: _tvbCellVal(m.tx_now,     'int'), d: _tvbDeltaPill(m.tx_pct) },
+    { lbl: en?'Conversion':'转化率',  v: _tvbCellVal(m.cr_now,     'pct'), d: _tvbDeltaPP(m.cr_pp) },
+    { lbl: en?'Basket':'客单价',     v: _tvbCellVal(m.basket_now, 'rm'),  d: _tvbDeltaPill(m.basket_pct) },
+  ];
+  const rowsHtml = rows.map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px dashed var(--bdr-w);">
+      <span style="font-size:10px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${r.lbl}</span>
+      <span style="display:flex;align-items:baseline;gap:8px;">
+        <span style="font-size:12px;color:var(--text);font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;">${r.v}</span>
+        ${r.d}
+      </span>
+    </div>`).join('');
+  return `
+    <div class="tvb-card" data-branch="${m.branch}" onclick="tvbGotoBranch('${m.branch}')" style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-radius:12px;padding:16px 16px 14px;cursor:pointer;transition:transform .15s,border-color .15s;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${accent};opacity:.6;"></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:8px;">
+        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--text);letter-spacing:-.2px;">${m.branch}</span>
+        <span style="font-size:9px;color:var(--text-mu);">${pairLbl}</span>
+      </div>
+      <div style="font-size:10.5px;color:var(--text-mu);margin-bottom:10px;line-height:1.4;">${(name||'').replace(m.branch+' ','')}</div>
+      <div style="margin-bottom:12px;">${rowsHtml}</div>
+      <div style="font-size:11px;line-height:1.55;color:var(--text);background:var(--s2);border-left:2px solid ${accent};padding:8px 10px;border-radius:0 6px 6px 0;">${diag}</div>
+    </div>`;
+}
+
+// One watch-list card for Section 2 — bigger, with action buttons.
+function _tvbWatchHtml(m, severity, en){
+  const sevColor = severity === 'red' ? 'var(--amber)' : severity === 'bright' ? 'var(--emerald)' : 'var(--text-mu)';
+  const sevLbl = en
+    ? (severity === 'red' ? 'CRITICAL' : severity === 'bright' ? 'WIN' : 'WATCH')
+    : (severity === 'red' ? '红灯'      : severity === 'bright' ? '亮点'   : '黄灯');
+  const dom = _tvbDominant(m);
+  const domLbl = dom ? (en
+    ? ({walk:'walk-in', cr:'conversion', basket:'basket', rpw:'spend/visitor'})[dom.k]
+    : ({walk:'进店',     cr:'转化率',     basket:'客单价', rpw:'人均消费'})[dom.k]) : '';
+  let title;
+  if (severity === 'bright'){
+    title = en
+      ? `${m.branch} revenue surged ${_tvbPctTxt(m.rev_pct, true)} — what's working?`
+      : `${m.branch} 营收暴涨 ${_tvbPctTxt(m.rev_pct, false)} — 在做对什么?`;
+  } else {
+    const verb = en ? (dom ? domLbl + ' collapsed' : 'revenue down') : (dom ? domLbl + '崩盘' : '营收下滑');
+    title = `${m.branch} ${verb} ${_tvbPctTxt(m.rev_pct, en)}`;
+  }
+  const diag = _tvbDiagnose(m, en);
+  const stats = [
+    {l: en?'Revenue':'营收', v: _tvbCellVal(m.rev_now, 'rm'),  d: m.rev_pct},
+    {l: en?'Walk-in':'进店',  v: _tvbCellVal(m.walk_now, 'int'), d: m.walk_pct},
+    {l: en?'Basket':'客单价',  v: _tvbCellVal(m.basket_now != null ? m.basket_now : m.rpw_now, 'rm'),
+                              d: m.basket_pct != null ? m.basket_pct : m.rpw_pct},
+  ];
+  const statsHtml = stats.map(s => `
+    <div>
+      <div style="font-size:9px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:3px;">${s.l}</div>
+      <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--text);">${s.v}</div>
+      <div style="margin-top:3px;">${_tvbDeltaPill(s.d)}</div>
+    </div>`).join('');
+  return `
+    <div style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-left:3px solid ${sevColor};border-radius:12px;padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:${sevColor};">${sevLbl}</span>
+        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:9px;color:var(--text-mu);">${m.branch}</span>
+      </div>
+      <div style="font-size:14px;font-weight:600;line-height:1.35;color:var(--text);letter-spacing:-.1px;">${title}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">${statsHtml}</div>
+      <div style="font-size:11px;line-height:1.55;color:var(--text-mu);">${diag}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;">
+        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','flag')"    aria-label="${en?'Mark handled':'标记处理'}" title="${en?'Mark handled':'标记处理'}" style="flex:1;background:rgba(0,217,126,.1);border:1px solid rgba(0,217,126,.28);color:var(--emerald);padding:5px 0;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;">${en?'Mark handled':'标记处理'}</button>
+        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','observe')" aria-label="${en?'Observe 14d':'观察 14 天'}" title="${en?'Observe 14d':'观察 14 天'}" style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:5px 0;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;">${en?'Observe 14d':'观察 14 天'}</button>
+        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','push')"    aria-label="${en?'Push to team':'推送给团队'}" title="${en?'Push to team':'推送给团队'}" style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:5px 0;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;">${en?'Push to team':'推送给团队'}</button>
+      </div>
+    </div>`;
+}
+
+// Click handlers — light-touch (the action buttons are decision capture today;
+// full GTD round-trip is a follow-up task).
+function tvbGotoBranch(b){ try { window._tvbFocusBranch = b; } catch(e){} nav('branches'); }
+function tvbWatchAction(b, kind){
+  const en = lang === 'en';
+  const msg_en = ({flag:'Marked as handled',observe:'Observing 14 days',push:'Pushed to team'})[kind] || 'Done';
+  const msg_zh = ({flag:'已标记处理',observe:'已加入观察',push:'已推送给团队'})[kind] || '完成';
+  try { _tvbToast((en?msg_en:msg_zh) + ' · ' + b); } catch(e){ console.error(e); }
+}
+function _tvbToast(msg){
+  let el = document.getElementById('tvb-toast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'tvb-toast';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-raised);border:1px solid var(--bdr-w);color:var(--text);padding:9px 18px;border-radius:99px;font-size:12px;font-weight:600;box-shadow:var(--sh-2);z-index:1000;opacity:0;transition:opacity .2s,transform .2s;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(()=>{ el.style.opacity='1'; el.style.transform='translateX(-50%) translateY(0)'; });
+  clearTimeout(_tvbToast._t);
+  _tvbToast._t = setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(20px)'; }, 1800);
+}
+
+// Pick top-3 watch items: red flags first, then yellow, then bright wins.
+function _tvbWatchPick(metricsArr){
+  const reds=[], yellows=[], brights=[];
+  metricsArr.forEach(m=>{
+    if (m.rev_pct == null) return;
+    const dom = _tvbDominant(m);
+    const domAbs = dom ? Math.abs(dom.v) : 0;
+    if (m.rev_pct <= -0.10 && domAbs >= 0.08) reds.push(m);
+    else if (m.rev_pct < -0.05) yellows.push(m);
+    else if (m.rev_pct >= 0.20) brights.push(m);
+  });
+  reds.sort((a,b)=>a.rev_pct - b.rev_pct);
+  yellows.sort((a,b)=>a.rev_pct - b.rev_pct);
+  brights.sort((a,b)=>b.rev_pct - a.rev_pct);
+  const out=[];
+  reds.forEach(m=>{ if(out.length<3) out.push({m, sev:'red'}); });
+  yellows.forEach(m=>{ if(out.length<3) out.push({m, sev:'yellow'}); });
+  brights.forEach(m=>{ if(out.length<3) out.push({m, sev:'bright'}); });
+  return out;
+}
+
+// Trend chart dataset: revenue ÷ walk-in across months with data, plus
+// a dashed company-average line. 2-color rule respected: branch lines
+// are warm-gray shades, only the company-avg line uses emerald (the
+// "bar to clear").
+function _tvbBuildTrend(floatAll, en){
+  const monthSlots = [
+    {nm:'jan', idx:1, lbl: en?'Jan':'1月'},
+    {nm:'feb', idx:2, lbl: en?'Feb':'2月'},
+    {nm:'mar', idx:3, lbl: en?'Mar':'3月'},
+    {nm:'apr', idx:4, lbl: en?'Apr':'4月'},
+    {nm:'may', idx:5, lbl: en?'May':'5月'},
+    {nm:'jun', idx:6, lbl: en?'Jun':'6月'},
+  ];
+  const months = monthSlots.filter(s => BR.W01[s.nm] && BR.W01[s.nm].ns > 0);
+  const labels = months.map(s=>s.lbl);
+  const branchColors = {
+    W01: '#5a5550', W02: '#857d72', W03: '#a89d8e',
+    W05: '#cfc1aa', W07: '#7a7165', W11: '#928678',
+  };
+  const datasets = TVB_BRANCHES.map(b=>{
+    const bDat = floatAll && floatAll[b];
+    const rAll = bDat && _tvbFindRow(bDat.rows, 'All');
+    const data = months.map(s=>{
+      const ns = BR[b] && BR[b][s.nm] && BR[b][s.nm].ns;
+      const wk = rAll ? _tvbNum(rAll.values[s.idx]) : null;
+      if (!ns || !wk || wk <= 0) return null;
+      return Math.round(ns / wk);
+    });
+    return {
+      label: b, data,
+      borderColor: branchColors[b],
+      backgroundColor: branchColors[b],
+      borderWidth: 1.6,
+      tension: .25,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      spanGaps: true,
+    };
+  });
+  const avg = months.map((s,i)=>{
+    const vals = datasets.map(d=>d.data[i]).filter(v=>v!=null);
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+  });
+  datasets.push({
+    label: en ? 'Company avg' : '公司平均',
+    data: avg,
+    borderColor: '#00d97e',
+    backgroundColor: '#00d97e',
+    borderWidth: 1.4,
+    borderDash: [5,4],
+    tension: .25,
+    pointRadius: 0,
+    pointHoverRadius: 0,
+    spanGaps: true,
+  });
+  return {labels, datasets};
+}
+
+// Main render — async-aware: kicks off the floatation fetch once, then
+// re-renders when it resolves. While loading, BR-only metrics still
+// populate (revenue cards remain useful even before walk-in lands).
+async function renderTrafficVsBasket(){
+  const page = document.getElementById('p-tvb');
+  if (!page) return;
+  const en = lang === 'en';
+  const pair = _tvbMonthPair();
+  const pairLbl = _tvbMonthLabel(pair.curName, en) + (en?' vs ':' vs ') + _tvbMonthLabel(pair.prvName, en);
+
+  txt(document.getElementById('tvb-ph'),
+    '<svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg> Traffic vs Basket',
+    '<svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg> 客流 vs 客单价');
+  txt(document.getElementById('tvb-ps'),
+    'Are we losing customers, or losing average spend? — per-branch decomposition',
+    '顾客越来越少,还是单价越来越低?— 6 店逐家拆解');
+  txt(document.getElementById('tvb-s1-h'),
+    '6 stores · this month vs last month',
+    '6 店 · 本月对上月');
+  txt(document.getElementById('tvb-s1-s'),
+    'Click a card to drill into Branch P&L.',
+    '点击卡片进入门市盈亏。');
+  document.getElementById('tvb-s1-period').textContent = pairLbl;
+  txt(document.getElementById('tvb-s2-h'),
+    'Top 3 things to watch this month',
+    '本月最该看的 3 件事');
+  txt(document.getElementById('tvb-s2-s'),
+    'Auto-picked from the 6-store decomposition above.',
+    '从上方 6 店诊断中自动挑选。');
+  txt(document.getElementById('tvb-s3-h'),
+    'Spend per visitor — months trend',
+    '人均消费 — 月度趋势');
+  txt(document.getElementById('tvb-s3-s'),
+    'Revenue \u00f7 walk-in. Dashed line = company average.',
+    '营收 \u00f7 进店人数。虚线 = 公司平均。');
+  document.getElementById('tvb-s3-note').textContent = en
+    ? 'A more stable proxy for basket size than the conversion-noisy raw closing rate.'
+    : '比受 walk-in 噪声影响的转化率更稳定的客单价代理指标。';
+
+  if (!TVB_FLOAT_CACHE && !TVB_FLOAT_LOADING){
+    _tvbLoadFloat().then(()=>{ try { renderTrafficVsBasket(); } catch(e){ console.error('tvb re-render', e); } });
+  }
+
+  const status = document.getElementById('tvb-status');
+  if (TVB_FLOAT_LOADING){
+    status.style.display = 'block';
+    status.style.background = 'rgba(140,132,121,.08)';
+    status.style.border = '1px solid var(--bdr-w)';
+    status.style.color = 'var(--text-mu)';
+    status.innerHTML = (en?'Loading walk-in data…':'加载客流数据中…');
+  } else if (TVB_FLOAT_ERROR){
+    status.style.display = 'block';
+    status.style.background = 'rgba(246,166,9,.08)';
+    status.style.border = '1px solid rgba(246,166,9,.3)';
+    status.style.color = 'var(--amber)';
+    status.innerHTML = (en?'Walk-in data unavailable: ':'客流数据不可用:') + TVB_FLOAT_ERROR + (en?' — showing revenue only.':' — 仅显示营收。');
+  } else {
+    status.style.display = 'none';
+  }
+
+  const floatAll = TVB_FLOAT_CACHE;
+  const allMetrics = TVB_BRANCHES.map(b => _tvbBranchMetrics(b, floatAll, pair));
+
+  document.getElementById('tvb-cards').innerHTML = allMetrics.map(m=>_tvbCardHtml(m, en, pairLbl)).join('');
+
+  const picks = _tvbWatchPick(allMetrics);
+  const wEl = document.getElementById('tvb-watch');
+  if (picks.length === 0){
+    wEl.innerHTML = `<div class="card" style="grid-column:1 / -1;text-align:center;padding:32px 16px;color:var(--text-mu);font-size:12px;">${en?'No critical signals this month — all stores within normal range.':'本月无重大异常 — 6 店都在正常范围。'}</div>`;
+  } else {
+    let html = picks.map(p=>_tvbWatchHtml(p.m, p.sev, en)).join('');
+    if (picks.length < 3){
+      for (let i=picks.length;i<3;i++){
+        html += `<div style="background:transparent;border:1px dashed var(--bdr-w);border-radius:12px;padding:32px 16px;display:flex;align-items:center;justify-content:center;color:var(--text-mu);font-size:11px;text-align:center;">${en?'(slot empty — fewer than 3 signals)':'(暂无 — 信号不足 3 件)'}</div>`;
+      }
+    }
+    wEl.innerHTML = html;
+  }
+
+  const trend = _tvbBuildTrend(floatAll, en);
+  mkChart('tvbBasketChart', {
+    type: 'line',
+    data: trend,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode:'index', intersect:false},
+      plugins: {
+        legend: {position:'bottom', labels:{boxWidth:12, padding:8, font:{size:10}}},
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              if (v == null) return ctx.dataset.label + ': —';
+              return ctx.dataset.label + ': RM ' + Number(v).toLocaleString('en-MY', {maximumFractionDigits:0});
+            }
+          }
+        }
+      },
+      scales: {
+        x: {grid:{display:false}, ticks:{color:'#8c8479'}},
+        y: {grid:{color:'rgba(255,250,240,.06)'}, ticks:{color:'#8c8479', callback:v=>'RM '+Number(v).toLocaleString('en-MY')}},
+      },
+    },
+  });
+}
+
+// Mobile-friendly card grid + watch grid.
+(function _tvbMqStyle(){
+  if (document.getElementById('tvb-mq-style')) return;
+  const css = document.createElement('style');
+  css.id = 'tvb-mq-style';
+  css.textContent = `
+    .tvb-card:hover { transform: translateY(-2px); border-color: rgba(255,250,240,.18) !important; }
+    @media(max-width:1280px){
+      #tvb-cards { grid-template-columns: repeat(3,1fr) !important; }
+    }
+    @media(max-width:960px){
+      #tvb-cards { grid-template-columns: repeat(2,1fr) !important; }
+      #tvb-watch { grid-template-columns: 1fr !important; }
+    }
+    @media(max-width:600px){
+      #tvb-cards { grid-template-columns: 1fr !important; }
+    }
+  `;
+  document.head.appendChild(css);
+})();
 
 // ══════════════════════════════════════════════════════════
 // GTD PAGE (Tasks)
