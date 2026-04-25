@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 tests/playwright-report.json
 tests/qa-findings.json
+.claude/
