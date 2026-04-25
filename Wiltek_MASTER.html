@@ -151,7 +151,7 @@ body::before{
 .topbar{position:sticky;top:0;z-index:200;background:rgba(14,13,12,.86);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);border-bottom:1px solid var(--bdr-w);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:56px}
 .brand{display:flex;align-items:center;gap:9px}
 .brand-icon{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--emerald),#00b369);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--bg-base)}
-.brand-name{font-weight:800;font-size:14px;letter-spacing:-.3px}.brand-name em{color:var(--g);font-style:normal}
+.brand-name{font-weight:600;font-size:14px;letter-spacing:-.3px;white-space:nowrap;line-height:1.2}.brand-name em{color:var(--emerald);font-style:normal;font-weight:600}
 .topbar-right{display:flex;align-items:center;gap:8px}
 .msel{background:var(--s2);border:1px solid var(--bdr);color:var(--txt);padding:4px 8px;border-radius:7px;font-size:11px;font-family:'Geist Mono','JetBrains Mono',monospace;cursor:pointer;outline:none}
 .msel:focus{border-color:var(--g)}
@@ -347,6 +347,8 @@ td:not(.la):not(.la2){text-align:right}
   .sidenav{position:fixed;left:-220px;top:50px;height:calc(100vh - 50px);width:220px;transition:left .22s ease;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   .sidenav.open{left:0}
   .kr.c4,.kr.c5,.kr.c6{grid-template-columns:1fr 1fr}
+  /* Force 5-up KPI rows that use inline grid-template-columns to stack */
+  #h-kpis{grid-template-columns:1fr 1fr !important}
   .gr.g11,.gr.g21,.gr.g111,.gr.g211{grid-template-columns:1fr}
   .apg{grid-template-columns:1fr}
   .td-lever-grid{grid-template-columns:1fr}
@@ -354,18 +356,26 @@ td:not(.la):not(.la2){text-align:right}
   .td-amp{grid-template-columns:1fr}
   .td-amp-num{font-size:38px}
 }
-/* ── Mobile (≤600px): keep topbar single-row, hide redundant chrome ── */
+/* ── Tablet (≤1100px): hide redundant chrome that crowds the topbar ── */
+@media(max-width:1100px){
+  /* Period badge duplicates the month select; data-status pill is debug
+     info — both removed below desktop to ease topbar density */
+  .pb,#gd-status{display:none !important}
+}
+/* ── Mobile (≤600px): keep topbar single-row ── */
 @media(max-width:600px){
   .topbar{padding:0 12px;gap:6px}
-  .topbar-right{gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 110px)}
+  .topbar-right{gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 88px)}
   /* Brand: keep icon, hide wordmark to free space for the right-side controls */
   .brand-name{display:none}
-  /* Period badge (.pb) duplicates the month select; data-status pill is debug
-     info — both removed on mobile to keep the topbar one row */
-  .pb,#gd-status{display:none !important}
-  /* Compact the right-side pills so 380px fits */
+  /* Owner-only chrome that bloats the mobile topbar — drop on small screens */
+  .topbar-right #userMgmtBtn,
+  .topbar-right #adminBadge,
+  .topbar-right #saveBtn,
+  .topbar-right #userBadge{display:none !important}
+  /* Compact the remaining right-side pills */
   .topbar-right .msel{font-size:10px;padding:3px 6px;max-width:120px}
-  .topbar-right button,.topbar-right #userBadge,.topbar-right #adminBadge,.topbar-right #saveBtn{font-size:9px;padding:2px 7px}
+  .topbar-right button{font-size:9px;padding:2px 7px}
   .lsw{padding:1px}
   .lb{font-size:10px;padding:2px 7px}
 }
@@ -397,8 +407,10 @@ td:not(.la):not(.la2){text-align:right}
 /* Tighter, refined focus ring */
 input:focus,select:focus,button:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(var(--emerald-c),.35);border-color:var(--emerald)!important}
 
-/* Smooth scroll + scrollbar polish */
-html{scroll-behavior:smooth}
+/* Scrollbar polish — note we deliberately do NOT set
+   `html{scroll-behavior:smooth}`. Smooth scroll fights nav()'s instant
+   reset (window.scrollTo(0,0)) and leaves a small residual scrollY,
+   which fails the B14 e2e check. Buttons/anchors scroll fine without it. */
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-track{background:var(--bg-base)}
 ::-webkit-scrollbar-thumb{background:var(--gray-9);border-radius:6px;border:2px solid var(--bg-base)}
@@ -556,9 +568,9 @@ html{scroll-behavior:smooth}
     <button onclick="fetchFromGoogleDrive()" style="background:rgba(0,217,126,.1);border:1px solid rgba(0,217,126,.25);color:var(--emerald);padding:3px 10px;border-radius:99px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;cursor:pointer;" title="Sync from Google Drive"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Sync GD</button>
     <div id="adminBadge" title="Edit mode (owner only)" style="display:none;background:rgba(140,132,121,.15);border:1px solid rgba(140,132,121,.3);color:var(--text-mu);padding:3px 10px;border-radius:99px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="toggleAdminMode()"><svg class="ic" aria-hidden="true"><use href="#i-edit"/></svg> EDIT</div>
     <div id="saveBtn" style="display:none;background:rgba(0,217,126,.15);border:1px solid rgba(0,217,126,.3);color:var(--emerald);padding:3px 10px;border-radius:99px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;align-items:center;" onclick="saveEdits()"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> SAVE</div>
-    <div id="userBadge" style="display:none;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;color:var(--text);background:rgba(255,250,240,.6);border:1px solid var(--gray-8);padding:3px 10px;border-radius:99px;align-items:center;gap:6px;"></div>
+    <div id="userBadge" style="display:none;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;color:var(--text);background:rgba(40,35,30,.55);border:1px solid var(--gray-8);padding:3px 10px;border-radius:99px;align-items:center;gap:6px;"></div>
     <button id="userMgmtBtn" onclick="openUserMgmt()" style="display:none;background:rgba(140,132,121,.1);border:1px solid rgba(140,132,121,.25);color:var(--text-mu);padding:3px 10px;border-radius:99px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;cursor:pointer;" title="User Management"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Users</button>
-    <button onclick="logout()" id="logoutBtn" style="display:none;background:rgba(246,166,9,.08);border:1px solid rgba(246,166,9,.2);color:var(--amber);padding:3px 10px;border-radius:99px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;cursor:pointer;">↩ Logout</button>
+    <button onclick="logout()" id="logoutBtn" style="display:none;align-items:center;gap:6px;background:rgba(140,132,121,.08);border:1px solid rgba(140,132,121,.22);color:var(--text-mu);padding:3px 10px;border-radius:99px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:10px;cursor:pointer;"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-log-out"/></svg>Logout</button>
     <div class="lsw">
       <button class="lb active" onclick="setLang('en')">EN</button>
       <button class="lb" onclick="setLang('zh')">中文</button>
@@ -2015,7 +2027,11 @@ function setBrView(v){
 const L1_PAGES = new Set(['today','settings']);
 
 function nav(id){
-  window.scrollTo(0,0);
+  // Reset scroll synchronously and on next frame — some renders trigger
+  // a tiny layout shift that pushes scrollY a few px below 0.
+  try { window.scrollTo({top:0,left:0,behavior:'instant'}); } catch(e){ window.scrollTo(0,0); }
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
   // Hide all pages, clear all active flags (L1 + L3).
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -2096,7 +2112,7 @@ function kpiHtml(cls,lbl,val,sub,pill){
 // ═══════════════════════════════
 function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[k]);
   const m=selMonth, prev=prevM(m), i=idx(m);
-  document.getElementById('pb').textContent='<svg class="ic" aria-hidden="true"><use href="#i-calendar-days"/></svg> '+mLabel(m);
+  document.getElementById('pb').innerHTML='<svg class="ic" aria-hidden="true"><use href="#i-calendar-days"/></svg> '+mLabel(m);
 
   // Nav labels (L1 + L2 headers + L3 leaves).
   // L1: today / deepdive / settings.
@@ -2275,7 +2291,13 @@ function _tdRenderAmpang(){
            '<svg class="ic" aria-hidden="true"><use href="#i-building"/></svg> 安邦水岸旗舰店 — 倒计时');
   txt(sEl, 'Target opening: 2026-05-01 · W02',
            '预计开业：2026-05-01 · W02');
-  if(fillEl) fillEl.style.width = '67%';
+  if(fillEl){
+    fillEl.style.width = '67%';
+    // Match the bar tint to the urgency: amber under 7 days, emerald otherwise
+    fillEl.style.background = days <= 7
+      ? 'linear-gradient(90deg,var(--amber),rgba(246,166,9,.6))'
+      : 'linear-gradient(90deg,var(--emerald),rgba(0,217,126,.6))';
+  }
   txt(pblEl, 'Transfer-in progress — pending W02 stock feed',
              '调货完成度 — 待接 W02 库存数据');
   if(pbrEl) pbrEl.textContent = '67%';
@@ -2455,7 +2477,7 @@ function renderSettings(){
       <div class="card">
         <div class="ch">${en?'<svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Snapshot Export':'<svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> 数据快照导出'}</div>
         <div class="cs">${en?'Download a JSON of the current month\'s D / BR data.':'导出当前月份的 D / BR 数据 JSON。'}</div>
-        <button onclick="saveEdits()" style="background:rgba(246,166,9,.12);border:1px solid rgba(246,166,9,.3);color:var(--amber);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Geist','Inter Display',system-ui,sans-serif;">
+        <button onclick="saveEdits()" style="background:rgba(140,132,121,.12);border:1px solid rgba(140,132,121,.3);color:var(--text-mu);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Geist','Inter Display',system-ui,sans-serif;">
           ${en?'Download JSON':'下载 JSON'} →
         </button>
       </div>
@@ -2505,18 +2527,18 @@ function renderHealth(m,prev,i){
       verdictEl.textContent=en?'<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> All Good':'<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> 运营良好';
       verdictEl.style.cssText='background:rgba(0,217,126,.15);border:1px solid rgba(0,217,126,.4);color:var(--emerald);font-size:13px;font-weight:700;padding:8px 18px;border-radius:99px;';
     } else {
-      verdictEl.textContent='<svg class="ic" aria-hidden="true"><use href="#i-alert-triangle"/></svg> '+issues.join(' · ');
+      verdictEl.innerHTML='<svg class="ic" aria-hidden="true"><use href="#i-alert-triangle"/></svg> '+issues.join(' · ');
       verdictEl.style.cssText='background:rgba(246,166,9,.12);border:1px solid rgba(246,166,9,.35);color:var(--amber);font-size:13px;font-weight:700;padding:8px 18px;border-radius:99px;';
     }
   }
 
   // 5 BIG KPIs
-  const kpi5=v=>`<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:18px 16px;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${v.color}"></div>
-    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mu);margin-bottom:10px;">${v.label}</div>
-    <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${v.color};line-height:1;margin-bottom:8px;">${v.value}</div>
-    <div style="font-size:11px;color:var(--mu);margin-bottom:6px;">${v.sub}</div>
-    <div style="font-size:12px;font-weight:600;color:${v.delta&&v.delta.startsWith('▲')?'var(--emerald)':v.delta&&v.delta.startsWith('▼')?'var(--amber)':'var(--text-mu)'};">${v.delta||''}</div>
+  const kpi5=v=>`<div style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-radius:12px;padding:22px 24px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${v.color};opacity:.55;"></div>
+    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.4px;color:var(--text-mu);margin-bottom:12px;">${v.label}</div>
+    <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:26px;font-weight:600;color:${v.color};line-height:1;margin-bottom:8px;letter-spacing:-.01em;">${v.value}</div>
+    <div style="font-size:11px;color:var(--text-mu);margin-bottom:6px;">${v.sub}</div>
+    <div style="font-size:12px;font-weight:500;color:${v.delta&&v.delta.startsWith('▲')?'var(--emerald)':v.delta&&v.delta.startsWith('▼')?'var(--amber)':'var(--text-mu)'};">${v.delta||''}</div>
   </div>`;
 
   document.getElementById('h-kpis').innerHTML=[
@@ -2606,7 +2628,7 @@ function renderHealth(m,prev,i){
   const bMonthly=bkeys.map(k=>(BR[k][period]||BR[k]['feb']).net);
   const bYTD=bkeys.map(k=>BR_YTD[k].net);
   txt(document.getElementById('h-c2t'), 'Branch Net — Month vs YTD', '分行净利润 — 当月 vs 累计');
-  txt(document.getElementById('h-c2s'),en?'Blue=YTD Jan–Mar · Teal/Red='+m+' month':'蓝=年初至今 · 绿/红='+m,'');
+  txt(document.getElementById('h-c2s'),en?'Bars=YTD Jan–Mar · Highlight='+m+' month':'柱=年初至今 · 高亮='+m,'');
   mkChart('netProfitTrend',{type:'bar',data:{labels:bkeys,datasets:[
     {label:en?'YTD Net':'年初至今',data:bYTD,backgroundColor:'rgba(140,132,121,.2)',borderColor:C.b,borderWidth:1.5},
     {label:en?m+' Net':m+'净利润',data:bMonthly,backgroundColor:bMonthly.map(v=>v>=0?'rgba(0,217,126,.5)':'rgba(246,166,9,.5)'),borderColor:bMonthly.map(v=>v>=0?C.g:C.r),borderWidth:1.5},
@@ -2780,7 +2802,7 @@ function renderCF(m,prev,i){
   ].join('');
 
   txt(document.getElementById('cf-c1t'),`True Operating Cash Flow — 14 Months`,`真实运营现金流 — 14个月`);
-  txt(document.getElementById('cf-c1s'),`Green = surplus · Red = deficit · Nov25 corrected: −RM 129K (raw was +574K due to OD)`,`绿 = 盈余 · 红 = 亏损 · 11月25已更正：-12.9万（原始+57.4万含透支）`);
+  txt(document.getElementById('cf-c1s'),`Green = surplus · Amber = deficit · Nov25 corrected: −RM 129K (raw was +574K due to OD)`,`绿 = 盈余 · 琥珀 = 亏损 · 11月25已更正：-12.9万（原始+57.4万含透支）`);
   mkChart('cfChart',{type:'bar',data:{labels:M15,datasets:[
     {label:en?'Operating CF':'运营现金流',data:D.cf_true,backgroundColor:D.cf_true.map((v,j)=>j===i?C.y:(v>=0?'rgba(0,217,126,.6)':'rgba(246,166,9,.6)')),borderColor:D.cf_true.map((v,j)=>j===i?C.y:(v>=0?C.g:C.r)),borderWidth:1.5},
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'RM'+(v>=0?'+':'')+Math.round(v/1000)+'K'},grid:{color:'rgba(255,250,240,.5)'}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
@@ -5121,8 +5143,8 @@ function renderGTD(){
         '<div style="display:flex;gap:4px;">'+
           (t.status!=='doing'?'<button onclick="gtdQuickStatus(\''+t.id+'\',\'doing\')" style="background:rgba(246,166,9,.12);border:1px solid rgba(246,166,9,.3);color:var(--y);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:700;">▶</button>':'')+
           (t.status!=='waiting'?'<button onclick="gtdQuickStatus(\''+t.id+'\',\'waiting\')" style="background:rgba(140,132,121,.12);border:1px solid rgba(140,132,121,.3);color:var(--p);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:700;">⏸</button>':'')+
-          (t.status!=='done'?'<button onclick="gtdQuickStatus(\''+t.id+'\',\'done\')" style="background:rgba(0,217,126,.12);border:1px solid rgba(0,217,126,.3);color:var(--g);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:700;"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></button>':'')+
-          '<button onclick="gtdDelete(\''+t.id+'\')" style="background:var(--s3);border:1px solid var(--bdr);color:var(--mu);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>'+
+          (t.status!=='done'?'<button onclick="gtdQuickStatus(\''+t.id+'\',\'done\')" aria-label="'+(en?'Mark done':'标记完成')+'" title="'+(en?'Mark done':'标记完成')+'" style="background:rgba(0,217,126,.12);border:1px solid rgba(0,217,126,.3);color:var(--g);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:700;"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></button>':'')+
+          '<button onclick="gtdDelete(\''+t.id+'\')" aria-label="'+(en?'Delete task':'删除任务')+'" title="'+(en?'Delete task':'删除任务')+'" style="background:var(--s3);border:1px solid var(--bdr);color:var(--mu);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:10px;"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>'+
         '</div></div>';
     }).join('');
 }
