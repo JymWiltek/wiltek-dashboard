@@ -221,6 +221,21 @@ td:not(.la):not(.la2){text-align:right}
   .td-amp{grid-template-columns:1fr}
   .td-amp-num{font-size:38px}
 }
+/* ── Mobile (≤600px): keep topbar single-row, hide redundant chrome ── */
+@media(max-width:600px){
+  .topbar{padding:0 12px;gap:6px}
+  .topbar-right{gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 110px)}
+  /* Brand: keep icon, hide wordmark to free space for the right-side controls */
+  .brand-name{display:none}
+  /* Period badge (.pb) duplicates the month select; data-status pill is debug
+     info — both removed on mobile to keep the topbar one row */
+  .pb,#gd-status{display:none !important}
+  /* Compact the right-side pills so 380px fits */
+  .topbar-right .msel{font-size:10px;padding:3px 6px;max-width:120px}
+  .topbar-right button,.topbar-right #userBadge,.topbar-right #adminBadge,.topbar-right #saveBtn{font-size:9px;padding:2px 7px}
+  .lsw{padding:1px}
+  .lb{font-size:10px;padding:2px 7px}
+}
 </style>
 </head>
 <body>
@@ -1829,8 +1844,11 @@ function toggleSidenav(force){
 // ═══════════════════════════════
 const idx = m=>M15.indexOf(m);
 const d    = (k,m)=>(D[k]&&D[k][idx(m)])||0;
-const rm   = v=>'RM '+(+v).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0});
-const pct  = v=>(+v*100).toFixed(1)+'%';
+// rm() / pct() must never emit NaN — div-by-zero or missing data formats
+// to a long-dash "—" so the UI degrades gracefully on the current month
+// before data lands. Wave-1 Step-3 QA hardening.
+const rm   = v=>{ const n=+v; if(!Number.isFinite(n)) return 'RM —'; return 'RM '+n.toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:0}); };
+const pct  = v=>{ const n=+v; if(!Number.isFinite(n)) return '—'; return (n*100).toFixed(1)+'%'; };
 const C={g:'#00e5c4',g2:'rgba(0,229,196,.15)',r:'#ff4d6d',r2:'rgba(255,77,109,.15)',y:'#f5c842',y2:'rgba(245,200,66,.15)',b:'#4d9fff',b2:'rgba(77,159,255,.15)',o:'#ff8c42',mu:'#5a738a'};
 Chart.defaults.font.family="'JetBrains Mono',monospace";Chart.defaults.font.size=10;Chart.defaults.color=C.mu;Chart.defaults.plugins.legend.labels.boxWidth=10;Chart.defaults.plugins.legend.labels.padding=9;
 const charts={};
@@ -5005,13 +5023,13 @@ function renderValuation(){
 
   // KPIs
   var si = d('sales_inv',selMonth), net = d('br_net',selMonth), ns = d('br_ns',selMonth);
-  var netPct = si?(net/ns):0;
+  var netPct = (ns > 0) ? (net/ns) : NaN;
   var stock = d('stock_close',selMonth);
   var avgCogs=D.br_cogs.slice(0,14).reduce(function(a,b){return a+b;},0)/14;
-  var days=Math.round(stock/(avgCogs/30));
+  var days = (avgCogs > 0) ? Math.round(stock/(avgCogs/30)) : 0;
   document.getElementById('vl-kpis').innerHTML = [
     {lbl:en?'LTM EBITDA':'LTM EBITDA', val:'RM '+(ebitda/1000).toFixed(0)+'K', c:ebitda>0?'#00e5c4':'#ff4d6d', sub:en?'12-month rolling':'12个月滚动'},
-    {lbl:en?'NET MARGIN':'净利率', val:(netPct*100).toFixed(1)+'%', c:netPct>=.03?'#00e5c4':netPct>=0?'#f5c842':'#ff4d6d', sub:en?'Target ≥3%':'目标 ≥3%'},
+    {lbl:en?'NET MARGIN':'净利率', val:pct(netPct), c:netPct>=.03?'#00e5c4':netPct>=0?'#f5c842':'#ff4d6d', sub:en?'Target ≥3%':'目标 ≥3%'},
     {lbl:en?'STOCK DAYS':'库存天数', val:days+'d', c:days<=120?'#00e5c4':'#f5c842', sub:en?'Target ≤120d':'目标 ≤120天'},
     {lbl:en?'DEAD/EXCESS':'死货/滞销', val:'RM '+Math.round(((BI_D.sc_totals||{}).dead_val||0)+((BI_D.sc_totals||{}).excess_val||0)).toLocaleString(), c:'#ff4d6d', sub:en?'Clear for M&A':'清理助 M&A'},
   ].map(function(k){return '<div class="kpi" style="border-top:3px solid '+k.c+';"><div class="kl">'+k.lbl+'</div><div class="kv" style="color:'+k.c+';">'+k.val+'</div><div class="ks">'+(k.sub||'')+'</div></div>';}).join('');
@@ -5021,13 +5039,17 @@ function renderValuation(){
   txt(document.getElementById('vl-s2'),'18-MONTH PHASES','18个月阶段');
   txt(document.getElementById('vl-s3'),'8 CORE ACTIONS','8项核心动作');
 
-  // Metrics list
+  // Metrics list — use safe pct() so empty-month doesn't bleed NaN%.
+  var brGpRatio  = (ns > 0) ? (d('br_gp',selMonth)/ns) : NaN;
+  var deadStock  = (BI_D.sc_totals||{}).dead_val || 0;
+  var totalStock = (BI_D.sc_totals||{}).stock    || 0;
+  var deadRatio  = (totalStock > 0) ? (deadStock/totalStock) : NaN;
   var metrics = [
-    {name:en?'Net margin':'净利率',        now:(netPct*100).toFixed(1)+'%', tgt:'≥3%',    ok:netPct>=.03},
-    {name:en?'Stock turnover':'库存周转',  now:days+'d',                   tgt:'≤120d',  ok:days<=120},
-    {name:en?'GP %':'毛利率',              now:(d('br_gp',selMonth)/ns*100).toFixed(1)+'%', tgt:'≥47%', ok:(d('br_gp',selMonth)/ns)>=.47},
+    {name:en?'Net margin':'净利率',        now:pct(netPct), tgt:'≥3%',    ok:netPct>=.03},
+    {name:en?'Stock turnover':'库存周转',  now:days+'d',    tgt:'≤120d',  ok:days<=120},
+    {name:en?'GP %':'毛利率',              now:pct(brGpRatio), tgt:'≥47%', ok:brGpRatio>=.47},
     {name:en?'B2B ratio':'B2B 占比',       now:'—', tgt:'A(20)+B(50)', ok:false, note:en?'Manual entry needed':'需手动录入'},
-    {name:en?'Dead stock ratio':'死货占比', now:(((BI_D.sc_totals||{}).dead_val||0)/((BI_D.sc_totals||{}).stock||1)*100).toFixed(1)+'%', tgt:'≤5%', ok:(((BI_D.sc_totals||{}).dead_val||0)/((BI_D.sc_totals||{}).stock||1))<=.05},
+    {name:en?'Dead stock ratio':'死货占比', now:pct(deadRatio), tgt:'≤5%', ok:deadRatio<=.05},
   ];
   document.getElementById('vl-metrics-list').innerHTML = metrics.map(function(m){
     var col = m.ok?'var(--g)':'var(--r)';
