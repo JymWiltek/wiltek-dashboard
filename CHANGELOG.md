@@ -1,5 +1,70 @@
 # Wiltek Portal — Changelog
 
+## Wave 1 Step 1 — Menu collapsed to 3 L1 entries (2026-04-25)
+
+Sidebar refactor for the Master Plan rebuild: 18 leaves + 8 section headers
+collapse into **Today / Deep Dive / Settings**. Branch managers (and every
+other role) now land on Today instead of their old per-role page. Deep Dive
+preserves the original 8-section × 18-page tree exactly — collapsed by
+default, auto-expanded when an active page lives inside it.
+
+### Added
+- **`Wiltek_MASTER.html` — 3-level sidenav** (Today · Deep Dive · Settings).
+  Lucide-style inline SVG icons (home / bar-chart-3 / settings + chevron) —
+  no emoji at L1, no CDN, ~24×24 stroke icons. New CSS classes `.lv1`,
+  `.lv2`, `.dd-tree`, `.hamb`, `.sidenav-scrim`. Active-state styling
+  unchanged (`.active` still teal-tinted left border).
+- **`p-today` page** — single-line landing
+  ("Today landing — Wave 1 Step 2 在路上") so the menu structure ships
+  ahead of the per-role widgets in Step 2.
+- **`p-settings` page** — owner-only landing surfacing
+  User Management / Sync GD / JSON Snapshot via the existing topbar
+  handlers (no business logic forked). Non-owners see a polite
+  "owner-only" placeholder if they hit the page directly.
+- **Mobile hamburger** — `<button class="hamb">` slides the sidebar in/out
+  under 960 px. Tap-outside-scrim closes it; picking a leaf auto-closes.
+- **`toggleSidenav()` / `toggleDeepDive()` / `setDeepDive()`** helpers,
+  `L1_PAGES` set (`{'today','settings'}`) so `nav()` can route active state
+  to the right L1 entry.
+- **i18n** — `nav_today`, `nav_deepdive`, `nav_settings` keys (EN + ZH).
+- **`renderToday()` / `renderSettings()`** added to the render cascade.
+
+### Changed
+- **`Wiltek_MASTER.html` — `nav(id)`** now also clears/sets `.lv1.active`,
+  auto-collapses Deep Dive when navigating to an L1 page, auto-expands it
+  when navigating to a leaf, and on mobile auto-closes the slide-in drawer
+  after a pick.
+- **`updateNav()`** — same per-role L3 prune via `WP_PERMS.canAccess()`,
+  plus L2 empty-section prune (now `.lv2` instead of `.ns`), plus L1
+  visibility gates: hide Settings unless the role can access it; hide the
+  Deep Dive entry + sub-tree if the role can see zero leaves. Default
+  landing now resolves to **`'today'`** for every role (with a fallback to
+  `WP_PERMS.getLandingPage` if a role somehow loses access to `today`).
+- **`PAGE_LABELS` / `PAGE_IDS`** — added `today` and `settings` so the
+  User Management modal renders the new permission rows correctly.
+- **`permissions.js`**:
+  - `rolePages` — `today` added to every role; `settings` added to
+    `owner` only. The original 18-page Deep Dive matrix is unchanged.
+  - `roleLanding` — every role now lands on `'today'` (was: `health` for
+    owner/finance, `bistrat`/`biwh`/`expenses`/`customers` for the
+    function roles, `branchtoday` for the six branch managers).
+
+### Why this route
+Per Jym's directive on the Master Plan: Portal is too dense for the six
+branch managers to open daily. Wave 1 Step 1 makes the menu feel calm
+without touching any business logic, page rendering, calculations, or the
+Branch Today aggregate-mode fix. Step 3 reworks visuals; Step 2 fills in
+real Today widgets.
+
+### Not touched (intentional)
+- Page renderers (`renderHealth`, `renderPL`, `renderCF`, …) — untouched.
+- Business calculations / Apps Script / Google Sheets — untouched.
+- Branch Today aggregate-mode fix from Phase 3.1-hotfix2 — untouched.
+- Existing topbar shortcuts (Sync GD / EDIT / Users / Logout) — untouched.
+- i18n copy on existing pages — untouched.
+
+---
+
 ## Phase 3.1-hotfix2 — Branch Today aggregate-mode fallback (2026-04-24)
 
 Root cause of the "⚠️ signal is aborted without reason" error on Branch Today:

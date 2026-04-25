@@ -27,64 +27,85 @@
 //
 // Phase 3.1 built pages:
 //   - "Branch Today" (`branchtoday`)       → live Floatation daily data.
-//                                            Default landing for w01..w11_mgr.
 //                                            Branch-scoped (dropdown locked to own branch).
+//
+// Wave 1 Step 1 added pages:
+//   - "Today"     (`today`)     → universal landing for ALL roles (placeholder
+//                                  until Wave 1 Step 2 dispatches per-role
+//                                  widgets). Replaces the old per-role landings
+//                                  (every roleLanding now points at 'today').
+//   - "Settings"  (`settings`)  → admin tools (User Management, Refresh,
+//                                  JSON snapshot). Owner only.
 // ═══════════════════════════════════════════════════════════════════════
 (function(){
   "use strict";
 
   // ── Role × page matrix (SPEC §5.2) ────────────────────────────────
+  // Wave 1 Step 1 — every role gets `today` (universal L1 landing).
+  // `settings` is owner-only. The original 18 page IDs gate Deep Dive
+  // sub-tree visibility unchanged.
   const rolePages = {
     owner: [
+      'today','settings',
       'health','pl','cashflow','gp','branches','balancesheet','expenses',
       'inventory','customers','bistrat','biwh','inv360',
       'gtd','proposals','action','valuation','branchhub','branchtoday','quicklinks'
     ],
     finance: [
+      'today',
       'health','pl','cashflow','gp','branches','balancesheet','expenses',
       'inventory','customers','branchtoday',
       'gtd','proposals','action','quicklinks'
     ],
     bi_consultant: [
+      'today',
       'inventory','customers','bistrat','biwh','inv360','branchtoday',
       'gtd','proposals','action','quicklinks'
     ],
     warehouse: [
+      'today',
       'inventory','biwh','inv360',
       'gtd','proposals','action','quicklinks'
     ],
     hr: [
+      'today',
       'expenses',
       'gtd','proposals','action','quicklinks'
     ],
     marketing: [
+      'today',
       'customers',
       'gtd','proposals','action','quicklinks'
     ],
     // Branch managers share the same page set; data scoping is handled
     // via shouldLockBranchSelector() + Phase 4 server-side filters.
-    w01_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w02_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w03_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w05_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w07_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
-    w11_mgr: ['branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w01_mgr: ['today','branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w02_mgr: ['today','branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w03_mgr: ['today','branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w05_mgr: ['today','branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w07_mgr: ['today','branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
+    w11_mgr: ['today','branchtoday','branches','inventory','customers','branchhub','gtd','proposals','action','quicklinks'],
   };
 
-  // ── Default landing page (SPEC §5.1, with Phase 2 fallbacks) ───────
+  // ── Default landing page ───────────────────────────────────────────
+  // Wave 1 Step 1: every role lands on Today first. Wave 1 Step 2 will
+  // dispatch to per-role widgets *inside* Today. Until then, Today is a
+  // single-line placeholder. The old per-role landings (Financial Health
+  // for owner, Branch Today for managers, etc.) remain reachable via the
+  // Deep Dive sub-tree.
   const roleLanding = {
-    owner:         'health',   // "CEO Cockpit" unbuilt → collapses onto Financial Health
-    finance:       'health',
-    bi_consultant: 'bistrat',
-    warehouse:     'biwh',
-    hr:            'expenses', // "HR Dashboard" unbuilt → fallback
-    marketing:     'customers',// "Customer Intel" is the customers page
-    w01_mgr:       'branchtoday', // Phase 3.1 — live Floatation dashboard
-    w02_mgr:       'branchtoday',
-    w03_mgr:       'branchtoday',
-    w05_mgr:       'branchtoday',
-    w07_mgr:       'branchtoday',
-    w11_mgr:       'branchtoday',
+    owner:         'today',
+    finance:       'today',
+    bi_consultant: 'today',
+    warehouse:     'today',
+    hr:            'today',
+    marketing:     'today',
+    w01_mgr:       'today',
+    w02_mgr:       'today',
+    w03_mgr:       'today',
+    w05_mgr:       'today',
+    w07_mgr:       'today',
+    w11_mgr:       'today',
   };
 
   // ── Branch scoping (Jym's Phase 2 addendum) ────────────────────────

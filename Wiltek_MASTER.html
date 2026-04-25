@@ -27,12 +27,35 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .lb{font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:none;background:transparent;color:var(--mu);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
 .lb.active{background:var(--g);color:#07090f}
 .layout{display:flex;position:relative;z-index:1}
-.sidenav{width:185px;min-height:calc(100vh - 50px);background:var(--s1);border-right:1px solid var(--bdr);padding:12px 0;position:sticky;top:50px;height:calc(100vh - 50px);overflow-y:auto;flex-shrink:0}
-.ns{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mu);padding:12px 15px 4px}
-.ni{display:flex;align-items:center;gap:8px;padding:7px 15px;cursor:pointer;font-size:12px;font-weight:500;color:var(--mu);border-left:2px solid transparent;transition:all .15s;user-select:none}
+.sidenav{width:200px;min-height:calc(100vh - 50px);background:var(--s1);border-right:1px solid var(--bdr);padding:14px 0 28px;position:sticky;top:50px;height:calc(100vh - 50px);overflow-y:auto;flex-shrink:0}
+
+/* ── L1: 3 top-level entries (Today / Deep Dive / Settings) ── */
+.lv1{display:flex;align-items:center;gap:11px;padding:11px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--txt);border-left:2px solid transparent;transition:all .15s;user-select:none;letter-spacing:.1px}
+.lv1:hover{background:var(--s2);border-left-color:var(--bdr)}
+.lv1.active{color:var(--g);background:rgba(0,229,196,.06);border-left-color:var(--g)}
+.lv1 .lv1-ic{width:18px;height:18px;color:var(--mu);flex-shrink:0;transition:color .15s}
+.lv1.active .lv1-ic{color:var(--g)}
+.lv1:hover .lv1-ic{color:var(--txt)}
+.lv1 .lv1-lb{flex:1}
+.lv1 .lv1-chev{width:14px;height:14px;color:var(--mu);transition:transform .2s;flex-shrink:0}
+.lv1.dd-open .lv1-chev{transform:rotate(90deg)}
+
+/* ── L2: section header inside Deep Dive ── */
+.dd-tree{padding:2px 0 6px;display:none}
+.dd-tree.dd-open{display:block}
+.lv2{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--mu);padding:13px 18px 5px 38px}
+
+/* ── L3: leaf page (was .ni) ── */
+.ni{display:flex;align-items:center;gap:9px;padding:6px 18px 6px 38px;cursor:pointer;font-size:12px;font-weight:500;color:var(--mu);border-left:2px solid transparent;transition:all .15s;user-select:none}
 .ni:hover{color:var(--txt);background:var(--s2);border-left-color:var(--bdr)}
 .ni.active{color:var(--g);background:rgba(0,229,196,.06);border-left-color:var(--g)}
-.nx{font-size:13px;width:15px;text-align:center}
+.nx{font-size:13px;width:15px;text-align:center;flex-shrink:0}
+
+/* ── Mobile hamburger ── */
+.hamb{display:none;background:transparent;border:1px solid var(--bdr);color:var(--txt);width:32px;height:32px;border-radius:7px;cursor:pointer;align-items:center;justify-content:center;padding:0;margin-right:6px}
+.hamb svg{width:16px;height:16px}
+.sidenav-scrim{display:none;position:fixed;inset:50px 0 0 0;background:rgba(7,9,15,.6);backdrop-filter:blur(2px);z-index:90}
+.sidenav-scrim.open{display:block}
 .main{flex:1;padding:20px 24px;overflow-x:hidden;min-width:0}
 .page{display:none}.page.active{display:block;animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
@@ -139,7 +162,15 @@ td:not(.la):not(.la2){text-align:right}
 .formula{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu);background:var(--s2);border-radius:6px;padding:7px 10px;margin-bottom:9px;line-height:1.6}
 .formula em{color:var(--y);font-style:normal}
 
-@media(max-width:960px){.sidenav{display:none}.kr.c4,.kr.c5,.kr.c6{grid-template-columns:1fr 1fr}.gr.g11,.gr.g21,.gr.g111,.gr.g211{grid-template-columns:1fr}.apg{grid-template-columns:1fr}}
+@media(max-width:960px){
+  .hamb{display:inline-flex}
+  /* Sidebar slides in from the left when hamburger is toggled */
+  .sidenav{position:fixed;left:-220px;top:50px;height:calc(100vh - 50px);width:220px;transition:left .22s ease;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .sidenav.open{left:0}
+  .kr.c4,.kr.c5,.kr.c6{grid-template-columns:1fr 1fr}
+  .gr.g11,.gr.g21,.gr.g111,.gr.g211{grid-template-columns:1fr}
+  .apg{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -200,6 +231,9 @@ td:not(.la):not(.la2){text-align:right}
 
 <div class="topbar">
   <div class="brand">
+    <button class="hamb" id="hambBtn" onclick="toggleSidenav()" title="Menu" aria-label="Toggle navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <div class="brand-icon">W</div>
     <div class="brand-name">Wiltek <em>Portal</em></div>
   </div>
@@ -238,34 +272,79 @@ td:not(.la):not(.la2){text-align:right}
 </div>
 
 <div class="layout">
+<div class="sidenav-scrim" id="sidenavScrim" onclick="toggleSidenav(false)"></div>
+<!--
+  Wave 1 Step 1 — 3-level menu (Today / Deep Dive / Settings).
+  L1 entries are always visible. Deep Dive is collapsed by default and holds
+  the original 8-section × 18-page tree. updateNav() (in JS below) prunes
+  any L3 entry the role can't access via WP_PERMS.canAccess(); empty L2
+  sections collapse so the tree stays tight.
+
+  Lucide icons inlined (home / bar-chart-3 / settings + chevron-right) — no
+  CDN, no emoji, ~24×24 viewBox, currentColor stroke.
+-->
 <nav class="sidenav" id="sidenav">
-  <div class="ns" id="nav-s1"></div>
-  <div class="ni active" onclick="nav('health')"><span class="nx">🏥</span><span id="nav-health"></span></div>
-  <div class="ni" onclick="nav('pl')"><span class="nx">📋</span><span id="nav-pl"></span></div>
-  <div class="ni" onclick="nav('cashflow')"><span class="nx">💧</span><span id="nav-cf"></span></div>
-  <div class="ns" id="nav-s2"></div>
-  <div class="ni" onclick="nav('gp')"><span class="nx">📈</span><span id="nav-gp"></span></div>
-  <div class="ni" onclick="nav('branches')"><span class="nx">🏪</span><span id="nav-br"></span></div>
-  <div class="ns" id="nav-s3"></div>
-  <div class="ni" onclick="nav('inventory')"><span class="nx">📦</span><span id="nav-inv"></span></div>
-  <div class="ni" onclick="nav('expenses')"><span class="nx">📊</span><span id="nav-exp"></span></div>
-  <div class="ns" id="nav-s4"></div>
-  <div class="ni" onclick="nav('action')"><span class="nx">⚡</span><span id="nav-act"></span></div>
-  <div class="ns" id="nav-s5"></div>
-  <div class="ni" onclick="nav('balancesheet')"><span class="nx">🏦</span><span id="nav-bs"></span></div>
-  <div class="ni" onclick="nav('customers')"><span class="nx">👥</span><span id="nav-cust"></span></div>
-  <div class="ns" id="nav-s6"></div>
-  <div class="ni" onclick="nav('branchhub')"><span class="nx">🗂️</span><span id="nav-hub"></span></div>
-  <div class="ni" onclick="nav('branchtoday')"><span class="nx">📅</span><span id="nav-bt"></span></div>
-  <div class="ni" onclick="nav('quicklinks')"><span class="nx">🔗</span><span id="nav-links"></span></div>
-  <div class="ns" id="nav-s7"></div>
-  <div class="ni" onclick="nav('bistrat')"><span class="nx">🎯</span><span id="nav-bistrat"></span></div>
-  <div class="ni" onclick="nav('biwh')"><span class="nx">🏭</span><span id="nav-biwh"></span></div>
-  <div class="ni" onclick="nav('inv360')"><span class="nx">🔬</span><span id="nav-inv360"></span></div>
-  <div class="ns" id="nav-s8"></div>
-  <div class="ni" onclick="nav('gtd')"><span class="nx">✅</span><span id="nav-gtd"></span></div>
-  <div class="ni" onclick="nav('proposals')"><span class="nx">📝</span><span id="nav-prop"></span></div>
-  <div class="ni" onclick="nav('valuation')"><span class="nx">💎</span><span id="nav-val"></span></div>
+  <!-- L1: Today (placeholder until Wave 1 Step 2 wires real Today landings) -->
+  <div class="lv1" id="nav-l1-today" onclick="nav('today')">
+    <svg class="lv1-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9.5L12 3l9 6.5V21a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1V9.5z"/>
+    </svg>
+    <span class="lv1-lb" id="nav-today">Today</span>
+  </div>
+
+  <!-- L1: Deep Dive (toggle) -->
+  <div class="lv1" id="nav-l1-dd" onclick="toggleDeepDive()">
+    <svg class="lv1-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="20" x2="21" y2="20"/>
+      <line x1="6" y1="20" x2="6" y2="11"/>
+      <line x1="12" y1="20" x2="12" y2="6"/>
+      <line x1="18" y1="20" x2="18" y2="14"/>
+    </svg>
+    <span class="lv1-lb" id="nav-deepdive">Deep Dive</span>
+    <svg class="lv1-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  </div>
+
+  <!-- L2 + L3: original 8 sections × 18 pages, indented inside Deep Dive -->
+  <div class="dd-tree" id="dd-tree">
+    <div class="lv2" id="nav-s1"></div>
+    <div class="ni" onclick="nav('health')"><span class="nx">🏥</span><span id="nav-health"></span></div>
+    <div class="ni" onclick="nav('pl')"><span class="nx">📋</span><span id="nav-pl"></span></div>
+    <div class="ni" onclick="nav('cashflow')"><span class="nx">💧</span><span id="nav-cf"></span></div>
+    <div class="lv2" id="nav-s2"></div>
+    <div class="ni" onclick="nav('gp')"><span class="nx">📈</span><span id="nav-gp"></span></div>
+    <div class="ni" onclick="nav('branches')"><span class="nx">🏪</span><span id="nav-br"></span></div>
+    <div class="lv2" id="nav-s3"></div>
+    <div class="ni" onclick="nav('inventory')"><span class="nx">📦</span><span id="nav-inv"></span></div>
+    <div class="ni" onclick="nav('expenses')"><span class="nx">📊</span><span id="nav-exp"></span></div>
+    <div class="lv2" id="nav-s4"></div>
+    <div class="ni" onclick="nav('action')"><span class="nx">⚡</span><span id="nav-act"></span></div>
+    <div class="lv2" id="nav-s5"></div>
+    <div class="ni" onclick="nav('balancesheet')"><span class="nx">🏦</span><span id="nav-bs"></span></div>
+    <div class="ni" onclick="nav('customers')"><span class="nx">👥</span><span id="nav-cust"></span></div>
+    <div class="lv2" id="nav-s6"></div>
+    <div class="ni" onclick="nav('branchhub')"><span class="nx">🗂️</span><span id="nav-hub"></span></div>
+    <div class="ni" onclick="nav('branchtoday')"><span class="nx">📅</span><span id="nav-bt"></span></div>
+    <div class="ni" onclick="nav('quicklinks')"><span class="nx">🔗</span><span id="nav-links"></span></div>
+    <div class="lv2" id="nav-s7"></div>
+    <div class="ni" onclick="nav('bistrat')"><span class="nx">🎯</span><span id="nav-bistrat"></span></div>
+    <div class="ni" onclick="nav('biwh')"><span class="nx">🏭</span><span id="nav-biwh"></span></div>
+    <div class="ni" onclick="nav('inv360')"><span class="nx">🔬</span><span id="nav-inv360"></span></div>
+    <div class="lv2" id="nav-s8"></div>
+    <div class="ni" onclick="nav('gtd')"><span class="nx">✅</span><span id="nav-gtd"></span></div>
+    <div class="ni" onclick="nav('proposals')"><span class="nx">📝</span><span id="nav-prop"></span></div>
+    <div class="ni" onclick="nav('valuation')"><span class="nx">💎</span><span id="nav-val"></span></div>
+  </div>
+
+  <!-- L1: Settings (admin tools — owner only via WP_PERMS) -->
+  <div class="lv1" id="nav-l1-settings" onclick="nav('settings')">
+    <svg class="lv1-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+    <span class="lv1-lb" id="nav-settings">Settings</span>
+  </div>
 </nav>
 
 <main class="main">
@@ -829,6 +908,40 @@ td:not(.la):not(.la2){text-align:right}
   </div>
 </div>
 
+<!-- ══════════ TODAY (Wave 1 Step 1 placeholder) ══════════
+     Wave 1 Step 2 will hang real Owner-Today / Branch-Today / Finance-Today
+     widgets here. For now this is intentionally a single-line landing so the
+     menu structure ships ahead of the content.
+-->
+<div class="page" id="p-today">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+    <div>
+      <div class="ph" id="td-ph"></div>
+      <div class="ps" id="td-ps"></div>
+    </div>
+  </div>
+  <div class="ins info" style="text-align:center;padding:48px 24px;">
+    <div style="font-size:32px;margin-bottom:8px;">🏠</div>
+    <div id="td-msg" style="font-size:14px;line-height:1.7;color:var(--mu);"></div>
+  </div>
+</div>
+
+<!-- ══════════ SETTINGS (Wave 1 Step 1) ══════════
+     Surfaces existing admin tools (User Management, Refresh, JSON snapshot).
+     Visibility is gated by WP_PERMS — non-owners see a "no admin tools"
+     placeholder. The original topbar shortcuts remain, this page is just a
+     dedicated landing for the same actions.
+-->
+<div class="page" id="p-settings">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+    <div>
+      <div class="ph" id="st-ph"></div>
+      <div class="ps" id="st-ps"></div>
+    </div>
+  </div>
+  <div id="st-content"></div>
+</div>
+
 </main>
 </div>
 
@@ -1091,8 +1204,7 @@ function updateNav(){
   const role = currentUser && currentUser.role;
   if (!role) return;
 
-  // Authoritative allow-list: permissions.js → WP_PERMS.rolePages.
-  // canAccess() already consults WP_PERMS via getPerms(), so it's the same check.
+  // L3 leaf prune (Deep Dive sub-tree) — same allow-list as before via WP_PERMS.
   side.querySelectorAll('.ni').forEach(ni => {
     const oc = ni.getAttribute('onclick') || '';
     const m  = oc.match(/nav\('(\w+)'\)/);
@@ -1100,21 +1212,41 @@ function updateNav(){
     if (!canAccess(m[1])) ni.remove();
   });
 
-  // Strip section headers (.ns) whose entire section is now empty.
-  side.querySelectorAll('.ns').forEach(ns => {
+  // L2 section header prune — drop any header whose entire section is now empty.
+  // Walk forward inside the dd-tree only (L1 entries are not headers).
+  side.querySelectorAll('.lv2').forEach(ns => {
     let sib = ns.nextElementSibling;
     let anyLeft = false;
-    while (sib && !sib.classList.contains('ns')) {
+    while (sib && !sib.classList.contains('lv2')) {
       if (sib.classList.contains('ni')) { anyLeft = true; break; }
       sib = sib.nextElementSibling;
     }
     if (!anyLeft) ns.remove();
   });
 
-  // Navigate to role's default landing (SPEC §5.1 via WP_PERMS).
-  const landing = (window.WP_PERMS && WP_PERMS.getLandingPage(role))
-               || (userPerms.pages && userPerms.pages[0])
-               || 'health';
+  // L1 Deep Dive entry — hide entirely if the role can see zero leaves.
+  const ddEntry = document.getElementById('nav-l1-dd');
+  const ddTree  = document.getElementById('dd-tree');
+  const anyDD   = ddTree && ddTree.querySelector('.ni');
+  if (ddEntry && !anyDD) ddEntry.style.display = 'none';
+  if (ddTree  && !anyDD) ddTree.style.display  = 'none';
+
+  // L1 Settings — hide unless the role has access via WP_PERMS.
+  const stEntry = document.getElementById('nav-l1-settings');
+  if (stEntry && !canAccess('settings')) stEntry.style.display = 'none';
+
+  // L1 Today is universal (every role can see it). Sanity check anyway.
+  const tdEntry = document.getElementById('nav-l1-today');
+  if (tdEntry && !canAccess('today')) tdEntry.style.display = 'none';
+
+  // Default landing — Wave 1 Step 1: every role lands on Today first.
+  // If a role somehow can't access 'today', fall through to WP_PERMS landing.
+  let landing = 'today';
+  if (!canAccess(landing)) {
+    landing = (window.WP_PERMS && WP_PERMS.getLandingPage(role))
+           || (userPerms.pages && userPerms.pages[0])
+           || 'health';
+  }
   if (canAccess(landing)) nav(landing);
   else {
     const first = userPerms.pages && userPerms.pages[0];
@@ -1505,7 +1637,11 @@ function mLabel(code){
 }
 
 const T = {
-  // Nav
+  // Nav — L1 (Wave 1 Step 1)
+  nav_today:    {en:'Today',     zh:'今日'},
+  nav_deepdive: {en:'Deep Dive', zh:'深入分析'},
+  nav_settings: {en:'Settings',  zh:'设置'},
+  // Nav — L2 section headers (existing 8 sections, kept verbatim)
   nav_s1:     {en:'Overview',zh:'总览'},
   nav_health: {en:'Financial Health',zh:'财务健康'},
   nav_pl:     {en:'P&L Statement',zh:'损益表'},
@@ -1551,12 +1687,62 @@ function setBrView(v){
   renderBranches(selMonth, M15.indexOf(selMonth));
 }
 
+// Page IDs that live at L1 (top-level) instead of inside Deep Dive.
+const L1_PAGES = new Set(['today','settings']);
+
 function nav(id){
   window.scrollTo(0,0);
+  // Hide all pages, clear all active flags (L1 + L3).
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
-  document.getElementById('p-'+id).classList.add('active');
-  document.querySelectorAll('.ni').forEach(n=>{if(n.getAttribute('onclick')===`nav('${id}')`)n.classList.add('active')});
+  document.querySelectorAll('.lv1').forEach(n=>n.classList.remove('active'));
+
+  const pg = document.getElementById('p-'+id);
+  if (pg) pg.classList.add('active');
+
+  if (L1_PAGES.has(id)) {
+    // Today / Settings — light up the matching L1 entry.
+    const l1 = document.getElementById('nav-l1-'+(id==='today'?'today':'settings'));
+    if (l1) l1.classList.add('active');
+    // Auto-collapse Deep Dive when leaving it (keeps the menu tight).
+    setDeepDive(false);
+  } else {
+    // L3 leaf — light up the matching .ni inside Deep Dive AND the L1 toggle,
+    // then auto-expand Deep Dive so the user sees where they are.
+    document.querySelectorAll('.ni').forEach(n=>{
+      if (n.getAttribute('onclick') === `nav('${id}')`) n.classList.add('active');
+    });
+    const dd = document.getElementById('nav-l1-dd');
+    if (dd) dd.classList.add('active');
+    setDeepDive(true);
+  }
+
+  // On mobile, close the slide-in drawer after a pick.
+  if (window.matchMedia && window.matchMedia('(max-width:960px)').matches) {
+    toggleSidenav(false);
+  }
+}
+
+// Deep Dive open/closed state — open === sub-tree visible.
+function setDeepDive(open){
+  const tree = document.getElementById('dd-tree');
+  const head = document.getElementById('nav-l1-dd');
+  if (tree) tree.classList.toggle('dd-open', !!open);
+  if (head) head.classList.toggle('dd-open', !!open);
+}
+function toggleDeepDive(){
+  const tree = document.getElementById('dd-tree');
+  setDeepDive(!(tree && tree.classList.contains('dd-open')));
+}
+
+// Mobile slide-in drawer for the sidebar. force=true/false to set explicitly.
+function toggleSidenav(force){
+  const sn  = document.getElementById('sidenav');
+  const scr = document.getElementById('sidenavScrim');
+  if (!sn) return;
+  const want = (typeof force === 'boolean') ? force : !sn.classList.contains('open');
+  sn.classList.toggle('open', want);
+  if (scr) scr.classList.toggle('open', want);
 }
 
 // ═══════════════════════════════
@@ -1585,8 +1771,12 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
   const m=selMonth, prev=prevM(m), i=idx(m);
   document.getElementById('pb').textContent='📅 '+mLabel(m);
 
-  // Nav labels
-  ['s1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
+  // Nav labels (L1 + L2 headers + L3 leaves).
+  // L1: today / deepdive / settings.
+  // L2: s1..s8 section headers (inside Deep Dive).
+  // L3: original 18 page leaves.
+  ['today','deepdive','settings',
+   's1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
     const el=document.getElementById('nav-'+k);
     if(el) el.textContent=t('nav_'+k);
   });
@@ -1611,7 +1801,84 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
     ()=>renderGTD(),
     ()=>renderProposals(),
     ()=>renderValuation(),
+    ()=>renderToday(),
+    ()=>renderSettings(),
   ].forEach(fn=>{try{fn();}catch(e){console.error(fn.toString().slice(0,40),e);}});
+}
+
+// ─────────── TODAY (Wave 1 Step 1 placeholder) ───────────
+// Intentionally a single line. Wave 1 Step 2 fills this with the per-role
+// Today landing (Owner Today / Branch Today / Finance Today).
+function renderToday(){
+  const en = lang === 'en';
+  txt(document.getElementById('td-ph'),
+      '🏠 Today', '🏠 今日');
+  txt(document.getElementById('td-ps'),
+      'Your daily landing — Wave 1 Step 2 will plug per-role widgets in here.',
+      '日常落地页 — 波 1 步骤 2 将按角色装入对应模块。');
+  txt(document.getElementById('td-msg'),
+      'Today landing — <strong style="color:var(--g)">Wave 1 Step 2</strong> 在路上。',
+      'Today 落地页 — <strong style="color:var(--g)">波 1 步骤 2</strong> 在路上。');
+}
+
+// ─────────── SETTINGS (Wave 1 Step 1) ───────────
+// Owner-only landing surfacing existing admin tools (User Management, Refresh,
+// Edit-mode JSON snapshot). Non-owners shouldn't see this entry at all (the
+// L1 sidebar item is hidden by updateNav()), but render a polite placeholder
+// just in case the page is hit directly.
+function renderSettings(){
+  const en   = lang === 'en';
+  const role = currentUser && currentUser.role;
+  txt(document.getElementById('st-ph'),
+      '⚙️ Settings', '⚙️ 设置');
+  txt(document.getElementById('st-ps'),
+      'Admin tools — user management, data refresh, snapshot export',
+      '管理员工具 — 用户、数据刷新、快照导出');
+
+  const host = document.getElementById('st-content');
+  if (!host) return;
+
+  if (role !== 'owner') {
+    host.innerHTML = `<div class="ins info" style="padding:32px;text-align:center;">
+      <div style="font-size:24px;margin-bottom:8px;">🔒</div>
+      <div style="color:var(--mu);">${en
+        ? 'Settings are owner-only. Ask Jym if you need access.'
+        : '设置仅 owner 可见。需要请联系 Jym。'}</div>
+    </div>`;
+    return;
+  }
+
+  // Owner view — three cards: Users / Refresh / Snapshot. Each reuses the
+  // existing topbar handler so we don't fork business logic.
+  host.innerHTML = `
+    <div class="gr g111">
+      <div class="card">
+        <div class="ch">${en?'👥 User Management':'👥 用户管理'}</div>
+        <div class="cs">${en?'Add, edit or remove portal users.':'添加、修改或删除门户用户。'}</div>
+        <button onclick="openUserMgmt()" style="background:rgba(184,124,255,.12);border:1px solid rgba(184,124,255,.3);color:#b87cff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">
+          ${en?'Open':'打开'} →
+        </button>
+      </div>
+      <div class="card">
+        <div class="ch">${en?'🔄 Refresh from Google Drive':'🔄 从 Google Drive 同步'}</div>
+        <div class="cs">${en?'Pull the latest sheet snapshot via Apps Script.':'通过 Apps Script 拉取最新数据。'}</div>
+        <button onclick="fetchFromGoogleDrive()" style="background:rgba(0,229,196,.12);border:1px solid rgba(0,229,196,.3);color:#00e5c4;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">
+          ${en?'Sync now':'立即同步'} →
+        </button>
+      </div>
+      <div class="card">
+        <div class="ch">${en?'💾 Snapshot Export':'💾 数据快照导出'}</div>
+        <div class="cs">${en?'Download a JSON of the current month\'s D / BR data.':'导出当前月份的 D / BR 数据 JSON。'}</div>
+        <button onclick="saveEdits()" style="background:rgba(245,200,66,.12);border:1px solid rgba(245,200,66,.3);color:#f5c842;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">
+          ${en?'Download JSON':'下载 JSON'} →
+        </button>
+      </div>
+    </div>
+    <div class="ins info" style="margin-top:14px;font-size:12px;">
+      ${en
+        ? '💡 The same tools live in the topbar — this page just gives them a dedicated home.'
+        : '💡 这些工具同样可在顶栏访问 — 本页只是给它们一个专门的入口。'}
+    </div>`;
 }
 
 // ─────────── CEO OVERVIEW ───────────
@@ -3411,8 +3678,8 @@ function applyRoleCSS(){
 // SPEC §5.1 — 12 roles
 const ALL_ROLES=['owner','finance','bi_consultant','warehouse','hr','marketing','w01_mgr','w02_mgr','w03_mgr','w05_mgr','w07_mgr','w11_mgr'];
 const BRANCHES=['W01','W02','W03','W05','W07','W11'];
-const PAGE_IDS=['health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation'];
-const PAGE_LABELS={health:'Exec Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',branchtoday:'Branch Today',quicklinks:'Quick Links',bistrat:'BI Strategy',biwh:'BI Warehouse',inv360:'Inventory 360',gtd:'GTD Tasks',proposals:'Proposals',valuation:'Valuation'};
+const PAGE_IDS=['today','health','pl','cashflow','gp','branches','inventory','expenses','action','balancesheet','customers','branchhub','branchtoday','quicklinks','bistrat','biwh','inv360','gtd','proposals','valuation','settings'];
+const PAGE_LABELS={today:'Today',health:'Exec Overview',pl:'P&L',cashflow:'Cash Flow',gp:'Gross Profit',branches:'Branch P&L',inventory:'Inventory',expenses:'Expenses',action:'Action Plan',balancesheet:'Balance Sheet',customers:'Customers',branchhub:'Branch Hub',branchtoday:'Branch Today',quicklinks:'Quick Links',bistrat:'BI Strategy',biwh:'BI Warehouse',inv360:'Inventory 360',gtd:'GTD Tasks',proposals:'Proposals',valuation:'Valuation',settings:'Settings'};
 
 function openUserMgmt(){
   if(currentUser?.role!=='owner') return;
