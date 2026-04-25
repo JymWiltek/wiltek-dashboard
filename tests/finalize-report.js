@@ -71,9 +71,13 @@ function fixedBugCommits(){
     const i = l.indexOf('\t');
     return { hash: l.slice(0, i), subject: l.slice(i+1) };
   });
-  // Find anchor: first "Wave 1 Step 3" commit (oldest end of the list,
-  // since git log is newest-first the LAST match is the anchor).
-  const anchorIdx = lines.findIndex(c => /wave\s*1\s*step\s*3/i.test(c.subject));
+  // Find anchor: oldest "Wave 1 Step 3" commit. git log is newest-first,
+  // so the LAST matching index is the anchor; everything from HEAD down
+  // to it is in scope.
+  let anchorIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--){
+    if (/wave\s*1\s*step\s*3/i.test(lines[i].subject)){ anchorIdx = i; break; }
+  }
   const since = anchorIdx >= 0 ? lines.slice(0, anchorIdx + 1) : lines;
   return since.filter(c =>
     /\b(fix|hotfix|harden|guard|repair|patch)\b/i.test(c.subject) ||
