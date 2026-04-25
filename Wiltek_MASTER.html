@@ -162,6 +162,52 @@ td:not(.la):not(.la2){text-align:right}
 .formula{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu);background:var(--s2);border-radius:6px;padding:7px 10px;margin-bottom:9px;line-height:1.6}
 .formula em{color:var(--y);font-style:normal}
 
+/* TODAY — Wave 1 Step 2 (Owner landing) */
+.td-sec-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--mu);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+.td-sec-lbl::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.td-lever-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+.td-lever{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:16px 18px;border-left:3px solid var(--r);transition:border-color .2s,transform .15s}
+.td-lever:hover{transform:translateY(-1px)}
+.td-lever.r{border-left-color:var(--r)}
+.td-lever.y{border-left-color:var(--y)}
+.td-lever.b{border-left-color:var(--b)}
+.td-lever-rule{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--mu);margin-bottom:6px;font-family:'JetBrains Mono',monospace}
+.td-lever-title{font-size:15px;font-weight:700;margin-bottom:6px;line-height:1.35;color:var(--txt)}
+.td-lever-desc{font-size:12px;color:var(--mu);line-height:1.55;margin-bottom:12px}
+.td-lever-desc strong{color:var(--txt)}
+.td-lever-btns{display:flex;gap:6px;flex-wrap:wrap}
+.td-btn{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.6px;padding:5px 11px;border-radius:99px;cursor:pointer;border:1px solid;transition:transform .15s,background .15s;background:transparent}
+.td-btn:hover{transform:translateY(-1px)}
+.td-btn.act{color:var(--g);border-color:rgba(0,229,196,.4);background:rgba(0,229,196,.08)}
+.td-btn.act:hover{background:rgba(0,229,196,.18)}
+.td-btn.obs{color:var(--mu);border-color:var(--bdr)}
+.td-btn.obs:hover{background:var(--s2)}
+.td-btn.prm{color:var(--b);border-color:rgba(77,159,255,.35);background:rgba(77,159,255,.06)}
+.td-btn.prm:hover{background:rgba(77,159,255,.16)}
+.td-amp{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:18px 20px;margin-bottom:8px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.td-amp-num{font-family:'JetBrains Mono',monospace;font-size:46px;font-weight:700;line-height:1;color:var(--y);letter-spacing:-1px}
+.td-amp-num.dn{color:var(--r)}
+.td-amp-unit{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:1.2px;margin-top:6px}
+.td-amp-r{display:flex;flex-direction:column;gap:8px;min-width:0}
+.td-amp-h{font-size:13px;font-weight:700;color:var(--txt)}
+.td-amp-s{font-size:11px;color:var(--mu);font-family:'JetBrains Mono',monospace}
+.td-pbar{position:relative;height:10px;background:var(--s3);border-radius:5px;overflow:hidden}
+.td-pbar-fill{height:100%;background:linear-gradient(90deg,var(--g),rgba(0,229,196,.6));border-radius:5px;transition:width .4s ease}
+.td-pbar-lbl{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu);margin-top:4px}
+.td-stores{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:8px}
+.td-store{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:13px 14px;cursor:pointer;transition:border-color .2s,transform .15s;text-align:left}
+.td-store:hover{transform:translateY(-2px);border-color:rgba(0,229,196,.35)}
+.td-store-code{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--mu);letter-spacing:1px}
+.td-store-name{font-size:10px;color:var(--mu);margin-top:1px;margin-bottom:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-store-rev{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;color:var(--txt);letter-spacing:-.3px;line-height:1}
+.td-store-trend{display:flex;align-items:center;gap:5px;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px}
+.td-store-trend.up{color:var(--g)}.td-store-trend.dn{color:var(--r)}.td-store-trend.fl{color:var(--mu)}
+.td-store-arrow{font-size:13px;line-height:1}
+.td-skel{background:linear-gradient(90deg,var(--s2) 0%,var(--s3) 50%,var(--s2) 100%);background-size:200% 100%;animation:tdshim 1.4s infinite;border-radius:4px}
+@keyframes tdshim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.td-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid rgba(0,229,196,.4);color:var(--g);padding:10px 18px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace;z-index:9000;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s}
+.td-toast.show{opacity:1}
+
 @media(max-width:960px){
   .hamb{display:inline-flex}
   /* Sidebar slides in from the left when hamburger is toggled */
@@ -170,6 +216,10 @@ td:not(.la):not(.la2){text-align:right}
   .kr.c4,.kr.c5,.kr.c6{grid-template-columns:1fr 1fr}
   .gr.g11,.gr.g21,.gr.g111,.gr.g211{grid-template-columns:1fr}
   .apg{grid-template-columns:1fr}
+  .td-lever-grid{grid-template-columns:1fr}
+  .td-stores{grid-template-columns:repeat(3,1fr)}
+  .td-amp{grid-template-columns:1fr}
+  .td-amp-num{font-size:38px}
 }
 </style>
 </head>
@@ -908,23 +958,52 @@ td:not(.la):not(.la2){text-align:right}
   </div>
 </div>
 
-<!-- ══════════ TODAY (Wave 1 Step 1 placeholder) ══════════
-     Wave 1 Step 2 will hang real Owner-Today / Branch-Today / Finance-Today
-     widgets here. For now this is intentionally a single-line landing so the
-     menu structure ships ahead of the content.
+<!-- ══════════ TODAY (Wave 1 Step 2 — Owner landing) ══════════
+     Three sections, computed from in-memory BR / BR_YTD / D data:
+       A. This Week's 2 Levers — top 2 priority issues from a 5-rule pipeline
+          (GP% drop / revenue drop / race walk-in drop / conversion gap /
+          basket-size drop). Each lever ships [Act] [Observe] [Promote].
+       B. Ampang Countdown — days until 2026-05-01 + a static 67% transfer
+          progress bar (real W02 inventory hookup is Phase 4).
+       C. 6 Stores at a Glance — W01..W11 (no W10/warehouse), each card is
+          revenue + MoM trend arrow + click-to-Branch-P&L jump.
+
+     Falls back gracefully to "—" when a metric is unavailable, never throws.
 -->
 <div class="page" id="p-today">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
     <div>
       <div class="ph" id="td-ph"></div>
       <div class="ps" id="td-ps"></div>
     </div>
   </div>
-  <div class="ins info" style="text-align:center;padding:48px 24px;">
-    <div style="font-size:32px;margin-bottom:8px;">🏠</div>
-    <div id="td-msg" style="font-size:14px;line-height:1.7;color:var(--mu);"></div>
+
+  <!-- Section A — This Week's 2 Levers -->
+  <div class="td-sec-lbl" id="td-lbl-levers"></div>
+  <div id="td-levers"></div>
+
+  <!-- Section B — Ampang Countdown -->
+  <div class="td-sec-lbl" id="td-lbl-amp"></div>
+  <div class="td-amp" id="td-amp">
+    <div style="text-align:center;">
+      <div class="td-amp-num" id="td-amp-num">—</div>
+      <div class="td-amp-unit" id="td-amp-unit"></div>
+    </div>
+    <div class="td-amp-r">
+      <div class="td-amp-h" id="td-amp-h"></div>
+      <div class="td-amp-s" id="td-amp-s"></div>
+      <div class="td-pbar"><div class="td-pbar-fill" id="td-amp-fill" style="width:0%"></div></div>
+      <div class="td-pbar-lbl"><span id="td-amp-pbl"></span><span id="td-amp-pbr">67%</span></div>
+    </div>
   </div>
+
+  <!-- Section C — 6 Stores at a Glance -->
+  <div class="td-sec-lbl" id="td-lbl-stores"></div>
+  <div class="td-stores" id="td-stores"></div>
 </div>
+
+<!-- One-shot toast (Promote / Act / Observe feedback) -->
+<div class="td-toast" id="td-toast"></div>
 
 <!-- ══════════ SETTINGS (Wave 1 Step 1) ══════════
      Surfaces existing admin tools (User Management, Refresh, JSON snapshot).
@@ -1806,19 +1885,278 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
   ].forEach(fn=>{try{fn();}catch(e){console.error(fn.toString().slice(0,40),e);}});
 }
 
-// ─────────── TODAY (Wave 1 Step 1 placeholder) ───────────
-// Intentionally a single line. Wave 1 Step 2 fills this with the per-role
-// Today landing (Owner Today / Branch Today / Finance Today).
+// ─────────── TODAY (Wave 1 Step 2 — Owner landing) ───────────
+// Three sections wired to live in-memory data (BR / BR_YTD / D):
+//   A. This Week's 2 Levers (5-rule pipeline, top 2 by priority)
+//   B. Ampang Countdown to 2026-05-01 (with 67% static progress bar)
+//   C. 6 Stores at a Glance (W01..W11, monthly revenue + MoM arrow)
+//
+// All data is read from the same in-memory tables Branch P&L uses, so this
+// page reflects the latest snapshot without any extra fetch.
+
+// ── 14-day "Observe" suppression list (per-browser localStorage) ──
+const TD_OBS_KEY = 'wp_today_obs_v1';
+function _tdLoadObs(){
+  try{ const raw = localStorage.getItem(TD_OBS_KEY); if(!raw) return {};
+       const o = JSON.parse(raw); const now = Date.now(); const out = {};
+       Object.keys(o).forEach(k=>{ if(typeof o[k]==='number' && o[k]>now) out[k]=o[k]; });
+       return out;
+  }catch(e){ return {}; }
+}
+function _tdSaveObs(o){ try{ localStorage.setItem(TD_OBS_KEY, JSON.stringify(o)); }catch(e){} }
+function _tdIsObserved(id){ return !!_tdLoadObs()[id]; }
+
+// ── Compute the "Top 2 Levers" candidate list, in priority order ──
+// Rules (SPEC §Wave 1 Step 2):
+//   1) GP% drop ≥ 3pp MoM
+//   2) Revenue drop ≥ 10% MoM
+//   3) Race walk-in drop ≥ 20% MoM   (floatation — currently unavailable)
+//   4) Conversion < company avg − 10pp (Floatation — currently unavailable)
+//   5) Basket size drop ≥ 10% MoM    (currently unavailable)
+// Returns up to 2 hits, never fabricates triggers.
+function _tdComputeLevers(){
+  const out = [];
+  const BKEYS = ['W01','W02','W03','W05','W07','W11'];
+  // Latest two periods for which BR has full data (Mar26 vs Feb26).
+  const cur = 'mar', prev = 'feb';
+  const obs = _tdLoadObs();
+
+  // Rule 1 — GP% MoM drop ≥ 3pp
+  BKEYS.forEach(bk=>{
+    const c = BR[bk] && BR[bk][cur], p = BR[bk] && BR[bk][prev];
+    if(!c || !p || !c.ns || !p.ns) return;
+    const gpC = (typeof c.gp_pct==='number') ? c.gp_pct : (c.gp/c.ns);
+    const gpP = (typeof p.gp_pct==='number') ? p.gp_pct : (p.gp/p.ns);
+    const dPP = (gpC - gpP) * 100; // pp
+    if(dPP <= -3){
+      out.push({
+        id:'r1-'+bk, rule:1, priority:1, sev:'r', branch:bk,
+        title_en:`${bk} GP% dropped ${Math.abs(dPP).toFixed(1)}pp MoM`,
+        title_zh:`${bk} 毛利率环比下滑 ${Math.abs(dPP).toFixed(1)}pp`,
+        desc_en:`${BR[bk].name_en} — Mar GP% <strong>${(gpC*100).toFixed(1)}%</strong> vs Feb <strong>${(gpP*100).toFixed(1)}%</strong>. Pricing or COGS shift?`,
+        desc_zh:`${BR[bk].name_zh} — 3 月毛利率 <strong>${(gpC*100).toFixed(1)}%</strong>，2 月 <strong>${(gpP*100).toFixed(1)}%</strong>。售价或进货成本异动？`,
+        gotoBranch:bk,
+      });
+    }
+  });
+
+  // Rule 2 — Revenue MoM drop ≥ 10%
+  BKEYS.forEach(bk=>{
+    const c = BR[bk] && BR[bk][cur], p = BR[bk] && BR[bk][prev];
+    if(!c || !p || !p.ns) return;
+    const dPct = ((c.ns - p.ns) / p.ns) * 100;
+    if(dPct <= -10){
+      out.push({
+        id:'r2-'+bk, rule:2, priority:2, sev:'r', branch:bk,
+        title_en:`${bk} revenue down ${Math.abs(dPct).toFixed(0)}% MoM`,
+        title_zh:`${bk} 营收环比下滑 ${Math.abs(dPct).toFixed(0)}%`,
+        desc_en:`${BR[bk].name_en} — Mar net sales <strong>${rm(c.ns)}</strong> vs Feb <strong>${rm(p.ns)}</strong>. Walk-in or promo gap?`,
+        desc_zh:`${BR[bk].name_zh} — 3 月净销售 <strong>${rm(c.ns)}</strong>，2 月 <strong>${rm(p.ns)}</strong>。客流或促销缺口？`,
+        gotoBranch:bk,
+      });
+    }
+  });
+
+  // Rules 3–5 require Floatation race + transaction data we don't currently
+  // hold in-memory. Skip silently rather than fabricate — the 5-rule
+  // pipeline is preserved for Phase 4.
+
+  // Filter observed, sort by priority then severity of drop (rule order),
+  // return top 2.
+  const filtered = out.filter(L => !obs[L.id]);
+  filtered.sort((a,b)=> a.priority - b.priority);
+  return filtered.slice(0,2);
+}
+
+// ── Render Section A — This Week's 2 Levers ──
+function _tdRenderLevers(){
+  const en = lang === 'en';
+  const host = document.getElementById('td-levers');
+  if(!host) return;
+  const hits = _tdComputeLevers();
+
+  if(hits.length === 0){
+    host.innerHTML = `
+      <div class="ins ok" style="margin:0 0 8px;text-align:center;padding:22px;">
+        <strong>${en?'No major anomalies this week':'本周暂无重大异常'}</strong><br>
+        <span style="font-size:12px;color:var(--mu);">${en?'All 6 stores running smoothly. Routine review only.':'6 店运营平稳，建议常规巡店。'}</span>
+      </div>`;
+    return;
+  }
+
+  host.innerHTML = `<div class="td-lever-grid">${hits.map(h=>{
+    const title = en ? h.title_en : h.title_zh;
+    const desc  = en ? h.desc_en  : h.desc_zh;
+    const ruleLbl = en ? `RULE ${h.rule}` : `规则 ${h.rule}`;
+    return `
+      <div class="td-lever ${h.sev}" data-id="${h.id}">
+        <div class="td-lever-rule">${ruleLbl} · ${h.branch}</div>
+        <div class="td-lever-title">${title}</div>
+        <div class="td-lever-desc">${desc}</div>
+        <div class="td-lever-btns">
+          <button class="td-btn act" onclick="tdLeverAct('${h.id}','${h.gotoBranch||''}')">${en?'▸ Act':'▸ 处理'}</button>
+          <button class="td-btn obs" onclick="tdLeverObserve('${h.id}')">${en?'◷ Observe (14d)':'◷ 观察 14 天'}</button>
+          <button class="td-btn prm" onclick="tdLeverPromote('${h.id}')">${en?'⇪ Promote':'⇪ 推送'}</button>
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+// ── Render Section B — Ampang Countdown ──
+function _tdRenderAmpang(){
+  const en   = lang === 'en';
+  const TARGET = new Date('2026-05-01T00:00:00');
+  const now  = new Date();
+  const ms   = TARGET.getTime() - now.getTime();
+  const days = Math.max(0, Math.ceil(ms / 86400000));
+
+  const numEl  = document.getElementById('td-amp-num');
+  const unitEl = document.getElementById('td-amp-unit');
+  const hEl    = document.getElementById('td-amp-h');
+  const sEl    = document.getElementById('td-amp-s');
+  const fillEl = document.getElementById('td-amp-fill');
+  const pblEl  = document.getElementById('td-amp-pbl');
+  const pbrEl  = document.getElementById('td-amp-pbr');
+
+  if(numEl){
+    numEl.textContent = days;
+    numEl.className = 'td-amp-num' + (days <= 7 ? ' dn' : '');
+  }
+  if(unitEl) unitEl.textContent = en ? (days === 1 ? 'DAY LEFT' : 'DAYS LEFT') : '天';
+  txt(hEl, '🏬 Ampang Waterfront — flagship countdown',
+           '🏬 安邦水岸旗舰店 — 倒计时');
+  txt(sEl, 'Target opening: 2026-05-01 · W02',
+           '预计开业：2026-05-01 · W02');
+  if(fillEl) fillEl.style.width = '67%';
+  txt(pblEl, 'Transfer-in progress — pending W02 stock feed',
+             '调货完成度 — 待接 W02 库存数据');
+  if(pbrEl) pbrEl.textContent = '67%';
+}
+
+// ── Render Section C — 6 Stores at a Glance ──
+function _tdRenderStores(){
+  const en   = lang === 'en';
+  const host = document.getElementById('td-stores');
+  if(!host) return;
+  const BKEYS = ['W01','W02','W03','W05','W07','W11'];
+  const cur = 'mar', prev = 'feb';
+
+  host.innerHTML = BKEYS.map(bk=>{
+    const meta = BR[bk] || {};
+    const name = en ? (meta.name_en||bk) : (meta.name_zh||bk);
+    const c = meta[cur], p = meta[prev];
+    const ns = c && c.ns;
+    const pNs = p && p.ns;
+    const revStr = (typeof ns === 'number' && ns > 0) ? rm(ns) : '—';
+
+    let arrow = '—', cls = 'fl', deltaTxt = en ? 'no prior data' : '无对比数据';
+    if(typeof ns === 'number' && typeof pNs === 'number' && pNs > 0){
+      const dPct = ((ns - pNs)/pNs)*100;
+      if(dPct >= 5){ arrow = '▲'; cls = 'up'; deltaTxt = `+${dPct.toFixed(0)}% vs ${en?'Feb':'2 月'}`; }
+      else if(dPct <= -5){ arrow = '▼'; cls = 'dn'; deltaTxt = `${dPct.toFixed(0)}% vs ${en?'Feb':'2 月'}`; }
+      else { arrow = '—'; cls = 'fl'; deltaTxt = `${dPct>=0?'+':''}${dPct.toFixed(0)}% vs ${en?'Feb':'2 月'}`; }
+    }
+
+    return `
+      <button class="td-store" onclick="tdGotoBranch('${bk}')" title="${en?'Open Branch P&L':'查看门市损益'}">
+        <div class="td-store-code">${bk}</div>
+        <div class="td-store-name">${name.replace(bk+' ','')}</div>
+        <div class="td-store-rev">${revStr}</div>
+        <div class="td-store-trend ${cls}">
+          <span class="td-store-arrow">${arrow}</span><span>${deltaTxt}</span>
+        </div>
+      </button>`;
+  }).join('');
+}
+
 function renderToday(){
   const en = lang === 'en';
   txt(document.getElementById('td-ph'),
       '🏠 Today', '🏠 今日');
   txt(document.getElementById('td-ps'),
-      'Your daily landing — Wave 1 Step 2 will plug per-role widgets in here.',
-      '日常落地页 — 波 1 步骤 2 将按角色装入对应模块。');
-  txt(document.getElementById('td-msg'),
-      'Today landing — <strong style="color:var(--g)">Wave 1 Step 2</strong> 在路上。',
-      'Today 落地页 — <strong style="color:var(--g)">波 1 步骤 2</strong> 在路上。');
+      'Your daily one-screen — what matters this week, at a glance.',
+      '今日一屏 — 本周需要关注的事，一眼看完。');
+  txt(document.getElementById('td-lbl-levers'),
+      "▸ This Week's 2 Levers", '▸ 本周两个抓手');
+  txt(document.getElementById('td-lbl-amp'),
+      '▸ Ampang Countdown',    '▸ 安邦倒计时');
+  txt(document.getElementById('td-lbl-stores'),
+      '▸ 6 Stores at a Glance','▸ 6 店一览');
+
+  try{ _tdRenderLevers();  }catch(e){ console.error('renderToday levers',e); }
+  try{ _tdRenderAmpang();  }catch(e){ console.error('renderToday ampang',e); }
+  try{ _tdRenderStores();  }catch(e){ console.error('renderToday stores',e); }
+}
+
+// ── Toast helper (Promote / Act / Observe feedback) ──
+let _tdToastT = null;
+function _tdToast(msg){
+  const el = document.getElementById('td-toast');
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  if(_tdToastT) clearTimeout(_tdToastT);
+  _tdToastT = setTimeout(()=>el.classList.remove('show'), 2000);
+}
+
+// ── Lever button handlers ──
+function tdLeverAct(leverId, branchCode){
+  const en = lang === 'en';
+  // Phase 4: this will create a GTD task. For now, just nav to branches
+  // pre-loaded with the offending branch's row visible, and toast.
+  _tdToast(en ? `Marked ${leverId} for action` : `已标记 ${leverId} 待处理`);
+  if(branchCode){
+    // Light pre-selection: hop to Branches page; the user lands on the
+    // Branch P&L matrix where they can dig further.
+    setTimeout(()=>{ try{ nav('branches'); }catch(e){} }, 220);
+  }
+}
+function tdLeverObserve(leverId){
+  const en = lang === 'en';
+  const obs = _tdLoadObs();
+  obs[leverId] = Date.now() + 14*86400000; // +14 days
+  _tdSaveObs(obs);
+  _tdToast(en ? `Hidden for 14 days` : `已隐藏 14 天`);
+  _tdRenderLevers();
+}
+function tdLeverPromote(leverId){
+  const en = lang === 'en';
+  const card = document.querySelector(`.td-lever[data-id="${leverId}"]`);
+  let txtPayload = leverId;
+  if(card){
+    const t = card.querySelector('.td-lever-title');
+    const d = card.querySelector('.td-lever-desc');
+    txtPayload = `[Wiltek Today] ${t?t.textContent:leverId}\n${d?d.textContent:''}`.trim();
+  }
+  // Best-effort clipboard write — silently degrade if unavailable.
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txtPayload).then(
+      ()=>_tdToast(en ? 'Copied — paste into branch chat. Push API later.' : '已复制 — 可粘贴到群聊，推送 API 稍后实现'),
+      ()=>_tdToast(en ? 'Copy failed — see console' : '复制失败 — 请看控制台')
+    );
+  }else{
+    _tdToast(en ? 'Clipboard unavailable' : '剪贴板不可用');
+  }
+}
+function tdGotoBranch(branchCode){
+  // Phase 4: pre-select the branch row. For now we just nav — Branch P&L
+  // already shows all 6 branches in one table, so the user lands in the
+  // right context.
+  try{ nav('branches'); }catch(e){ console.error(e); }
+  // Tiny scroll-into-view nudge for the row matching this branch code.
+  setTimeout(()=>{
+    try{
+      const rows = document.querySelectorAll('#br-tbody1 tr');
+      rows.forEach(r=>{
+        if(r.textContent && r.textContent.indexOf(branchCode) === 0){
+          r.scrollIntoView({behavior:'smooth', block:'center'});
+          r.style.transition = 'background .4s';
+          r.style.background = 'rgba(0,229,196,.12)';
+          setTimeout(()=>{ r.style.background=''; }, 1400);
+        }
+      });
+    }catch(e){}
+  }, 250);
 }
 
 // ─────────── SETTINGS (Wave 1 Step 1) ───────────

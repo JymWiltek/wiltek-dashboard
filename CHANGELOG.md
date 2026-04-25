@@ -1,5 +1,54 @@
 # Wiltek Portal — Changelog
 
+## Wave 1 Step 2 — Owner Today landing wired to live data (2026-04-25)
+
+Replaces the Step 1 single-line `p-today` placeholder with a real Owner Today
+screen. Three sections, all read from in-memory `BR` / `BR_YTD` / `D` (no
+extra fetch, no Apps Script call), graceful "—" fallbacks where data is
+absent.
+
+### Added
+- **Section A — This Week's 2 Levers**: 5-rule pipeline applied in priority
+  order, top 2 hits surface as cards with `[Act] [Observe] [Promote]`
+  buttons. Rules 1 (GP% drop ≥ 3pp MoM) and 2 (revenue drop ≥ 10% MoM) read
+  from `BR[bk].mar` vs `BR[bk].feb`. Rules 3–5 (race walk-in / conversion /
+  basket size) require Floatation transaction data we don't yet hold
+  client-side — they're skipped silently rather than fabricated. Empty hit
+  list falls back to "本周暂无重大异常 — 6 店运营平稳".
+- **Section B — Ampang Countdown**: dynamic days-to-2026-05-01 readout
+  (turns red ≤ 7 days), 67% transfer-progress bar labelled "调货完成度 —
+  待接 W02 库存数据" (pending Phase 4 W02 stock feed).
+- **Section C — 6 Stores at a Glance**: horizontal grid of W01/W02/W03/W05/
+  W07/W11 cards, each with branch code + Mar net-sales + ▲/—/▼ trend arrow
+  vs Feb (±5% threshold) + click-to-Branch-P&L jump (highlights the matching
+  row in the P&L matrix).
+- **`tdLeverAct(id, branch)` / `tdLeverObserve(id)` / `tdLeverPromote(id)`**
+  handlers. Observe stashes a 14-day suppression in `localStorage`
+  (`wp_today_obs_v1`); expired entries auto-purge. Promote copies a
+  branch-chat-ready summary to the clipboard. Act marks + hops to Branches.
+- **`tdGotoBranch(code)`** — used by Section C cards to nav and softly
+  highlight the matching branch row.
+- **`.td-lever`, `.td-lever-grid`, `.td-amp`, `.td-stores`, `.td-store`,
+  `.td-pbar`, `.td-toast`, `.td-skel`** CSS — dark-theme, reuses existing
+  `var(--s1) / --bdr / --g / --r / --y / --b / --mu`. Mobile breakpoint
+  collapses lever grid to 1 col, store grid to 3 cols.
+- **`#td-toast`** — single shared one-shot toast for Act/Observe/Promote
+  feedback (auto-hides after 2 s).
+
+### Changed
+- **`renderToday()`** rewritten from placeholder to full 3-section render.
+  Each section is wrapped in its own `try/catch` so a partial data outage
+  in one section never blanks the others.
+
+### Notes
+- No business logic forked — Branch P&L, Branch Today, Action Plan all
+  unchanged. Today simply *reads* the same `BR` / `BR_YTD` tables.
+- Promote is currently a clipboard-copy. The branch-push API hooks land in
+  Phase 4 alongside the GTD task spawn for `[Act]`.
+- Lucide icons for L1 stay as Step 1 — no font/CDN added.
+
+---
+
 ## Wave 1 Step 1 — Menu collapsed to 3 L1 entries (2026-04-25)
 
 Sidebar refactor for the Master Plan rebuild: 18 leaves + 8 section headers
