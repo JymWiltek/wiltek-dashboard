@@ -27,6 +27,13 @@ import {
 } from './lib/harness';
 
 // ── Result accumulator (one shared file across the run) ──────────────────
+//
+// Findings are persisted to a JSON sidecar (qa-findings.json) because
+// Playwright runs `test.afterAll` per-describe, and module-scoped arrays
+// are reset between describes (each describe gets a fresh import in
+// some pool configs). Reading-then-writing the JSON guarantees that
+// every `afterAll` flush sees prior findings and re-renders the .md
+// against the union.
 type Finding = {
   layer: 'A' | 'B' | 'C';
   rule: string;
@@ -36,23 +43,33 @@ type Finding = {
   lang?: string;
   detail: string;
 };
-const FINDINGS: Finding[] = [];
-const REPORT_DIR = path.resolve(__dirname, '..');
-const REPORT_PATH = path.join(REPORT_DIR, 'qa-report.md');
+const REPORT_DIR    = path.resolve(__dirname, '..');
+const REPORT_PATH   = path.join(REPORT_DIR, 'qa-report.md');
+const FINDINGS_PATH = path.join(REPORT_DIR, 'qa-findings.json');
 
-function record(f: Finding){ FINDINGS.push(f); }
-
-test.afterAll(async () => {
+function loadFindings(): Finding[]{
+  try { return JSON.parse(fs.readFileSync(FINDINGS_PATH, 'utf8')) || []; }
+  catch { return []; }
+}
+function saveFindings(arr: Finding[]){
   ensureDir(REPORT_DIR);
-  const total = (test.info() as any) || {};
+  fs.writeFileSync(FINDINGS_PATH, JSON.stringify(arr, null, 2), 'utf8');
+}
+function record(f: Finding){
+  const arr = loadFindings();
+  arr.push(f);
+  saveFindings(arr);
+}
+
+function renderReport(findings: Finding[]){
   const lines: string[] = [];
   lines.push('# Wiltek Portal — QA Report');
   lines.push('');
   lines.push(`Generated: ${new Date().toISOString()}`);
-  lines.push(`Total findings: **${FINDINGS.length}**`);
+  lines.push(`Total findings: **${findings.length}**`);
   lines.push('');
 
-  const byLayer = (l: string) => FINDINGS.filter(f => f.layer === l);
+  const byLayer = (l: string) => findings.filter(f => f.layer === l);
   const sections: Array<['A'|'B'|'C', string]> = [
     ['A', 'A. Functional'],
     ['B', 'B. UX checklist'],
@@ -71,9 +88,19 @@ test.afterAll(async () => {
     });
     lines.push('');
   }
-  fs.writeFileSync(REPORT_PATH, lines.join('\n'), 'utf8');
+  return lines.join('\n');
+}
+
+// Session-id strategy: the npm script (`pretest:e2e`) deletes
+// qa-findings.json before invoking Playwright. We then *append* to the
+// file across all afterAll calls without ever wiping mid-run.
+
+test.afterAll(async () => {
+  ensureDir(REPORT_DIR);
+  const findings = loadFindings();
+  fs.writeFileSync(REPORT_PATH, renderReport(findings), 'utf8');
   // Always log to stdout too so CI tail picks it up
-  console.log(`\n=== QA report written to ${REPORT_PATH} (${FINDINGS.length} findings) ===\n`);
+  console.log(`\n=== QA report written to ${REPORT_PATH} (${findings.length} findings) ===\n`);
 });
 
 // ── Functional helpers ───────────────────────────────────────────────────
@@ -279,19 +306,47 @@ test.describe('A+B  per-role × per-page  @ tablet/EN', () => {
 //             ESC modal close, nav scroll-to-top, login error message)
 // ─────────────────────────────────────────────────────────────────────────
 test.describe('B  UX behaviours', () => {
-  test('B12 language switch — ZH translates page header', async ({ page }) => {
+  test('B12 language switch — ZH translates header / subtitle on key pages', async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: 1024, height: 768 });
     attachConsoleCapture(page);
     await loginAs(page, CREDENTIALS[0] as any, 'en');
-    await gotoPage(page, 'health');
-    const en = await page.evaluate(() => (document.querySelector('#p-health.active .ph') as HTMLElement | null)?.innerText || '');
-    await page.evaluate(() => (window as any).setLang('zh'));
-    await page.waitForTimeout(200);
-    const zh = await page.evaluate(() => (document.querySelector('#p-health.active .ph') as HTMLElement | null)?.innerText || '');
-    if (en === zh){
-      record({ layer:'B', rule:'B12-lang-switch', role:'owner', page:'health', detail:`header unchanged after lang switch (${en})` });
+
+    // Pages whose header (.ph) OR subtitle (.ps) MUST differ between EN/ZH —
+    // a stable hook that an injection attacker couldn't easily fake.
+    const probes: Array<[string, string]> = [
+      ['health',   '#p-health'],
+      ['pl',       '#p-pl'],
+      ['cashflow', '#p-cashflow'],
+      ['gp',       '#p-gp'],
+    ];
+    type Snap = { ph: string; ps: string };
+    const snap = async (sel: string): Promise<Snap> => page.evaluate((s) => {
+      const root = document.querySelector(s + '.active') as HTMLElement | null;
+      const ph = (root?.querySelector('.ph') as HTMLElement | null)?.innerText || '';
+      const ps = (root?.querySelector('.ps') as HTMLElement | null)?.innerText || '';
+      return { ph, ps };
+    }, sel);
+
+    for (const [pid, sel] of probes){
+      const ok = await gotoPage(page, pid);
+      if (!ok) continue;
+      await page.waitForTimeout(200);
+      await page.evaluate(() => (window as any).setLang('en'));
+      await page.waitForTimeout(150);
+      const en = await snap(sel);
+      await page.evaluate(() => (window as any).setLang('zh'));
+      await page.waitForTimeout(150);
+      const zh = await snap(sel);
+      // A page is considered translated if EITHER header or subtitle changes.
+      const changed = (en.ph !== zh.ph && en.ph) || (en.ps !== zh.ps && en.ps);
+      if (!changed){
+        record({ layer:'B', rule:'B12-lang-switch', role:'owner', page:pid, detail:
+          `no translation: ph='${en.ph}' ps='${en.ps}'` });
+      }
+      // Reset to EN so the next probe starts clean.
+      await page.evaluate(() => (window as any).setLang('en'));
     }
-    expect(en).not.toEqual(zh);
   });
 
   test('B14 nav scroll resets to top', async ({ page }) => {

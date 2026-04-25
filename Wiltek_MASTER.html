@@ -2255,7 +2255,7 @@ function renderHealth(m,prev,i){
   const netDelta=prevNet?(net-prevNet)/Math.abs(prevNet):0;
 
   // Page header
-  txt(document.getElementById('h-ph'),`Wiltek — ${m}`,`Wiltek — ${m}`);
+  txt(document.getElementById('h-ph'),`🏥 Wiltek Health — ${m}`,`🏥 Wiltek 健康总览 — ${m}`);
   txt(document.getElementById('h-ps'), 'CEO Overview · 6 Branches · Key Metrics', 'CEO总览 · 6家分行 · 关键指标');
 
   // Overall verdict pill
@@ -2704,10 +2704,15 @@ function renderBranches(m,i){
   let tNS=0,tCOGS=0,tGP=0,tExp=0,tNet=0;
   btbody.innerHTML=bkeys.map((bk,bi)=>{
     const b=bdata_all[bi];
-    const gpp=b.gp/b.ns, netp=b.net/b.ns, expp=b.total_exp/b.ns;
-    const sc=b.net<0?'neg':b.net<5000?'cy':'cg';
-    const pill=b.net<0?`<span class="pl dn">${en?'Loss':'亏损'}</span>`:b.net<10000?`<span class="pl wa">${en?'Weak':'偏弱'}</span>`:`<span class="pl up">${en?'OK':'盈利'}</span>`;
-    tNS+=b.ns;tCOGS+=b.cogs;tGP+=b.gp;tExp+=b.total_exp;tNet+=b.net;
+    // Numeric guards: backend snapshots occasionally omit fields. Treat
+    // missing as 0 so the table renders instead of throwing.
+    const _ns=+b.ns||0, _gp=+b.gp||0, _net=+b.net||0;
+    const _exp=+(b.total_exp ?? b.exp ?? 0)||0;
+    const _cogs=+b.cogs||0;
+    const gpp = _ns ? _gp/_ns : 0, netp = _ns ? _net/_ns : 0, expp = _ns ? _exp/_ns : 0;
+    const sc=_net<0?'neg':_net<5000?'cy':'cg';
+    const pill=_net<0?`<span class="pl dn">${en?'Loss':'亏损'}</span>`:_net<10000?`<span class="pl wa">${en?'Weak':'偏弱'}</span>`:`<span class="pl up">${en?'OK':'盈利'}</span>`;
+    tNS+=_ns;tCOGS+=_cogs;tGP+=_gp;tExp+=_exp;tNet+=_net;
     // MoM delta vs prior period
     const bp = bprev?bprev[bi]:null;
     let momCell = '';
@@ -2725,11 +2730,11 @@ function renderBranches(m,i){
 
     return `<tr>
       <td class="la">${en?BR[bk].name_en:BR[bk].name_zh}</td>
-      <td>${b.ns.toLocaleString()}</td>
+      <td>${_ns.toLocaleString()}</td>
       <td><div class="mb"><span class="${gpp>=.47?'cg':gpp>=.4?'cy':'cr'}">${pct(gpp)}</span><div class="mbr"><div class="mbf" style="width:${Math.min(100,gpp*100).toFixed(0)}%;background:${gpp>=.47?C.g:gpp>=.4?C.y:C.r}"></div></div></div></td>
-      <td class="${sc}">${b.net.toLocaleString()}</td>
+      <td class="${sc}">${_net.toLocaleString()}</td>
       <td class="${sc}">${pct(netp)}</td>
-      <td class="cr">${b.total_exp.toLocaleString()}</td>
+      <td class="cr">${_exp.toLocaleString()}</td>
       <td class="${expp>=.35?'cr':expp>=.25?'cy':'cg'}">${pct(expp)}</td>
       ${momCell}
       <td>${pill}</td>
@@ -4220,7 +4225,9 @@ function recalcBR_YTD(){
         stat+=(d.statutory||0);
       }
     });
-    BR_YTD[bk]={ns,cogs,gp,exp,net,
+    // Emit BOTH `exp` (legacy) and `total_exp` so renderBranches (which
+    // expects total_exp on each row) continues to work after a fresh sync.
+    BR_YTD[bk]={ns,cogs,gp,exp,total_exp:exp,net,
       hr,adm,mkt,fin,salary:sal,statutory:stat,
       gp_pct:ns>0?(gp/ns*100).toFixed(1):'0.0'};
   });

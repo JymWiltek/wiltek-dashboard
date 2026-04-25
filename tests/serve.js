@@ -42,13 +42,28 @@ function stubFloatation(){
   };
 }
 
-function stubAll(){
-  return {
-    type:'all',
-    financial:{}, sales:{}, stock:{}, customers:{},
-    floatation: stubFloatation(),
-    meta:{ stub:true }
-  };
+// Per-type stubs: dashboard's fetchFromGoogleDrive() pulls financial / stock /
+// customers separately. Each handler expects `{ok:true, data:{...}}` —
+// returning empty {} in `data` is fine; the dashboard merges only fields
+// that are present.
+function stubByType(t){
+  switch(t){
+    case 'financial':
+      return { ok:true, data: { current_period:{}, branch_monthly:{}, cashflow:{months:[],series:{}}, liability:{} } };
+    case 'stock':
+      return { ok:true, data: { by_branch:{} } };
+    case 'customers':
+      return { ok:true, data: { by_month:[], race:{} } };
+    case 'sales':
+      return { ok:true, data: {} };
+    case 'floatation':
+    case 'branch_today':
+      return { ok:true, data: stubFloatation() };
+    case 'all':
+      return { ok:true, data: { financial:{}, stock:{}, customers:{}, floatation: stubFloatation(), meta:{ stub:true } } };
+    default:
+      return { ok:true, data: {} };
+  }
 }
 
 function send(res, status, body, type){
@@ -82,14 +97,14 @@ function serveStatic(req, res){
 }
 
 const server = http.createServer((req, res) => {
-  // Stub the Vercel proxy so the dashboard runs offline
+  // Stub the Vercel proxy so the dashboard runs offline.
+  // Contract: respond with {ok:true, data:{...}} so the production
+  // fetchFromGoogleDrive() flow accepts the response without falling
+  // through to the error path.
   if (req.url && req.url.startsWith('/api/proxy')) {
     const u = new URL(req.url, 'http://localhost');
     const t = (u.searchParams.get('type') || '').toLowerCase();
-    let body;
-    if (t === 'floatation' || t === 'branch_today') body = JSON.stringify(stubFloatation());
-    else                                            body = JSON.stringify(stubAll());
-    return send(res, 200, body);
+    return send(res, 200, JSON.stringify(stubByType(t)));
   }
   serveStatic(req, res);
 });
