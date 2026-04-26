@@ -142,9 +142,9 @@ test.describe('Round 2 — Functional', () => {
   test('language toggle EN ↔ 中', async ({ page }) => {
     await loginOwner(page);
     await page.click('#langZH');
-    await expect(page.locator('.page-title')).toHaveText('呆死货清单');
+    await expect(page.locator('#view-deadstock.on .page-title')).toHaveText('呆死货清单');
     await page.click('#langEN');
-    await expect(page.locator('.page-title')).toHaveText('Dead Stock List');
+    await expect(page.locator('#view-deadstock.on .page-title')).toHaveText('Dead Stock List');
   });
 
   test('CSV export triggers download', async ({ page }) => {

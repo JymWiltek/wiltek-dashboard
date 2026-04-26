@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Wiltek Portal — Dead Stock</title>
+<title>Wiltek Portal</title>
 <style>
 :root {
   --bg:           #FFFFFF;
@@ -121,9 +121,11 @@ nav.menu a, nav.menu .item, nav.menu .sub-item {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 12px; border-radius: 6px;
   color: var(--text-meta); text-decoration: none;
-  font-size: 14px; cursor: default; user-select: none;
+  font-size: 14px; cursor: pointer; user-select: none;
   margin-bottom: 2px;
 }
+nav.menu .sub-item:hover:not(.active):not(.disabled) { background: var(--brand-soft); color: var(--brand); }
+nav.menu .sub-item.hidden { display: none; }
 nav.menu .item.disabled, nav.menu .sub-item.disabled {
   color: var(--text-light);
   cursor: not-allowed;
@@ -306,6 +308,116 @@ table.detail tbody tr.row-expand .branches-distribution .pill.empty {
 
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-meta); }
 
+/* ── Header role view-as switcher ───────────────────────────────── */
+header.app-header .view-as {
+  display: inline-flex; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+header.app-header .view-as button {
+  padding: 5px 10px; background: var(--bg); border: 0; color: var(--text-meta); font-size: 12px;
+}
+header.app-header .view-as button.on { background: var(--brand); color: #fff; }
+header.app-header .view-as.locked button { cursor: not-allowed; opacity: 0.6; }
+
+/* ── View containers ────────────────────────────────────────────── */
+.view { display: none; }
+.view.on { display: block; }
+
+/* ── Owner kanban (transfers) ───────────────────────────────────── */
+.kanban-summary {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  margin-bottom: 20px;
+}
+.kanban-summary .sum-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.kanban-summary .sum-card .sum-label { font-size: 12px; color: var(--text-meta); text-transform: uppercase; letter-spacing: 0.04em; }
+.kanban-summary .sum-card .sum-count { font-size: 26px; font-weight: 600; color: var(--text-primary); }
+.kanban-summary .sum-card .sum-amount { font-size: 12px; color: var(--text-meta); margin-top: 2px; }
+.kanban-summary .sum-card.col-pending  { border-left: 3px solid var(--warn); }
+.kanban-summary .sum-card.col-approved { border-left: 3px solid var(--brand); }
+.kanban-summary .sum-card.col-done     { border-left: 3px solid var(--ok); }
+.kanban-summary .sum-card.col-cancel   { border-left: 3px solid var(--danger); }
+
+.kanban {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  align-items: start;
+}
+.kanban .col {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px;
+  min-height: 220px;
+}
+.kanban .col-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.kanban .col-head .col-count { color: var(--text-meta); font-weight: 500; }
+.kanban .card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; margin-bottom: 10px;
+}
+.kanban .card .route {
+  font-weight: 600; font-size: 13px; color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.kanban .card .route .arrow { color: var(--brand); }
+.kanban .card .sku { font-size: 12px; color: var(--text-meta); margin-top: 4px; font-family: 'SF Mono', Menlo, monospace; }
+.kanban .card .meta { font-size: 12px; color: var(--text-meta); margin-top: 6px; }
+.kanban .card .meta .qty { font-weight: 600; color: var(--text-primary); }
+.kanban .card .meta .amt { font-weight: 600; color: var(--brand); }
+.kanban .card .reason { font-size: 11px; color: var(--text-light); margin-top: 6px; font-style: italic; }
+.kanban .card .actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.kanban .card .actions button {
+  font-size: 12px; padding: 5px 10px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-primary);
+}
+.kanban .card .actions button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.kanban .card .actions button.primary:hover { background: #19503e; }
+.kanban .card .actions button.warn { color: var(--danger); border-color: var(--danger); background: var(--bg); }
+.kanban .card .actions button.warn:hover { background: rgba(160,48,48,0.06); }
+.kanban .card .actions button:hover:not(.primary):not(.warn) { border-color: var(--brand); color: var(--brand); }
+.kanban .col-empty { font-size: 12px; color: var(--text-light); text-align: center; padding: 20px 8px; }
+
+/* ── Warehouse today's list ────────────────────────────────────── */
+.wh-list {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden;
+}
+.wh-list .wh-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px; align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.wh-list .wh-row:last-child { border-bottom: 0; }
+.wh-list .wh-row.done { background: rgba(46,125,91,0.05); }
+.wh-list .wh-row.cancelled { background: rgba(160,48,48,0.04); }
+.wh-list .wh-row .wh-info { font-size: 14px; }
+.wh-list .wh-row .wh-info .wh-route {
+  font-weight: 600; color: var(--text-primary);
+  display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap;
+}
+.wh-list .wh-row .wh-info .wh-route .arrow { color: var(--brand); }
+.wh-list .wh-row .wh-info .wh-sku { color: var(--text-meta); font-family: 'SF Mono', Menlo, monospace; font-size: 12px; margin-left: 6px; }
+.wh-list .wh-row .wh-info .wh-meta { color: var(--text-meta); font-size: 12px; margin-top: 4px; }
+.wh-list .wh-row .wh-info .wh-status {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  margin-left: 8px;
+}
+.wh-list .wh-row .wh-info .wh-status.done { background: rgba(46,125,91,0.10); color: var(--ok); }
+.wh-list .wh-row .wh-info .wh-status.cancelled { background: rgba(160,48,48,0.10); color: var(--danger); }
+.wh-list .wh-row .wh-actions { display: flex; gap: 8px; }
+.wh-list .wh-row .wh-actions button {
+  font-size: 12px; padding: 6px 12px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-primary);
+}
+.wh-list .wh-row .wh-actions button.primary { background: var(--ok); color: #fff; border-color: var(--ok); }
+.wh-list .wh-row .wh-actions button.warn { color: var(--danger); border-color: var(--danger); }
+.wh-list .wh-row .wh-actions button.primary:hover { background: #246046; }
+
 footer.app-footer {
   padding: 24px 40px; color: var(--text-light); font-size: 12px;
   border-top: 1px solid var(--border); text-align: center;
@@ -318,16 +430,22 @@ footer.app-footer {
   nav.menu { display: none; }
   section.content { padding: 24px 20px; }
   .branch-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .kanban-summary { grid-template-columns: repeat(2, 1fr); }
+  .kanban { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
-  header.app-header { padding: 12px 16px; }
+  header.app-header { padding: 12px 16px; gap: 8px; flex-wrap: wrap; }
   header.app-header .data-date { display: none; }
+  header.app-header .header-right { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
   .branch-grid { grid-template-columns: 1fr; }
+  .kanban-summary { grid-template-columns: 1fr 1fr; }
+  .kanban { grid-template-columns: 1fr; }
   .hero .hero-big { font-size: 24px; }
   .page-title { font-size: 22px; }
   table.detail thead th, table.detail tbody td { padding: 8px 10px; font-size: 12px; }
   table.detail thead th.opt, table.detail tbody td.opt { display: none; }
   .toolbar input[type="search"] { max-width: 100%; }
+  .wh-list .wh-row { grid-template-columns: 1fr; gap: 8px; }
   section.content { padding: 16px 12px; }
 }
 </style>
@@ -358,6 +476,10 @@ footer.app-footer {
     <div class="header-right">
       <div class="role-chip"><strong id="userName">—</strong> · <span id="userRole">—</span></div>
       <div class="data-date" id="dataDate">—</div>
+      <div class="view-as" id="viewAsSwitcher" role="tablist" title="View as (test)" style="display:none">
+        <button id="viewAsOwner" type="button" onclick="setViewAs('owner')" data-i18n="viewas-owner">Owner</button>
+        <button id="viewAsWarehouse" type="button" onclick="setViewAs('warehouse')" data-i18n="viewas-warehouse">Warehouse</button>
+      </div>
       <div class="lang-toggle" role="tablist">
         <button id="langEN" class="on" type="button" onclick="setLang('en')">EN</button>
         <button id="langZH" type="button" onclick="setLang('zh')">中</button>
@@ -367,7 +489,7 @@ footer.app-footer {
   </header>
 
   <main class="app-main">
-    <nav class="menu">
+    <nav class="menu" id="menu">
       <div class="group">
         <div class="menu-section" data-i18n="nav-section-execute">Execute</div>
         <div class="item disabled" title="V1 next cut">
@@ -379,8 +501,14 @@ footer.app-footer {
         <div class="item">
           <span class="icon">📦</span><span data-i18n="nav-inv">Inventory</span>
         </div>
-        <div class="sub-item active">
+        <div class="sub-item" data-view="deadstock" id="navDeadstock" onclick="setView('deadstock')">
           <span class="icon">↳</span><span data-i18n="nav-deadstock">Dead Stock List</span>
+        </div>
+        <div class="sub-item" data-view="transfers" id="navTransfers" onclick="setView('transfers')">
+          <span class="icon">↳</span><span data-i18n="nav-transfers">Transfer Suggestions</span>
+        </div>
+        <div class="sub-item" data-view="warehouse" id="navWarehouse" onclick="setView('warehouse')">
+          <span class="icon">↳</span><span data-i18n="nav-wh-today">Today's Transfers</span>
         </div>
       </div>
       <div class="group">
@@ -394,38 +522,53 @@ footer.app-footer {
     </nav>
 
     <section class="content">
-      <h1 class="page-title" data-i18n="title">Dead Stock List</h1>
-      <p class="page-sub" data-i18n="subtitle">5 active stores · classified by movement to surface releasable cash.</p>
+      <!-- ── View: Dead Stock List ─────────────────────────────── -->
+      <div class="view" id="view-deadstock">
+        <h1 class="page-title" data-i18n="title">Dead Stock List</h1>
+        <p class="page-sub" data-i18n="subtitle">5 active stores · classified by movement to surface releasable cash.</p>
 
-      <!-- Block 1: Hero -->
-      <div class="hero" id="hero"></div>
+        <div class="hero" id="hero"></div>
+        <div class="tabs" id="tabs"></div>
 
-      <!-- Block 2: Tabs -->
-      <div class="tabs" id="tabs"></div>
+        <div class="section-title" data-i18n="block-stores">Per-store distribution</div>
+        <div class="branch-grid" id="branchGrid"></div>
 
-      <!-- Block 3: Branch cards -->
-      <div class="section-title" data-i18n="block-stores">Per-store distribution</div>
-      <div class="branch-grid" id="branchGrid"></div>
-
-      <!-- Block 4: Detail table -->
-      <div class="section-title" data-i18n="block-detail">Detail</div>
-      <div class="toolbar">
-        <input id="searchBox" type="search" placeholder="Search SKU or description…">
-        <select id="catFilter">
-          <option value="">All categories</option>
-        </select>
-        <div class="spacer"></div>
-        <button class="csv-btn" type="button" onclick="exportCSV()" id="csvBtn">Export CSV</button>
+        <div class="section-title" data-i18n="block-detail">Detail</div>
+        <div class="toolbar">
+          <input id="searchBox" type="search" placeholder="Search SKU or description…">
+          <select id="catFilter">
+            <option value="">All categories</option>
+          </select>
+          <div class="spacer"></div>
+          <button class="csv-btn" type="button" onclick="exportCSV()" id="csvBtn">Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="detail" id="detail">
+            <thead><tr id="detailHead"></tr></thead>
+            <tbody id="detailBody"></tbody>
+          </table>
+        </div>
       </div>
-      <div class="table-wrap">
-        <table class="detail" id="detail">
-          <thead><tr id="detailHead"></tr></thead>
-          <tbody id="detailBody"></tbody>
-        </table>
+
+      <!-- ── View: Owner Transfer Suggestions (kanban) ─────────── -->
+      <div class="view" id="view-transfers">
+        <h1 class="page-title" data-i18n="tr-title">Transfer Suggestions</h1>
+        <p class="page-sub" data-i18n="tr-sub">Auto-generated from misplaced stock — approve, edit, or cancel each.</p>
+
+        <div class="kanban-summary" id="trSummary"></div>
+        <div class="kanban" id="trKanban"></div>
+      </div>
+
+      <!-- ── View: Warehouse Today's Transfers ─────────────────── -->
+      <div class="view" id="view-warehouse">
+        <h1 class="page-title" data-i18n="wh-title">Today's Transfers</h1>
+        <p class="page-sub" data-i18n="wh-sub">Approved transfers waiting for your action. Mark each done or report why not.</p>
+
+        <div class="wh-list" id="whList"></div>
       </div>
 
       <footer class="app-footer">
-        <span data-i18n="footer">Wiltek Portal V1 cut 0 · Snapshot</span>
+        <span data-i18n="footer">Wiltek Portal V1 cut 1 · Snapshot</span>
         <span class="num" id="footerSnapshot"></span>
         ·
         <span data-i18n="footer-source">Source</span>:
@@ -437,6 +580,7 @@ footer.app-footer {
 
 <script src="users.js"></script>
 <script src="session.js"></script>
+<script src="auditlog.js"></script>
 <script src="assets/deadstock-data.js"></script>
 <script>
 /* ──────────────────────────────────────────────────────────────────
@@ -486,6 +630,8 @@ const STR = {
     "nav-today": "Today Overview",
     "nav-inv": "Inventory",
     "nav-deadstock": "Dead Stock List",
+    "nav-transfers": "Transfer Suggestions",
+    "nav-wh-today": "Today's Transfers",
     "nav-stores": "5 Stores",
     "nav-cust": "Customer Insights",
     "nav-fin": "Financial Depth",
@@ -497,7 +643,40 @@ const STR = {
     "logoutBtn": "Sign out",
     "loginErrInvalid": "Username or password is incorrect.",
     "loginErrEmpty": "Please enter username and password.",
-    "loginErrLocked": "Too many failed attempts. Try again later."
+    "loginErrLocked": "Too many failed attempts. Try again later.",
+
+    "tr-title": "Transfer Suggestions",
+    "tr-sub": "Auto-generated from misplaced stock — approve, edit, or cancel each.",
+    "tr-col-pending": "Pending",
+    "tr-col-approved": "In progress",
+    "tr-col-done": "Done",
+    "tr-col-cancel": "Not done",
+    "tr-empty": "Nothing here.",
+    "tr-suggestions": "suggestions",
+    "tr-approve": "Approve",
+    "tr-edit": "Edit qty",
+    "tr-cancel": "Cancel",
+    "tr-reset": "Reset to pending",
+    "tr-reason-cancel": "Cancelled by Owner",
+    "tr-reason-cant": "Warehouse: cannot transfer",
+    "tr-prompt-edit": "New transfer quantity (max {max}):",
+    "tr-prompt-cancel-reason": "Reason for cancelling:",
+    "tr-prompt-cant-reason": "Reason it cannot be transferred:",
+    "tr-meta": "Qty {qty} · RM {amt}",
+    "tr-route": "{src} → {dst}",
+    "tr-reason-misplaced": "Misplaced at {src}, {dst} sold {sold} in last 3m, has {stock} in stock.",
+
+    "wh-title": "Today's Transfers",
+    "wh-sub": "Approved transfers waiting for your action. Mark each done or report why not.",
+    "wh-empty": "No approved transfers right now.",
+    "wh-done": "Done",
+    "wh-cant": "Can't",
+    "wh-row": "{src} take {code} ×{qty} → to {dst}",
+    "wh-status-done": "Completed",
+    "wh-status-cancel": "Not done",
+
+    "viewas-owner": "Owner",
+    "viewas-warehouse": "Warehouse"
   },
   zh: {
     "title": "呆死货清单",
@@ -540,6 +719,8 @@ const STR = {
     "nav-today": "今天总览",
     "nav-inv": "库存",
     "nav-deadstock": "呆死货清单",
+    "nav-transfers": "调货建议",
+    "nav-wh-today": "今天调货清单",
     "nav-stores": "5 家门市",
     "nav-cust": "顾客洞察",
     "nav-fin": "财务深度",
@@ -551,7 +732,40 @@ const STR = {
     "logoutBtn": "登出",
     "loginErrInvalid": "账号或密码错误。",
     "loginErrEmpty": "请输入账号和密码。",
-    "loginErrLocked": "失败次数过多,稍后再试。"
+    "loginErrLocked": "失败次数过多,稍后再试。",
+
+    "tr-title": "调货建议",
+    "tr-sub": "从错位库存自动生成 — Owner 批准、改量或取消。",
+    "tr-col-pending": "待批",
+    "tr-col-approved": "进行中",
+    "tr-col-done": "完成",
+    "tr-col-cancel": "未完成",
+    "tr-empty": "暂无内容。",
+    "tr-suggestions": "条建议",
+    "tr-approve": "批准",
+    "tr-edit": "改量",
+    "tr-cancel": "取消",
+    "tr-reset": "重置为待批",
+    "tr-reason-cancel": "Owner 取消",
+    "tr-reason-cant": "仓库:无法调货",
+    "tr-prompt-edit": "新的调货数量(最多 {max}):",
+    "tr-prompt-cancel-reason": "取消原因:",
+    "tr-prompt-cant-reason": "无法调货的原因:",
+    "tr-meta": "数量 {qty} · RM {amt}",
+    "tr-route": "{src} → {dst}",
+    "tr-reason-misplaced": "{src} 错位库存,{dst} 近 3 月卖 {sold},现库存 {stock}。",
+
+    "wh-title": "今天调货清单",
+    "wh-sub": "Owner 已批准的调货,请逐条操作:已调或填写无法调货的原因。",
+    "wh-empty": "目前没有已批准的调货。",
+    "wh-done": "已调",
+    "wh-cant": "做不了",
+    "wh-row": "{src} 取 {code} ×{qty} → 到 {dst}",
+    "wh-status-done": "已完成",
+    "wh-status-cancel": "未完成",
+
+    "viewas-owner": "Owner",
+    "viewas-warehouse": "仓库"
   }
 };
 
@@ -617,11 +831,19 @@ function enterApp() {
   document.getElementById('app').classList.add('ready');
   document.getElementById('app').setAttribute('aria-hidden', 'false');
 
+  // Expose for AuditLog
+  window.__wp_currentUser = { id: s.userId, role: s.role, name: s.name };
+
   document.getElementById('userName').textContent = s.name || s.userId;
   document.getElementById('userRole').textContent = ROLE_LABEL[s.role] || s.role;
   const meta = (window.WP_DEADSTOCK || {}).meta || {};
   document.getElementById('dataDate').textContent = meta.snapshot ? ('Snapshot ' + meta.snapshot) : '';
   document.getElementById('footerSnapshot').textContent = meta.snapshot || '';
+
+  // Initial view-as = real role
+  VIEW_AS = (s.role === 'warehouse') ? 'warehouse' : 'owner';
+  setupViewAsSwitcher(s.role);
+  applyMenuVisibility();
 
   buildCategoryFilter();
   applyLang();
@@ -629,6 +851,12 @@ function enterApp() {
   renderTabs();
   renderBranchCards();
   renderTable();
+
+  // Initial view: warehouse role lands on warehouse list, others on dead stock
+  const initialView = (VIEW_AS === 'warehouse') ? 'warehouse' : 'deadstock';
+  setView(initialView);
+
+  try { window.AuditLog && window.AuditLog.log('login_success', s.userId, 'role=' + s.role); } catch(_){}
 }
 
 /* ── Language ──────────────────────────────────────────────────── */
@@ -643,6 +871,8 @@ function setLang(l) {
   renderTabs();
   renderBranchCards();
   renderTable();
+  if (CUR_VIEW === 'transfers') renderTransfers();
+  else if (CUR_VIEW === 'warehouse') renderWarehouse();
 }
 function applyLang() {
   document.documentElement.setAttribute('lang', LANG);
@@ -890,6 +1120,298 @@ function exportCSV() {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   V1 第 1 刀  ·  Transfer suggestions (调货回路)
+   ──────────────────────────────────────────────────────────────── */
+
+let CUR_VIEW = 'deadstock';
+let VIEW_AS = 'owner';            // owner | warehouse — view-mode (not real role)
+const STATE_KEY = 'wp_transfers_v1';
+
+/* ── State persistence (per-suggestion lifecycle) ───────────────── */
+function loadState() {
+  try { const s = localStorage.getItem(STATE_KEY); return s ? JSON.parse(s) : {}; }
+  catch(_) { return {}; }
+}
+function saveState(st) {
+  try { localStorage.setItem(STATE_KEY, JSON.stringify(st)); } catch(_) {}
+}
+function getStatus(id) {
+  const st = loadState();
+  return st[id] || { status: 'pending', qty: null, reason: '' };
+}
+function setStatus(id, patch) {
+  const st = loadState();
+  st[id] = Object.assign({}, st[id] || { status: 'pending', qty: null, reason: '' }, patch);
+  saveState(st);
+  try { window.AuditLog && window.AuditLog.log('transfer_' + (patch.status || 'update'), id, JSON.stringify(patch)); } catch(_){}
+}
+
+/* ── Transfer suggestion engine ─────────────────────────────────── */
+function computeSuggestions() {
+  const ds = window.WP_DEADSTOCK; if (!ds) return [];
+  const ACTIVE = ds.meta.active_branches;
+  const sales = ds.sku_branch_sales_3m || {};
+  const stockMap = ds.sku_branch_stock || {};
+  const out = [];
+  const sourcePool = {};
+
+  ds.rows.forEach(r => {
+    if (r.cls !== 'MISPLACED') return;
+    sourcePool[r.code + '|' + r.branch] = r.qty;
+  });
+
+  ds.rows.forEach(r => {
+    if (r.cls !== 'MISPLACED') return;
+    const code = r.code, src = r.branch;
+    const skuSales = sales[code] || {};
+    const skuStock = stockMap[code] || {};
+    const deficits = [];
+    ACTIVE.forEach(b => {
+      if (b === src) return;
+      const sold = skuSales[b] || 0;
+      const onHand = skuStock[b] || 0;
+      const deficit = sold - onHand;
+      if (deficit > 0) deficits.push({ branch: b, deficit: deficit, sold: sold, stock: onHand });
+    });
+    deficits.sort((a, b) => b.deficit - a.deficit);
+    let remaining = sourcePool[code + '|' + src];
+    for (let i = 0; i < deficits.length; i++) {
+      if (remaining <= 0) break;
+      const d = deficits[i];
+      const qty = Math.min(remaining, d.deficit);
+      if (qty <= 0) continue;
+      out.push({
+        id: code + '|' + src + '|' + d.branch,
+        code: code,
+        desc: r.desc,
+        category: r.category,
+        src: src,
+        dst: d.branch,
+        qty: qty,
+        unit_cost: r.unit_cost,
+        amount: qty * r.unit_cost,
+        sold_dst: d.sold,
+        stock_dst: d.stock
+      });
+      remaining -= qty;
+    }
+    sourcePool[code + '|' + src] = remaining;
+  });
+
+  out.sort((a, b) => b.amount - a.amount);
+  return out;
+}
+
+/* ── View router ────────────────────────────────────────────────── */
+function setView(v) {
+  CUR_VIEW = v;
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('on'));
+  const cur = document.getElementById('view-' + v);
+  if (cur) cur.classList.add('on');
+  document.querySelectorAll('nav.menu .sub-item[data-view]').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-view') === v);
+  });
+  if (v === 'transfers') renderTransfers();
+  else if (v === 'warehouse') renderWarehouse();
+  // Scroll to top on view change
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+function applyMenuVisibility() {
+  // Warehouse role/view only sees warehouse + deadstock; transfers is Owner-only
+  const isWarehouse = (VIEW_AS === 'warehouse');
+  const navTransfers = document.getElementById('navTransfers');
+  const navWarehouse = document.getElementById('navWarehouse');
+  if (navTransfers) navTransfers.classList.toggle('hidden', isWarehouse);
+  // Warehouse sub-item is always visible (Owner can preview it via view-as switcher)
+  if (navWarehouse) navWarehouse.classList.remove('hidden');
+}
+
+/* ── Header view-as switcher ────────────────────────────────────── */
+function setupViewAsSwitcher(realRole) {
+  const sw = document.getElementById('viewAsSwitcher');
+  if (!sw) return;
+  // Show only for owner (test-mode); warehouse sticks to its real role
+  if (realRole === 'owner') {
+    sw.style.display = 'inline-flex';
+    sw.classList.remove('locked');
+  } else {
+    sw.style.display = 'none';
+  }
+  document.getElementById('viewAsOwner').classList.toggle('on', VIEW_AS === 'owner');
+  document.getElementById('viewAsWarehouse').classList.toggle('on', VIEW_AS === 'warehouse');
+}
+function setViewAs(mode) {
+  const s = window.WP_SESSION.get(); if (!s) return;
+  if (s.role !== 'owner') return;  // only owner can preview
+  VIEW_AS = mode;
+  document.getElementById('viewAsOwner').classList.toggle('on', mode === 'owner');
+  document.getElementById('viewAsWarehouse').classList.toggle('on', mode === 'warehouse');
+  applyMenuVisibility();
+  // Jump to that role's default page
+  setView(mode === 'warehouse' ? 'warehouse' : 'transfers');
+}
+
+/* ── Owner kanban renderer ──────────────────────────────────────── */
+function bucketSuggestions() {
+  const all = computeSuggestions();
+  const buckets = { pending: [], approved: [], done: [], cancelled: [] };
+  all.forEach(s => {
+    const st = getStatus(s.id);
+    const status = st.status || 'pending';
+    if (st.qty != null) s.qty = st.qty, s.amount = st.qty * s.unit_cost;
+    s._reason = st.reason || '';
+    (buckets[status] || buckets.pending).push(s);
+  });
+  return buckets;
+}
+
+function renderTransfers() {
+  const buckets = bucketSuggestions();
+  const summary = document.getElementById('trSummary');
+  const cols = [
+    { key: 'pending',   label: t('tr-col-pending'),  cls: 'col-pending' },
+    { key: 'approved',  label: t('tr-col-approved'), cls: 'col-approved' },
+    { key: 'done',      label: t('tr-col-done'),     cls: 'col-done' },
+    { key: 'cancelled', label: t('tr-col-cancel'),   cls: 'col-cancel' }
+  ];
+  summary.innerHTML = cols.map(c => {
+    const items = buckets[c.key];
+    const count = items.length;
+    const amount = items.reduce((a, x) => a + x.amount, 0);
+    return '<div class="sum-card ' + c.cls + '">' +
+      '<div class="sum-label">' + c.label + '</div>' +
+      '<div class="sum-count num">' + fmt(count) + '</div>' +
+      '<div class="sum-amount num">RM ' + fmtMoney(amount) + '</div>' +
+    '</div>';
+  }).join('');
+
+  const kanban = document.getElementById('trKanban');
+  kanban.innerHTML = cols.map(c => {
+    const items = buckets[c.key];
+    const cards = items.length ? items.map(s => suggestionCard(s, c.key)).join('') :
+      '<div class="col-empty">' + t('tr-empty') + '</div>';
+    return '<div class="col">' +
+      '<div class="col-head"><span>' + c.label + '</span><span class="col-count num">' + fmt(items.length) + '</span></div>' +
+      cards +
+    '</div>';
+  }).join('');
+}
+
+function suggestionCard(s, bucket) {
+  const reasonLine = (bucket === 'cancelled' && s._reason) ?
+    '<div class="reason cancel-reason">' + escapeHtml(s._reason) + '</div>' : '';
+  const ctxLine = '<div class="reason">' +
+    t('tr-reason-misplaced')
+      .replace('{src}', s.src).replace('{dst}', s.dst)
+      .replace('{sold}', fmt(s.sold_dst)).replace('{stock}', fmt(s.stock_dst)) +
+    '</div>';
+  let actions = '';
+  if (bucket === 'pending') {
+    actions =
+      '<button class="primary" type="button" data-act="approve" data-id="' + s.id + '">' + t('tr-approve') + '</button>' +
+      '<button type="button" data-act="edit" data-id="' + s.id + '">' + t('tr-edit') + '</button>' +
+      '<button class="warn" type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>';
+  } else if (bucket === 'approved') {
+    actions = '<button type="button" data-act="reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
+  } else {
+    actions = '<button type="button" data-act="reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
+  }
+  return '<div class="card" data-id="' + s.id + '">' +
+    '<div class="route"><span>' + s.src + '</span><span class="arrow">→</span><span>' + s.dst + '</span></div>' +
+    '<div class="sku">' + escapeHtml(s.code) + '</div>' +
+    '<div class="meta">' + t('tr-meta').replace('{qty}', fmt(s.qty)).replace('{amt}', fmtMoney(s.amount)) + '</div>' +
+    ctxLine + reasonLine +
+    '<div class="actions">' + actions + '</div>' +
+  '</div>';
+}
+
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function handleTransferAction(act, id) {
+  const all = computeSuggestions();
+  const s = all.find(x => x.id === id);
+  if (!s) return;
+  if (act === 'approve') {
+    setStatus(id, { status: 'approved', reason: '' });
+  } else if (act === 'edit') {
+    const max = s.qty;
+    const cur = (getStatus(id).qty != null) ? getStatus(id).qty : s.qty;
+    const v = prompt(t('tr-prompt-edit').replace('{max}', fmt(max)), String(cur));
+    if (v == null) return;
+    const n = parseFloat(v);
+    if (!isFinite(n) || n <= 0 || n > max) return;
+    setStatus(id, { qty: n, status: 'approved', reason: '' });
+  } else if (act === 'cancel') {
+    const r = prompt(t('tr-prompt-cancel-reason'), t('tr-reason-cancel'));
+    if (r == null) return;
+    setStatus(id, { status: 'cancelled', reason: r || t('tr-reason-cancel') });
+  } else if (act === 'reset') {
+    setStatus(id, { status: 'pending', reason: '' });
+  }
+  renderTransfers();
+  if (CUR_VIEW === 'warehouse') renderWarehouse();
+}
+
+/* ── Warehouse list renderer ────────────────────────────────────── */
+function renderWarehouse() {
+  const buckets = bucketSuggestions();
+  const list = document.getElementById('whList');
+  // Show approved (today's work) + done/cancelled (today's results), approved first
+  const items = buckets.approved.concat(buckets.done).concat(buckets.cancelled);
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state">' + t('wh-empty') + '</div>';
+    return;
+  }
+  list.innerHTML = items.map(s => {
+    const st = getStatus(s.id);
+    const status = st.status;
+    let statusBadge = '';
+    let actions = '';
+    let rowCls = '';
+    if (status === 'approved') {
+      actions =
+        '<button class="primary" type="button" data-act="wh-done" data-id="' + s.id + '">' + t('wh-done') + '</button>' +
+        '<button class="warn" type="button" data-act="wh-cant" data-id="' + s.id + '">' + t('wh-cant') + '</button>';
+    } else if (status === 'done') {
+      rowCls = ' done';
+      statusBadge = '<span class="wh-status done">' + t('wh-status-done') + '</span>';
+      actions = '<button type="button" data-act="wh-reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
+    } else if (status === 'cancelled') {
+      rowCls = ' cancelled';
+      statusBadge = '<span class="wh-status cancelled">' + t('wh-status-cancel') + '</span>';
+      actions = '<button type="button" data-act="wh-reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
+    }
+    const meta = 'Qty ' + fmt(s.qty) + (s._reason ? ' · ' + escapeHtml(s._reason) : '');
+    return '<div class="wh-row' + rowCls + '" data-id="' + s.id + '">' +
+      '<div class="wh-info">' +
+        '<div class="wh-route"><span>' + s.src + '</span><span class="arrow">→</span><span>' + s.dst + '</span><span class="wh-sku">' + escapeHtml(s.code) + '</span>' + statusBadge + '</div>' +
+        '<div class="wh-meta">' + meta + '</div>' +
+      '</div>' +
+      '<div class="wh-actions">' + actions + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function handleWarehouseAction(act, id) {
+  if (act === 'wh-done') {
+    setStatus(id, { status: 'done', reason: '' });
+  } else if (act === 'wh-cant') {
+    const r = prompt(t('tr-prompt-cant-reason'), t('tr-reason-cant'));
+    if (r == null) return;
+    setStatus(id, { status: 'cancelled', reason: r || t('tr-reason-cant') });
+  } else if (act === 'wh-reset') {
+    setStatus(id, { status: 'approved', reason: '' });
+  }
+  renderWarehouse();
+  if (CUR_VIEW === 'transfers') renderTransfers();
+}
+
 /* ── Wire up ──────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('searchBox').addEventListener('input', e => {
@@ -901,6 +1423,18 @@ document.addEventListener('DOMContentLoaded', () => {
     CAT = e.target.value || '';
     EXPANDED_ROW = null;
     renderTable();
+  });
+
+  // Delegated handlers for kanban + warehouse buttons
+  document.getElementById('trKanban').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    handleTransferAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'));
+  });
+  document.getElementById('whList').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    handleWarehouseAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'));
   });
 
   applyLang();

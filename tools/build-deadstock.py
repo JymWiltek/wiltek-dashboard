@@ -74,13 +74,16 @@ for r in ws.iter_rows(min_row=2, values_only=True):
 NOW = max_month                # latest month with data, e.g. (2026, 3)
 SLOW_CUTOFF = shift(NOW, 5)    # earliest month considered "recent" (last 6m incl.)
 DEAD_CUTOFF = shift(NOW, 11)   # earliest month considered "still warm" (last 12m incl.)
+SALES_3M_CUTOFF = shift(NOW, 2)  # earliest month for last-3m sales (used for transfer demand)
 print(f"Snapshot month: {ym_str(NOW)}")
 print(f"SLOW cutoff (last 6m incl.): {ym_str(SLOW_CUTOFF)}")
 print(f"DEAD cutoff (last 12m incl.): {ym_str(DEAD_CUTOFF)}")
+print(f"Sales-3m cutoff (transfer demand): {ym_str(SALES_3M_CUTOFF)}")
 
 # Aggregations
 last_sale_skubr = {}                                        # (sku, branch) -> last ym (any branch, but keyed per pair)
 sku_branch_qty_last6 = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 6m (active branches only)
+sku_branch_qty_last3 = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 3m (active branches only)
 
 for (ym, code, branch, qty) in all_rows:
     key = (code, branch)
@@ -88,6 +91,8 @@ for (ym, code, branch, qty) in all_rows:
         last_sale_skubr[key] = ym
     if branch in ACTIVE and ym >= SLOW_CUTOFF:
         sku_branch_qty_last6[code][branch] += qty
+    if branch in ACTIVE and ym >= SALES_3M_CUTOFF:
+        sku_branch_qty_last3[code][branch] += qty
 
 # ── Raw CS (current stock) ──────────────────────────────────────────
 ws = wb["Raw CS"]
@@ -179,6 +184,16 @@ totals_clean = {k: {"rows": v["rows"], "amount": round(v["amount"], 2)} for k, v
 sku_branch_stock_clean = {k: {b: round(q, 2) for b, q in v.items() if q > 0}
                            for k, v in sku_branch_stock.items()}
 
+# Last-3m sales per SKU per branch (only SKUs that exist in stock; trim zeros)
+sku_codes_in_stock = set(r["code"] for r in classified)
+sku_branch_sales_3m_clean = {}
+for code, bd in sku_branch_qty_last3.items():
+    if code not in sku_codes_in_stock:
+        continue
+    pruned = {b: round(q, 2) for b, q in bd.items() if q > 0 and b in ACTIVE}
+    if pruned:
+        sku_branch_sales_3m_clean[code] = pruned
+
 payload = {
     "meta": {
         "generated":    datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -194,6 +209,7 @@ payload = {
     "by_branch": by_branch,
     "rows":      classified,
     "sku_branch_stock": sku_branch_stock_clean,
+    "sku_branch_sales_3m": sku_branch_sales_3m_clean,
 }
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
