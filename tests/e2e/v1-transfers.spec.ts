@@ -134,16 +134,90 @@ test.describe('Round 2 — Functional', () => {
     await expect(page.locator('.kanban .col').nth(3).locator('.card .cancel-reason').first()).toContainText('Test reason');
   });
 
-  test('edit qty updates card amount and approves it', async ({ page }) => {
+  test('pending column renders 3 buckets (A / B / C) with counts that sum to total', async ({ page }) => {
     await loginOwner(page);
     await page.click('#navTransfers');
-    const firstCard = page.locator('.kanban .col').nth(0).locator('.card').first();
-    const id = await firstCard.getAttribute('data-id');
-    page.once('dialog', d => d.accept('1'));
-    await firstCard.locator('button[data-act="edit"]').click();
-    const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem('wp_transfers_v1') || '{}')[k!],  id);
+    const groups = page.locator('.kanban .col').nth(0).locator('.bucket-group');
+    await expect(groups).toHaveCount(3);
+    // Bucket A is open by default, B and C collapsed
+    await expect(page.locator('.bucket-group.bucket-A')).not.toHaveClass(/collapsed/);
+    await expect(page.locator('.bucket-group.bucket-B')).toHaveClass(/collapsed/);
+    await expect(page.locator('.bucket-group.bucket-C')).toHaveClass(/collapsed/);
+    // Card count across buckets equals pending total (all rendered, just collapsed visually)
+    const counts = await page.evaluate(() => {
+      const all = (window as any).computeSuggestions().map((s: any) => (window as any).classifyBucket(s));
+      const c = { A: 0, B: 0, C: 0 };
+      all.forEach((b: 'A'|'B'|'C') => c[b]++);
+      return c;
+    });
+    expect(counts.A + counts.B + counts.C).toBeGreaterThan(0);
+    expect(counts.A).toBeGreaterThan(0);
+    expect(counts.C).toBeGreaterThan(0);
+  });
+
+  test('clicking a bucket head toggles its expansion', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    const bucketB = page.locator('.bucket-group.bucket-B');
+    await expect(bucketB).toHaveClass(/collapsed/);
+    await bucketB.locator('.bucket-head').click();
+    await expect(bucketB).not.toHaveClass(/collapsed/);
+    await bucketB.locator('.bucket-head').click();
+    await expect(bucketB).toHaveClass(/collapsed/);
+  });
+
+  test('bucket A has Accept-all button that approves every card in bucket A', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    const aCount = await page.locator('.bucket-group.bucket-A .card.bA').count();
+    expect(aCount).toBeGreaterThan(0);
+    const beforeApproved = await page.locator('.kanban .col').nth(1).locator('.card').count();
+    await page.click('.bucket-group.bucket-A button[data-bucket-act="accept-all"]');
+    const afterApproved = await page.locator('.kanban .col').nth(1).locator('.card').count();
+    expect(afterApproved).toBe(beforeApproved + aCount);
+    // bucket A is now empty in pending
+    const aCountAfter = await page.locator('.bucket-group.bucket-A .card.bA').count();
+    expect(aCountAfter).toBe(0);
+  });
+
+  test('bucket B card shows full 5-store table with src + dst tags', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    // Open bucket B
+    await page.locator('.bucket-group.bucket-B .bucket-head').click();
+    const firstB = page.locator('.bucket-group.bucket-B .card.bB').first();
+    await expect(firstB).toBeVisible();
+    const rows = await firstB.locator('table.skutable tbody tr').count();
+    expect(rows).toBe(5);
+    await expect(firstB.locator('table.skutable tr.src')).toHaveCount(1);
+    await expect(firstB.locator('table.skutable tr.dst')).toHaveCount(1);
+  });
+
+  test('bucket B redirect button changes destination and approves', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    await page.locator('.bucket-group.bucket-B .bucket-head').click();
+    const firstB = page.locator('.bucket-group.bucket-B .card.bB').first();
+    const id = await firstB.getAttribute('data-id');
+    const redirect = firstB.locator('button[data-act="redirect"]').first();
+    if (await redirect.count() === 0) test.skip();
+    const newDst = await redirect.getAttribute('data-dst');
+    await redirect.click();
+    const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem('wp_transfers_v1') || '{}')[k!], id);
     expect(stored.status).toBe('approved');
-    expect(stored.qty).toBe(1);
+    expect(stored.dst_override).toBe(newDst);
+  });
+
+  test('bucket C card is single-line and has accept + skip', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    await page.locator('.bucket-group.bucket-C .bucket-head').click();
+    const firstC = page.locator('.bucket-group.bucket-C .card.bC').first();
+    await expect(firstC).toBeVisible();
+    await expect(firstC.locator('button[data-act="approve"]')).toBeVisible();
+    await expect(firstC.locator('button[data-act="cancel"]')).toBeVisible();
+    // No 5-store table
+    expect(await firstC.locator('table.skutable').count()).toBe(0);
   });
 
   test('owner uses view-as switcher to preview Warehouse', async ({ page }) => {

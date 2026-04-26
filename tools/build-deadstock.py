@@ -82,8 +82,9 @@ print(f"Sales-3m cutoff (transfer demand): {ym_str(SALES_3M_CUTOFF)}")
 
 # Aggregations
 last_sale_skubr = {}                                        # (sku, branch) -> last ym (any branch, but keyed per pair)
-sku_branch_qty_last6 = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 6m (active branches only)
-sku_branch_qty_last3 = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 3m (active branches only)
+sku_branch_qty_last6  = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 6m (active branches only)
+sku_branch_qty_last3  = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 3m (active branches only)
+sku_branch_qty_last12 = defaultdict(lambda: defaultdict(float))  # sku -> branch -> qty in last 12m (active branches only)
 
 for (ym, code, branch, qty) in all_rows:
     key = (code, branch)
@@ -93,6 +94,8 @@ for (ym, code, branch, qty) in all_rows:
         sku_branch_qty_last6[code][branch] += qty
     if branch in ACTIVE and ym >= SALES_3M_CUTOFF:
         sku_branch_qty_last3[code][branch] += qty
+    if branch in ACTIVE and ym >= DEAD_CUTOFF:
+        sku_branch_qty_last12[code][branch] += qty
 
 # ── Raw CS (current stock) ──────────────────────────────────────────
 ws = wb["Raw CS"]
@@ -194,6 +197,24 @@ for code, bd in sku_branch_qty_last3.items():
     if pruned:
         sku_branch_sales_3m_clean[code] = pruned
 
+# Last-6m sales per SKU per branch (used by transfer bucket logic)
+sku_branch_sales_6m_clean = {}
+for code, bd in sku_branch_qty_last6.items():
+    if code not in sku_codes_in_stock:
+        continue
+    pruned = {b: round(q, 2) for b, q in bd.items() if q > 0 and b in ACTIVE}
+    if pruned:
+        sku_branch_sales_6m_clean[code] = pruned
+
+# Last-12m company-total sales per SKU (active branches only) — bucket logic input
+sku_total_12m_clean = {}
+for code, bd in sku_branch_qty_last12.items():
+    if code not in sku_codes_in_stock:
+        continue
+    total = sum(q for b, q in bd.items() if b in ACTIVE)
+    if total > 0:
+        sku_total_12m_clean[code] = round(total, 2)
+
 payload = {
     "meta": {
         "generated":    datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -210,6 +231,8 @@ payload = {
     "rows":      classified,
     "sku_branch_stock": sku_branch_stock_clean,
     "sku_branch_sales_3m": sku_branch_sales_3m_clean,
+    "sku_branch_sales_6m": sku_branch_sales_6m_clean,
+    "sku_total_12m":       sku_total_12m_clean,
 }
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)

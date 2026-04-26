@@ -400,6 +400,83 @@ header.app-header .view-as.locked button { cursor: not-allowed; opacity: 0.6; }
 .kanban .card .actions button:hover:not(.primary):not(.warn) { border-color: var(--brand); color: var(--brand); }
 .kanban .col-empty { font-size: 12px; color: var(--text-light); text-align: center; padding: 20px 8px; }
 
+/* ── Smart bucket grouping (pending column only) ────────────────── */
+.bucket-group {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.bucket-group:last-child { margin-bottom: 0; }
+.bucket-group .bucket-head {
+  padding: 9px 11px;
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+  background: var(--surface);
+}
+.bucket-group .bucket-head:hover { background: rgba(46,125,91,0.04); }
+.bucket-group .bucket-icon { font-size: 14px; flex-shrink: 0; }
+.bucket-group .bucket-lbl { font-weight: 600; font-size: 12px; color: var(--text-primary); flex: 1; line-height: 1.3; }
+.bucket-group .bucket-meta { font-size: 11px; color: var(--text-meta); margin-left: 4px; }
+.bucket-group .bucket-toggle { font-size: 11px; color: var(--text-meta); flex-shrink: 0; }
+.bucket-group.bucket-A { border-left: 3px solid var(--ok); }
+.bucket-group.bucket-B { border-left: 3px solid var(--warn-soft); }
+.bucket-group.bucket-C { border-left: 3px solid var(--neutral); }
+.bucket-desc {
+  padding: 4px 12px 8px;
+  font-size: 11px; color: var(--text-light);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  line-height: 1.4;
+}
+.bucket-actions {
+  padding: 6px 12px 10px;
+  display: flex; gap: 6px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.bucket-actions button {
+  font-size: 11px; padding: 4px 9px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-primary);
+  cursor: pointer;
+}
+.bucket-actions button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.bucket-actions button.primary:hover { background: #19503e; }
+.bucket-body { padding: 10px 10px 4px; }
+.bucket-body.empty { padding: 14px 10px; color: var(--text-light); font-size: 11px; text-align: center; }
+.bucket-group.collapsed .bucket-body,
+.bucket-group.collapsed .bucket-desc,
+.bucket-group.collapsed .bucket-actions { display: none; }
+.bucket-group.collapsed .bucket-toggle::after { content: '▸'; }
+.bucket-group:not(.collapsed) .bucket-toggle::after { content: '▾'; }
+.bucket-group .bucket-toggle { width: 10px; }
+
+/* Bucket A — compact card (3 lines + actions) */
+.kanban .card.bA .reason { font-style: normal; color: var(--text-meta); }
+
+/* Bucket B — full 5-store table */
+.kanban .card.bB { padding: 10px 10px 12px; }
+.kanban .card.bB .b-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.kanban .card.bB .b-head .sku { font-family: 'SF Mono', Menlo, monospace; font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.kanban .card.bB .b-info { font-size: 11px; color: var(--text-meta); margin-top: 2px; line-height: 1.4; }
+.kanban .card.bB .skutable { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+.kanban .card.bB .skutable th { text-align: right; padding: 3px 4px; font-weight: 500; color: var(--text-meta); border-bottom: 1px solid var(--border); }
+.kanban .card.bB .skutable th:first-child, .kanban .card.bB .skutable td:first-child { text-align: left; }
+.kanban .card.bB .skutable th:last-child, .kanban .card.bB .skutable td:last-child { text-align: left; padding-left: 6px; }
+.kanban .card.bB .skutable td { text-align: right; padding: 3px 4px; color: var(--text-primary); }
+.kanban .card.bB .skutable tr.src td { color: var(--warn); }
+.kanban .card.bB .skutable tr.dst td { background: rgba(46,125,91,0.08); font-weight: 600; }
+.kanban .card.bB .skutable td.tag { color: var(--text-meta); font-size: 10px; font-weight: 400; }
+.kanban .card.bB .b-note { font-size: 11px; color: var(--text-light); margin-top: 8px; line-height: 1.4; font-style: italic; }
+
+/* Bucket C — single-line card */
+.kanban .card.bC { padding: 8px 10px; }
+.kanban .card.bC .row1 { font-size: 11px; color: var(--text-primary); line-height: 1.4; }
+.kanban .card.bC .row1 .sku { font-family: 'SF Mono', Menlo, monospace; font-weight: 600; }
+.kanban .card.bC .actions { margin-top: 6px; }
+.kanban .card.bC .actions button { font-size: 11px; padding: 3px 8px; }
+
 /* ── Warehouse today's list ────────────────────────────────────── */
 .wh-list {
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
@@ -688,6 +765,27 @@ const STR = {
     "tr-meta": "Qty {qty} · RM {amt}",
     "tr-route": "{src} → {dst}",
     "tr-reason-misplaced": "Stock at {src}; {dst} sold {sold} in last 3m and has {stock} on hand.",
+    "tr-bucket-A-name": "Sure thing",
+    "tr-bucket-A-desc": "Single destination + steady demand. Glance and accept.",
+    "tr-bucket-B-name": "Take a look",
+    "tr-bucket-B-desc": "Multiple candidate destinations or high value. Decide one by one.",
+    "tr-bucket-C-name": "Weak",
+    "tr-bucket-C-desc": "Low value, inactive SKU, or weak demand. Skippable.",
+    "tr-bucket-meta": "{n} · RM {amt}",
+    "tr-accept-all": "Accept all",
+    "tr-bA-line-dst": "{dst} sold {n3} in last 3m, has {stock} on hand",
+    "tr-bA-line-src": "{src} hasn't sold this in 12+ months",
+    "tr-bB-info": "RM {unit}/unit · annual sales {y} units",
+    "tr-bB-note": "Default destination {dst} (highest 6m sales).",
+    "tr-bB-accept": "Accept → {dst}",
+    "tr-bB-redirect": "→ {dst}",
+    "tr-bC-line": "{sku} · {src}→{dst} · {qty} · RM {amt} · annual {y}",
+    "tr-tbl-store": "Store",
+    "tr-tbl-stock": "Stock",
+    "tr-tbl-3m": "3m",
+    "tr-tbl-6m": "6m",
+    "tr-tbl-src": "src",
+    "tr-tbl-default": "default",
 
     "wh-title": "Today's Transfers",
     "wh-sub": "Transfers the Owner accepted — mark each as transferred or note why not.",
@@ -779,6 +877,27 @@ const STR = {
     "tr-meta": "数量 {qty} · RM {amt}",
     "tr-route": "{src} → {dst}",
     "tr-reason-misplaced": "{src} 有库存;{dst} 近 3 月卖 {sold},现库存 {stock}。",
+    "tr-bucket-A-name": "稳赚的",
+    "tr-bucket-A-desc": "目的地唯一 + 源店不需要 + 需求稳。扫一眼接受。",
+    "tr-bucket-B-name": "要看的",
+    "tr-bucket-B-desc": "多个候选目的地 或 高金额。逐单判断。",
+    "tr-bucket-C-name": "弱建议",
+    "tr-bucket-C-desc": "金额小 或 SKU 不活跃 或 需求弱。可跳过。",
+    "tr-bucket-meta": "{n} 单 · RM {amt}",
+    "tr-accept-all": "一键接受",
+    "tr-bA-line-dst": "{dst} 近 3 月卖 {n3} 颗,现库存 {stock}",
+    "tr-bA-line-src": "{src} 这颗 12+ 月未动",
+    "tr-bB-info": "RM {unit}/颗 · 全公司年销 {y} 颗",
+    "tr-bB-note": "默认调去 {dst}(近 6 月销量最高)。",
+    "tr-bB-accept": "接受 → {dst}",
+    "tr-bB-redirect": "改调 {dst}",
+    "tr-bC-line": "{sku} · {src}→{dst} · {qty} 颗 · RM {amt} · 年销 {y}",
+    "tr-tbl-store": "店",
+    "tr-tbl-stock": "库存",
+    "tr-tbl-3m": "近 3 月",
+    "tr-tbl-6m": "近 6 月",
+    "tr-tbl-src": "源",
+    "tr-tbl-default": "默认",
 
     "wh-title": "今天调货清单",
     "wh-sub": "Owner 已接受的调货建议,请逐条标记为已调或填写无法调货的原因。",
@@ -1189,61 +1308,85 @@ function setStatus(id, patch) {
   try { window.AuditLog && window.AuditLog.log('transfer_' + (patch.status || 'update'), id, JSON.stringify(patch)); } catch(_){}
 }
 
-/* ── Transfer suggestion engine ─────────────────────────────────── */
+/* ── Transfer suggestion engine (V1 1.2 — candidate-aware) ──────── */
 function computeSuggestions() {
   const ds = window.WP_DEADSTOCK; if (!ds) return [];
   const ACTIVE = ds.meta.active_branches;
-  const sales = ds.sku_branch_sales_3m || {};
+  const sales3 = ds.sku_branch_sales_3m || {};
+  const sales6 = ds.sku_branch_sales_6m || {};
   const stockMap = ds.sku_branch_stock || {};
+  const totals12m = ds.sku_total_12m || {};
   const out = [];
-  const sourcePool = {};
-
-  ds.rows.forEach(r => {
-    if (r.cls !== 'MISPLACED') return;
-    sourcePool[r.code + '|' + r.branch] = r.qty;
-  });
 
   ds.rows.forEach(r => {
     if (r.cls !== 'MISPLACED') return;
     const code = r.code, src = r.branch;
-    const skuSales = sales[code] || {};
+    const skuSales3 = sales3[code] || {};
+    const skuSales6 = sales6[code] || {};
     const skuStock = stockMap[code] || {};
-    const deficits = [];
-    ACTIVE.forEach(b => {
-      if (b === src) return;
-      const sold = skuSales[b] || 0;
-      const onHand = skuStock[b] || 0;
-      const deficit = sold - onHand;
-      if (deficit > 0) deficits.push({ branch: b, deficit: deficit, sold: sold, stock: onHand });
+
+    // 5-store snapshot (for bucket B card)
+    const allBranches = ACTIVE.map(b => ({
+      branch: b,
+      stock: skuStock[b] || 0,
+      sold3: skuSales3[b] || 0,
+      sold6: skuSales6[b] || 0
+    }));
+
+    // Candidate destinations: branch != src AND has recent demand exceeding stock
+    const candidates = allBranches
+      .filter(b => b.branch !== src)
+      .filter(b => b.sold6 > 0 && b.stock < Math.max(1, b.sold3));
+
+    if (candidates.length === 0) return;
+
+    // Default destination: highest 6m sales, then 3m as tiebreaker
+    candidates.sort((a, b) => (b.sold6 - a.sold6) || (b.sold3 - a.sold3));
+    const top = candidates[0];
+
+    // Quantity: how short is the top candidate? Capped by source qty.
+    const need = Math.max(1, Math.ceil(top.sold3 - top.stock));
+    const qty = Math.min(r.qty, need);
+    if (qty <= 0) return;
+
+    out.push({
+      id: code + '|' + src + '|' + top.branch,
+      code: code,
+      desc: r.desc,
+      category: r.category,
+      src: src,
+      dst: top.branch,
+      qty: qty,
+      unit_cost: r.unit_cost,
+      amount: qty * r.unit_cost,
+      sold_dst: top.sold3,         // back-compat
+      stock_dst: top.stock,        // back-compat
+      total12m: totals12m[code] || 0,
+      destSold3: top.sold3,
+      destSold6: top.sold6,
+      nCandidates: candidates.length,
+      candidates: candidates,
+      allBranches: allBranches
     });
-    deficits.sort((a, b) => b.deficit - a.deficit);
-    let remaining = sourcePool[code + '|' + src];
-    for (let i = 0; i < deficits.length; i++) {
-      if (remaining <= 0) break;
-      const d = deficits[i];
-      const qty = Math.min(remaining, d.deficit);
-      if (qty <= 0) continue;
-      out.push({
-        id: code + '|' + src + '|' + d.branch,
-        code: code,
-        desc: r.desc,
-        category: r.category,
-        src: src,
-        dst: d.branch,
-        qty: qty,
-        unit_cost: r.unit_cost,
-        amount: qty * r.unit_cost,
-        sold_dst: d.sold,
-        stock_dst: d.stock
-      });
-      remaining -= qty;
-    }
-    sourcePool[code + '|' + src] = remaining;
   });
 
   out.sort((a, b) => b.amount - a.amount);
   return out;
 }
+
+/* ── V1 1.2: bucket classifier ──────────────────────────────────── */
+function classifyBucket(s) {
+  const value = s.amount;
+  if (value < 200) return 'C';
+  if ((s.total12m || 0) < 3) return 'C';
+  if ((s.destSold3 || 0) < 1 && (s.destSold6 || 0) < 2) return 'C';
+  if ((s.nCandidates || 0) > 1) return 'B';
+  if (value >= 1000) return 'B';
+  return 'A';
+}
+
+/* ── V1 1.2: bucket open/closed UI state ────────────────────────── */
+const BUCKET_OPEN = { A: true, B: false, C: false };
 
 /* ── View router ────────────────────────────────────────────────── */
 function setView(v) {
@@ -1302,8 +1445,10 @@ function bucketSuggestions() {
   all.forEach(s => {
     const st = getStatus(s.id);
     const status = st.status || 'pending';
-    if (st.qty != null) s.qty = st.qty, s.amount = st.qty * s.unit_cost;
+    if (st.qty != null) { s.qty = st.qty; s.amount = st.qty * s.unit_cost; }
+    if (st.dst_override) s.dst = st.dst_override;       // V1 1.2: redirected target
     s._reason = st.reason || '';
+    s.bucket = classifyBucket(s);                        // V1 1.2: A / B / C
     (buckets[status] || buckets.pending).push(s);
   });
   return buckets;
@@ -1345,40 +1490,152 @@ function renderTransfers() {
   const kanban = document.getElementById('trKanban');
   kanban.innerHTML = cols.map(c => {
     const items = buckets[c.key];
-    const cards = items.length ? items.map(s => suggestionCard(s, c.key)).join('') :
-      '<div class="col-empty">' + t('tr-empty') + '</div>';
+    let body;
+    if (c.key === 'pending') {
+      body = renderPendingBuckets(items);
+    } else {
+      body = items.length ? items.map(s => suggestionCard(s, c.key)).join('') :
+        '<div class="col-empty">' + t('tr-empty') + '</div>';
+    }
     return '<div class="col">' +
       '<div class="col-head"><span>' + c.label + '</span><span class="col-count num">' + fmt(items.length) + '</span></div>' +
-      cards +
+      body +
     '</div>';
   }).join('');
 }
 
-function suggestionCard(s, bucket) {
-  const reasonLine = (bucket === 'cancelled' && s._reason) ?
-    '<div class="reason cancel-reason">' + escapeHtml(s._reason) + '</div>' : '';
-  const ctxLine = '<div class="reason">' +
-    t('tr-reason-misplaced')
-      .replace('{src}', s.src).replace('{dst}', s.dst)
-      .replace('{sold}', fmt(s.sold_dst)).replace('{stock}', fmt(s.stock_dst)) +
+/* ── V1 1.2: pending column = 3 collapsible buckets ─────────────── */
+function renderPendingBuckets(pending) {
+  if (!pending.length) return '<div class="col-empty">' + t('tr-empty') + '</div>';
+  const groups = { A: [], B: [], C: [] };
+  pending.forEach(s => { (groups[s.bucket] || groups.C).push(s); });
+  const order = ['A', 'B', 'C'];
+  const ICON = { A: '🟢', B: '🟡', C: '⚪' };
+  return order.map(key => {
+    const items = groups[key];
+    const count = items.length;
+    const amt = items.reduce((a, x) => a + x.amount, 0);
+    const open = !!BUCKET_OPEN[key];
+    const meta = t('tr-bucket-meta').replace('{n}', fmt(count)).replace('{amt}', fmtMoney(amt));
+    const headLine = t('tr-bucket-' + key + '-name') + ' · ' + meta;
+    const accept = (key === 'A' && count > 0) ?
+      '<div class="bucket-actions"><button type="button" class="primary" data-bucket-act="accept-all" data-bucket="A">' + t('tr-accept-all') + '</button></div>' : '';
+    const cards = items.length ?
+      items.map(s => suggestionCard(s, 'pending')).join('') :
+      '<div class="bucket-body empty">' + t('tr-empty') + '</div>';
+    const bodyCls = items.length ? 'bucket-body' : '';
+    const bodyHtml = items.length ? '<div class="bucket-body">' + cards + '</div>' : cards;
+    return '<div class="bucket-group bucket-' + key + (open ? '' : ' collapsed') + '" data-bucket="' + key + '">' +
+      '<div class="bucket-head" data-bucket-act="toggle" data-bucket="' + key + '">' +
+        '<span class="bucket-icon">' + ICON[key] + '</span>' +
+        '<span class="bucket-lbl">' + headLine + '</span>' +
+        '<span class="bucket-toggle"></span>' +
+      '</div>' +
+      '<div class="bucket-desc">' + t('tr-bucket-' + key + '-desc') + '</div>' +
+      accept +
+      bodyHtml +
     '</div>';
-  let actions = '';
-  if (bucket === 'pending') {
-    actions =
-      '<button class="primary" type="button" data-act="approve" data-id="' + s.id + '">' + t('tr-approve') + '</button>' +
-      '<button type="button" data-act="edit" data-id="' + s.id + '">' + t('tr-edit') + '</button>' +
-      '<button type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>';
-  } else if (bucket === 'approved') {
-    actions = '<button type="button" data-act="reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
-  } else {
-    actions = '<button type="button" data-act="reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
+  }).join('');
+}
+
+function suggestionCard(s, status) {
+  // For non-pending columns (approved / done / cancelled): render the classic compact card.
+  if (status !== 'pending') {
+    const reasonLine = (status === 'cancelled' && s._reason) ?
+      '<div class="reason cancel-reason">' + escapeHtml(s._reason) + '</div>' : '';
+    const ctxLine = '<div class="reason">' +
+      t('tr-reason-misplaced')
+        .replace('{src}', s.src).replace('{dst}', s.dst)
+        .replace('{sold}', fmt(s.sold_dst)).replace('{stock}', fmt(s.stock_dst)) +
+      '</div>';
+    const actions = '<button type="button" data-act="reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
+    return '<div class="card" data-id="' + s.id + '">' +
+      '<div class="route"><span>' + s.src + '</span><span class="arrow">→</span><span>' + s.dst + '</span></div>' +
+      '<div class="sku">' + escapeHtml(s.code) + '</div>' +
+      '<div class="meta">' + t('tr-meta').replace('{qty}', fmt(s.qty)).replace('{amt}', fmtMoney(s.amount)) + '</div>' +
+      ctxLine + reasonLine +
+      '<div class="actions">' + actions + '</div>' +
+    '</div>';
   }
-  return '<div class="card" data-id="' + s.id + '">' +
-    '<div class="route"><span>' + s.src + '</span><span class="arrow">→</span><span>' + s.dst + '</span></div>' +
-    '<div class="sku">' + escapeHtml(s.code) + '</div>' +
+  // Pending column: variant per bucket.
+  const variant = s.bucket || 'C';
+  if (variant === 'B') return cardBucketB(s);
+  if (variant === 'C') return cardBucketC(s);
+  return cardBucketA(s);
+}
+
+function cardBucketA(s) {
+  const lineDst = t('tr-bA-line-dst')
+    .replace('{dst}', s.dst).replace('{n3}', fmt(s.destSold3 || s.sold_dst || 0))
+    .replace('{stock}', fmt(s.stock_dst || 0));
+  const lineSrc = t('tr-bA-line-src').replace('{src}', s.src);
+  return '<div class="card bA" data-id="' + s.id + '" data-bucket="A">' +
+    '<div class="route"><span>' + s.src + '</span><span class="arrow">→</span><span>' + s.dst + '</span><span class="sku">' + escapeHtml(s.code) + '</span></div>' +
     '<div class="meta">' + t('tr-meta').replace('{qty}', fmt(s.qty)).replace('{amt}', fmtMoney(s.amount)) + '</div>' +
-    ctxLine + reasonLine +
-    '<div class="actions">' + actions + '</div>' +
+    '<div class="reason">→ ' + lineDst + '</div>' +
+    '<div class="reason">→ ' + lineSrc + '</div>' +
+    '<div class="actions">' +
+      '<button class="primary" type="button" data-act="approve" data-id="' + s.id + '">' + t('tr-approve') + '</button>' +
+      '<button type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function cardBucketB(s) {
+  const all = s.allBranches || [];
+  const cands = (s.candidates || []).map(c => c.branch);
+  const rows = all.map(b => {
+    let cls = '', tag = '';
+    if (b.branch === s.src) { cls = 'src'; tag = t('tr-tbl-src'); }
+    else if (b.branch === s.dst) { cls = 'dst'; tag = t('tr-tbl-default'); }
+    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
+      '<td>' + b.branch + '</td>' +
+      '<td>' + fmt(b.stock) + '</td>' +
+      '<td>' + fmt(b.sold3) + '</td>' +
+      '<td>' + fmt(b.sold6) + '</td>' +
+      '<td class="tag">' + tag + '</td>' +
+    '</tr>';
+  }).join('');
+  const altButtons = cands.filter(b => b !== s.dst).slice(0, 2).map(b =>
+    '<button type="button" data-act="redirect" data-id="' + s.id + '" data-dst="' + b + '">' +
+      t('tr-bB-redirect').replace('{dst}', b) + '</button>'
+  ).join('');
+  const info = t('tr-bB-info')
+    .replace('{unit}', fmtMoney(s.unit_cost))
+    .replace('{y}', fmt(s.total12m || 0));
+  return '<div class="card bB" data-id="' + s.id + '" data-bucket="B">' +
+    '<div class="b-head"><span class="sku">' + escapeHtml(s.code) + '</span></div>' +
+    '<div class="b-info">' + info + '</div>' +
+    '<table class="skutable"><thead><tr>' +
+      '<th>' + t('tr-tbl-store') + '</th>' +
+      '<th>' + t('tr-tbl-stock') + '</th>' +
+      '<th>' + t('tr-tbl-3m') + '</th>' +
+      '<th>' + t('tr-tbl-6m') + '</th>' +
+      '<th></th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="b-note">' + t('tr-bB-note').replace('{dst}', s.dst) + '</div>' +
+    '<div class="meta">' + t('tr-meta').replace('{qty}', fmt(s.qty)).replace('{amt}', fmtMoney(s.amount)) + '</div>' +
+    '<div class="actions">' +
+      '<button class="primary" type="button" data-act="approve" data-id="' + s.id + '">' +
+        t('tr-bB-accept').replace('{dst}', s.dst) + '</button>' +
+      altButtons +
+      '<button type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function cardBucketC(s) {
+  const line = t('tr-bC-line')
+    .replace('{sku}', '<span class="sku">' + escapeHtml(s.code) + '</span>')
+    .replace('{src}', s.src).replace('{dst}', s.dst)
+    .replace('{qty}', fmt(s.qty)).replace('{amt}', fmtMoney(s.amount))
+    .replace('{y}', fmt(s.total12m || 0));
+  return '<div class="card bC" data-id="' + s.id + '" data-bucket="C">' +
+    '<div class="row1">' + line + '</div>' +
+    '<div class="actions">' +
+      '<button class="primary" type="button" data-act="approve" data-id="' + s.id + '">' + t('tr-approve') + '</button>' +
+      '<button type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>' +
+    '</div>' +
   '</div>';
 }
 
@@ -1388,12 +1645,17 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function handleTransferAction(act, id) {
+function handleTransferAction(act, id, extra) {
   const all = computeSuggestions();
   const s = all.find(x => x.id === id);
   if (!s) return;
   if (act === 'approve') {
-    setStatus(id, { status: 'approved', reason: '' });
+    setStatus(id, { status: 'approved', reason: '', dst_override: null });
+  } else if (act === 'redirect') {
+    // V1 1.2: bucket B "改调 W07" — accept with overridden destination
+    const newDst = extra && extra.dst;
+    if (!newDst) return;
+    setStatus(id, { status: 'approved', reason: '', dst_override: newDst });
   } else if (act === 'edit') {
     const max = s.qty;
     const cur = (getStatus(id).qty != null) ? getStatus(id).qty : s.qty;
@@ -1407,10 +1669,27 @@ function handleTransferAction(act, id) {
     if (r == null) return;
     setStatus(id, { status: 'cancelled', reason: r || t('tr-reason-cancel') });
   } else if (act === 'reset') {
-    setStatus(id, { status: 'pending', reason: '' });
+    setStatus(id, { status: 'pending', reason: '', dst_override: null });
   }
   renderTransfers();
   if (CUR_VIEW === 'warehouse') renderWarehouse();
+}
+
+/* ── V1 1.2: bucket-level actions (toggle, accept-all) ──────────── */
+function handleBucketAction(act, key) {
+  if (act === 'toggle') {
+    BUCKET_OPEN[key] = !BUCKET_OPEN[key];
+    renderTransfers();
+  } else if (act === 'accept-all') {
+    const buckets = bucketSuggestions();
+    buckets.pending.forEach(s => {
+      if (s.bucket === key) {
+        setStatus(s.id, { status: 'approved', reason: '', dst_override: null });
+      }
+    });
+    renderTransfers();
+    if (CUR_VIEW === 'warehouse') renderWarehouse();
+  }
 }
 
 /* ── Warehouse list renderer ────────────────────────────────────── */
@@ -1491,9 +1770,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Delegated handlers for kanban + warehouse buttons
   document.getElementById('trKanban').addEventListener('click', e => {
+    // V1 1.2: bucket-level actions (toggle / accept-all)
+    const bucketEl = e.target.closest('[data-bucket-act]');
+    if (bucketEl) {
+      const bAct = bucketEl.getAttribute('data-bucket-act');
+      const bKey = bucketEl.getAttribute('data-bucket');
+      handleBucketAction(bAct, bKey);
+      e.stopPropagation();
+      return;
+    }
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
-    handleTransferAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'));
+    const extra = {};
+    const dstAttr = btn.getAttribute('data-dst');
+    if (dstAttr) extra.dst = dstAttr;
+    handleTransferAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), extra);
   });
   document.getElementById('whList').addEventListener('click', e => {
     const btn = e.target.closest('button[data-act]');
