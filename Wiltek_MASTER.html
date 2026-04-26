@@ -9,6 +9,7 @@
 <script src="./session.js"></script>
 <script src="./auditlog.js"></script>
 <script src="./permissions.js"></script>
+<script src="./assets/sku-tiers.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -631,6 +632,7 @@ input:focus,select:focus,button:focus-visible{outline:none;box-shadow:0 0 0 2px 
     <div class="ni" onclick="nav('quicklinks')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span><span id="nav-links"></span></div>
     <div class="lv2" id="nav-s7"></div>
     <div class="ni" onclick="nav('tvb')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg></span><span id="nav-tvb"></span></div>
+    <div class="ni" onclick="nav('sku')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg></span><span id="nav-sku"></span></div>
     <div class="ni" onclick="nav('bistrat')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-target"/></svg></span><span id="nav-bistrat"></span></div>
     <div class="ni" onclick="nav('biwh')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg></span><span id="nav-biwh"></span></div>
     <div class="ni" onclick="nav('inv360')"><span class="nx"><svg class="ic" aria-hidden="true"><use href="#i-microscope"/></svg></span><span id="nav-inv360"></span></div>
@@ -1156,31 +1158,86 @@ input:focus,select:focus,button:focus-visible{outline:none;box-shadow:0 0 0 2px 
   <div id="tvb-status" style="display:none;margin:12px 0 18px;padding:11px 16px;border-radius:10px;font-size:12px;"></div>
 
   <!-- Section 1 — 6 store cards, this month -->
-  <div style="margin:18px 0 10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <!-- Layout: 2 rows × 3 cols (rule §1: max 3-4 cards/row).
+       Cards are now BIG enough for stacked KPI layout (label+number+delta
+       no longer crammed onto a single 90-px-wide line). -->
+  <div style="margin:18px 0 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
     <div>
-      <div id="tvb-s1-h" style="font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
-      <div id="tvb-s1-s" style="font-size:11px;color:var(--text-mu);margin-top:2px;"></div>
+      <div id="tvb-s1-h" style="font-size:18px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+      <div id="tvb-s1-s" style="font-size:13px;color:var(--text-mu);margin-top:2px;"></div>
     </div>
-    <div id="tvb-s1-period" style="font-size:10px;font-family:'Geist Mono','JetBrains Mono',monospace;color:var(--text-mu);letter-spacing:.5px;"></div>
+    <div id="tvb-s1-period" style="font-size:12px;font-family:'Geist Mono','JetBrains Mono',monospace;color:var(--text-mu);letter-spacing:.5px;font-variant-numeric:tabular-nums;"></div>
   </div>
-  <div id="tvb-cards" style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:32px;"></div>
+  <div id="tvb-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:36px;"></div>
 
   <!-- Section 2 — Top 3 things to watch -->
-  <div style="margin:0 0 10px;">
-    <div id="tvb-s2-h" style="font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
-    <div id="tvb-s2-s" style="font-size:11px;color:var(--text-mu);margin-top:2px;"></div>
+  <div style="margin:0 0 14px;">
+    <div id="tvb-s2-h" style="font-size:18px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+    <div id="tvb-s2-s" style="font-size:13px;color:var(--text-mu);margin-top:2px;"></div>
   </div>
-  <div id="tvb-watch" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:32px;"></div>
+  <div id="tvb-watch" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:36px;"></div>
 
   <!-- Section 3 — 6-line trend, basket proxy -->
-  <div style="margin:0 0 10px;">
-    <div id="tvb-s3-h" style="font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
-    <div id="tvb-s3-s" style="font-size:11px;color:var(--text-mu);margin-top:2px;"></div>
+  <div style="margin:0 0 14px;">
+    <div id="tvb-s3-h" style="font-size:18px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+    <div id="tvb-s3-s" style="font-size:13px;color:var(--text-mu);margin-top:2px;"></div>
   </div>
   <div class="card" style="padding:18px 20px 14px;">
     <div class="cv" style="height:280px;"><canvas id="tvbBasketChart"></canvas></div>
-    <div id="tvb-s3-note" style="font-size:10px;color:var(--text-mu);margin-top:8px;font-family:'Geist Mono','JetBrains Mono',monospace;letter-spacing:.3px;"></div>
+    <div id="tvb-s3-note" style="font-size:11px;color:var(--text-mu);margin-top:8px;font-family:'Geist Mono','JetBrains Mono',monospace;letter-spacing:.3px;font-variant-numeric:tabular-nums;"></div>
   </div>
+</div>
+
+<!-- ══════════ SKU TIERING (BI Cut #2) ══════════
+  ABC analysis on 6 ops branches × 6 months sales (2025-10 → 2026-03).
+  Data source: tools/build-sku-tiers.py → assets/sku-tiers.js.
+
+  Three sections + an Ampang banner above:
+    - Banner   : Days-to-5/1 + recommended A/B/D counts.
+    - Section 1: 4 tier cards (A/B/C/D distribution by SKU count
+                 + 6 m sales + stock value share + auto-diagnostic).
+    - Section 2: Top 5 SKUs to watch (high-stock-zero-sales,
+                 hot-but-low-cover, declining ≥ 50%) with action
+                 buttons.
+    - Section 3: 6×4 matrix (branch × tier) — count + sales% + stock%
+                 per cell + auto-diagnostic ("W02 D 占库存 54%…").
+
+  All 20 visual rules apply — see tests/e2e/wiltek-visual-rules.spec.ts.
+-->
+<div class="page" id="p-sku">
+  <div class="ph" id="sku-ph"></div>
+  <div class="ps" id="sku-ps"></div>
+
+  <!-- Status banner — only shown when WP_SKU is missing/old. -->
+  <div id="sku-status" style="display:none;margin:12px 0 18px;padding:11px 16px;border-radius:10px;font-size:12px;"></div>
+
+  <!-- Ampang countdown banner -->
+  <div id="sku-ampang" style="margin:18px 0 28px;"></div>
+
+  <!-- Section 1 — 4 tier cards -->
+  <div style="margin:0 0 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div>
+      <div id="sku-s1-h" style="font-size:18px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+      <div id="sku-s1-s" style="font-size:13px;color:var(--text-mu);margin-top:2px;"></div>
+    </div>
+    <div id="sku-s1-period" style="font-size:12px;font-family:'Geist Mono','JetBrains Mono',monospace;color:var(--text-mu);letter-spacing:.5px;font-variant-numeric:tabular-nums;"></div>
+  </div>
+  <div id="sku-tiers" style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-bottom:36px;"></div>
+
+  <!-- Section 2 — Top 5 SKUs to watch -->
+  <div style="margin:0 0 14px;">
+    <div id="sku-s2-h" style="font-size:18px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+    <div id="sku-s2-s" style="font-size:13px;color:var(--text-mu);margin-top:2px;"></div>
+  </div>
+  <div id="sku-watch" style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:36px;"></div>
+
+  <!-- Section 3 — 6×4 matrix -->
+  <div style="margin:0 0 14px;">
+    <div id="sku-s3-h" style="font-size:18px;font-weight:600;letter-spacing:-.2px;color:var(--text);"></div>
+    <div id="sku-s3-s" style="font-size:13px;color:var(--text-mu);margin-top:2px;"></div>
+  </div>
+  <div id="sku-matrix" style="overflow-x:auto;margin-bottom:14px;"></div>
+  <div id="sku-matrix-diag" style="font-size:13px;line-height:1.55;color:var(--text);background:var(--s2);border-left:2px solid var(--amber);padding:10px 14px;border-radius:0 6px 6px 0;"></div>
 </div>
 
 <!-- ══════════ GTD (Task Engine) ══════════ -->
@@ -2050,6 +2107,7 @@ const T = {
   nav_links: {en:'Quick Links',zh:'快速链接'},
   nav_s7:{en:'BI WAR ROOM',zh:'BI 作战室'},
   nav_tvb:{en:'Traffic vs Basket',zh:'客流 vs 客单价'},
+  nav_sku:{en:'SKU Tiering',zh:'SKU 分级'},
   nav_bistrat:{en:'BI Strategic',zh:'BI 战略'},
   nav_biwh:{en:'BI Warehouse',zh:'BI 仓库'},
   nav_inv360:{en:'Inventory 360',zh:'库存 360'},
@@ -2171,7 +2229,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
   // L2: s1..s8 section headers (inside Deep Dive).
   // L3: original 18 page leaves.
   ['today','deepdive','settings',
-   's1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','tvb','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
+   's1','health','pl','cf','s2','gp','br','s3','inv','exp','s4','act','s5','bs','cust','s6','hub','bt','links','s7','tvb','sku','bistrat','biwh','inv360','s8','gtd','prop','val'].forEach(k=>{
     const el=document.getElementById('nav-'+k);
     if(el) el.textContent=t('nav_'+k);
   });
@@ -2191,6 +2249,7 @@ function render(){ _editIdx=0; Object.keys(_editCbs).forEach(k=>delete _editCbs[
     ()=>renderBranchToday(),
     ()=>renderQuickLinks(),
     ()=>renderTrafficVsBasket(),
+    ()=>renderSkuTiering(),
     ()=>renderBIStrategic(),
     ()=>renderBIWarehouse(),
     ()=>renderInventory360(),
@@ -5397,21 +5456,23 @@ function _tvbDiagnose(m, en){
 }
 
 // Display helpers — pills + cells. Two-color rule: green = good, amber = warn.
+// Font size 12px (rule §5: 3-tier scale, deltas sit at the smallest tier
+// alongside labels). Tabular-nums so a "+5%" doesn't shift relative to "+15%".
 function _tvbDeltaPill(p){
   if (p == null || !Number.isFinite(p))
-    return '<span style="font-size:10px;color:var(--text-mu);font-family:\'Geist Mono\',\'JetBrains Mono\',monospace;">—</span>';
+    return '<span style="font-size:12px;color:var(--text-mu);font-family:\'Geist Mono\',\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">—</span>';
   const good = p >= 0;
   const col = good ? 'var(--emerald)' : 'var(--amber)';
   const sign = good ? '+' : '';
-  return `<span style="font-size:10px;color:${col};font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;">${sign}${(p*100).toFixed(0)}%</span>`;
+  return `<span style="font-size:12px;color:${col};font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;font-variant-numeric:tabular-nums;">${sign}${(p*100).toFixed(0)}%</span>`;
 }
 function _tvbDeltaPP(pp){
   if (pp == null || !Number.isFinite(pp))
-    return '<span style="font-size:10px;color:var(--text-mu);font-family:\'Geist Mono\',\'JetBrains Mono\',monospace;">—</span>';
+    return '<span style="font-size:12px;color:var(--text-mu);font-family:\'Geist Mono\',\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">—</span>';
   const good = pp >= 0;
   const col = good ? 'var(--emerald)' : 'var(--amber)';
   const sign = good ? '+' : '';
-  return `<span style="font-size:10px;color:${col};font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;">${sign}${pp.toFixed(1)}pp</span>`;
+  return `<span style="font-size:12px;color:${col};font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;font-variant-numeric:tabular-nums;">${sign}${pp.toFixed(1)}pp</span>`;
 }
 function _tvbCellVal(v, fmt){
   if (v == null || !Number.isFinite(v)) return '—';
@@ -5422,35 +5483,63 @@ function _tvbCellVal(v, fmt){
 }
 
 // One branch card for Section 1.
-function _tvbCardHtml(m, en, pairLbl){
+//
+// Visual surgery (BI Cut #1.1) — Jym fed back "non-human readable":
+//   - Cards used to crowd 6-in-a-row. Now 3-in-a-row → ~ 290 px wide each,
+//     enough room for proper stacked KPI rows.
+//   - Each KPI row used to be one cramped line: label + number + delta
+//     all on the same flex baseline at 10/12px. Now stacked: tiny label
+//     on top, big number + delta on a single right-aligned row.
+//   - The 5 KPIs were always all rendered, so a branch missing walk-in
+//     data showed 3 rows of plain "—" placeholders. Now we drop any KPI
+//     where both `value` and `delta` are null/missing — and if the count
+//     of dropped rows ≥ 2, we collapse them into a single Phase-4 note
+//     line ("此 N 个指标待 Phase 4 接入 Floatation 详细数据") instead.
+//   - Card-level period badge ("Mar 2026 vs Feb 2026") is removed —
+//     it duplicated the section-header badge. One source of truth.
+//   - Numbers use tabular-nums and right-align; 3-tier font scale
+//     (KPI value 16px, label 11px, diag 12px).
+function _tvbCardHtml(m, en){
   const name = en ? m.name_en : m.name_zh;
   const diag = _tvbDiagnose(m, en);
   const accent = m.rev_pct == null ? 'var(--text-mu)' : (m.rev_pct >= 0 ? 'var(--emerald)' : 'var(--amber)');
-  const rows = [
-    { lbl: en?'Revenue':'营收',     v: _tvbCellVal(m.rev_now,    'rm'),  d: _tvbDeltaPill(m.rev_pct) },
-    { lbl: en?'Walk-in':'进店',     v: _tvbCellVal(m.walk_now,   'int'), d: _tvbDeltaPill(m.walk_pct) },
-    { lbl: en?'Customers':'成交客户', v: _tvbCellVal(m.tx_now,     'int'), d: _tvbDeltaPill(m.tx_pct) },
-    { lbl: en?'Conversion':'转化率',  v: _tvbCellVal(m.cr_now,     'pct'), d: _tvbDeltaPP(m.cr_pp) },
-    { lbl: en?'Basket':'客单价',     v: _tvbCellVal(m.basket_now, 'rm'),  d: _tvbDeltaPill(m.basket_pct) },
+  const allRows = [
+    { lbl: en?'Revenue':'营收',     v: m.rev_now,    fmt:'rm',  d: m.rev_pct,    isPP:false },
+    { lbl: en?'Walk-in':'进店',     v: m.walk_now,   fmt:'int', d: m.walk_pct,   isPP:false },
+    { lbl: en?'Customers':'成交客户', v: m.tx_now,    fmt:'int', d: m.tx_pct,     isPP:false },
+    { lbl: en?'Conversion':'转化率',  v: m.cr_now,    fmt:'pct', d: m.cr_pp,      isPP:true  },
+    { lbl: en?'Basket':'客单价',     v: m.basket_now, fmt:'rm',  d: m.basket_pct, isPP:false },
   ];
-  const rowsHtml = rows.map(r => `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px dashed var(--bdr-w);">
-      <span style="font-size:10px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${r.lbl}</span>
-      <span style="display:flex;align-items:baseline;gap:8px;">
-        <span style="font-size:12px;color:var(--text);font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;">${r.v}</span>
-        ${r.d}
-      </span>
-    </div>`).join('');
+  const valid  = allRows.filter(r => Number.isFinite(r.v));
+  const missing = allRows.length - valid.length;
+  const rowsHtml = valid.map(r => {
+    const valTxt = _tvbCellVal(r.v, r.fmt);
+    const delta  = r.isPP ? _tvbDeltaPP(r.d) : _tvbDeltaPill(r.d);
+    return `
+      <div style="display:flex;flex-direction:column;gap:3px;padding:8px 0;border-bottom:1px dashed var(--bdr-w);">
+        <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${r.lbl}</div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+          <span style="font-size:16px;color:var(--text);font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;flex:1;">${valTxt}</span>
+          <span style="min-width:54px;text-align:right;">${delta}</span>
+        </div>
+      </div>`;
+  }).join('');
+  const phaseNote = missing >= 2 ? `
+    <div style="margin-top:10px;padding:8px 10px;font-size:11px;color:var(--text-mu);background:var(--s2);border-radius:6px;line-height:1.5;">
+      ${en
+        ? `${missing} metrics pending — awaiting Floatation detail (Phase 4).`
+        : `此 ${missing} 个指标待 Phase 4 接入 Floatation 详细数据。`}
+    </div>` : '';
   return `
-    <div class="tvb-card" data-branch="${m.branch}" onclick="tvbGotoBranch('${m.branch}')" style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-radius:12px;padding:16px 16px 14px;cursor:pointer;transition:transform .15s,border-color .15s;position:relative;overflow:hidden;">
+    <div class="tvb-card" data-branch="${m.branch}" onclick="tvbGotoBranch('${m.branch}')" style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-radius:12px;padding:18px 18px 16px;cursor:pointer;transition:transform .15s,border-color .15s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${accent};opacity:.6;"></div>
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:8px;">
-        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--text);letter-spacing:-.2px;">${m.branch}</span>
-        <span style="font-size:9px;color:var(--text-mu);">${pairLbl}</span>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--text);letter-spacing:-.2px;">${m.branch}</span>
+        <span style="font-size:11px;color:var(--text-mu);line-height:1.3;text-align:right;flex:1;margin-left:8px;">${(name||'').replace(m.branch+' ','')}</span>
       </div>
-      <div style="font-size:10.5px;color:var(--text-mu);margin-bottom:10px;line-height:1.4;">${(name||'').replace(m.branch+' ','')}</div>
-      <div style="margin-bottom:12px;">${rowsHtml}</div>
-      <div style="font-size:11px;line-height:1.55;color:var(--text);background:var(--s2);border-left:2px solid ${accent};padding:8px 10px;border-radius:0 6px 6px 0;">${diag}</div>
+      <div>${rowsHtml}</div>
+      ${phaseNote}
+      <div style="font-size:12px;line-height:1.55;color:var(--text);background:var(--s2);border-left:2px solid ${accent};padding:9px 11px;border-radius:0 6px 6px 0;">${diag}</div>
     </div>`;
 }
 
@@ -5482,23 +5571,23 @@ function _tvbWatchHtml(m, severity, en){
   ];
   const statsHtml = stats.map(s => `
     <div>
-      <div style="font-size:9px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:3px;">${s.l}</div>
-      <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--text);">${s.v}</div>
-      <div style="margin-top:3px;">${_tvbDeltaPill(s.d)}</div>
+      <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:4px;">${s.l}</div>
+      <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-.3px;">${s.v}</div>
+      <div style="margin-top:4px;">${_tvbDeltaPill(s.d)}</div>
     </div>`).join('');
   return `
     <div style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-left:3px solid ${sevColor};border-radius:12px;padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
-        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:${sevColor};">${sevLbl}</span>
-        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:9px;color:var(--text-mu);">${m.branch}</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:${sevColor};">${sevLbl}</span>
+        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:12px;color:var(--text-mu);">${m.branch}</span>
       </div>
-      <div style="font-size:14px;font-weight:600;line-height:1.35;color:var(--text);letter-spacing:-.1px;">${title}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">${statsHtml}</div>
-      <div style="font-size:11px;line-height:1.55;color:var(--text-mu);">${diag}</div>
+      <div style="font-size:15px;font-weight:600;line-height:1.35;color:var(--text);letter-spacing:-.1px;">${title}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;">${statsHtml}</div>
+      <div style="font-size:12px;line-height:1.55;color:var(--text-mu);">${diag}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;">
-        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','flag')"    aria-label="${en?'Mark handled':'标记处理'}" title="${en?'Mark handled':'标记处理'}" style="flex:1;background:rgba(0,217,126,.1);border:1px solid rgba(0,217,126,.28);color:var(--emerald);padding:5px 0;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;">${en?'Mark handled':'标记处理'}</button>
-        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','observe')" aria-label="${en?'Observe 14d':'观察 14 天'}" title="${en?'Observe 14d':'观察 14 天'}" style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:5px 0;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;">${en?'Observe 14d':'观察 14 天'}</button>
-        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','push')"    aria-label="${en?'Push to team':'推送给团队'}" title="${en?'Push to team':'推送给团队'}" style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:5px 0;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;">${en?'Push to team':'推送给团队'}</button>
+        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','flag')"    aria-label="${en?'Mark handled':'标记处理'}" title="${en?'Mark handled':'标记处理'}" style="flex:1;background:rgba(0,217,126,.1);border:1px solid rgba(0,217,126,.28);color:var(--emerald);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">${en?'Mark handled':'标记处理'}</button>
+        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','observe')" aria-label="${en?'Observe 14d':'观察 14 天'}" title="${en?'Observe 14d':'观察 14 天'}" style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">${en?'Observe 14d':'观察 14 天'}</button>
+        <button onclick="event.stopPropagation();tvbWatchAction('${m.branch}','push')"    aria-label="${en?'Push to team':'推送给团队'}" title="${en?'Push to team':'推送给团队'}" style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">${en?'Push to team':'推送给团队'}</button>
       </div>
     </div>`;
 }
@@ -5669,7 +5758,7 @@ async function renderTrafficVsBasket(){
   const floatAll = TVB_FLOAT_CACHE;
   const allMetrics = TVB_BRANCHES.map(b => _tvbBranchMetrics(b, floatAll, pair));
 
-  document.getElementById('tvb-cards').innerHTML = allMetrics.map(m=>_tvbCardHtml(m, en, pairLbl)).join('');
+  document.getElementById('tvb-cards').innerHTML = allMetrics.map(m=>_tvbCardHtml(m, en)).join('');
 
   const picks = _tvbWatchPick(allMetrics);
   const wEl = document.getElementById('tvb-watch');
@@ -5720,15 +5809,320 @@ async function renderTrafficVsBasket(){
   css.id = 'tvb-mq-style';
   css.textContent = `
     .tvb-card:hover { transform: translateY(-2px); border-color: rgba(255,250,240,.18) !important; }
-    @media(max-width:1280px){
-      #tvb-cards { grid-template-columns: repeat(3,1fr) !important; }
-    }
-    @media(max-width:960px){
-      #tvb-cards { grid-template-columns: repeat(2,1fr) !important; }
-      #tvb-watch { grid-template-columns: 1fr !important; }
+    /* Default: 3 cols × 2 rows (set inline). Below 1024 px we drop to 2,
+       below 600 px we stack — rule §2 (mobile 380 px = single column). */
+    @media(max-width:1024px){
+      #tvb-cards { grid-template-columns: repeat(2,1fr) !important; gap: 18px !important; }
+      #tvb-watch { grid-template-columns: 1fr !important; gap: 18px !important; }
     }
     @media(max-width:600px){
-      #tvb-cards { grid-template-columns: 1fr !important; }
+      #tvb-cards { grid-template-columns: 1fr !important; gap: 14px !important; }
+    }
+  `;
+  document.head.appendChild(css);
+})();
+
+// ══════════════════════════════════════════════════════════
+// SKU TIERING PAGE (BI Cut #2)
+// ══════════════════════════════════════════════════════════
+//
+// Reads window.WP_SKU (built by tools/build-sku-tiers.py from the
+// Sales/Stock/PO/GRN xlsx). Renders the same data slice in 4 panels:
+//
+//   - Ampang banner (countdown to 5/1 + carry-list summary).
+//   - 4 tier cards (A/B/C/D rollups + per-card auto-diagnostic).
+//   - Top-5 SKUs to watch (risk × value, with action buttons).
+//   - 6×4 matrix (branch × tier) + bottom-line auto-diagnostic.
+//
+// All numbers are right-aligned with tabular-nums; thousand separator
+// is `,`; only emerald + amber are used for color signals (rule §13).
+
+var SKU_FMT = (function(){
+  // RM formatter — 0 decimals, en-MY thousand separator (rule §11).
+  function rmInt(n){
+    if (n == null || !Number.isFinite(n)) return '—';
+    return 'RM ' + Number(n).toLocaleString('en-MY', {maximumFractionDigits:0, minimumFractionDigits:0});
+  }
+  function intFmt(n){
+    if (n == null || !Number.isFinite(n)) return '—';
+    return Number(n).toLocaleString('en-MY');
+  }
+  function pct(n){
+    if (n == null || !Number.isFinite(n)) return '—';
+    return Number(n).toFixed(1) + '%';
+  }
+  function pct0(n){
+    if (n == null || !Number.isFinite(n)) return '—';
+    return Number(n).toFixed(0) + '%';
+  }
+  return { rmInt: rmInt, intFmt: intFmt, pct: pct, pct0: pct0 };
+})();
+
+// 4-tier cards. Color rule §13: emerald = good, amber = warn, neutral = info.
+// A is "the spine" (good), D is "dead stock" (warn). B/C neutral.
+function _skuTierCard(t, en){
+  // Color signal — keep it sparing (rule §15).
+  // A → emerald (your wins). D → amber (your problem).
+  // B / C → neutral grey, so the eye lands on A and D first.
+  let accent = 'var(--text-mu)';
+  let badge = en ? 'NEUTRAL' : '中性';
+  if (t.tier === 'A'){ accent = 'var(--emerald)'; badge = en ? 'WINS' : '主力'; }
+  if (t.tier === 'D'){ accent = 'var(--amber)';   badge = en ? 'DEAD' : '呆货'; }
+  return `
+    <div class="sku-card sku-card-${t.tier}" data-tier="${t.tier}" style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-radius:12px;padding:18px 18px 16px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${accent};opacity:.6;"></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+        <span style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:28px;font-weight:700;color:var(--text);letter-spacing:-.5px;">${t.tier}</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:${accent};">${badge}</span>
+      </div>
+      <div>
+        <div style="display:flex;flex-direction:column;gap:3px;padding:8px 0;border-bottom:1px dashed var(--bdr-w);">
+          <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${en?'SKU count':'SKU 数量'}</div>
+          <div style="font-size:20px;color:var(--text);font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;font-variant-numeric:tabular-nums;">${SKU_FMT.intFmt(t.count)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;padding:8px 0;border-bottom:1px dashed var(--bdr-w);">
+          <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${en?'6m sales':'6 月销售'}</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+            <span style="font-size:16px;color:var(--text);font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(t.sales_6m)}</span>
+            <span style="font-size:12px;color:var(--text-mu);font-family:'Geist Mono','JetBrains Mono',monospace;font-variant-numeric:tabular-nums;min-width:54px;text-align:right;">${SKU_FMT.pct(t.pct_sales)}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;padding:8px 0;">
+          <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${en?'Stock value':'库存价值'}</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+            <span style="font-size:16px;color:var(--text);font-family:'Geist Mono','JetBrains Mono',monospace;font-weight:600;font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(t.stock_val)}</span>
+            <span style="font-size:12px;color:var(--text-mu);font-family:'Geist Mono','JetBrains Mono',monospace;font-variant-numeric:tabular-nums;min-width:54px;text-align:right;">${SKU_FMT.pct(t.pct_stock)}</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;line-height:1.55;color:var(--text);background:var(--s2);border-left:2px solid ${accent};padding:9px 11px;border-radius:0 6px 6px 0;">${en ? t.diag_en : t.diag_zh}</div>
+    </div>`;
+}
+
+// One watch row — full-width; left half = SKU + numbers, right = action buttons.
+function _skuWatchRow(w, en){
+  let accent = 'var(--amber)';
+  if (w.tier === 'A') accent = 'var(--emerald)';
+  return `
+    <div class="sku-watch-row" data-code="${w.code}" style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-left:3px solid ${accent};border-radius:12px;padding:16px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;">
+      <div style="min-width:120px;">
+        <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.2px;">${w.code}</div>
+        <div style="font-size:11px;color:var(--text-mu);margin-top:3px;line-height:1.4;">${w.name}</div>
+        <div style="margin-top:6px;display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:${accent};padding:3px 9px;border:1px solid ${accent};border-radius:99px;">${en?'Tier':'级别'} ${w.tier}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">
+        <div>
+          <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:4px;">${en?'6m sales':'6 月销售'}</div>
+          <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:16px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(w.sales_6m)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:4px;">${en?'Stock value':'库存价值'}</div>
+          <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:16px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(w.stock_val)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:4px;">${en?'Last 3m / prior 3m':'近 3 月 / 上 3 月'}</div>
+          <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(w.p3_late)} <span style="color:var(--text-mu);">/</span> ${SKU_FMT.rmInt(w.p3_early)}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:130px;">
+        <div style="font-size:12px;line-height:1.55;color:var(--text-mu);margin-bottom:4px;">${en ? w.diag_en : w.diag_zh}</div>
+        <div style="display:flex;gap:6px;">
+          <button onclick="event.stopPropagation();skuWatchAction('${w.code}','clear')"   style="flex:1;background:rgba(246,166,9,.1);border:1px solid rgba(246,166,9,.3);color:var(--amber);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">${en?'Liquidate':'清仓'}</button>
+          <button onclick="event.stopPropagation();skuWatchAction('${w.code}','watch')"   style="flex:1;background:rgba(140,132,121,.08);border:1px solid var(--bdr-w);color:var(--text-mu);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">${en?'Watch':'观察'}</button>
+          <button onclick="event.stopPropagation();skuWatchAction('${w.code}','done')"    style="flex:1;background:rgba(0,217,126,.1);border:1px solid rgba(0,217,126,.28);color:var(--emerald);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;">${en?'Decided':'已决'}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function skuWatchAction(code, kind){
+  const en = lang === 'en';
+  const msg_en = ({clear:'Liquidation queued',watch:'Watching',done:'Marked decided'})[kind] || 'Done';
+  const msg_zh = ({clear:'已加入清仓队列',watch:'已加入观察',done:'已标记决定'})[kind] || '完成';
+  try { _skuToast((en?msg_en:msg_zh) + ' · ' + code); } catch(e){ console.error(e); }
+}
+
+function _skuToast(msg){
+  let el = document.getElementById('sku-toast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'sku-toast';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-raised);border:1px solid var(--bdr-w);color:var(--text);padding:9px 18px;border-radius:99px;font-size:12px;font-weight:600;box-shadow:var(--sh-2);z-index:1000;opacity:0;transition:opacity .2s,transform .2s;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(()=>{ el.style.opacity='1'; el.style.transform='translateX(-50%) translateY(0)'; });
+  clearTimeout(_skuToast._t);
+  _skuToast._t = setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(20px)'; }, 1800);
+}
+
+// 6×4 matrix → table. Rows = branch, cols = tier. Each cell shows
+// SKU count + sales% + stock% (compact, all right-aligned tabular-nums).
+function _skuMatrixHtml(matrix, en){
+  const tiers = ['A','B','C','D'];
+  const branches = (window.WP_SKU && window.WP_SKU.meta && window.WP_SKU.meta.branches) || ['W01','W02','W03','W05','W07','W11'];
+  const head = `
+    <tr>
+      <th style="text-align:left;padding:10px 12px;font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;border-bottom:1px solid var(--bdr-w);">${en?'Branch':'门市'}</th>
+      ${tiers.map(t => `<th style="text-align:right;padding:10px 12px;font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;border-bottom:1px solid var(--bdr-w);">${en?'Tier':'级别'} ${t}</th>`).join('')}
+    </tr>`;
+  const rows = branches.map(b => {
+    const cells = tiers.map(t => {
+      const c = (matrix && matrix[b] && matrix[b][t]) || {count:0, sales_pct:0, stock_pct:0};
+      // Highlight cells where D-tier holds ≥ 30% of this branch's stock value.
+      const warn = (t === 'D' && c.stock_pct >= 30);
+      const bg = warn ? 'background:rgba(246,166,9,.08);' : '';
+      const col = warn ? 'var(--amber)' : 'var(--text)';
+      return `
+        <td style="${bg}text-align:right;padding:10px 12px;border-bottom:1px solid var(--bdr-w);font-family:'Geist Mono','JetBrains Mono',monospace;font-variant-numeric:tabular-nums;">
+          <div style="font-size:14px;font-weight:600;color:${col};">${SKU_FMT.intFmt(c.count)}</div>
+          <div style="font-size:11px;color:var(--text-mu);margin-top:2px;">${en?'sales':'销售'} ${SKU_FMT.pct(c.sales_pct)}</div>
+          <div style="font-size:11px;color:${warn?'var(--amber)':'var(--text-mu)'};">${en?'stock':'库存'} ${SKU_FMT.pct(c.stock_pct)}</div>
+        </td>`;
+    }).join('');
+    return `
+      <tr>
+        <td style="text-align:left;padding:10px 12px;font-family:'Geist Mono','JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--bdr-w);">${b}</td>
+        ${cells}
+      </tr>`;
+  }).join('');
+  return `
+    <table style="width:100%;border-collapse:collapse;background:var(--bg-raised);border:1px solid var(--bdr-w);border-radius:12px;overflow:hidden;">
+      <thead>${head}</thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function _skuAmpangBanner(a, en){
+  const days = a.days;
+  const recA = a.rec_a_count;
+  const recB = a.rec_b_count;
+  const avoidD = a.avoid_d_count;
+  const recVal = a.rec_a_value;
+  const avoidVal = a.avoid_d_value;
+  // Days color: emerald if > 14, amber otherwise (closer = more urgent).
+  const accent = days > 14 ? 'var(--emerald)' : 'var(--amber)';
+  const headline_en = days >= 0
+    ? `Ampang opens in ${days} days — carry list ready.`
+    : `Ampang opened ${-days} days ago.`;
+  const headline_zh = days >= 0
+    ? `距离 Ampang 开店还有 ${days} 天 — 调货清单已就绪。`
+    : `Ampang 已开店 ${-days} 天。`;
+  return `
+    <div style="background:var(--bg-raised);border:1px solid var(--bdr-w);border-left:3px solid ${accent};border-radius:12px;padding:18px 22px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;">
+      <div style="text-align:center;min-width:88px;">
+        <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:32px;font-weight:700;color:${accent};letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1;">${days}</div>
+        <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">${en?'days':'天'}</div>
+      </div>
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--text);letter-spacing:-.2px;line-height:1.3;">${en ? headline_en : headline_zh}</div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;">
+          <div>
+            <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${en?'Bring A-tier':'带 A 级'}</div>
+            <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--emerald);font-variant-numeric:tabular-nums;margin-top:3px;">${SKU_FMT.intFmt(recA)} <span style="font-size:12px;color:var(--text-mu);">SKU</span></div>
+            <div style="font-size:11px;color:var(--text-mu);margin-top:2px;font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(recVal)} ${en?'6m sales':'6 月销售'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${en?'Bring B-front':'带 B 前线'}</div>
+            <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;margin-top:3px;">${SKU_FMT.intFmt(recB)} <span style="font-size:12px;color:var(--text-mu);">SKU</span></div>
+            <div style="font-size:11px;color:var(--text-mu);margin-top:2px;">${en?'top-100 by sales':'按销售前 100'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-mu);text-transform:uppercase;letter-spacing:.8px;font-weight:600;">${en?'Avoid D-tier':'避开 D 级'}</div>
+            <div style="font-family:'Geist Mono','JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--amber);font-variant-numeric:tabular-nums;margin-top:3px;">${SKU_FMT.intFmt(avoidD)} <span style="font-size:12px;color:var(--text-mu);">SKU</span></div>
+            <div style="font-size:11px;color:var(--text-mu);margin-top:2px;font-variant-numeric:tabular-nums;">${SKU_FMT.rmInt(avoidVal)} ${en?'dead stock':'呆货价值'}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSkuTiering(){
+  const page = document.getElementById('p-sku');
+  if (!page) return;
+  const en = lang === 'en';
+  const data = window.WP_SKU;
+
+  txt(document.getElementById('sku-ph'),
+    '<svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg> SKU Tiering',
+    '<svg class="ic" aria-hidden="true"><use href="#i-bar-chart"/></svg> SKU 分级');
+  txt(document.getElementById('sku-ps'),
+    'A/B/C/D classification + dead-stock alert · auto-priorities for Ampang carry-list',
+    'A/B/C/D 分级 + 呆货警报 · Ampang 调货自动优先');
+
+  const status = document.getElementById('sku-status');
+  if (!data || !data.tiers){
+    status.style.display = 'block';
+    status.style.background = 'rgba(246,166,9,.08)';
+    status.style.border = '1px solid rgba(246,166,9,.3)';
+    status.style.color = 'var(--amber)';
+    status.innerHTML = en
+      ? 'SKU tiering data missing — run <code>tools/build-sku-tiers.py</code> to regenerate.'
+      : 'SKU 分级数据缺失 — 请运行 <code>tools/build-sku-tiers.py</code> 重新生成。';
+    return;
+  }
+  status.style.display = 'none';
+
+  // Ampang banner
+  if (data.ampang){
+    document.getElementById('sku-ampang').innerHTML = _skuAmpangBanner(data.ampang, en);
+  } else {
+    document.getElementById('sku-ampang').innerHTML = '';
+  }
+
+  // Section 1 headers + period badge
+  txt(document.getElementById('sku-s1-h'),
+    'Company-wide SKU tier distribution',
+    '全公司 SKU 分布');
+  txt(document.getElementById('sku-s1-s'),
+    'ABC by 6-month sales (cum 80/95/99). D = any of: 60-day zero sales · stock cover > 6 months · 3m-vs-prior-3m drop ≥ 50%.',
+    'ABC 按 6 月销售累计 80/95/99 划分。D 等级任一条件触发:60 天零销售 / 库存够卖 > 6 个月 / 近 3 月比上 3 月跌 ≥ 50%。');
+  document.getElementById('sku-s1-period').textContent = (data.meta && data.meta.period) || '';
+
+  // 4 tier cards
+  document.getElementById('sku-tiers').innerHTML = (data.tiers || []).map(t => _skuTierCard(t, en)).join('');
+
+  // Top-5 watch
+  txt(document.getElementById('sku-s2-h'),
+    'Top 5 SKUs to watch',
+    '本月最该看的 5 个 SKU');
+  txt(document.getElementById('sku-s2-s'),
+    'Auto-prioritized by risk × value: high stock + zero recent sales · hot-selling + low cover · sharp 3-month decline.',
+    '按风险 × 价值自动排序:高库存零销售 / 销量好库存少 / 近 3 月销售骤跌。');
+  const wEl = document.getElementById('sku-watch');
+  if (!data.watch || !data.watch.length){
+    wEl.innerHTML = `<div style="background:transparent;border:1px dashed var(--bdr-w);border-radius:12px;padding:32px 16px;color:var(--text-mu);font-size:13px;text-align:center;">${en?'No urgent SKUs this month — inventory healthy.':'本月无急需关注的 SKU — 库存健康。'}</div>`;
+  } else {
+    wEl.innerHTML = data.watch.map(w => _skuWatchRow(w, en)).join('');
+  }
+
+  // 6×4 matrix
+  txt(document.getElementById('sku-s3-h'),
+    '6 stores × A/B/C/D distribution',
+    '6 店 × A/B/C/D 分布对比');
+  txt(document.getElementById('sku-s3-s'),
+    'Each cell: SKU count + sales % + stock %. Amber = D-tier holds ≥ 30% of branch stock value.',
+    '每格:SKU 数量 + 销售占比 + 库存占比。琥珀色 = 该店 D 级 SKU 占库存价值 ≥ 30%。');
+  document.getElementById('sku-matrix').innerHTML = _skuMatrixHtml(data.matrix, en);
+  document.getElementById('sku-matrix-diag').textContent = en ? (data.matrix_diag_en || '') : (data.matrix_diag_zh || '');
+}
+
+// Mobile-friendly grids — match TVB rule §2.
+(function _skuMqStyle(){
+  if (document.getElementById('sku-mq-style')) return;
+  const css = document.createElement('style');
+  css.id = 'sku-mq-style';
+  css.textContent = `
+    .sku-card { transition: transform .15s, border-color .15s; }
+    .sku-card:hover { transform: translateY(-2px); border-color: rgba(255,250,240,.18) !important; }
+    @media(max-width:1280px){
+      #sku-tiers { grid-template-columns: repeat(2,1fr) !important; gap: 18px !important; }
+    }
+    @media(max-width:960px){
+      .sku-watch-row { grid-template-columns: 1fr !important; gap: 12px !important; }
+    }
+    @media(max-width:600px){
+      #sku-tiers { grid-template-columns: 1fr !important; gap: 14px !important; }
     }
   `;
   document.head.appendChild(css);

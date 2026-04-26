@@ -48,23 +48,23 @@
     owner: [
       'today','settings',
       'health','pl','cashflow','gp','branches','balancesheet','expenses',
-      'inventory','customers','tvb','bistrat','biwh','inv360',
+      'inventory','customers','tvb','sku','bistrat','biwh','inv360',
       'gtd','proposals','action','valuation','branchhub','branchtoday','quicklinks'
     ],
     finance: [
       'today',
       'health','pl','cashflow','gp','branches','balancesheet','expenses',
-      'inventory','customers','tvb','branchtoday',
+      'inventory','customers','tvb','sku','branchtoday',
       'gtd','proposals','action','quicklinks'
     ],
     bi_consultant: [
       'today',
-      'inventory','customers','tvb','bistrat','biwh','inv360','branchtoday',
+      'inventory','customers','tvb','sku','bistrat','biwh','inv360','branchtoday',
       'gtd','proposals','action','quicklinks'
     ],
     warehouse: [
       'today',
-      'inventory','biwh','inv360',
+      'inventory','sku','biwh','inv360',
       'gtd','proposals','action','quicklinks'
     ],
     hr: [
@@ -74,7 +74,7 @@
     ],
     marketing: [
       'today',
-      'customers','tvb',
+      'customers','tvb','sku',
       'gtd','proposals','action','quicklinks'
     ],
     // Branch managers share the same page set; data scoping is handled
