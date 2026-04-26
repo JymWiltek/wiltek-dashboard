@@ -216,9 +216,26 @@ test.describe('Round 2 — Functional', () => {
     await loginOwner(page);
     await page.click('#navTransfers');
     await page.click('#langZH');
-    await expect(page.locator('#view-transfers.on .page-title')).toHaveText('调货建议');
+    await expect(page.locator('#view-transfers.on .page-title')).toContainText('调货建议');
     await page.click('#langEN');
-    await expect(page.locator('#view-transfers.on .page-title')).toHaveText('Transfer Suggestions');
+    await expect(page.locator('#view-transfers.on .page-title')).toContainText('Transfer Suggestions');
+  });
+
+  test('transfer title shows dynamic count + total', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    const title = await page.locator('#view-transfers.on .page-title').textContent();
+    expect(title).toMatch(/Transfer Suggestions · \d+ suggestions · RM [\d,]+/);
+  });
+
+  test('cancel button is neutral grey, not red', async ({ page }) => {
+    await loginOwner(page);
+    await page.click('#navTransfers');
+    const btn = page.locator('.kanban .col').nth(0).locator('.card').first()
+      .locator('button[data-act="cancel"]');
+    // The cancel button must not carry the 'warn' (red) class
+    const klass = await btn.getAttribute('class');
+    expect(klass || '').not.toContain('warn');
   });
 
   test('logout returns to login screen', async ({ page }) => {

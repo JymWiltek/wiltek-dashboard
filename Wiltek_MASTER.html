@@ -18,6 +18,7 @@
 
   --ok:           #2E7D5B;
   --warn:         #B8860B;
+  --warn-soft:    #D4A845;
   --danger:       #A03030;
   --neutral:      #6B6B6B;
 
@@ -192,10 +193,10 @@ section.content {
 .tab .tab-meta { font-size: 11px; color: var(--text-light); }
 .tab .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .dot.cls-ACTIVE { background: var(--ok); }
-.dot.cls-SLOW { background: var(--warn); }
-.dot.cls-DEAD { background: var(--danger); }
-.dot.cls-MISPLACED { background: #C8761B; }
-.dot.cls-COMPANY_DEAD { background: #2C2C2C; }
+.dot.cls-SLOW { background: var(--warn-soft); }
+.dot.cls-DEAD { background: var(--warn); }
+.dot.cls-MISPLACED { background: var(--brand); }
+.dot.cls-COMPANY_DEAD { background: var(--danger); }
 
 /* ── Block 3: branch cards ──────────────────────────────────────── */
 .section-title { font-size: 18px; font-weight: 600; margin: 32px 0 14px; color: var(--text-primary); }
@@ -253,6 +254,25 @@ section.content {
   padding: 8px 14px; border-radius: 6px; font-size: 13px;
 }
 .toolbar .csv-btn:hover { border-color: var(--brand); color: var(--brand); }
+.toolbar .class-filter {
+  display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.toolbar .class-filter .cf-label {
+  font-size: 12px; color: var(--text-meta); margin-right: 2px;
+}
+.toolbar .class-filter .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text-meta); font-size: 12px;
+  user-select: none; transition: border-color .12s, background .12s, color .12s;
+}
+.toolbar .class-filter .chip .dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+}
+.toolbar .class-filter .chip.on {
+  border-color: var(--brand); background: var(--brand-soft); color: var(--text-primary);
+}
+.toolbar .class-filter .chip:hover { border-color: var(--brand); }
 
 .table-wrap {
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
@@ -301,10 +321,10 @@ table.detail tbody tr.row-expand .branches-distribution .pill.empty {
   font-weight: 500; white-space: nowrap;
 }
 .cls-chip.cls-ACTIVE { background: rgba(46,125,91,0.10); color: var(--ok); }
-.cls-chip.cls-SLOW { background: rgba(184,134,11,0.10); color: var(--warn); }
-.cls-chip.cls-DEAD { background: rgba(160,48,48,0.10); color: var(--danger); }
-.cls-chip.cls-MISPLACED { background: rgba(200,118,27,0.10); color: #C8761B; }
-.cls-chip.cls-COMPANY_DEAD { background: rgba(44,44,44,0.08); color: #2C2C2C; }
+.cls-chip.cls-SLOW { background: rgba(212,168,69,0.14); color: #8B6F1F; }
+.cls-chip.cls-DEAD { background: rgba(184,134,11,0.12); color: var(--warn); }
+.cls-chip.cls-MISPLACED { background: rgba(31,95,74,0.10); color: var(--brand); }
+.cls-chip.cls-COMPANY_DEAD { background: rgba(160,48,48,0.10); color: var(--danger); }
 
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-meta); }
 
@@ -334,10 +354,10 @@ header.app-header .view-as.locked button { cursor: not-allowed; opacity: 0.6; }
 .kanban-summary .sum-card .sum-label { font-size: 12px; color: var(--text-meta); text-transform: uppercase; letter-spacing: 0.04em; }
 .kanban-summary .sum-card .sum-count { font-size: 26px; font-weight: 600; color: var(--text-primary); }
 .kanban-summary .sum-card .sum-amount { font-size: 12px; color: var(--text-meta); margin-top: 2px; }
-.kanban-summary .sum-card.col-pending  { border-left: 3px solid var(--warn); }
-.kanban-summary .sum-card.col-approved { border-left: 3px solid var(--brand); }
+.kanban-summary .sum-card.col-pending  { border-left: 3px solid var(--brand); }
+.kanban-summary .sum-card.col-approved { border-left: 3px solid var(--warn-soft); }
 .kanban-summary .sum-card.col-done     { border-left: 3px solid var(--ok); }
-.kanban-summary .sum-card.col-cancel   { border-left: 3px solid var(--danger); }
+.kanban-summary .sum-card.col-cancel   { border-left: 3px solid var(--neutral); }
 
 .kanban {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
@@ -539,6 +559,7 @@ footer.app-footer {
           <select id="catFilter">
             <option value="">All categories</option>
           </select>
+          <div class="class-filter" id="classFilter"></div>
           <div class="spacer"></div>
           <button class="csv-btn" type="button" onclick="exportCSV()" id="csvBtn">Export CSV</button>
         </div>
@@ -553,7 +574,7 @@ footer.app-footer {
       <!-- ── View: Owner Transfer Suggestions (kanban) ─────────── -->
       <div class="view" id="view-transfers">
         <h1 class="page-title" data-i18n="tr-title">Transfer Suggestions</h1>
-        <p class="page-sub" data-i18n="tr-sub">Auto-generated from misplaced stock — approve, edit, or cancel each.</p>
+        <p class="page-sub" data-i18n="tr-sub">Suggestions based on misplaced sales — you decide whether to execute.</p>
 
         <div class="kanban-summary" id="trSummary"></div>
         <div class="kanban" id="trKanban"></div>
@@ -562,7 +583,7 @@ footer.app-footer {
       <!-- ── View: Warehouse Today's Transfers ─────────────────── -->
       <div class="view" id="view-warehouse">
         <h1 class="page-title" data-i18n="wh-title">Today's Transfers</h1>
-        <p class="page-sub" data-i18n="wh-sub">Approved transfers waiting for your action. Mark each done or report why not.</p>
+        <p class="page-sub" data-i18n="wh-sub">Transfers the Owner accepted — mark each as transferred or note why not.</p>
 
         <div class="wh-list" id="whList"></div>
       </div>
@@ -599,16 +620,17 @@ const STR = {
     "block-detail": "Detail",
     "tab-all": "All",
     "tab-ACTIVE": "Active",
-    "tab-SLOW": "Slow (6–12m)",
-    "tab-DEAD": "Dead (12m+)",
-    "tab-MISPLACED": "Misplaced",
-    "tab-COMPANY_DEAD": "Company-dead",
+    "tab-SLOW": "Slow",
+    "tab-DEAD": "Dead",
+    "tab-MISPLACED": "Transferable",
+    "tab-COMPANY_DEAD": "Discontinued",
     "card-total": "Total stock",
     "card-ACTIVE": "Active",
     "card-SLOW": "Slow",
     "card-DEAD": "Dead",
-    "card-MISPLACED": "Misplaced",
-    "card-COMPANY_DEAD": "Company-dead",
+    "card-MISPLACED": "Transferable",
+    "card-COMPANY_DEAD": "Discontinued",
+    "filter-class-label": "Class",
     "card-problem-share": "Problem share",
     "col-cls": "Class",
     "col-branch": "Store",
@@ -646,34 +668,35 @@ const STR = {
     "loginErrLocked": "Too many failed attempts. Try again later.",
 
     "tr-title": "Transfer Suggestions",
-    "tr-sub": "Auto-generated from misplaced stock — approve, edit, or cancel each.",
-    "tr-col-pending": "Pending",
+    "tr-title-meta": "{count} suggestions · RM {amt}",
+    "tr-sub": "Suggestions based on misplaced sales — you decide whether to execute.",
+    "tr-col-pending": "To decide",
     "tr-col-approved": "In progress",
-    "tr-col-done": "Done",
-    "tr-col-cancel": "Not done",
+    "tr-col-done": "Transferred",
+    "tr-col-cancel": "Skipped",
     "tr-empty": "Nothing here.",
     "tr-suggestions": "suggestions",
-    "tr-approve": "Approve",
-    "tr-edit": "Edit qty",
-    "tr-cancel": "Cancel",
-    "tr-reset": "Reset to pending",
-    "tr-reason-cancel": "Cancelled by Owner",
+    "tr-approve": "Accept",
+    "tr-edit": "Adjust qty",
+    "tr-cancel": "Skip",
+    "tr-reset": "Move back to To decide",
+    "tr-reason-cancel": "Skipped by Owner",
     "tr-reason-cant": "Warehouse: cannot transfer",
     "tr-prompt-edit": "New transfer quantity (max {max}):",
-    "tr-prompt-cancel-reason": "Reason for cancelling:",
+    "tr-prompt-cancel-reason": "Why are you skipping this suggestion?",
     "tr-prompt-cant-reason": "Reason it cannot be transferred:",
     "tr-meta": "Qty {qty} · RM {amt}",
     "tr-route": "{src} → {dst}",
-    "tr-reason-misplaced": "Misplaced at {src}, {dst} sold {sold} in last 3m, has {stock} in stock.",
+    "tr-reason-misplaced": "Stock at {src}; {dst} sold {sold} in last 3m and has {stock} on hand.",
 
     "wh-title": "Today's Transfers",
-    "wh-sub": "Approved transfers waiting for your action. Mark each done or report why not.",
-    "wh-empty": "No approved transfers right now.",
-    "wh-done": "Done",
+    "wh-sub": "Transfers the Owner accepted — mark each as transferred or note why not.",
+    "wh-empty": "No accepted transfers right now.",
+    "wh-done": "Transferred",
     "wh-cant": "Can't",
     "wh-row": "{src} take {code} ×{qty} → to {dst}",
-    "wh-status-done": "Completed",
-    "wh-status-cancel": "Not done",
+    "wh-status-done": "Transferred",
+    "wh-status-cancel": "Skipped",
 
     "viewas-owner": "Owner",
     "viewas-warehouse": "Warehouse"
@@ -687,17 +710,18 @@ const STR = {
     "block-stores": "5 家门市分布",
     "block-detail": "详细清单",
     "tab-all": "全部",
-    "tab-ACTIVE": "活跃",
-    "tab-SLOW": "呆货 6-12 月",
-    "tab-DEAD": "死货 12 月以上",
-    "tab-MISPLACED": "错位",
-    "tab-COMPANY_DEAD": "全公司死货",
+    "tab-ACTIVE": "正常货",
+    "tab-SLOW": "慢货",
+    "tab-DEAD": "死货",
+    "tab-MISPLACED": "可调货",
+    "tab-COMPANY_DEAD": "全店死货",
     "card-total": "总库存",
-    "card-ACTIVE": "活跃",
-    "card-SLOW": "呆货",
+    "card-ACTIVE": "正常货",
+    "card-SLOW": "慢货",
     "card-DEAD": "死货",
-    "card-MISPLACED": "错位",
-    "card-COMPANY_DEAD": "全死",
+    "card-MISPLACED": "可调货",
+    "card-COMPANY_DEAD": "全店死货",
+    "filter-class-label": "类别",
     "card-problem-share": "问题占比",
     "col-cls": "类别",
     "col-branch": "门市",
@@ -735,34 +759,35 @@ const STR = {
     "loginErrLocked": "失败次数过多,稍后再试。",
 
     "tr-title": "调货建议",
-    "tr-sub": "从错位库存自动生成 — Owner 批准、改量或取消。",
-    "tr-col-pending": "待批",
+    "tr-title-meta": "{count} 单 · 总值 RM {amt}",
+    "tr-sub": "基于销售错位生成的建议,你来决定要不要执行。",
+    "tr-col-pending": "待决定",
     "tr-col-approved": "进行中",
-    "tr-col-done": "完成",
-    "tr-col-cancel": "未完成",
+    "tr-col-done": "已调",
+    "tr-col-cancel": "不调",
     "tr-empty": "暂无内容。",
     "tr-suggestions": "条建议",
-    "tr-approve": "批准",
-    "tr-edit": "改量",
-    "tr-cancel": "取消",
-    "tr-reset": "重置为待批",
-    "tr-reason-cancel": "Owner 取消",
+    "tr-approve": "接受建议",
+    "tr-edit": "调整数量",
+    "tr-cancel": "不调",
+    "tr-reset": "重置为待决定",
+    "tr-reason-cancel": "Owner 跳过",
     "tr-reason-cant": "仓库:无法调货",
     "tr-prompt-edit": "新的调货数量(最多 {max}):",
-    "tr-prompt-cancel-reason": "取消原因:",
+    "tr-prompt-cancel-reason": "为什么不采纳这条建议?",
     "tr-prompt-cant-reason": "无法调货的原因:",
     "tr-meta": "数量 {qty} · RM {amt}",
     "tr-route": "{src} → {dst}",
-    "tr-reason-misplaced": "{src} 错位库存,{dst} 近 3 月卖 {sold},现库存 {stock}。",
+    "tr-reason-misplaced": "{src} 有库存;{dst} 近 3 月卖 {sold},现库存 {stock}。",
 
     "wh-title": "今天调货清单",
-    "wh-sub": "Owner 已批准的调货,请逐条操作:已调或填写无法调货的原因。",
-    "wh-empty": "目前没有已批准的调货。",
+    "wh-sub": "Owner 已接受的调货建议,请逐条标记为已调或填写无法调货的原因。",
+    "wh-empty": "目前没有已接受的调货建议。",
     "wh-done": "已调",
     "wh-cant": "做不了",
     "wh-row": "{src} 取 {code} ×{qty} → 到 {dst}",
-    "wh-status-done": "已完成",
-    "wh-status-cancel": "未完成",
+    "wh-status-done": "已调",
+    "wh-status-cancel": "已跳过",
 
     "viewas-owner": "Owner",
     "viewas-warehouse": "仓库"
@@ -778,6 +803,7 @@ let CAT = '';
 let EXPANDED_ROW = null;
 
 const CLS_ORDER = ['ACTIVE', 'SLOW', 'DEAD', 'MISPLACED', 'COMPANY_DEAD'];
+let CLASS_SET = new Set(CLS_ORDER);
 const ROLE_LABEL = { owner: 'Owner', finance: 'Finance', bi_consultant: 'BI', warehouse: 'Warehouse', hr: 'HR', marketing: 'Marketing' };
 
 function t(key) {
@@ -850,6 +876,7 @@ function enterApp() {
   renderHero();
   renderTabs();
   renderBranchCards();
+  renderClassFilter();
   renderTable();
 
   // Initial view: warehouse role lands on warehouse list, others on dead stock
@@ -870,6 +897,7 @@ function setLang(l) {
   renderHero();
   renderTabs();
   renderBranchCards();
+  renderClassFilter();
   renderTable();
   if (CUR_VIEW === 'transfers') renderTransfers();
   else if (CUR_VIEW === 'warehouse') renderWarehouse();
@@ -1001,11 +1029,25 @@ function buildCategoryFilter() {
   });
 }
 
+function renderClassFilter() {
+  const wrap = document.getElementById('classFilter');
+  if (!wrap) return;
+  const html = '<span class="cf-label">' + t('filter-class-label') + '</span>' +
+    CLS_ORDER.map(c => {
+      const on = CLASS_SET.has(c) ? ' on' : '';
+      return '<button type="button" class="chip' + on + '" data-cls="' + c + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="dot cls-' + c + '"></span>' + t('tab-' + c) +
+      '</button>';
+    }).join('');
+  wrap.innerHTML = html;
+}
+
 function visibleRows() {
   const ds = window.WP_DEADSTOCK;
   const q = SEARCH.toLowerCase();
   let rows = ds.rows;
   if (CUR_TAB !== 'all') rows = rows.filter(r => r.cls === CUR_TAB);
+  else rows = rows.filter(r => CLASS_SET.has(r.cls));
   if (CAT) rows = rows.filter(r => r.category === CAT);
   if (q) rows = rows.filter(r => r.code.toLowerCase().includes(q) || (r.desc||'').toLowerCase().includes(q));
   rows = rows.slice().sort((a,b) => {
@@ -1269,6 +1311,19 @@ function bucketSuggestions() {
 
 function renderTransfers() {
   const buckets = bucketSuggestions();
+  const allItems = buckets.pending.concat(buckets.approved, buckets.done, buckets.cancelled);
+  const totalCount = allItems.length;
+  const totalAmt = allItems.reduce((a, x) => a + x.amount, 0);
+
+  // Advisory-tone title: "Transfer Suggestions · 115 suggestions · RM 17,791"
+  const titleEl = document.querySelector('#view-transfers .page-title');
+  if (titleEl) {
+    const meta = t('tr-title-meta')
+      .replace('{count}', fmt(totalCount))
+      .replace('{amt}', fmtMoney(totalAmt));
+    titleEl.textContent = t('tr-title') + (LANG === 'zh' ? ' ' : ' · ') + meta;
+  }
+
   const summary = document.getElementById('trSummary');
   const cols = [
     { key: 'pending',   label: t('tr-col-pending'),  cls: 'col-pending' },
@@ -1312,7 +1367,7 @@ function suggestionCard(s, bucket) {
     actions =
       '<button class="primary" type="button" data-act="approve" data-id="' + s.id + '">' + t('tr-approve') + '</button>' +
       '<button type="button" data-act="edit" data-id="' + s.id + '">' + t('tr-edit') + '</button>' +
-      '<button class="warn" type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>';
+      '<button type="button" data-act="cancel" data-id="' + s.id + '">' + t('tr-cancel') + '</button>';
   } else if (bucket === 'approved') {
     actions = '<button type="button" data-act="reset" data-id="' + s.id + '">' + t('tr-reset') + '</button>';
   } else {
@@ -1377,7 +1432,7 @@ function renderWarehouse() {
     if (status === 'approved') {
       actions =
         '<button class="primary" type="button" data-act="wh-done" data-id="' + s.id + '">' + t('wh-done') + '</button>' +
-        '<button class="warn" type="button" data-act="wh-cant" data-id="' + s.id + '">' + t('wh-cant') + '</button>';
+        '<button type="button" data-act="wh-cant" data-id="' + s.id + '">' + t('wh-cant') + '</button>';
     } else if (status === 'done') {
       rowCls = ' done';
       statusBadge = '<span class="wh-status done">' + t('wh-status-done') + '</span>';
@@ -1422,6 +1477,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('catFilter').addEventListener('change', e => {
     CAT = e.target.value || '';
     EXPANDED_ROW = null;
+    renderTable();
+  });
+  document.getElementById('classFilter').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-cls]');
+    if (!btn) return;
+    const cls = btn.getAttribute('data-cls');
+    if (CLASS_SET.has(cls)) CLASS_SET.delete(cls); else CLASS_SET.add(cls);
+    EXPANDED_ROW = null;
+    renderClassFilter();
     renderTable();
   });
 

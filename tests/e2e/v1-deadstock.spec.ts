@@ -131,6 +131,48 @@ test.describe('Round 2 — Functional', () => {
     }
   });
 
+  test('class filter renders 5 chips, all on by default', async ({ page }) => {
+    await loginOwner(page);
+    const chips = page.locator('#classFilter .chip');
+    await expect(chips).toHaveCount(5);
+    const onCount = await page.locator('#classFilter .chip.on').count();
+    expect(onCount).toBe(5);
+    // Labels match the new advisory-tone names (EN default)
+    const labels = await chips.allTextContents();
+    const joined = labels.join('|');
+    expect(joined).toContain('Active');
+    expect(joined).toContain('Slow');
+    expect(joined).toContain('Dead');
+    expect(joined).toContain('Transferable');
+    expect(joined).toContain('Discontinued');
+  });
+
+  test('class filter toggling narrows the All-tab table', async ({ page }) => {
+    await loginOwner(page);
+    // On "all" tab by default; toggle off SLOW + DEAD + COMPANY_DEAD, leave ACTIVE + MISPLACED
+    await page.click('#classFilter .chip[data-cls="SLOW"]');
+    await page.click('#classFilter .chip[data-cls="DEAD"]');
+    await page.click('#classFilter .chip[data-cls="COMPANY_DEAD"]');
+    // Visible chips: ACTIVE + MISPLACED only — table chips should never show DEAD/SLOW/Discontinued labels
+    const chipTexts = await page.locator('tbody tr.row-main .cls-chip').allTextContents();
+    expect(chipTexts.length).toBeGreaterThan(0);
+    chipTexts.forEach(c => {
+      expect(c.trim()).not.toBe('Slow');
+      expect(c.trim()).not.toBe('Dead');
+      expect(c.trim()).not.toBe('Discontinued');
+    });
+  });
+
+  test('renamed class labels appear in tabs (Transferable, Discontinued)', async ({ page }) => {
+    await loginOwner(page);
+    const tabsText = await page.locator('#tabs').textContent();
+    expect(tabsText).toContain('Transferable');
+    expect(tabsText).toContain('Discontinued');
+    // Old labels should be gone
+    expect(tabsText).not.toContain('Misplaced');
+    expect(tabsText).not.toContain('Company-dead');
+  });
+
   test('row click expands SKU distribution', async ({ page }) => {
     await loginOwner(page);
     await page.click('tbody tr.row-main:first-child');
