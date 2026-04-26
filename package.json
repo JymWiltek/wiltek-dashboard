@@ -5,8 +5,7 @@
   "description": "Wiltek Executive Portal — QA test harness (Playwright). Static site lives at root; this package exists only for the test suite.",
   "scripts": {
     "serve": "node tests/serve.js",
-    "pretest:e2e": "rm -f tests/qa-findings.json",
-    "test:e2e": "playwright test ; node tests/finalize-report.js",
+    "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:report": "playwright show-report"
   },

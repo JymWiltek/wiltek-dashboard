@@ -14,10 +14,7 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   fullyParallel: false,           // matrix is huge; sequential is more deterministic
   workers: 1,
-  reporter: [
-    ['list'],
-    ['json', { outputFile: 'tests/playwright-report.json' }],
-  ],
+  reporter: [['list']],
   use: {
     baseURL: `http://localhost:${PORT}`,
     actionTimeout: 6_000,
