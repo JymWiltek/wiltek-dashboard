@@ -699,8 +699,38 @@ footer.app-footer {
   margin-top: 40px;
 }
 
+/* ── Filters row (churn + insights) ─────────────────────────────── */
+.toolbar.cc-filters { gap: 10px; flex-wrap: wrap; align-items: center; padding: 0; background: transparent; box-shadow: none; }
+.toolbar.cc-filters .filter-label { font-size: 12px; color: var(--text-meta); font-weight: 500; }
+.toolbar.cc-filters select { height: 36px; padding: 0 28px 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; color: var(--text); }
+
+/* ── Customer Insights + Financial Depth (V1 第 3/4 刀) ──────────── */
+.ci-diag, .fd-diag { background: #F4F8F6; border-left: 3px solid var(--brand); padding: 14px 18px; border-radius: 8px; margin: 12px 0 24px; font-size: 14px; line-height: 1.55; color: var(--text); }
+.ci-cards, .fd-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 8px; }
+.ci-card, .fd-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.ci-card .label, .fd-card .label { font-size: 12px; color: var(--text-meta); font-weight: 500; }
+.ci-card .value, .fd-card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 6px; color: var(--text); }
+.ci-card .sub, .fd-card .sub { font-size: 12px; color: var(--text-meta); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.ci-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-bottom: 8px; }
+.ci-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ci-table thead th { background: #FAFBFB; text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.ci-table thead th.num { text-align: right; }
+.ci-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+.ci-table tbody td.num { text-align: right; }
+.ci-table tbody tr:last-child td { border-bottom: 0; }
+.ci-table tbody tr:hover { background: #FAFBFB; }
+.fd-flag { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+.fd-flag.ok { background: var(--ok, #5EAA85); }
+.fd-flag.warn { background: #E8A93B; }
+.fd-flag.danger { background: var(--danger, #C04848); }
+.fd-spark { display: inline-flex; gap: 2px; align-items: end; height: 24px; }
+.fd-spark span { width: 6px; background: var(--brand); border-radius: 1px; opacity: 0.55; }
+.fd-spark span.last { opacity: 1; }
+.fd-note { font-size: 12px; color: var(--text-meta); margin: 8px 4px 0; line-height: 1.5; }
+
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
+  .ci-cards, .fd-cards { grid-template-columns: repeat(2, 1fr); }
   main.app-main { grid-template-columns: minmax(0, 1fr); }
   nav.menu { display: none; }
   section.content { padding: 24px 20px; }
@@ -710,6 +740,12 @@ footer.app-footer {
   .today-roles { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
+  .ci-cards, .fd-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ci-card, .fd-card { padding: 12px 14px; }
+  .ci-card .value, .fd-card .value { font-size: 20px; }
+  .ci-table thead th, .ci-table tbody td { padding: 8px 10px; font-size: 12px; }
+  .toolbar.cc-filters { gap: 6px; }
+  .toolbar.cc-filters select { height: 32px; font-size: 12px; }
   .today-card { grid-template-columns: 32px 1fr; }
   .today-card .td-jump { grid-column: 1 / -1; justify-self: stretch; margin-top: 8px; }
   .today-stores .ts-row { grid-template-columns: 70px 1fr 80px; gap: 8px; padding: 10px 14px; font-size: 12px; }
@@ -804,12 +840,19 @@ footer.app-footer {
         <div class="sub-item" data-view="customer-churn" id="navChurn" onclick="setView('customer-churn')" style="padding-left:12px">
           <span class="icon">👥</span><span data-i18n="nav-cust-churn">Lapsed Customers</span>
         </div>
+        <div class="sub-item" data-view="cust-insights" id="navCustInsights" onclick="setView('cust-insights')" style="padding-left:12px">
+          <span class="icon">📊</span><span data-i18n="nav-cust-insights">Customer Insights</span>
+        </div>
+      </div>
+      <div class="group">
+        <div class="menu-section" data-i18n="nav-section-fin">Finance</div>
+        <div class="sub-item" data-view="financial-depth" id="navFinDepth" onclick="setView('financial-depth')" style="padding-left:12px">
+          <span class="icon">💰</span><span data-i18n="nav-fin">Financial Depth</span>
+        </div>
       </div>
       <div class="group">
         <div class="menu-section" data-i18n="nav-section-other">Coming in V1</div>
         <div class="item disabled"><span class="icon">🏪</span><span data-i18n="nav-stores">5 Stores</span><span class="later" data-i18n="later">V1 next cut</span></div>
-        <div class="item disabled"><span class="icon">👥</span><span data-i18n="nav-cust">Customer Insights</span><span class="later" data-i18n="later">V1 next cut</span></div>
-        <div class="item disabled"><span class="icon">💰</span><span data-i18n="nav-fin">Financial Depth</span><span class="later" data-i18n="later">V1 next cut</span></div>
         <div class="item disabled"><span class="icon">🎯</span><span data-i18n="nav-exit">18-Month Exit</span><span class="later" data-i18n="later">V1 next cut</span></div>
         <div class="item disabled"><span class="icon">⚙️</span><span data-i18n="nav-users">User Management</span><span class="later" data-i18n="later">V1 next cut</span></div>
       </div>
@@ -872,12 +915,110 @@ footer.app-footer {
         <p class="page-sub" data-i18n="cc-sub">High-lifetime members who haven't shopped in 6+ months — first call list.</p>
 
         <div class="simple-list-summary" id="ccSummary"></div>
+        <div class="toolbar cc-filters">
+          <label class="filter-label" data-i18n="cc-fl-branch">Store</label>
+          <select id="ccBranchFilter">
+            <option value="" data-i18n="cc-fl-all">All</option>
+            <option value="W01">W01</option>
+            <option value="W02">W02</option>
+            <option value="W03">W03</option>
+            <option value="W05">W05</option>
+            <option value="W07">W07</option>
+          </select>
+          <label class="filter-label" data-i18n="cc-fl-type">Customer type</label>
+          <select id="ccTypeFilter">
+            <option value="" data-i18n="cc-fl-all">All</option>
+            <option value="Walk-in">Walk-in</option>
+            <option value="Contractor">Contractor</option>
+            <option value="Interior Designer">Interior Designer</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
         <div class="toolbar">
           <input id="ccSearch" type="search" placeholder="Search name, member, store…">
           <div class="spacer"></div>
           <button class="csv-btn" type="button" id="ccCsvBtn">Export CSV</button>
         </div>
         <div class="simple-list" id="ccList"></div>
+      </div>
+
+      <!-- ── View: Customer Insights (V1 第 3 刀) ────────────────── -->
+      <div class="view" id="view-cust-insights">
+        <h1 class="page-title" data-i18n="ci-title">Customer Insights</h1>
+        <p class="page-sub" data-i18n="ci-sub">Members tiered by enrol age — see where the moat lives and where to invest.</p>
+
+        <div class="ci-diag" id="ciDiag"></div>
+
+        <div class="ci-cards" id="ciCards"></div>
+
+        <div class="today-section-title">
+          <span data-i18n="ci-bucket-title">Sales by membership age</span>
+        </div>
+        <div class="ci-table-wrap">
+          <table class="ci-table" id="ciBucketTable"><thead></thead><tbody></tbody></table>
+        </div>
+
+        <div class="today-section-title">
+          <span data-i18n="ci-cross-title">Customer type × membership age</span>
+          <span class="meta" data-i18n="ci-cross-sub">members · LTM RM</span>
+        </div>
+        <div class="ci-table-wrap">
+          <table class="ci-table" id="ciCrossTable"><thead></thead><tbody></tbody></table>
+        </div>
+
+        <div class="today-section-title">
+          <span data-i18n="ci-top-title">Top 100 members (last 12 months)</span>
+        </div>
+        <div class="toolbar cc-filters">
+          <label class="filter-label" data-i18n="cc-fl-branch">Store</label>
+          <select id="ciBranchFilter">
+            <option value="" data-i18n="cc-fl-all">All</option>
+            <option value="W01">W01</option>
+            <option value="W02">W02</option>
+            <option value="W03">W03</option>
+            <option value="W05">W05</option>
+            <option value="W07">W07</option>
+          </select>
+          <label class="filter-label" data-i18n="cc-fl-type">Customer type</label>
+          <select id="ciTypeFilter">
+            <option value="" data-i18n="cc-fl-all">All</option>
+            <option value="Walk-in">Walk-in</option>
+            <option value="Contractor">Contractor</option>
+            <option value="Interior Designer">Interior Designer</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="toolbar">
+          <input id="ciSearch" type="search" placeholder="Search member…">
+          <div class="spacer"></div>
+          <button class="csv-btn" type="button" id="ciCsvBtn">Export CSV</button>
+        </div>
+        <div class="simple-list" id="ciTopList"></div>
+      </div>
+
+      <!-- ── View: Financial Depth (V1 第 4 刀) ──────────────────── -->
+      <div class="view" id="view-financial-depth">
+        <h1 class="page-title" data-i18n="fd-title">Financial Depth</h1>
+        <p class="page-sub" data-i18n="fd-sub">Sales, expenses, payroll discipline and brand-level GP — the "is this a real business" view.</p>
+
+        <div class="ci-diag" id="fdDiag"></div>
+
+        <div class="fd-cards" id="fdCards"></div>
+
+        <div class="today-section-title">
+          <span data-i18n="fd-cats-title">7 cost categories — last 6 months</span>
+        </div>
+        <div class="ci-table-wrap">
+          <table class="ci-table" id="fdCatTable"><thead></thead><tbody></tbody></table>
+        </div>
+
+        <div class="today-section-title">
+          <span data-i18n="fd-brand-title">Brand GP ranking — last 12 months</span>
+        </div>
+        <div class="ci-table-wrap">
+          <table class="ci-table" id="fdBrandTable"><thead></thead><tbody></tbody></table>
+        </div>
+        <p class="fd-note" data-i18n="fd-brand-note">Brand GP derived from Raw Sale × per-item PO cost. May differ slightly from FMM Sheet 3 reconciled figures.</p>
       </div>
 
       <!-- ── View: Purchase Exceptions (V1 第 2 刀) ────────────── -->
@@ -925,6 +1066,8 @@ footer.app-footer {
 <script src="auditlog.js"></script>
 <script src="assets/deadstock-data.js"></script>
 <script src="assets/today-data.js"></script>
+<script src="assets/customers-data.js"></script>
+<script src="assets/financial-data.js"></script>
 <script>
 /* ──────────────────────────────────────────────────────────────────
    Wiltek Portal — V1 第 0 刀  (Dead Stock Dashboard)
@@ -1115,7 +1258,62 @@ const STR = {
     "pe-col-grn": "GRN date",
     "pe-col-days": "Days",
     "pe-col-amt": "Amount RM",
-    "pe-empty": "Nothing flagged."
+    "pe-empty": "Nothing flagged.",
+
+    "cc-fl-branch": "Store",
+    "cc-fl-type": "Customer type",
+    "cc-fl-all": "All",
+    "nav-cust-insights": "Customer Insights",
+    "nav-section-fin": "Finance",
+
+    "ci-title": "Customer Insights",
+    "ci-sub": "Members tiered by enrol age — see where the moat lives and where to invest.",
+    "ci-card-total": "Total members",
+    "ci-card-lt1": "<1 year",
+    "ci-card-1-5": "1–5 years",
+    "ci-card-5-8": "5–8 years",
+    "ci-card-8plus": "8+ years",
+    "ci-bucket-title": "Sales by membership age",
+    "ci-bucket-col-bucket": "Membership age",
+    "ci-bucket-col-n": "Members",
+    "ci-bucket-col-ltm": "12M sales RM",
+    "ci-bucket-col-aov": "12M AOV",
+    "ci-bucket-col-rep": "Repeat % (≥2 visits)",
+    "ci-cross-title": "Customer type × membership age",
+    "ci-cross-sub": "members · 12M sales RM",
+    "ci-top-title": "Top 100 members (last 12 months)",
+    "ci-search-ph": "Search member…",
+    "ci-csv-name": "Wiltek_CustomerInsights_",
+    "ci-col-rank": "#",
+    "ci-col-store": "Store",
+    "ci-col-name": "Name / Member",
+    "ci-col-type": "Type",
+    "ci-col-age": "Age",
+    "ci-col-ltm": "12M RM",
+    "ci-col-vis": "12M visits",
+    "ci-col-last": "Last seen",
+    "ci-empty": "No members match the filters.",
+
+    "fd-title": "Financial Depth",
+    "fd-sub": "Sales, expenses, payroll discipline and brand-level GP — the \"is this a real business\" view.",
+    "fd-card-sales": "Sales collection",
+    "fd-card-exp": "Total expenses",
+    "fd-card-net": "Net",
+    "fd-card-netpct": "Net %",
+    "fd-cats-title": "7 cost categories — last 6 months",
+    "fd-cat-col-name": "Category",
+    "fd-cat-col-latest": "Latest month",
+    "fd-cat-col-pct": "% of sales",
+    "fd-cat-col-mom": "MoM %",
+    "fd-cat-col-trend": "6M trend",
+    "fd-brand-title": "Brand GP ranking — last 12 months",
+    "fd-brand-col-rank": "#",
+    "fd-brand-col-brand": "Brand",
+    "fd-brand-col-sales": "12M sales RM",
+    "fd-brand-col-cogs": "12M cost RM",
+    "fd-brand-col-gp": "GP RM",
+    "fd-brand-col-gppct": "GP %",
+    "fd-brand-note": "Brand GP derived from Raw Sale × per-item PO cost. May differ slightly from FMM Sheet 3 reconciled figures."
   },
   zh: {
     "title": "呆死货清单",
@@ -1300,7 +1498,62 @@ const STR = {
     "pe-col-grn": "到货日",
     "pe-col-days": "天数",
     "pe-col-amt": "金额 RM",
-    "pe-empty": "暂无异常。"
+    "pe-empty": "暂无异常。",
+
+    "cc-fl-branch": "门市",
+    "cc-fl-type": "顾客类型",
+    "cc-fl-all": "全部",
+    "nav-cust-insights": "顾客洞察",
+    "nav-section-fin": "财务",
+
+    "ci-title": "顾客洞察",
+    "ci-sub": "按入会年龄分层 — 看清护城河在哪、该往哪投。",
+    "ci-card-total": "总会员数",
+    "ci-card-lt1": "<1 年",
+    "ci-card-1-5": "1–5 年",
+    "ci-card-5-8": "5–8 年",
+    "ci-card-8plus": "8 年以上",
+    "ci-bucket-title": "会员龄段销售贡献",
+    "ci-bucket-col-bucket": "会员龄",
+    "ci-bucket-col-n": "会员数",
+    "ci-bucket-col-ltm": "12M 销售 RM",
+    "ci-bucket-col-aov": "12M 客单价",
+    "ci-bucket-col-rep": "复购率 (≥2 单)",
+    "ci-cross-title": "顾客类型 × 会员龄",
+    "ci-cross-sub": "会员数 · 12M 销售 RM",
+    "ci-top-title": "Top 100 会员(过去 12 月)",
+    "ci-search-ph": "搜索会员…",
+    "ci-csv-name": "Wiltek_CustomerInsights_",
+    "ci-col-rank": "排名",
+    "ci-col-store": "门市",
+    "ci-col-name": "顾客 / 会员",
+    "ci-col-type": "类型",
+    "ci-col-age": "会员龄",
+    "ci-col-ltm": "12M RM",
+    "ci-col-vis": "12M 单数",
+    "ci-col-last": "最后见",
+    "ci-empty": "无符合条件的会员。",
+
+    "fd-title": "财务深度",
+    "fd-sub": "销售、费用、人事比例、品牌毛利 — 看「是不是真生意」。",
+    "fd-card-sales": "销售回款",
+    "fd-card-exp": "费用合计",
+    "fd-card-net": "净利",
+    "fd-card-netpct": "净利 %",
+    "fd-cats-title": "7 大费用类(过去 6 个月)",
+    "fd-cat-col-name": "类别",
+    "fd-cat-col-latest": "最近月",
+    "fd-cat-col-pct": "占销售 %",
+    "fd-cat-col-mom": "环比 %",
+    "fd-cat-col-trend": "6M 趋势",
+    "fd-brand-title": "品牌毛利排名(过去 12 月)",
+    "fd-brand-col-rank": "排名",
+    "fd-brand-col-brand": "品牌",
+    "fd-brand-col-sales": "12M 销售 RM",
+    "fd-brand-col-cogs": "12M 成本 RM",
+    "fd-brand-col-gp": "GP RM",
+    "fd-brand-col-gppct": "GP %",
+    "fd-brand-note": "品牌毛利来自 Raw Sale × 历史 PO 单价,与 FMM Sheet 3 口径可能有细微差异。"
   }
 };
 
@@ -1414,6 +1667,8 @@ function setLang(l) {
   else if (CUR_VIEW === 'today') renderToday();
   else if (CUR_VIEW === 'customer-churn') renderChurn();
   else if (CUR_VIEW === 'po-exceptions') renderPoExceptions();
+  else if (CUR_VIEW === 'cust-insights') renderCustInsights();
+  else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
 }
 function applyLang() {
   document.documentElement.setAttribute('lang', LANG);
@@ -1796,6 +2051,8 @@ function setView(v) {
   else if (v === 'today') renderToday();
   else if (v === 'customer-churn') renderChurn();
   else if (v === 'po-exceptions') renderPoExceptions();
+  else if (v === 'cust-insights') renderCustInsights();
+  else if (v === 'financial-depth') renderFinancialDepth();
   // Scroll to top on view change
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
@@ -2148,7 +2405,12 @@ function handleWarehouseAction(act, id) {
    ──────────────────────────────────────────────────────────────── */
 
 let CC_SEARCH = '';
+let CC_BRANCH = '';
+let CC_TYPE   = '';
 let PE_TAB = 'overdue';
+let CI_SEARCH = '';
+let CI_BRANCH = '';
+let CI_TYPE   = '';
 
 /* ── Candidate generation: collect signals across 4 dimensions ─── */
 function collectTodayCandidates() {
@@ -2410,6 +2672,8 @@ function renderChurn() {
 
   const rows = (churn.rows || [])
     .filter(r => r.amount >= (churn.summary.high_value_threshold || 1000))
+    .filter(r => !CC_BRANCH || r.branch === CC_BRANCH)
+    .filter(r => !CC_TYPE   || (r.cust_type || 'Other') === CC_TYPE)
     .filter(r => {
       if (!CC_SEARCH) return true;
       const q = CC_SEARCH.toLowerCase();
@@ -2417,6 +2681,24 @@ function renderChurn() {
              String(r.mc || '').toLowerCase().includes(q) ||
              String(r.branch || '').toLowerCase().includes(q);
     });
+
+  // Live-update summary counts based on filtered set
+  if (summaryEl && (CC_BRANCH || CC_TYPE)) {
+    const filteredAmt = rows.reduce((s, r) => s + (r.amount || 0), 0);
+    summaryEl.innerHTML =
+      '<div class="sls-cell"><div class="sls-label">' + t('cc-summary-total') + '</div>' +
+        '<div class="sls-value num">' + fmt(rows.length) + '</div>' +
+        '<div class="sls-sub">' + (LANG === 'zh' ? '已套用筛选' : 'filtered subset') + '</div>' +
+      '</div>' +
+      '<div class="sls-cell"><div class="sls-label">' + t('cc-summary-amt') + '</div>' +
+        '<div class="sls-value num">RM ' + fmtMoney(filteredAmt) + '</div>' +
+        '<div class="sls-sub">' + (LANG === 'zh' ? '终身消费总和' : 'lifetime spend total') + '</div>' +
+      '</div>' +
+      '<div class="sls-cell"><div class="sls-label">' + t('cc-summary-cutoff') + '</div>' +
+        '<div class="sls-value num">RM ' + fmt(churn.summary.high_value_threshold || 1000) + '+</div>' +
+        '<div class="sls-sub">' + (LANG === 'zh' ? '终身消费门槛' : 'lifetime spend cutoff') + '</div>' +
+      '</div>';
+  }
 
   const listEl = document.getElementById('ccList');
   if (!listEl) return;
@@ -2538,6 +2820,249 @@ function renderPoExceptions() {
   bodyEl.innerHTML = head + body + tail;
 }
 
+/* ── Render Customer Insights (V1 第 3 刀) ─────────────────────── */
+function renderCustInsights() {
+  const ci = window.WP_CUSTOMERS || {};
+  if (!ci.summary) return;
+  const s = ci.summary;
+
+  // Diagnosis line
+  const diagEl = document.getElementById('ciDiag');
+  if (diagEl) {
+    const moat = s.pct_5plus_n >= 25 && s.pct_5plus_ltm >= 25;
+    const decline = s.pct_5plus_ltm < 20;
+    const verdict = moat
+      ? (LANG === 'zh' ? '这是 Wiltek 的真正护城河 — 老客是金。'
+                       : 'This is Wiltek\'s real moat — the loyal core.')
+      : decline
+        ? (LANG === 'zh' ? '老客占比下滑,需关注 — 流失正在啃护城河。'
+                         : 'Long-tenure share is slipping — the moat is eroding.')
+        : (LANG === 'zh' ? '老客盘稳定,继续维护。'
+                         : 'Long-tenure base is steady — keep nurturing.');
+    diagEl.textContent = (LANG === 'zh'
+      ? '全公司 ' + fmt(s.total_members) + ' 名会员中,5 年+ 老客 ' + fmt(s.n_5_8 + s.n_8plus) +
+        ' 人(占 ' + s.pct_5plus_n + '%)贡献了 12M 销售的 ' + s.pct_5plus_ltm + '%。' + verdict
+      : 'Of ' + fmt(s.total_members) + ' members, ' + fmt(s.n_5_8 + s.n_8plus) +
+        ' (' + s.pct_5plus_n + '%) have been with us 5+ years and contribute ' +
+        s.pct_5plus_ltm + '% of last-12M sales. ' + verdict);
+  }
+
+  // Number cards
+  const cardsEl = document.getElementById('ciCards');
+  if (cardsEl) {
+    const card = (label, val, sub) =>
+      '<div class="ci-card"><div class="label">' + label + '</div>' +
+      '<div class="value num">' + val + '</div>' +
+      '<div class="sub">' + sub + '</div></div>';
+    cardsEl.innerHTML =
+      card(t('ci-card-total'), fmt(s.total_members),
+           '12M RM ' + fmtMoney(s.ltm_total)) +
+      card(t('ci-card-1-5'), fmt(s.n_1_5),
+           '12M RM ' + fmtMoney(s.ltm_1_5)) +
+      card(t('ci-card-5-8'), fmt(s.n_5_8),
+           '12M RM ' + fmtMoney(s.ltm_5_8)) +
+      card(t('ci-card-8plus'), fmt(s.n_8plus),
+           '12M RM ' + fmtMoney(s.ltm_8plus));
+  }
+
+  // Bucket table
+  const btab = document.getElementById('ciBucketTable');
+  if (btab) {
+    btab.querySelector('thead').innerHTML =
+      '<tr><th>' + t('ci-bucket-col-bucket') + '</th>' +
+      '<th class="num">' + t('ci-bucket-col-n') + '</th>' +
+      '<th class="num">' + t('ci-bucket-col-ltm') + '</th>' +
+      '<th class="num">' + t('ci-bucket-col-aov') + '</th>' +
+      '<th class="num">' + t('ci-bucket-col-rep') + '</th></tr>';
+    btab.querySelector('tbody').innerHTML = (ci.buckets || []).map(b =>
+      '<tr><td>' + b.key + '</td>' +
+        '<td class="num">' + fmt(b.n) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(b.ltm_amt) + '</td>' +
+        '<td class="num">RM ' + fmt(b.aov) + '</td>' +
+        '<td class="num">' + b.repeat_pct + '%</td></tr>'
+    ).join('');
+  }
+
+  // Cross table
+  const ctab = document.getElementById('ciCrossTable');
+  if (ctab) {
+    const buckets = ['<1y','1-5y','5-8y','8y+'];
+    const types = ci.types || ['Walk-in','Contractor','Interior Designer','Other'];
+    ctab.querySelector('thead').innerHTML =
+      '<tr><th>' + t('ci-col-type') + '</th>' +
+      buckets.map(b => '<th class="num">' + b + '</th>').join('') +
+      '</tr>';
+    ctab.querySelector('tbody').innerHTML = types.map(tp => {
+      const cells = buckets.map(b => {
+        const c = (ci.cross && ci.cross[tp] && ci.cross[tp][b]) || { n: 0, ltm_amt: 0 };
+        return '<td class="num">' + fmt(c.n) + '<br>' +
+               '<span class="sl-meta">RM ' + fmtMoney(c.ltm_amt) + '</span></td>';
+      }).join('');
+      return '<tr><td>' + tp + '</td>' + cells + '</tr>';
+    }).join('');
+  }
+
+  // Top 100 list (with filters)
+  const sb = document.getElementById('ciSearch');
+  if (sb) sb.placeholder = t('ci-search-ph');
+  const cb = document.getElementById('ciCsvBtn');
+  if (cb) cb.textContent = LANG === 'zh' ? '导出 CSV' : 'Export CSV';
+
+  const all = ci.all || ci.top100 || [];
+  const filtered = all
+    .filter(r => !CI_BRANCH || r.branch === CI_BRANCH)
+    .filter(r => !CI_TYPE   || (r.cust_type || 'Other') === CI_TYPE)
+    .filter(r => {
+      if (!CI_SEARCH) return true;
+      const q = CI_SEARCH.toLowerCase();
+      return String(r.name || '').toLowerCase().includes(q) ||
+             String(r.mc || '').toLowerCase().includes(q) ||
+             String(r.branch || '').toLowerCase().includes(q);
+    })
+    .sort((a, b) => (b.ltm_amt || 0) - (a.ltm_amt || 0))
+    .slice(0, 100);
+
+  const listEl = document.getElementById('ciTopList');
+  if (!listEl) return;
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="empty-state">' + t('ci-empty') + '</div>';
+    return;
+  }
+  const head = '<div class="sl-row head">' +
+    '<div>' + t('ci-col-store') + '</div>' +
+    '<div>' + t('ci-col-name') + '</div>' +
+    '<div class="sl-num">' + t('ci-col-ltm') + '</div>' +
+    '<div class="sl-num opt">' + t('ci-col-vis') + '</div>' +
+    '<div class="sl-num opt">' + t('ci-col-age') + '</div>' +
+  '</div>';
+  listEl.innerHTML = head + filtered.map((r, i) =>
+    '<div class="sl-row">' +
+      '<div><span class="sl-tag brand">' + r.branch + '</span></div>' +
+      '<div><div class="sl-pri">#' + (i+1) + ' ' + escapeHtml(r.name || r.mc) + '</div>' +
+      '<div class="sl-meta">' + escapeHtml(r.mc) + ' · ' + escapeHtml(r.cust_type || 'Other') + '</div></div>' +
+      '<div class="sl-num">RM ' + fmtMoney(r.ltm_amt) + '</div>' +
+      '<div class="sl-num opt">' + (r.ltm_visits || 0) + '</div>' +
+      '<div class="sl-num opt sl-meta">' + (r.age_bucket || '—') + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function exportCustInsightsCSV() {
+  const ci = window.WP_CUSTOMERS || {};
+  const all = ci.all || ci.top100 || [];
+  const rows = all
+    .filter(r => !CI_BRANCH || r.branch === CI_BRANCH)
+    .filter(r => !CI_TYPE   || (r.cust_type || 'Other') === CI_TYPE)
+    .sort((a, b) => (b.ltm_amt || 0) - (a.ltm_amt || 0))
+    .slice(0, 100);
+  const head = ['rank','store','member','name','cust_type','age_years','age_bucket','ltm_rm','ltm_visits','last_seen'];
+  const lines = [head.join(',')];
+  rows.forEach((r, i) => {
+    const out = [
+      i+1, r.branch, r.mc, r.name, r.cust_type, r.age_years, r.age_bucket,
+      r.ltm_amt, r.ltm_visits, r.last
+    ].map(v => {
+      if (v == null) return '';
+      const s = String(v);
+      if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1)
+        return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    });
+    lines.push(out.join(','));
+  });
+  const csv = '\ufeff' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  const d = new Date();
+  const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  a.href = URL.createObjectURL(blob);
+  a.download = t('ci-csv-name') + stamp + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+}
+
+/* ── Render Financial Depth (V1 第 4 刀) ───────────────────────── */
+function renderFinancialDepth() {
+  const fd = window.WP_FINANCIAL || {};
+  if (!fd.headline) return;
+  const h = fd.headline;
+
+  // Diagnosis
+  const diagEl = document.getElementById('fdDiag');
+  if (diagEl) {
+    diagEl.textContent = (LANG === 'zh' ? (fd.meta && fd.meta.diag_zh) : (fd.meta && fd.meta.diag_en)) || '';
+  }
+
+  // Cards
+  const cardsEl = document.getElementById('fdCards');
+  if (cardsEl) {
+    const card = (label, val, sub) =>
+      '<div class="fd-card"><div class="label">' + label + '</div>' +
+      '<div class="value num">' + val + '</div>' +
+      '<div class="sub">' + sub + '</div></div>';
+    cardsEl.innerHTML =
+      card(t('fd-card-sales'), 'RM ' + fmtMoney(h.sales_collection),
+           (LANG === 'zh' ? '最近月' : 'latest month')) +
+      card(t('fd-card-exp'),   'RM ' + fmtMoney(h.total_expenses),
+           (LANG === 'zh' ? 'HR 占 ' : 'HR ') + h.hr_pct_sales + '%') +
+      card(t('fd-card-net'),   'RM ' + fmtMoney(h.net),
+           (LANG === 'zh' ? '销售 - 费用' : 'sales − expenses')) +
+      card(t('fd-card-netpct'), h.net_pct + '%',
+           (LANG === 'zh' ? '净利率' : 'net margin'));
+  }
+
+  // 7 categories table with sparkline
+  const tbl = document.getElementById('fdCatTable');
+  if (tbl) {
+    tbl.querySelector('thead').innerHTML =
+      '<tr><th>' + t('fd-cat-col-name') + '</th>' +
+      '<th class="num">' + t('fd-cat-col-latest') + '</th>' +
+      '<th class="num">' + t('fd-cat-col-pct') + '</th>' +
+      '<th class="num">' + t('fd-cat-col-mom') + '</th>' +
+      '<th class="num">' + t('fd-cat-col-trend') + '</th></tr>';
+    const cats = fd.categories || [];
+    const maxv = cats.reduce((m, c) => Math.max(m, ...(c.series || [0])), 1);
+    tbl.querySelector('tbody').innerHTML = cats.map(c => {
+      const spark = (c.series || []).slice().reverse().map((v, i, arr) => {
+        const h = Math.max(2, Math.round((v / maxv) * 22));
+        return '<span style="height:' + h + 'px"' +
+               (i === arr.length - 1 ? ' class="last"' : '') + '></span>';
+      }).join('');
+      const momSign = c.mom_pct > 0 ? '+' : '';
+      return '<tr>' +
+        '<td><span class="fd-flag ' + c.flag + '"></span>' + c.name + '</td>' +
+        '<td class="num">RM ' + fmtMoney(c.latest) + '</td>' +
+        '<td class="num">' + c.pct_sales + '%</td>' +
+        '<td class="num">' + momSign + c.mom_pct + '%</td>' +
+        '<td class="num"><span class="fd-spark">' + spark + '</span></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // Brand GP ranking
+  const btbl = document.getElementById('fdBrandTable');
+  if (btbl) {
+    btbl.querySelector('thead').innerHTML =
+      '<tr><th>' + t('fd-brand-col-rank') + '</th>' +
+      '<th>' + t('fd-brand-col-brand') + '</th>' +
+      '<th class="num">' + t('fd-brand-col-sales') + '</th>' +
+      '<th class="num">' + t('fd-brand-col-cogs') + '</th>' +
+      '<th class="num">' + t('fd-brand-col-gp') + '</th>' +
+      '<th class="num">' + t('fd-brand-col-gppct') + '</th></tr>';
+    btbl.querySelector('tbody').innerHTML = (fd.brands || []).map((b, i) => {
+      const flag = b.gp_pct < 25 ? 'danger' : b.gp_pct < 35 ? 'warn' : 'ok';
+      return '<tr>' +
+        '<td>' + (i+1) + '</td>' +
+        '<td><span class="fd-flag ' + flag + '"></span>' + escapeHtml(b.brand || '—') + '</td>' +
+        '<td class="num">RM ' + fmtMoney(b.ltm_sales) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(b.ltm_cogs) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(b.gp) + '</td>' +
+        '<td class="num">' + b.gp_pct + '%</td>' +
+      '</tr>';
+    }).join('');
+  }
+}
+
 /* ── Wire up ──────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('searchBox').addEventListener('input', e => {
@@ -2602,6 +3127,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const ccCsvBtn = document.getElementById('ccCsvBtn');
   if (ccCsvBtn) ccCsvBtn.addEventListener('click', exportChurnCSV);
+
+  // V1 第 2.1 刀: churn branch + cust-type filters
+  const ccBranchFilter = document.getElementById('ccBranchFilter');
+  if (ccBranchFilter) {
+    ccBranchFilter.addEventListener('change', e => { CC_BRANCH = e.target.value || ''; renderChurn(); });
+  }
+  const ccTypeFilter = document.getElementById('ccTypeFilter');
+  if (ccTypeFilter) {
+    ccTypeFilter.addEventListener('change', e => { CC_TYPE = e.target.value || ''; renderChurn(); });
+  }
+
+  // V1 第 3 刀: customer insights search + filters + CSV
+  const ciSearch = document.getElementById('ciSearch');
+  if (ciSearch) {
+    ciSearch.addEventListener('input', e => { CI_SEARCH = e.target.value || ''; renderCustInsights(); });
+  }
+  const ciBranchFilter = document.getElementById('ciBranchFilter');
+  if (ciBranchFilter) {
+    ciBranchFilter.addEventListener('change', e => { CI_BRANCH = e.target.value || ''; renderCustInsights(); });
+  }
+  const ciTypeFilter = document.getElementById('ciTypeFilter');
+  if (ciTypeFilter) {
+    ciTypeFilter.addEventListener('change', e => { CI_TYPE = e.target.value || ''; renderCustInsights(); });
+  }
+  const ciCsvBtn = document.getElementById('ciCsvBtn');
+  if (ciCsvBtn) ciCsvBtn.addEventListener('click', exportCustInsightsCSV);
 
   // V1 第 2 刀: PO exceptions tab toggle
   const peTabs = document.getElementById('peTabs');

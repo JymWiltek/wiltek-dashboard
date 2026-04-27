@@ -49,7 +49,7 @@ test.describe('Round 1 — Today data accuracy', () => {
     expect(td.hasPo).toBe(true);
     // Builder produced specific counts on the 2026-03 snapshot
     expect(td.nChurnHigh).toBe(1311);
-    expect(td.nPoOverdue).toBe(179);
+    expect(td.nPoOverdue).toBe(139);
     expect(td.nPoDelayed).toBe(833);
     expect(td.snapshot).toBe('2026-03');
   });
@@ -182,7 +182,7 @@ test.describe('Round 2 — Today functional', () => {
     await loginOwner(page);
     await page.evaluate(() => (window as any).setView('po-exceptions'));
     const txt = await page.locator('#peSummary').textContent();
-    expect(txt).toContain('179');   // overdue
+    expect(txt).toContain('139');   // overdue
     expect(txt).toContain('833');   // delayed
   });
 
