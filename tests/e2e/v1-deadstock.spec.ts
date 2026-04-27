@@ -24,12 +24,15 @@ if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
 
 async function loginOwner(page: Page) {
   await page.goto(PAGE_URL);
-  await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK);
+  await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
   await page.fill('#loginUser', 'owner');
   await page.fill('#loginPw', 'Owner@2026');
   await page.click('#loginBtn');
   await page.waitForSelector('#app.ready', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelectorAll('.branch-card').length === 5);
+  // V1 第 2 刀: Owner now lands on Today Overview. Navigate to deadstock for these tests.
+  await page.evaluate(() => (window as any).setView('deadstock'));
+  await page.waitForSelector('#view-deadstock.on', { timeout: 5000 });
 }
 
 function moneyToInt(s: string): number {

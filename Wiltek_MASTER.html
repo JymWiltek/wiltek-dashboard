@@ -477,6 +477,184 @@ header.app-header .view-as.locked button { cursor: not-allowed; opacity: 0.6; }
 .kanban .card.bC .actions { margin-top: 6px; }
 .kanban .card.bC .actions button { font-size: 11px; padding: 3px 8px; }
 
+/* ── V1 第 2 刀 · Owner Today Overview ──────────────────────────── */
+.today-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 24px;
+}
+.today-banner .td-date {
+  font-size: 13px; color: var(--text-meta); margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+.today-banner .td-headline {
+  font-size: 22px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.01em; line-height: 1.4;
+}
+.today-banner .td-headline .accent { color: var(--brand); }
+.today-banner .td-headline .danger { color: var(--danger); }
+.today-banner .td-sub {
+  margin-top: 8px; color: var(--text-meta); font-size: 14px; line-height: 1.6;
+}
+
+.today-section-title {
+  font-size: 16px; font-weight: 600; margin: 28px 0 14px;
+  color: var(--text-primary);
+}
+.today-section-title .meta { font-size: 12px; color: var(--text-meta); font-weight: 400; margin-left: 8px; }
+
+.today-cards {
+  display: grid; grid-template-columns: 1fr; gap: 16px;
+  margin-bottom: 24px;
+}
+.today-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--neutral);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 18px;
+  align-items: start;
+}
+.today-card.urg-high   { border-left-color: var(--danger); }
+.today-card.urg-mid    { border-left-color: var(--warn-soft); }
+.today-card.urg-low    { border-left-color: var(--brand); }
+.today-card .td-icon {
+  font-size: 26px; line-height: 1; padding-top: 2px;
+}
+.today-card .td-body { min-width: 0; }
+.today-card .td-title {
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 4px; line-height: 1.4;
+}
+.today-card .td-interp {
+  font-size: 13px; color: var(--text-meta);
+  line-height: 1.6; margin-bottom: 10px;
+}
+.today-card .td-interp .num { color: var(--text-primary); font-weight: 500; }
+.today-card .td-action-label {
+  font-size: 11px; color: var(--text-light); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 4px;
+}
+.today-card .td-action {
+  font-size: 13px; color: var(--text-primary);
+  line-height: 1.6;
+}
+.today-card .td-jump {
+  align-self: center;
+  background: var(--brand); color: #fff; border: 0; border-radius: 6px;
+  padding: 9px 16px; font-size: 13px; font-weight: 500;
+  white-space: nowrap;
+}
+.today-card .td-jump:hover { background: #19503e; }
+.today-card.empty {
+  grid-template-columns: 1fr;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 13px; padding: 24px;
+  border-left-color: var(--border);
+}
+
+.today-stores {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; margin-bottom: 24px;
+}
+.today-stores .ts-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 110px 110px 110px;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 13px;
+}
+.today-stores .ts-row:last-child { border-bottom: 0; }
+.today-stores .ts-row.head {
+  background: var(--surface); font-size: 11px; color: var(--text-meta);
+  text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+}
+.today-stores .ts-row .ts-id { font-weight: 600; color: var(--text-primary); font-family: 'SF Mono', Menlo, monospace; }
+.today-stores .ts-row .ts-name { color: var(--text-primary); }
+.today-stores .ts-row .ts-num { font-variant-numeric: tabular-nums; text-align: right; font-family: 'SF Mono', Menlo, monospace; }
+.today-stores .ts-row .ts-pct.high { color: var(--danger); font-weight: 600; }
+.today-stores .ts-row .ts-pct.mid  { color: var(--warn); font-weight: 600; }
+.today-stores .ts-row .ts-pct.low  { color: var(--ok); font-weight: 500; }
+
+.today-roles {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin-bottom: 8px;
+}
+.today-roles .tr-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  font-size: 12px; color: var(--text-meta);
+}
+.today-roles .tr-card .tr-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;
+}
+.today-roles .tr-card.live .tr-status { color: var(--ok); }
+.today-roles .tr-card.idle .tr-status { color: var(--text-light); }
+
+/* ── V1 第 2 刀 · Customer churn + PO exceptions list pages ─────── */
+.simple-list {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  margin-bottom: 24px;
+}
+.simple-list .sl-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 110px 90px 90px;
+  gap: 14px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 13px;
+}
+.simple-list .sl-row:last-child { border-bottom: 0; }
+.simple-list .sl-row.head {
+  background: var(--surface); font-size: 11px; color: var(--text-meta);
+  text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+}
+.simple-list .sl-row .sl-pri { font-weight: 600; color: var(--text-primary); }
+.simple-list .sl-row .sl-meta { color: var(--text-meta); font-size: 12px; }
+.simple-list .sl-row .sl-num { font-variant-numeric: tabular-nums; text-align: right; font-family: 'SF Mono', Menlo, monospace; }
+.simple-list .sl-row .sl-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; background: var(--surface); color: var(--text-meta);
+}
+.simple-list .sl-row .sl-tag.danger  { background: rgba(160,48,48,0.10); color: var(--danger); }
+.simple-list .sl-row .sl-tag.warn    { background: rgba(184,134,11,0.12); color: var(--warn); }
+.simple-list .sl-row .sl-tag.brand   { background: var(--brand-soft); color: var(--brand); }
+.simple-list-summary {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 22px; margin-bottom: 16px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;
+}
+.simple-list-summary .sls-cell .sls-label {
+  font-size: 11px; color: var(--text-meta); text-transform: uppercase;
+  letter-spacing: 0.04em; margin-bottom: 4px;
+}
+.simple-list-summary .sls-cell .sls-value {
+  font-size: 22px; font-weight: 600; color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.simple-list-summary .sls-cell .sls-sub {
+  font-size: 12px; color: var(--text-meta); margin-top: 2px;
+}
+.simple-list .sl-tabs {
+  display: flex; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.simple-list .sl-tabs button {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 12px; font-size: 12px; color: var(--text-meta);
+}
+.simple-list .sl-tabs button.on { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); font-weight: 500; }
+
 /* ── Warehouse today's list ────────────────────────────────────── */
 .wh-list {
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
@@ -529,8 +707,18 @@ footer.app-footer {
   .branch-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
   .kanban-summary { grid-template-columns: repeat(2, 1fr); }
   .kanban { grid-template-columns: repeat(2, 1fr); }
+  .today-roles { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
+  .today-card { grid-template-columns: 32px 1fr; }
+  .today-card .td-jump { grid-column: 1 / -1; justify-self: stretch; margin-top: 8px; }
+  .today-stores .ts-row { grid-template-columns: 70px 1fr 80px; gap: 8px; padding: 10px 14px; font-size: 12px; }
+  .today-stores .ts-row .ts-num.opt, .today-stores .ts-row.head .ts-num.opt { display: none; }
+  .today-roles { grid-template-columns: 1fr 1fr; }
+  .simple-list .sl-row { grid-template-columns: 1fr 90px; gap: 6px; padding: 10px 14px; font-size: 12px; }
+  .simple-list .sl-row .sl-num.opt, .simple-list .sl-row.head .sl-num.opt, .simple-list .sl-row .sl-meta.opt { display: none; }
+  .today-banner { padding: 18px 16px; }
+  .today-banner .td-headline { font-size: 18px; }
   header.app-header { padding: 12px 16px; gap: 8px; flex-wrap: wrap; }
   header.app-header .data-date { display: none; }
   header.app-header .header-right { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
@@ -589,8 +777,8 @@ footer.app-footer {
     <nav class="menu" id="menu">
       <div class="group">
         <div class="menu-section" data-i18n="nav-section-execute">Execute</div>
-        <div class="item disabled" title="V1 next cut">
-          <span class="icon">🏠</span><span data-i18n="nav-today">Today Overview</span><span class="later" data-i18n="later">V1 next cut</span>
+        <div class="sub-item" data-view="today" id="navToday" onclick="setView('today')" style="padding-left:12px">
+          <span class="icon">🏠</span><span data-i18n="nav-today">Today Overview</span>
         </div>
       </div>
       <div class="group">
@@ -606,6 +794,15 @@ footer.app-footer {
         </div>
         <div class="sub-item" data-view="warehouse" id="navWarehouse" onclick="setView('warehouse')">
           <span class="icon">↳</span><span data-i18n="nav-wh-today">Today's Transfers</span>
+        </div>
+        <div class="sub-item" data-view="po-exceptions" id="navPoExc" onclick="setView('po-exceptions')">
+          <span class="icon">↳</span><span data-i18n="nav-po-exc">Purchase Exceptions</span>
+        </div>
+      </div>
+      <div class="group">
+        <div class="menu-section" data-i18n="nav-section-cust">Customers</div>
+        <div class="sub-item" data-view="customer-churn" id="navChurn" onclick="setView('customer-churn')" style="padding-left:12px">
+          <span class="icon">👥</span><span data-i18n="nav-cust-churn">Lapsed Customers</span>
         </div>
       </div>
       <div class="group">
@@ -648,6 +845,53 @@ footer.app-footer {
         </div>
       </div>
 
+      <!-- ── View: Owner Today Overview (V1 第 2 刀) ──────────── -->
+      <div class="view" id="view-today">
+        <div class="today-banner" id="todayBanner"></div>
+
+        <div class="today-section-title">
+          <span data-i18n="td-cards-title">3 things to look at today</span>
+          <span class="meta" data-i18n="td-cards-sub">auto-selected from this week's data</span>
+        </div>
+        <div class="today-cards" id="todayCards"></div>
+
+        <div class="today-section-title">
+          <span data-i18n="td-stores-title">5 stores at a glance</span>
+        </div>
+        <div class="today-stores" id="todayStores"></div>
+
+        <div class="today-section-title">
+          <span data-i18n="td-roles-title">Team status</span>
+        </div>
+        <div class="today-roles" id="todayRoles"></div>
+      </div>
+
+      <!-- ── View: Customer Churn (V1 第 2 刀) ─────────────────── -->
+      <div class="view" id="view-customer-churn">
+        <h1 class="page-title" data-i18n="cc-title">Lapsed Customers</h1>
+        <p class="page-sub" data-i18n="cc-sub">High-lifetime members who haven't shopped in 6+ months — first call list.</p>
+
+        <div class="simple-list-summary" id="ccSummary"></div>
+        <div class="toolbar">
+          <input id="ccSearch" type="search" placeholder="Search name, member, store…">
+          <div class="spacer"></div>
+          <button class="csv-btn" type="button" id="ccCsvBtn">Export CSV</button>
+        </div>
+        <div class="simple-list" id="ccList"></div>
+      </div>
+
+      <!-- ── View: Purchase Exceptions (V1 第 2 刀) ────────────── -->
+      <div class="view" id="view-po-exceptions">
+        <h1 class="page-title" data-i18n="pe-title">Purchase Exceptions</h1>
+        <p class="page-sub" data-i18n="pe-sub">Open POs that haven't arrived and orders that took too long — clean up before next batch.</p>
+
+        <div class="simple-list-summary" id="peSummary"></div>
+        <div class="simple-list" id="peList">
+          <div class="sl-tabs" id="peTabs"></div>
+          <div id="peListBody"></div>
+        </div>
+      </div>
+
       <!-- ── View: Owner Transfer Suggestions (kanban) ─────────── -->
       <div class="view" id="view-transfers">
         <h1 class="page-title" data-i18n="tr-title">Transfer Suggestions</h1>
@@ -680,6 +924,7 @@ footer.app-footer {
 <script src="session.js"></script>
 <script src="auditlog.js"></script>
 <script src="assets/deadstock-data.js"></script>
+<script src="assets/today-data.js"></script>
 <script>
 /* ──────────────────────────────────────────────────────────────────
    Wiltek Portal — V1 第 0 刀  (Dead Stock Dashboard)
@@ -797,7 +1042,80 @@ const STR = {
     "wh-status-cancel": "Skipped",
 
     "viewas-owner": "Owner",
-    "viewas-warehouse": "Warehouse"
+    "viewas-warehouse": "Warehouse",
+
+    "nav-section-cust": "Customers",
+    "nav-cust-churn": "Lapsed Customers",
+    "nav-po-exc": "Purchase Exceptions",
+
+    "td-banner-date": "Today · {date}",
+    "td-headline-bad":  "Of RM {total} stock, RM {problem} ({pct}) is problem inventory. Pick one thing today.",
+    "td-headline-ok":   "Of RM {total} stock, RM {problem} ({pct}) is problem inventory. Steady — pick one thing today.",
+    "td-cards-title": "3 things to look at today",
+    "td-cards-sub": "auto-selected from this week's data",
+    "td-action-label": "What to do",
+    "td-jump": "Open list",
+    "td-stores-title": "5 stores at a glance",
+    "td-store-id": "Store",
+    "td-store-name": "Name",
+    "td-store-stock": "Stock RM",
+    "td-store-problem": "Problem RM",
+    "td-store-pct": "Problem %",
+    "td-roles-title": "Team status",
+    "td-role-live": "On",
+    "td-role-idle": "V1 next cut",
+    "td-role-owner": "Owner — you",
+    "td-role-warehouse": "Warehouse",
+    "td-role-finance": "Finance",
+    "td-role-marketing": "Marketing",
+    "td-empty": "No urgent items today.",
+
+    "td-card-deadstock-title": "Dead stock — RM {amt} sitting still",
+    "td-card-deadstock-interp": "{rows} SKUs haven't sold in 12+ months. Worst store is {branch}: RM {bamt}.",
+    "td-card-deadstock-action": "Pick the top 10 highest-value SKUs at {branch} this week. Decide: discount, return, or scrap.",
+    "td-card-misplaced-title": "Transferable stock — RM {amt} in the wrong store",
+    "td-card-misplaced-interp": "{rows} SKUs that one branch can't sell but another sold {sold3} units in 3m.",
+    "td-card-misplaced-action": "Open Transfer Suggestions and accept the bucket A items in one click.",
+    "td-card-po-overdue-title": "{n} POs overdue — never received",
+    "td-card-po-overdue-interp": "{n} purchase orders placed 30+ days ago still have no GRN. Worst is {days} days.",
+    "td-card-po-overdue-action": "Call suppliers today. Cancel anything older than 90 days that you don't actually need.",
+    "td-card-po-delayed-title": "Procurement lead time creeping",
+    "td-card-po-delayed-interp": "{n} POs took longer than 30 days to arrive (RM {amt}). Worst was {days} days.",
+    "td-card-po-delayed-action": "Review the 3 worst suppliers below. Plan next month's order earlier.",
+    "td-card-churn-title": "{n} loyal customers stopped showing up",
+    "td-card-churn-interp": "Lifetime spend RM {amt}. Top: {top} ({tspend}) — last seen {last}.",
+    "td-card-churn-action": "Pick top 5 below. Whatsapp them this week with a personal note, no promo.",
+
+    "cc-title": "Lapsed Customers",
+    "cc-sub": "High-lifetime members who haven't shopped in 6+ months — first call list.",
+    "cc-summary-total": "Lapsed",
+    "cc-summary-amt": "Lifetime spend",
+    "cc-summary-cutoff": "Cutoff",
+    "cc-col-name": "Name",
+    "cc-col-member": "Member",
+    "cc-col-store": "Store",
+    "cc-col-amt": "Lifetime RM",
+    "cc-col-last": "Last seen",
+    "cc-col-visits": "Visits",
+    "cc-col-loyalty": "Loyalty",
+    "cc-empty": "No lapsed customers.",
+    "cc-search-ph": "Search name, member, store…",
+    "cc-csv-name": "Wiltek_LapsedCustomers_",
+
+    "pe-title": "Purchase Exceptions",
+    "pe-sub": "Open POs that haven't arrived and orders that took too long — clean up before next batch.",
+    "pe-summary-overdue": "Overdue (open)",
+    "pe-summary-delayed": "Delayed (closed)",
+    "pe-summary-amt": "Total RM",
+    "pe-tab-overdue": "Overdue · open",
+    "pe-tab-delayed": "Delayed · closed",
+    "pe-col-code": "Item",
+    "pe-col-brand": "Brand",
+    "pe-col-po": "PO date",
+    "pe-col-grn": "GRN date",
+    "pe-col-days": "Days",
+    "pe-col-amt": "Amount RM",
+    "pe-empty": "Nothing flagged."
   },
   zh: {
     "title": "呆死货清单",
@@ -909,7 +1227,80 @@ const STR = {
     "wh-status-cancel": "已跳过",
 
     "viewas-owner": "Owner",
-    "viewas-warehouse": "仓库"
+    "viewas-warehouse": "仓库",
+
+    "nav-section-cust": "顾客",
+    "nav-cust-churn": "老客流失清单",
+    "nav-po-exc": "采购异常清单",
+
+    "td-banner-date": "今天 · {date}",
+    "td-headline-bad":  "总库存 RM {total},其中 RM {problem}({pct})是问题库存。今天挑一件事处理。",
+    "td-headline-ok":   "总库存 RM {total},其中 RM {problem}({pct})是问题库存。平稳 — 今天挑一件事处理。",
+    "td-cards-title": "你今天该看的 3 件事",
+    "td-cards-sub": "由本周数据自动挑出",
+    "td-action-label": "今天该做",
+    "td-jump": "看清单",
+    "td-stores-title": "5 家门市一眼看",
+    "td-store-id": "门市",
+    "td-store-name": "名字",
+    "td-store-stock": "总库存 RM",
+    "td-store-problem": "问题 RM",
+    "td-store-pct": "问题占比",
+    "td-roles-title": "团队状态",
+    "td-role-live": "已上线",
+    "td-role-idle": "V1 下一刀",
+    "td-role-owner": "Owner — 你",
+    "td-role-warehouse": "仓库",
+    "td-role-finance": "财务",
+    "td-role-marketing": "市场",
+    "td-empty": "今天暂无紧急事项。",
+
+    "td-card-deadstock-title": "死货 — RM {amt} 趴着不动",
+    "td-card-deadstock-interp": "{rows} 颗 SKU 12+ 月没卖。最严重 {branch}:RM {bamt}。",
+    "td-card-deadstock-action": "本周在 {branch} 挑前 10 颗金额最大的,决定:打折、退还供应商、或注销。",
+    "td-card-misplaced-title": "可调货 — RM {amt} 在错的店",
+    "td-card-misplaced-interp": "{rows} 颗 SKU 在一家店卖不动,但别店近 3 月卖了 {sold3} 颗。",
+    "td-card-misplaced-action": "打开调货建议,把 A 类(稳赚的)一键接受。",
+    "td-card-po-overdue-title": "{n} 张采购单逾期未到货",
+    "td-card-po-overdue-interp": "{n} 张 PO 下了 30+ 天还没收货。最久 {days} 天。",
+    "td-card-po-overdue-action": "今天打电话催货。超过 90 天且不必要的,取消掉。",
+    "td-card-po-delayed-title": "采购到货时间在拉长",
+    "td-card-po-delayed-interp": "{n} 张 PO 用了 30+ 天才到(总值 RM {amt})。最长 {days} 天。",
+    "td-card-po-delayed-action": "看下面最差 3 家供应商。下个月下单提早。",
+    "td-card-churn-title": "{n} 位老客好久没来了",
+    "td-card-churn-interp": "终身消费 RM {amt}。最大:{top}(RM {tspend})— 最后见 {last}。",
+    "td-card-churn-action": "选下面前 5 位,这周 WhatsApp 一条个人消息,不要促销。",
+
+    "cc-title": "老客流失清单",
+    "cc-sub": "高终身消费但 6+ 月没回头的会员 — 优先打电话名单。",
+    "cc-summary-total": "流失数",
+    "cc-summary-amt": "终身消费",
+    "cc-summary-cutoff": "门槛",
+    "cc-col-name": "顾客",
+    "cc-col-member": "会员号",
+    "cc-col-store": "门市",
+    "cc-col-amt": "终身 RM",
+    "cc-col-last": "最后见",
+    "cc-col-visits": "次数",
+    "cc-col-loyalty": "会员龄",
+    "cc-empty": "没有流失会员。",
+    "cc-search-ph": "搜索顾客、会员号、门市…",
+    "cc-csv-name": "Wiltek_LapsedCustomers_",
+
+    "pe-title": "采购异常清单",
+    "pe-sub": "未到货的 PO + 拖太久的旧单 — 下批前先清干净。",
+    "pe-summary-overdue": "逾期(未收)",
+    "pe-summary-delayed": "延迟(已收)",
+    "pe-summary-amt": "总值 RM",
+    "pe-tab-overdue": "逾期未收",
+    "pe-tab-delayed": "延迟到货",
+    "pe-col-code": "货号",
+    "pe-col-brand": "品牌",
+    "pe-col-po": "下单日",
+    "pe-col-grn": "到货日",
+    "pe-col-days": "天数",
+    "pe-col-amt": "金额 RM",
+    "pe-empty": "暂无异常。"
   }
 };
 
@@ -998,8 +1389,8 @@ function enterApp() {
   renderClassFilter();
   renderTable();
 
-  // Initial view: warehouse role lands on warehouse list, others on dead stock
-  const initialView = (VIEW_AS === 'warehouse') ? 'warehouse' : 'deadstock';
+  // Initial view: warehouse role lands on warehouse list, owner lands on today overview
+  const initialView = (VIEW_AS === 'warehouse') ? 'warehouse' : 'today';
   setView(initialView);
 
   try { window.AuditLog && window.AuditLog.log('login_success', s.userId, 'role=' + s.role); } catch(_){}
@@ -1020,6 +1411,9 @@ function setLang(l) {
   renderTable();
   if (CUR_VIEW === 'transfers') renderTransfers();
   else if (CUR_VIEW === 'warehouse') renderWarehouse();
+  else if (CUR_VIEW === 'today') renderToday();
+  else if (CUR_VIEW === 'customer-churn') renderChurn();
+  else if (CUR_VIEW === 'po-exceptions') renderPoExceptions();
 }
 function applyLang() {
   document.documentElement.setAttribute('lang', LANG);
@@ -1399,6 +1793,9 @@ function setView(v) {
   });
   if (v === 'transfers') renderTransfers();
   else if (v === 'warehouse') renderWarehouse();
+  else if (v === 'today') renderToday();
+  else if (v === 'customer-churn') renderChurn();
+  else if (v === 'po-exceptions') renderPoExceptions();
   // Scroll to top on view change
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
@@ -1746,6 +2143,401 @@ function handleWarehouseAction(act, id) {
   if (CUR_VIEW === 'transfers') renderTransfers();
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   V1 第 2 刀  ·  Owner 今天总览  +  老客流失  +  采购异常
+   ──────────────────────────────────────────────────────────────── */
+
+let CC_SEARCH = '';
+let PE_TAB = 'overdue';
+
+/* ── Candidate generation: collect signals across 4 dimensions ─── */
+function collectTodayCandidates() {
+  const ds = window.WP_DEADSTOCK || {};
+  const td = window.WP_TODAY || {};
+  const out = [];
+
+  // Inventory dimension — Dead stock company-wide
+  const totalsDead = (ds.totals && ds.totals.DEAD) || { rows: 0, amount: 0 };
+  if (totalsDead.amount > 0) {
+    // Find worst branch for DEAD
+    let worstBranch = null, worstAmt = 0;
+    Object.entries(ds.by_branch || {}).forEach(p => {
+      if ((p[1].DEAD || 0) > worstAmt) { worstAmt = p[1].DEAD; worstBranch = p[0]; }
+    });
+    out.push({
+      kind: 'deadstock',
+      dim: 'inventory',
+      icon: '📦',
+      urgency: totalsDead.amount,
+      title: t('td-card-deadstock-title').replace('{amt}', fmtMoney(totalsDead.amount)),
+      interp: t('td-card-deadstock-interp')
+        .replace('{rows}', fmt(totalsDead.rows))
+        .replace('{branch}', worstBranch || '—')
+        .replace('{bamt}', fmtMoney(worstAmt)),
+      action: t('td-card-deadstock-action').replace('{branch}', worstBranch || '—'),
+      jump: 'deadstock',
+    });
+  }
+
+  // Inventory dimension — Misplaced (transferable) stock
+  const totalsMis = (ds.totals && ds.totals.MISPLACED) || { rows: 0, amount: 0 };
+  if (totalsMis.amount > 0) {
+    // Sum 3m sales of misplaced SKUs at other branches (rough proxy)
+    let sold3 = 0;
+    (ds.rows || []).forEach(r => {
+      if (r.cls !== 'MISPLACED') return;
+      const sales = (ds.sku_branch_sales_3m && ds.sku_branch_sales_3m[r.code]) || {};
+      Object.entries(sales).forEach(([b, q]) => { if (b !== r.branch) sold3 += q; });
+    });
+    out.push({
+      kind: 'misplaced',
+      dim: 'inventory',
+      icon: '🔁',
+      urgency: totalsMis.amount,
+      title: t('td-card-misplaced-title').replace('{amt}', fmtMoney(totalsMis.amount)),
+      interp: t('td-card-misplaced-interp')
+        .replace('{rows}', fmt(totalsMis.rows))
+        .replace('{sold3}', fmt(Math.round(sold3))),
+      action: t('td-card-misplaced-action'),
+      jump: 'transfers',
+    });
+  }
+
+  // Procurement dimension — Overdue (unreceived) POs
+  const peSum = (td.po_exceptions && td.po_exceptions.summary) || {};
+  if ((peSum.n_overdue || 0) > 0) {
+    const worst = (td.po_exceptions.overdue && td.po_exceptions.overdue[0]) || {};
+    // Urgency: heavily weight overdue POs (each unit of risk)
+    const urgency = (peSum.amount_overdue || 0) + peSum.n_overdue * 50;
+    out.push({
+      kind: 'po-overdue',
+      dim: 'procurement',
+      icon: '🚚',
+      urgency: urgency,
+      title: t('td-card-po-overdue-title').replace('{n}', fmt(peSum.n_overdue)),
+      interp: t('td-card-po-overdue-interp')
+        .replace('{n}', fmt(peSum.n_overdue))
+        .replace('{days}', fmt(worst.days || 0)),
+      action: t('td-card-po-overdue-action'),
+      jump: 'po-exceptions',
+    });
+  }
+
+  // Procurement dimension — Delayed (already-received) POs
+  if ((peSum.n_delayed || 0) > 0) {
+    const worst = (td.po_exceptions.delayed && td.po_exceptions.delayed[0]) || {};
+    out.push({
+      kind: 'po-delayed',
+      dim: 'procurement',
+      icon: '⏱️',
+      urgency: (peSum.amount_delayed || 0) * 0.3,
+      title: t('td-card-po-delayed-title'),
+      interp: t('td-card-po-delayed-interp')
+        .replace('{n}', fmt(peSum.n_delayed))
+        .replace('{amt}', fmtMoney(peSum.amount_delayed))
+        .replace('{days}', fmt(worst.days || 0)),
+      action: t('td-card-po-delayed-action'),
+      jump: 'po-exceptions',
+    });
+  }
+
+  // Customer dimension — Churn
+  const cSum = (td.churn && td.churn.summary) || {};
+  if ((cSum.n_high_value || 0) > 0) {
+    const top = (td.churn.rows && td.churn.rows[0]) || {};
+    out.push({
+      kind: 'churn',
+      dim: 'customer',
+      icon: '👥',
+      urgency: cSum.lifetime_rm || 0,
+      title: t('td-card-churn-title').replace('{n}', fmt(cSum.n_high_value)),
+      interp: t('td-card-churn-interp')
+        .replace('{amt}', fmtMoney(cSum.lifetime_rm))
+        .replace('{top}', escapeHtml(top.name || '—'))
+        .replace('{tspend}', fmtMoney(top.amount || 0))
+        .replace('{last}', top.last || '—'),
+      action: t('td-card-churn-action'),
+      jump: 'customer-churn',
+    });
+  }
+
+  return out;
+}
+
+/* ── Pick top 3 spanning ≥ 2 dimensions ─────────────────────────── */
+function pickTodayThree(candidates) {
+  if (!candidates.length) return [];
+  candidates.sort((a, b) => b.urgency - a.urgency);
+  const dims = new Set();
+  const picked = [];
+  // First pass: take highest-urgency candidate per dimension
+  for (const c of candidates) {
+    if (picked.length >= 3) break;
+    if (!dims.has(c.dim)) { picked.push(c); dims.add(c.dim); }
+  }
+  // Second pass: fill remaining slots from any dimension
+  for (const c of candidates) {
+    if (picked.length >= 3) break;
+    if (!picked.includes(c)) picked.push(c);
+  }
+  return picked.slice(0, 3);
+}
+
+/* ── Urgency tier (drives left color bar) ───────────────────────── */
+function urgencyTier(value) {
+  if (value > 1000) return 'high';
+  if (value >= 500) return 'mid';
+  return 'low';
+}
+
+/* ── Render Today Overview ──────────────────────────────────────── */
+function renderToday() {
+  const ds = window.WP_DEADSTOCK || {};
+  const m = ds.meta || {};
+
+  // Banner
+  const banner = document.getElementById('todayBanner');
+  if (banner) {
+    const today = new Date();
+    const dateStr = today.toLocaleDateString(LANG === 'zh' ? 'zh-CN' : 'en-MY',
+      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const isBad = (m.problem_pct || 0) >= 30;
+    const headlineKey = isBad ? 'td-headline-bad' : 'td-headline-ok';
+    const head = t(headlineKey)
+      .replace('{total}', '<span class="accent num">' + fmtMoney(m.total_stock || 0) + '</span>')
+      .replace('{problem}', '<span class="danger num">' + fmtMoney(m.problem_total || 0) + '</span>')
+      .replace('{pct}', '<span class="num">' + fmtPct(m.problem_pct || 0) + '</span>');
+    banner.innerHTML =
+      '<div class="td-date">' + t('td-banner-date').replace('{date}', dateStr) + '</div>' +
+      '<div class="td-headline">' + head + '</div>';
+  }
+
+  // 3 cards
+  const cardsEl = document.getElementById('todayCards');
+  const candidates = collectTodayCandidates();
+  const top3 = pickTodayThree(candidates);
+  if (cardsEl) {
+    if (!top3.length) {
+      cardsEl.innerHTML = '<div class="today-card empty">' + t('td-empty') + '</div>';
+    } else {
+      cardsEl.innerHTML = top3.map(c => {
+        const tier = urgencyTier(c.urgency);
+        return '<div class="today-card urg-' + tier + '" data-jump="' + c.jump + '" data-kind="' + c.kind + '">' +
+          '<div class="td-icon">' + c.icon + '</div>' +
+          '<div class="td-body">' +
+            '<div class="td-title">' + c.title + '</div>' +
+            '<div class="td-interp">' + c.interp + '</div>' +
+            '<div class="td-action-label">' + t('td-action-label') + '</div>' +
+            '<div class="td-action">' + c.action + '</div>' +
+          '</div>' +
+          '<button class="td-jump" type="button" data-jump-btn="' + c.jump + '">' + t('td-jump') + '</button>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  // 5-store table
+  const storesEl = document.getElementById('todayStores');
+  if (storesEl) {
+    const branches = Object.entries(ds.by_branch || {})
+      .sort((a, b) => b[1].problem_pct - a[1].problem_pct);
+    const head = '<div class="ts-row head">' +
+      '<div>' + t('td-store-id') + '</div>' +
+      '<div>' + t('td-store-name') + '</div>' +
+      '<div class="ts-num opt">' + t('td-store-stock') + '</div>' +
+      '<div class="ts-num opt">' + t('td-store-problem') + '</div>' +
+      '<div class="ts-num">' + t('td-store-pct') + '</div>' +
+    '</div>';
+    const rows = branches.map(p => {
+      const id = p[0], b = p[1];
+      const pctCls = b.problem_pct >= 50 ? 'high' : b.problem_pct >= 30 ? 'mid' : 'low';
+      return '<div class="ts-row">' +
+        '<div class="ts-id">' + id + '</div>' +
+        '<div class="ts-name">' + b.name + '</div>' +
+        '<div class="ts-num opt">RM ' + fmtMoney(b.total) + '</div>' +
+        '<div class="ts-num opt">RM ' + fmtMoney(b.problem) + '</div>' +
+        '<div class="ts-num ts-pct ' + pctCls + '">' + fmtPct(b.problem_pct) + '</div>' +
+      '</div>';
+    }).join('');
+    storesEl.innerHTML = head + rows;
+  }
+
+  // Role status row
+  const rolesEl = document.getElementById('todayRoles');
+  if (rolesEl) {
+    const roles = [
+      { key: 'owner',     live: true,  label: t('td-role-owner') },
+      { key: 'warehouse', live: true,  label: t('td-role-warehouse') },
+      { key: 'finance',   live: false, label: t('td-role-finance') },
+      { key: 'marketing', live: false, label: t('td-role-marketing') },
+    ];
+    rolesEl.innerHTML = roles.map(r => {
+      const cls = r.live ? 'live' : 'idle';
+      const status = r.live ? '✅ ' + t('td-role-live') : '⚪ ' + t('td-role-idle');
+      return '<div class="tr-card ' + cls + '">' +
+        '<div class="tr-name">' + r.label + '</div>' +
+        '<div class="tr-status">' + status + '</div>' +
+      '</div>';
+    }).join('');
+  }
+}
+
+/* ── Render Customer Churn page ─────────────────────────────────── */
+function renderChurn() {
+  const td = window.WP_TODAY || {};
+  const churn = td.churn || { summary: {}, rows: [] };
+  const summaryEl = document.getElementById('ccSummary');
+  if (summaryEl) {
+    const s = churn.summary || {};
+    summaryEl.innerHTML =
+      '<div class="sls-cell"><div class="sls-label">' + t('cc-summary-total') + '</div>' +
+        '<div class="sls-value num">' + fmt(s.n_high_value || 0) + '</div>' +
+        '<div class="sls-sub">' + (s.cutoff_months || 6) + (LANG === 'zh' ? ' 月+ 没回头' : ' months silent') + '</div>' +
+      '</div>' +
+      '<div class="sls-cell"><div class="sls-label">' + t('cc-summary-amt') + '</div>' +
+        '<div class="sls-value num">RM ' + fmtMoney(s.lifetime_rm || 0) + '</div>' +
+        '<div class="sls-sub">' + (LANG === 'zh' ? '终身消费总和' : 'lifetime spend total') + '</div>' +
+      '</div>' +
+      '<div class="sls-cell"><div class="sls-label">' + t('cc-summary-cutoff') + '</div>' +
+        '<div class="sls-value num">RM ' + fmt(s.high_value_threshold || 1000) + '+</div>' +
+        '<div class="sls-sub">' + (LANG === 'zh' ? '终身消费门槛' : 'lifetime spend cutoff') + '</div>' +
+      '</div>';
+  }
+  const sb = document.getElementById('ccSearch');
+  if (sb) sb.placeholder = t('cc-search-ph');
+  const cb = document.getElementById('ccCsvBtn');
+  if (cb) cb.textContent = LANG === 'zh' ? '导出 CSV' : 'Export CSV';
+
+  const rows = (churn.rows || [])
+    .filter(r => r.amount >= (churn.summary.high_value_threshold || 1000))
+    .filter(r => {
+      if (!CC_SEARCH) return true;
+      const q = CC_SEARCH.toLowerCase();
+      return String(r.name || '').toLowerCase().includes(q) ||
+             String(r.mc || '').toLowerCase().includes(q) ||
+             String(r.branch || '').toLowerCase().includes(q);
+    });
+
+  const listEl = document.getElementById('ccList');
+  if (!listEl) return;
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="empty-state">' + t('cc-empty') + '</div>';
+    return;
+  }
+  const head = '<div class="sl-row head">' +
+    '<div>' + t('cc-col-store') + '</div>' +
+    '<div>' + t('cc-col-name') + ' / ' + t('cc-col-member') + '</div>' +
+    '<div class="sl-num">' + t('cc-col-amt') + '</div>' +
+    '<div class="sl-num opt">' + t('cc-col-last') + '</div>' +
+    '<div class="sl-num opt">' + t('cc-col-loyalty') + '</div>' +
+  '</div>';
+  const RENDER_CAP = 200;
+  const slice = rows.slice(0, RENDER_CAP);
+  const body = slice.map(r => {
+    return '<div class="sl-row">' +
+      '<div><span class="sl-tag brand">' + r.branch + '</span></div>' +
+      '<div><div class="sl-pri">' + escapeHtml(r.name || r.mc) + '</div><div class="sl-meta">' + r.mc + ' · ' + r.visits + 'x</div></div>' +
+      '<div class="sl-num">RM ' + fmtMoney(r.amount) + '</div>' +
+      '<div class="sl-num opt">' + r.last + '</div>' +
+      '<div class="sl-num opt sl-meta">' + (r.loyalty || '—') + '</div>' +
+    '</div>';
+  }).join('');
+  const tail = rows.length > RENDER_CAP ?
+    '<div class="empty-state">' + (LANG === 'zh' ?
+      '只显示前 ' + RENDER_CAP + ' 条,共 ' + fmt(rows.length) + ' 条 — 用搜索缩小范围。' :
+      'Showing first ' + RENDER_CAP + ' of ' + fmt(rows.length) + ' — use search to narrow.') + '</div>' : '';
+  listEl.innerHTML = head + body + tail;
+}
+
+function exportChurnCSV() {
+  const td = window.WP_TODAY || {}; const churn = td.churn || {};
+  const rows = (churn.rows || []).filter(r => r.amount >= (churn.summary.high_value_threshold || 1000));
+  const cols = ['branch', 'mc', 'name', 'amount', 'visits', 'last', 'loyalty'];
+  const head = ['store', 'member', 'name', 'lifetime_rm', 'visits', 'last_seen', 'loyalty'];
+  const lines = [head.join(',')];
+  rows.forEach(r => {
+    const out = cols.map(k => {
+      let v = r[k]; if (v == null) return '';
+      if (typeof v === 'string' && (v.indexOf(',') !== -1 || v.indexOf('"') !== -1))
+        v = '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    });
+    lines.push(out.join(','));
+  });
+  const csv = '\ufeff' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  const d = new Date();
+  const stamp = d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  a.href = URL.createObjectURL(blob);
+  a.download = t('cc-csv-name') + stamp + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+}
+
+/* ── Render Purchase Exceptions page ────────────────────────────── */
+function renderPoExceptions() {
+  const td = window.WP_TODAY || {};
+  const pe = td.po_exceptions || { summary: {}, overdue: [], delayed: [] };
+  const s = pe.summary || {};
+
+  const summaryEl = document.getElementById('peSummary');
+  if (summaryEl) {
+    summaryEl.innerHTML =
+      '<div class="sls-cell"><div class="sls-label">' + t('pe-summary-overdue') + '</div>' +
+        '<div class="sls-value num">' + fmt(s.n_overdue || 0) + '</div>' +
+        '<div class="sls-sub">RM ' + fmtMoney(s.amount_overdue || 0) + '</div>' +
+      '</div>' +
+      '<div class="sls-cell"><div class="sls-label">' + t('pe-summary-delayed') + '</div>' +
+        '<div class="sls-value num">' + fmt(s.n_delayed || 0) + '</div>' +
+        '<div class="sls-sub">RM ' + fmtMoney(s.amount_delayed || 0) + '</div>' +
+      '</div>';
+  }
+
+  const tabsEl = document.getElementById('peTabs');
+  if (tabsEl) {
+    const tabs = [
+      { key: 'overdue', label: t('pe-tab-overdue') + ' · ' + fmt(s.n_overdue || 0) },
+      { key: 'delayed', label: t('pe-tab-delayed') + ' · ' + fmt(s.n_delayed || 0) },
+    ];
+    tabsEl.innerHTML = tabs.map(tab =>
+      '<button type="button" data-pe-tab="' + tab.key + '" class="' + (PE_TAB === tab.key ? 'on' : '') + '">' + tab.label + '</button>'
+    ).join('');
+  }
+
+  const rows = PE_TAB === 'overdue' ? pe.overdue : pe.delayed;
+  const bodyEl = document.getElementById('peListBody');
+  if (!bodyEl) return;
+  if (!rows.length) {
+    bodyEl.innerHTML = '<div class="empty-state">' + t('pe-empty') + '</div>';
+    return;
+  }
+  const head = '<div class="sl-row head">' +
+    '<div>' + t('pe-col-po') + '</div>' +
+    '<div>' + t('pe-col-code') + ' / ' + t('pe-col-brand') + '</div>' +
+    '<div class="sl-num">' + t('pe-col-days') + '</div>' +
+    '<div class="sl-num opt">' + t('pe-col-grn') + '</div>' +
+    '<div class="sl-num opt">' + t('pe-col-amt') + '</div>' +
+  '</div>';
+  const RENDER_CAP = 200;
+  const slice = rows.slice(0, RENDER_CAP);
+  const body = slice.map(r => {
+    const tagCls = r.days > 90 ? 'danger' : 'warn';
+    return '<div class="sl-row">' +
+      '<div class="sl-meta">' + r.po_date + '</div>' +
+      '<div><div class="sl-pri">' + escapeHtml(r.code) + '</div><div class="sl-meta">' + escapeHtml(r.brand || '—') + ' · ' + escapeHtml(r.sub || '') + '</div></div>' +
+      '<div class="sl-num"><span class="sl-tag ' + tagCls + '">' + r.days + 'd</span></div>' +
+      '<div class="sl-num opt sl-meta">' + (r.grn_date || '—') + '</div>' +
+      '<div class="sl-num opt">RM ' + fmtMoney(r.amount) + '</div>' +
+    '</div>';
+  }).join('');
+  const tail = rows.length > RENDER_CAP ?
+    '<div class="empty-state">' + (LANG === 'zh' ?
+      '只显示前 ' + RENDER_CAP + ' 条,共 ' + fmt(rows.length) + ' 条。' :
+      'Showing first ' + RENDER_CAP + ' of ' + fmt(rows.length) + '.') + '</div>' : '';
+  bodyEl.innerHTML = head + body + tail;
+}
+
 /* ── Wire up ──────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('searchBox').addEventListener('input', e => {
@@ -1791,6 +2583,36 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!btn) return;
     handleWarehouseAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'));
   });
+
+  // V1 第 2 刀: today cards click-to-jump
+  const tdCards = document.getElementById('todayCards');
+  if (tdCards) {
+    tdCards.addEventListener('click', e => {
+      const btn = e.target.closest('[data-jump-btn]');
+      const card = e.target.closest('.today-card[data-jump]');
+      const target = btn ? btn.getAttribute('data-jump-btn') : (card ? card.getAttribute('data-jump') : null);
+      if (target) setView(target);
+    });
+  }
+
+  // V1 第 2 刀: churn page search + CSV
+  const ccSearch = document.getElementById('ccSearch');
+  if (ccSearch) {
+    ccSearch.addEventListener('input', e => { CC_SEARCH = e.target.value || ''; renderChurn(); });
+  }
+  const ccCsvBtn = document.getElementById('ccCsvBtn');
+  if (ccCsvBtn) ccCsvBtn.addEventListener('click', exportChurnCSV);
+
+  // V1 第 2 刀: PO exceptions tab toggle
+  const peTabs = document.getElementById('peTabs');
+  if (peTabs) {
+    peTabs.addEventListener('click', e => {
+      const btn = e.target.closest('[data-pe-tab]');
+      if (!btn) return;
+      PE_TAB = btn.getAttribute('data-pe-tab');
+      renderPoExceptions();
+    });
+  }
 
   applyLang();
   if (window.WP_SESSION && window.WP_SESSION.get()) {
