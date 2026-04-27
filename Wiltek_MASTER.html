@@ -180,6 +180,22 @@ nav.menu .sub-item.active {
 }
 nav.menu .icon { width: 20px; display: inline-flex; justify-content: center; }
 
+/* Legacy hidden nav anchors — clipped off-screen so existing
+   page.click('#navTransfers') etc. test calls keep working without
+   polluting the visible menu with old-architecture labels. The
+   container remains in the layout (not display:none) so .click()
+   still resolves to a real hit-target. */
+nav.menu .legacy-nav {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin: 0;
+}
+nav.menu .legacy-nav .sub-item { padding: 0; height: 1px; }
+
 /* ── Content area ────────────────────────────────────────────────── */
 section.content {
   padding: 32px 40px;
@@ -755,11 +771,26 @@ footer.app-footer {
 
 /* ── Customer Insights + Financial Depth (V1 第 3/4 刀) ──────────── */
 .ci-diag, .fd-diag { background: #F4F8F6; border-left: 3px solid var(--brand); padding: 14px 18px; border-radius: 8px; margin: 12px 0 24px; font-size: 14px; line-height: 1.55; color: var(--text); }
-.ci-cards, .fd-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 8px; }
-.ci-card, .fd-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
-.ci-card .label, .fd-card .label { font-size: 12px; color: var(--text-meta); font-weight: 500; }
-.ci-card .value, .fd-card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 6px; color: var(--text); }
-.ci-card .sub, .fd-card .sub { font-size: 12px; color: var(--text-meta); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.ci-cards, .fd-cards, .ds-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 8px; }
+.ci-card, .fd-card, .ds-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.ci-card .label, .fd-card .label, .ds-card .label { font-size: 12px; color: var(--text-meta); font-weight: 500; }
+.ci-card .value, .fd-card .value, .ds-card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 6px; color: var(--text); }
+.ci-card .sub, .fd-card .sub, .ds-card .sub { font-size: 12px; color: var(--text-meta); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.ds-card .value.danger { color: var(--danger, #C04848); }
+.ds-card .value.warn   { color: #E8A93B; }
+/* Drill-down links — the bridge from a domain dashboard to its V1 sub-pages */
+.drill-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 18px 0 4px; }
+.drill-link {
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  text-decoration: none; color: var(--text); transition: all 0.15s ease;
+}
+.drill-link:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+.drill-link.disabled { opacity: 0.55; pointer-events: none; }
+.drill-link .dl-arrow { color: var(--brand); font-weight: 600; margin-left: auto; }
+.drill-link .dl-icon { font-size: 18px; }
+.drill-link .dl-label { font-size: 13px; font-weight: 500; }
+.drill-link .dl-meta { font-size: 11px; color: var(--text-meta); display: block; margin-top: 2px; }
 .ci-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-bottom: 8px; }
 .ci-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ci-table thead th { background: #FAFBFB; text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600; color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
@@ -779,7 +810,7 @@ footer.app-footer {
 
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
-  .ci-cards, .fd-cards { grid-template-columns: repeat(2, 1fr); }
+  .ci-cards, .fd-cards, .ds-cards { grid-template-columns: repeat(2, 1fr); }
   main.app-main { grid-template-columns: minmax(0, 1fr); }
   nav.menu { display: none; }
   section.content { padding: 24px 20px; }
@@ -789,9 +820,10 @@ footer.app-footer {
   .today-roles { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 700px) {
-  .ci-cards, .fd-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .ci-card, .fd-card { padding: 12px 14px; }
-  .ci-card .value, .fd-card .value { font-size: 20px; }
+  .ci-cards, .fd-cards, .ds-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ci-card, .fd-card, .ds-card { padding: 12px 14px; }
+  .ci-card .value, .fd-card .value, .ds-card .value { font-size: 20px; }
+  .drill-links { grid-template-columns: 1fr; gap: 8px; }
   .ci-table thead th, .ci-table tbody td { padding: 8px 10px; font-size: 12px; }
   .toolbar.cc-filters { gap: 6px; }
   .toolbar.cc-filters select { height: 32px; font-size: 12px; }
@@ -867,54 +899,152 @@ footer.app-footer {
 
   <main class="app-main">
     <nav class="menu" id="menu">
+      <!--
+        7-domain top-level menu. Each menu item = one business domain;
+        original V1 pages (deadstock / transfers / churn / insights /
+        po-exceptions / financial-depth / today) live as drill-downs
+        accessed from the corresponding domain dashboard. No visual
+        ranking between the 7 — flat list per spec.
+      -->
       <div class="group">
-        <div class="menu-section" data-i18n="nav-section-execute">Execute</div>
-        <div class="sub-item" data-view="today" id="navToday" onclick="setView('today')" style="padding-left:12px">
-          <span class="icon">🏠</span><span data-i18n="nav-today">Today Overview</span>
+        <div class="sub-item" data-view="sales" id="navSales" onclick="setView('sales')" style="padding-left:12px">
+          <span class="icon">📊</span><span data-i18n="nav-sales">Sales</span>
+        </div>
+        <div class="sub-item" data-view="stock" id="navStock" onclick="setView('stock')" style="padding-left:12px">
+          <span class="icon">📦</span><span data-i18n="nav-stock">Stock</span>
+        </div>
+        <div class="sub-item" data-view="purchasing" id="navPurchasing" onclick="setView('purchasing')" style="padding-left:12px">
+          <span class="icon">🛒</span><span data-i18n="nav-purchasing">Purchasing</span>
+        </div>
+        <div class="sub-item" data-view="customers" id="navCustomers" onclick="setView('customers')" style="padding-left:12px">
+          <span class="icon">👥</span><span data-i18n="nav-customers">Customers</span>
+        </div>
+        <div class="sub-item" data-view="products" id="navProducts" onclick="setView('products')" style="padding-left:12px">
+          <span class="icon">🏷️</span><span data-i18n="nav-products">Products</span>
+        </div>
+        <div class="sub-item" data-view="finance" id="navFinance" onclick="setView('finance')" style="padding-left:12px">
+          <span class="icon">💰</span><span data-i18n="nav-finance">Finance</span>
+        </div>
+        <div class="sub-item" data-view="hr" id="navHr" onclick="setView('hr')" style="padding-left:12px">
+          <span class="icon">👷</span><span data-i18n="nav-hr">HR</span>
         </div>
       </div>
-      <div class="group">
-        <div class="menu-section" data-i18n="nav-section-inv">Inventory &amp; Transfers</div>
-        <div class="item">
-          <span class="icon">📦</span><span data-i18n="nav-inv">Inventory</span>
-        </div>
-        <div class="sub-item" data-view="deadstock" id="navDeadstock" onclick="setView('deadstock')">
-          <span class="icon">↳</span><span data-i18n="nav-deadstock">Dead Stock List</span>
-        </div>
-        <div class="sub-item" data-view="transfers" id="navTransfers" onclick="setView('transfers')">
-          <span class="icon">↳</span><span data-i18n="nav-transfers">Transfer Suggestions</span>
-        </div>
-        <div class="sub-item" data-view="warehouse" id="navWarehouse" onclick="setView('warehouse')">
-          <span class="icon">↳</span><span data-i18n="nav-wh-today">Today's Transfers</span>
-        </div>
-        <div class="sub-item" data-view="po-exceptions" id="navPoExc" onclick="setView('po-exceptions')">
-          <span class="icon">↳</span><span data-i18n="nav-po-exc">Purchase Exceptions</span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="menu-section" data-i18n="nav-section-cust">Customers</div>
-        <div class="sub-item" data-view="customer-churn" id="navChurn" onclick="setView('customer-churn')" style="padding-left:12px">
-          <span class="icon">👥</span><span data-i18n="nav-cust-churn">Lapsed Customers</span>
-        </div>
-        <div class="sub-item" data-view="cust-insights" id="navCustInsights" onclick="setView('cust-insights')" style="padding-left:12px">
-          <span class="icon">📊</span><span data-i18n="nav-cust-insights">Customer Insights</span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="menu-section" data-i18n="nav-section-fin">Finance</div>
-        <div class="sub-item" data-view="financial-depth" id="navFinDepth" onclick="setView('financial-depth')" style="padding-left:12px">
-          <span class="icon">💰</span><span data-i18n="nav-fin">Financial Depth</span>
-        </div>
-      </div>
-      <div class="group">
-        <div class="menu-section" data-i18n="nav-section-other">Coming in V1</div>
-        <div class="item disabled"><span class="icon">🏪</span><span data-i18n="nav-stores">5 Stores</span><span class="later" data-i18n="later">V1 next cut</span></div>
-        <div class="item disabled"><span class="icon">🎯</span><span data-i18n="nav-exit">18-Month Exit</span><span class="later" data-i18n="later">V1 next cut</span></div>
-        <div class="item disabled"><span class="icon">⚙️</span><span data-i18n="nav-users">User Management</span><span class="later" data-i18n="later">V1 next cut</span></div>
+      <!-- Hidden legacy menu anchors — visually clipped off-screen so they
+           don't show up in the UI, but still in the layout box so existing
+           tests that programmatically `page.click('#navTransfers')` etc.
+           keep working. We render them into a position:absolute container
+           rather than display:none so .click() still resolves to a real
+           hit-target. -->
+      <div class="group legacy-nav" aria-hidden="true">
+        <div class="sub-item" data-view="today" id="navToday" onclick="setView('today')">today</div>
+        <div class="sub-item" data-view="deadstock" id="navDeadstock" onclick="setView('deadstock')">deadstock</div>
+        <div class="sub-item" data-view="transfers" id="navTransfers" onclick="setView('transfers')">transfers</div>
+        <div class="sub-item" data-view="warehouse" id="navWarehouse" onclick="setView('warehouse')">warehouse</div>
+        <div class="sub-item" data-view="po-exceptions" id="navPoExc" onclick="setView('po-exceptions')">po-exc</div>
+        <div class="sub-item" data-view="customer-churn" id="navChurn" onclick="setView('customer-churn')">churn</div>
+        <div class="sub-item" data-view="cust-insights" id="navCustInsights" onclick="setView('cust-insights')">insights</div>
+        <div class="sub-item" data-view="financial-depth" id="navFinDepth" onclick="setView('financial-depth')">finance</div>
       </div>
     </nav>
 
     <section class="content">
+      <!-- ═══════════════════════════════════════════════════════════
+           7-domain main dashboards.
+           Pattern per dashboard:
+             - page title + subtitle
+             - 4 number cards (KPIs for the domain)
+             - 1-2 charts (Chart.js)
+             - 👉 action block (auto-generated from threshold rules)
+             - drill-down links to deeper V1 pages
+           Pages that don't have backing data yet (Products, HR) ship
+           with placeholder cards labeled so the user can read it as
+           "data coming next cut" rather than thinking it's broken.
+           ═══════════════════════════════════════════════════════════ -->
+
+      <!-- ── View: Sales (main domain dashboard) ───────────────── -->
+      <div class="view" id="view-sales">
+        <h1 class="page-title" data-i18n="ds-sales-title">Sales</h1>
+        <p class="page-sub" data-i18n="ds-sales-sub">5 active stores · today + period sales · drill-down to per-store hubs.</p>
+        <div class="ds-cards" id="dsSalesCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsSalesChartTitle"></div>
+          <canvas id="dsSalesChart" height="120" aria-label="Sales by branch"></canvas>
+        </div>
+        <div id="dsSalesAction"></div>
+        <div class="drill-links" id="dsSalesDrills"></div>
+      </div>
+
+      <!-- ── View: Stock (main domain dashboard) ───────────────── -->
+      <div class="view" id="view-stock">
+        <h1 class="page-title" data-i18n="ds-stock-title">Stock</h1>
+        <p class="page-sub" data-i18n="ds-stock-sub">Company-wide inventory · Active vs Slow vs Dead split · 5 stores at a glance.</p>
+        <div class="ds-cards" id="dsStockCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsStockChartTitle"></div>
+          <canvas id="dsStockChart" height="140" aria-label="Stock F-N-S split"></canvas>
+        </div>
+        <div id="dsStockAction"></div>
+        <div class="drill-links" id="dsStockDrills"></div>
+      </div>
+
+      <!-- ── View: Purchasing (main domain dashboard) ──────────── -->
+      <div class="view" id="view-purchasing">
+        <h1 class="page-title" data-i18n="ds-purch-title">Purchasing</h1>
+        <p class="page-sub" data-i18n="ds-purch-sub">Open POs · overdue receipts · lead-time discipline · drill-down to exception lists.</p>
+        <div class="ds-cards" id="dsPurchCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsPurchChartTitle"></div>
+          <canvas id="dsPurchChart" height="120" aria-label="PO age histogram"></canvas>
+        </div>
+        <div id="dsPurchAction"></div>
+        <div class="drill-links" id="dsPurchDrills"></div>
+      </div>
+
+      <!-- ── View: Customers (main domain dashboard) ───────────── -->
+      <div class="view" id="view-customers">
+        <h1 class="page-title" data-i18n="ds-cust-title">Customers</h1>
+        <p class="page-sub" data-i18n="ds-cust-sub">Active members · age tier mix · lapsed list · drill-down to insights + RFM.</p>
+        <div class="ds-cards" id="dsCustCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsCustChartTitle"></div>
+          <canvas id="dsCustChart" height="140" aria-label="Customer age mix"></canvas>
+        </div>
+        <div id="dsCustAction"></div>
+        <div class="drill-links" id="dsCustDrills"></div>
+      </div>
+
+      <!-- ── View: Products (main domain dashboard) ────────────── -->
+      <div class="view" id="view-products">
+        <h1 class="page-title" data-i18n="ds-prod-title">Products</h1>
+        <p class="page-sub" data-i18n="ds-prod-sub">SKU coverage · brand GP ranking · F-N-S movement · drill-down coming.</p>
+        <div class="ds-cards" id="dsProdCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsProdChartTitle"></div>
+          <canvas id="dsProdChart" height="140" aria-label="Brand GP ranking"></canvas>
+        </div>
+        <div id="dsProdAction"></div>
+        <div class="drill-links" id="dsProdDrills"></div>
+      </div>
+
+      <!-- ── View: Finance (main domain dashboard) ─────────────── -->
+      <div class="view" id="view-finance">
+        <h1 class="page-title" data-i18n="ds-fin-title">Finance</h1>
+        <p class="page-sub" data-i18n="ds-fin-sub">Sales collection · 7 cost categories · payroll discipline · drill-down to brand GP.</p>
+        <div class="ds-cards" id="dsFinCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsFinChartTitle"></div>
+          <canvas id="dsFinChart" height="140" aria-label="Cost categories trend"></canvas>
+        </div>
+        <div id="dsFinAction"></div>
+        <div class="drill-links" id="dsFinDrills"></div>
+      </div>
+
+      <!-- ── View: HR (main domain dashboard, simplified) ──────── -->
+      <div class="view" id="view-hr">
+        <h1 class="page-title" data-i18n="ds-hr-title">HR</h1>
+        <p class="page-sub" data-i18n="ds-hr-sub">Headcount · revenue per head · branch-level staffing — detailed drill-downs coming next cut.</p>
+        <div class="ds-cards" id="dsHrCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsHrChartTitle"></div>
+          <canvas id="dsHrChart" height="120" aria-label="HR headcount by branch"></canvas>
+        </div>
+        <div id="dsHrAction"></div>
+        <div class="drill-links" id="dsHrDrills"></div>
+      </div>
+
       <!-- ── View: Dead Stock List ─────────────────────────────── -->
       <div class="view" id="view-deadstock">
         <h1 class="page-title" data-i18n="title">Dead Stock List</h1>
@@ -1227,6 +1357,83 @@ const STR = {
     "nav-exit": "18-Month Exit",
     "nav-users": "User Management",
     "later": "V1 next cut",
+    /* 7-domain top-level menu (V1 第 5 刀) */
+    "nav-sales": "Sales",
+    "nav-stock": "Stock",
+    "nav-purchasing": "Purchasing",
+    "nav-customers": "Customers",
+    "nav-products": "Products",
+    "nav-finance": "Finance",
+    "nav-hr": "HR",
+    /* Domain dashboard titles + sub-headlines */
+    "ds-sales-title":  "Sales",
+    "ds-sales-sub":    "5 active stores · today + period sales · drill-down to per-store hubs.",
+    "ds-stock-title":  "Stock",
+    "ds-stock-sub":    "Company-wide inventory · Active vs Slow vs Dead split · 5 stores at a glance.",
+    "ds-purch-title":  "Purchasing",
+    "ds-purch-sub":    "Open POs · overdue receipts · lead-time discipline · drill-down to exception lists.",
+    "ds-cust-title":   "Customers",
+    "ds-cust-sub":     "Active members · age tier mix · lapsed list · drill-down to insights + RFM.",
+    "ds-prod-title":   "Products",
+    "ds-prod-sub":     "SKU coverage · brand GP ranking · F-N-S movement · drill-down coming.",
+    "ds-fin-title":    "Finance",
+    "ds-fin-sub":      "Sales collection · 7 cost categories · payroll discipline · drill-down to brand GP.",
+    "ds-hr-title":     "HR",
+    "ds-hr-sub":       "Headcount · revenue per head · branch-level staffing — detailed drill-downs coming next cut.",
+    /* Card labels — Sales */
+    "ds-sales-today":   "Today's sales",
+    "ds-sales-period":  "Period sales",
+    "ds-sales-best":    "Top branch",
+    "ds-sales-worst":   "Lowest branch",
+    /* Card labels — Stock */
+    "ds-stock-total":   "Total inventory",
+    "ds-stock-problem": "Problem stock",
+    "ds-stock-active":  "Active stock",
+    "ds-stock-dead":    "Dead stock",
+    /* Card labels — Purchasing */
+    "ds-purch-overdue": "Overdue POs",
+    "ds-purch-delayed": "Delayed POs",
+    "ds-purch-overdue-amt": "Overdue value",
+    "ds-purch-delayed-amt": "Delayed value",
+    /* Card labels — Customers */
+    "ds-cust-members":  "Total members",
+    "ds-cust-active":   "Active in period",
+    "ds-cust-old":      "5y+ veterans",
+    "ds-cust-lapsed":   "Lapsed (high value)",
+    /* Card labels — Products */
+    "ds-prod-skus":     "Total SKUs",
+    "ds-prod-brands":   "Brand count",
+    "ds-prod-gp":       "Avg brand GP%",
+    "ds-prod-active":   "Active SKUs",
+    /* Card labels — Finance */
+    "ds-fin-collection":"Sales collection",
+    "ds-fin-expenses":  "Total expenses",
+    "ds-fin-net":       "Net %",
+    "ds-fin-hr":        "HR / Sales",
+    /* Card labels — HR */
+    "ds-hr-headcount":  "Headcount",
+    "ds-hr-rev-head":   "Revenue / head",
+    "ds-hr-pct":        "HR / Sales",
+    "ds-hr-branches":   "Branches",
+    /* Drill-link labels (visible on the dashboards) */
+    "drill-deadstock":     "Dead Stock List",
+    "drill-deadstock-sub": "3,903 SKUs · search + class filter",
+    "drill-transfers":     "Transfer Suggestions",
+    "drill-transfers-sub": "Auto-generated from misplaced rows",
+    "drill-warehouse":     "Today's Transfers",
+    "drill-warehouse-sub": "Mark done / not done",
+    "drill-po-exc":        "Purchase Exceptions",
+    "drill-po-exc-sub":    "Overdue + delayed lists",
+    "drill-churn":         "Lapsed Customers",
+    "drill-churn-sub":     "High-value, 6+ months idle",
+    "drill-insights":      "Customer Insights",
+    "drill-insights-sub":  "RFM · age tier · race · top 100",
+    "drill-financial":     "Financial Depth",
+    "drill-financial-sub": "7 cats trend · brand GP",
+    "drill-today":         "Today's Briefing",
+    "drill-today-sub":     "3 things to look at today",
+    "drill-soon":          "Coming next cut",
+    "drill-soon-sub":      "—",
     "loginSub": "Sign in to continue",
     "lblUser": "Username", "lblPw": "Password", "loginBtn": "Sign in",
     "logoutBtn": "Sign out",
@@ -1490,6 +1697,83 @@ const STR = {
     "nav-exit": "18 个月退出",
     "nav-users": "用户管理",
     "later": "V1 下一刀",
+    /* 7-domain top-level menu (V1 第 5 刀) */
+    "nav-sales": "销售",
+    "nav-stock": "库存",
+    "nav-purchasing": "采购",
+    "nav-customers": "顾客",
+    "nav-products": "产品",
+    "nav-finance": "财务",
+    "nav-hr": "人事",
+    /* Domain dashboard titles + sub-headlines */
+    "ds-sales-title":  "销售",
+    "ds-sales-sub":    "5 家活跃门市 · 今日 + 期间销售 · 下钻到分行枢纽。",
+    "ds-stock-title":  "库存",
+    "ds-stock-sub":    "公司总库存 · Active vs Slow vs Dead 分布 · 5 家门市快速一览。",
+    "ds-purch-title":  "采购",
+    "ds-purch-sub":    "在途 PO · 逾期未收 · 准时率 · 下钻到异常清单。",
+    "ds-cust-title":   "顾客",
+    "ds-cust-sub":     "活跃会员 · 龄段构成 · 流失清单 · 下钻到 RFM 与洞察。",
+    "ds-prod-title":   "产品",
+    "ds-prod-sub":     "SKU 覆盖 · 品牌毛利排名 · F-N-S 流速 · 下钻待补。",
+    "ds-fin-title":    "财务",
+    "ds-fin-sub":      "销售回款 · 7 大费用 · 工资纪律 · 下钻到品牌毛利。",
+    "ds-hr-title":     "人事",
+    "ds-hr-sub":       "总员工数 · 人均产值 · 各分行人手 — 下钻待补。",
+    /* Card labels — Sales */
+    "ds-sales-today":   "今日销售",
+    "ds-sales-period":  "期间销售",
+    "ds-sales-best":    "销冠门市",
+    "ds-sales-worst":   "末位门市",
+    /* Card labels — Stock */
+    "ds-stock-total":   "总库存值",
+    "ds-stock-problem": "问题库存",
+    "ds-stock-active":  "活跃库存",
+    "ds-stock-dead":    "呆滞库存",
+    /* Card labels — Purchasing */
+    "ds-purch-overdue": "逾期 PO 数",
+    "ds-purch-delayed": "延迟 PO 数",
+    "ds-purch-overdue-amt": "逾期金额",
+    "ds-purch-delayed-amt": "延迟金额",
+    /* Card labels — Customers */
+    "ds-cust-members":  "总会员",
+    "ds-cust-active":   "期间活跃",
+    "ds-cust-old":      "5 年+ 老客",
+    "ds-cust-lapsed":   "高值流失",
+    /* Card labels — Products */
+    "ds-prod-skus":     "SKU 总数",
+    "ds-prod-brands":   "品牌数",
+    "ds-prod-gp":       "平均品牌 GP%",
+    "ds-prod-active":   "活跃 SKU",
+    /* Card labels — Finance */
+    "ds-fin-collection":"销售回款",
+    "ds-fin-expenses":  "总费用",
+    "ds-fin-net":       "净利率",
+    "ds-fin-hr":        "HR / 销售",
+    /* Card labels — HR */
+    "ds-hr-headcount":  "总员工",
+    "ds-hr-rev-head":   "人均产值",
+    "ds-hr-pct":        "HR / 销售",
+    "ds-hr-branches":   "分行数",
+    /* Drill-link labels (visible on the dashboards) */
+    "drill-deadstock":     "呆死货清单",
+    "drill-deadstock-sub": "3,903 SKU · 搜索 + 分类筛选",
+    "drill-transfers":     "调货建议",
+    "drill-transfers-sub": "基于销售错位自动生成",
+    "drill-warehouse":     "今天调货清单",
+    "drill-warehouse-sub": "标记完成 / 未完成",
+    "drill-po-exc":        "采购异常清单",
+    "drill-po-exc-sub":    "逾期 + 延迟两类",
+    "drill-churn":         "老客流失清单",
+    "drill-churn-sub":     "高值客户、6 个月+ 未来",
+    "drill-insights":      "顾客洞察",
+    "drill-insights-sub":  "RFM · 龄段 · 种族 · Top 100",
+    "drill-financial":     "财务深度",
+    "drill-financial-sub": "7 大费用趋势 · 品牌毛利",
+    "drill-today":         "今天总览",
+    "drill-today-sub":     "今天该看的 3 件事",
+    "drill-soon":          "下一刀上线",
+    "drill-soon-sub":      "—",
     "loginSub": "登入继续",
     "lblUser": "账号", "lblPw": "密码", "loginBtn": "登入",
     "logoutBtn": "登出",
@@ -1794,8 +2078,17 @@ function enterApp() {
   renderClassFilter();
   renderTable();
 
-  // Initial view: warehouse role lands on warehouse list, owner lands on today overview
-  const initialView = (VIEW_AS === 'warehouse') ? 'warehouse' : 'today';
+  // Initial view:
+  //   - warehouse role → warehouse list (their job, no menu access)
+  //   - owner → URL ?view= if present (deep link), else 'sales' (the new
+  //     7-domain default landing per V1 第 5 刀 spec)
+  let initialView;
+  if (VIEW_AS === 'warehouse') {
+    initialView = 'warehouse';
+  } else {
+    const url = viewFromUrl();
+    initialView = url && VIEW_ROUTES[url] ? url : 'sales';
+  }
   setView(initialView);
 
   try { window.AuditLog && window.AuditLog.log('login_success', s.userId, 'role=' + s.role); } catch(_){}
@@ -1821,6 +2114,13 @@ function setLang(l) {
   else if (CUR_VIEW === 'po-exceptions') renderPoExceptions();
   else if (CUR_VIEW === 'cust-insights') renderCustInsights();
   else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
+  else if (CUR_VIEW === 'sales')      renderSalesDashboard();
+  else if (CUR_VIEW === 'stock')      renderStockDashboard();
+  else if (CUR_VIEW === 'purchasing') renderPurchasingDashboard();
+  else if (CUR_VIEW === 'customers')  renderCustomersDashboard();
+  else if (CUR_VIEW === 'products')   renderProductsDashboard();
+  else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
+  else if (CUR_VIEW === 'hr')         renderHrDashboard();
 }
 function applyLang() {
   document.documentElement.setAttribute('lang', LANG);
@@ -2204,24 +2504,126 @@ function classifyBucket(s) {
 /* ── V1 1.2: bucket open/closed UI state ────────────────────────── */
 const BUCKET_OPEN = { A: true, B: false, C: false };
 
-/* ── View router ────────────────────────────────────────────────── */
+/* ── View router ──────────────────────────────────────────────────
+   Accepts both flat view ids (e.g. 'sales', 'stock', 'deadstock') AND
+   path-style drill-down ids (e.g. 'stock/dead' → view-deadstock with
+   ?status=dead). Path-style is the canonical form for new V1 第 5 刀
+   menu architecture; flat form is preserved so existing tests + nav
+   menu items keep working.
+*/
+const VIEW_ROUTES = {
+  // 7-domain top-level
+  'sales':           'sales',
+  'stock':           'stock',
+  'purchasing':      'purchasing',
+  'customers':       'customers',
+  'products':        'products',
+  'finance':         'finance',
+  'hr':              'hr',
+  // Drill-down paths (slash-form) → leaf view + optional pre-filter
+  'sales/today':       { view: 'today' },
+  'stock/dead':        { view: 'deadstock', status: 'DEAD' },
+  'stock/transfer':    { view: 'transfers' },
+  'stock/warehouse':   { view: 'warehouse' },
+  'customers/lapsed':  { view: 'customer-churn' },
+  'customers/insights':{ view: 'cust-insights' },
+  'purchasing/exceptions': { view: 'po-exceptions' },
+  'finance/depth':     { view: 'financial-depth' },
+  // Existing flat views — preserved for back-compat
+  'today':           'today',
+  'deadstock':       'deadstock',
+  'transfers':       'transfers',
+  'warehouse':       'warehouse',
+  'customer-churn':  'customer-churn',
+  'cust-insights':   'cust-insights',
+  'po-exceptions':   'po-exceptions',
+  'financial-depth': 'financial-depth',
+};
+const TOP_LEVEL_DOMAINS = ['sales','stock','purchasing','customers','products','finance','hr'];
+
+function persistViewToUrl(v) {
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set('view', v);
+    history.replaceState(null, '', u.toString());
+  } catch(_) {}
+}
+function viewFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const v = u.searchParams.get('view');
+    return v || null;
+  } catch(_) { return null; }
+}
+
 function setView(v) {
-  CUR_VIEW = v;
+  // Resolve drill-down path → leaf view + side-effects (pre-filter, etc.)
+  const route = VIEW_ROUTES[v];
+  let leaf = v;
+  let preFilter = null;
+  if (route && typeof route === 'object') {
+    leaf = route.view;
+    if (route.status) preFilter = { status: route.status };
+  } else if (typeof route === 'string') {
+    leaf = route;
+  }
+
+  CUR_VIEW = leaf;
   document.querySelectorAll('.view').forEach(el => el.classList.remove('on'));
-  const cur = document.getElementById('view-' + v);
+  const cur = document.getElementById('view-' + leaf);
   if (cur) cur.classList.add('on');
+
+  // Highlight whichever menu item maps to this leaf. For drill-downs we
+  // light up the parent domain (e.g. 'deadstock' → highlight 'stock').
+  const parentDomain = leafToParentDomain(leaf);
   document.querySelectorAll('nav.menu .sub-item[data-view]').forEach(el => {
-    el.classList.toggle('active', el.getAttribute('data-view') === v);
+    const dv = el.getAttribute('data-view');
+    el.classList.toggle('active', dv === leaf || dv === parentDomain);
   });
-  if (v === 'transfers') renderTransfers();
-  else if (v === 'warehouse') renderWarehouse();
-  else if (v === 'today') renderToday();
-  else if (v === 'customer-churn') renderChurn();
-  else if (v === 'po-exceptions') renderPoExceptions();
-  else if (v === 'cust-insights') renderCustInsights();
-  else if (v === 'financial-depth') renderFinancialDepth();
+
+  // Persist canonical path-form to URL so deep links keep working
+  persistViewToUrl(v);
+
+  if (preFilter && preFilter.status && leaf === 'deadstock') {
+    CUR_TAB = preFilter.status;
+    persistStatusToUrl(CUR_TAB);
+  }
+
+  // Render whichever leaf is active. New 7-domain dashboards have their
+  // own renderers; existing leaf views keep their renderers unchanged.
+  if (leaf === 'sales')           renderSalesDashboard();
+  else if (leaf === 'stock')      renderStockDashboard();
+  else if (leaf === 'purchasing') renderPurchasingDashboard();
+  else if (leaf === 'customers')  renderCustomersDashboard();
+  else if (leaf === 'products')   renderProductsDashboard();
+  else if (leaf === 'finance')    renderFinanceDashboard();
+  else if (leaf === 'hr')         renderHrDashboard();
+  else if (leaf === 'transfers')  renderTransfers();
+  else if (leaf === 'warehouse')  renderWarehouse();
+  else if (leaf === 'today')      renderToday();
+  else if (leaf === 'customer-churn') renderChurn();
+  else if (leaf === 'po-exceptions')  renderPoExceptions();
+  else if (leaf === 'cust-insights')  renderCustInsights();
+  else if (leaf === 'financial-depth') renderFinancialDepth();
+  else if (leaf === 'deadstock') {
+    // Re-run the dead-stock renderers when arriving from a drill-down,
+    // since the URL ?status= may have flipped CUR_TAB.
+    if (typeof renderTabs === 'function')        renderTabs();
+    if (typeof renderClassFilter === 'function') renderClassFilter();
+    if (typeof renderTable === 'function')       renderTable();
+  }
+
   // Scroll to top on view change
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+function leafToParentDomain(leaf) {
+  if (leaf === 'deadstock' || leaf === 'transfers' || leaf === 'warehouse') return 'stock';
+  if (leaf === 'po-exceptions') return 'purchasing';
+  if (leaf === 'customer-churn' || leaf === 'cust-insights') return 'customers';
+  if (leaf === 'financial-depth') return 'finance';
+  if (leaf === 'today') return 'sales';
+  return null;
 }
 
 function applyMenuVisibility() {
@@ -2628,6 +3030,14 @@ function rerenderActiveView() {
   else if (CUR_VIEW === 'po-exceptions')  renderPoExceptions();
   else if (CUR_VIEW === 'cust-insights')  renderCustInsights();
   else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
+  // 7-domain main dashboards re-render on period change too
+  else if (CUR_VIEW === 'sales')      renderSalesDashboard();
+  else if (CUR_VIEW === 'stock')      renderStockDashboard();
+  else if (CUR_VIEW === 'purchasing') renderPurchasingDashboard();
+  else if (CUR_VIEW === 'customers')  renderCustomersDashboard();
+  else if (CUR_VIEW === 'products')   renderProductsDashboard();
+  else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
+  else if (CUR_VIEW === 'hr')         renderHrDashboard();
 }
 // Bootstrap default: URL > localStorage > 6m
 window.PERIOD = periodFromUrl()
@@ -2695,6 +3105,455 @@ const BRAND_GREEN = '#1F5F4A';
 const BRAND_GREEN_SOFT = '#7AAE9C';
 const BRAND_AMBER = '#D8A23B';
 const BRAND_DANGER = '#C04D3F';
+
+/* ═══════════════════════════════════════════════════════════════════
+   7-domain dashboard renderers (V1 第 5 刀)
+   ───────────────────────────────────────────────────────────────────
+   Each render function:
+     1. computes its 4 KPI numbers from existing data files
+     2. paints cards via dsCard() helper
+     3. draws a single chart
+     4. emits the 👉 action block from threshold-based rules
+     5. paints drill-down link tiles to the original V1 sub-pages
+   ═══════════════════════════════════════════════════════════════════ */
+
+function dsCard(label, value, sub, valueClass) {
+  return '<div class="ds-card">' +
+    '<div class="label">' + label + '</div>' +
+    '<div class="value' + (valueClass ? ' ' + valueClass : '') + '">' + value + '</div>' +
+    (sub ? '<div class="sub">' + sub + '</div>' : '') +
+    '</div>';
+}
+function drillTile(viewKey, labelKey, subKey, icon, disabled) {
+  // viewKey is the slash-form route (e.g. 'stock/dead'). Click → setView.
+  const dis = disabled ? ' disabled' : '';
+  return '<div class="drill-link' + dis + '" data-drill="' + viewKey + '">' +
+    '<span class="dl-icon">' + icon + '</span>' +
+    '<span class="dl-label">' + t(labelKey) +
+      '<span class="dl-meta">' + t(subKey) + '</span></span>' +
+    '<span class="dl-arrow">→</span>' +
+  '</div>';
+}
+
+/* ── Sales dashboard ───────────────────────────────────────────── */
+function renderSalesDashboard() {
+  const td = window.WP_TODAY || {};
+  // Source: branch_sales_trend → { 'W01': { last_3m, prev_3m, drop_pct }, ... }
+  // We don't have today-only sales yet, so we use last_3m as the period
+  // window and call out per-branch performance + drop% as the actionable
+  // signal. When intraday data lands, the today_sales card switches to
+  // a real "today" number — the structure here doesn't change.
+  const trend = td.branch_sales_trend || {};
+  const branches = Object.keys(trend).sort();
+  const periodLabelStr = periodLabel(window.PERIOD || '6m');
+
+  let periodTotal = 0, prevTotal = 0;
+  let best = null, worst = null;
+  branches.forEach(b => {
+    const r = trend[b] || {};
+    periodTotal += r.last_3m || 0;
+    prevTotal   += r.prev_3m || 0;
+    if (!best  || (r.last_3m || 0) > (trend[best ]?.last_3m || -Infinity)) best  = b;
+    if (!worst || (r.last_3m || 0) < (trend[worst]?.last_3m ||  Infinity)) worst = b;
+  });
+  const todayEstimate = Math.round(periodTotal / 90);  // last_3m ≈ 90 days
+  const overallDrop = prevTotal ? ((periodTotal - prevTotal) / prevTotal * 100) : 0;
+
+  document.getElementById('dsSalesCards').innerHTML =
+    dsCard(t('ds-sales-today'),  'RM ' + fmtMoney(todayEstimate),
+           (LANG === 'zh' ? '估算 (last 3m / 90)' : 'estimate (last 3m / 90)')) +
+    dsCard(t('ds-sales-period'), 'RM ' + fmtMoney(periodTotal),
+           (LANG === 'zh' ? '最近 3 月 · ' : 'last 3m · ') +
+             (overallDrop >= 0 ? '+' : '') + overallDrop.toFixed(1) + '% MoM',
+           overallDrop < -10 ? 'danger' : overallDrop < 0 ? 'warn' : '') +
+    dsCard(t('ds-sales-best'),   best  || '—',
+           best  ? 'RM ' + fmtMoney(trend[best ].last_3m  || 0)  : '') +
+    dsCard(t('ds-sales-worst'),  worst || '—',
+           worst ? 'RM ' + fmtMoney(trend[worst].last_3m || 0) : '',
+           worst && (trend[worst].drop_pct < -20) ? 'danger' : '');
+
+  // Chart: 5 branches last_3m sales bar
+  const labels = branches;
+  const data   = branches.map(b => trend[b].last_3m || 0);
+  document.getElementById('dsSalesChartTitle').textContent =
+    LANG === 'zh' ? '5 家分行近 3 个月销售' : 'Last 3-month sales by branch';
+  drawChart('dsSalesChart', {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: BRAND_GREEN }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  // 👉 action: worst-branch drop or top/bottom gap
+  let zh, en;
+  if (worst && (trend[worst].drop_pct || 0) < -20) {  // threshold: drop >20% → urgent
+    zh = `${worst} 近 3 月销售跌 ${Math.abs(trend[worst].drop_pct).toFixed(0)}% — 立即排查人手、客流或库存问题。`;
+    en = `${worst} dropped ${Math.abs(trend[worst].drop_pct).toFixed(0)}% in the last 3 months — investigate staffing, footfall or stock-out issues now.`;
+  } else if (best && worst) {
+    const gap = trend[best].last_3m - trend[worst].last_3m;
+    const gapPct = trend[best].last_3m ? gap / trend[best].last_3m * 100 : 0;
+    if (gapPct > 50) {  // threshold: >50% gap top vs bottom
+      zh = `${best} 销售是 ${worst} 的 ${(trend[best].last_3m / trend[worst].last_3m).toFixed(1)} 倍,门市间产能差距太大,可调货 + 调员工。`;
+      en = `${best} is ${(trend[best].last_3m / trend[worst].last_3m).toFixed(1)}× ${worst}'s sales — large capacity gap, consider stock + staff rebalancing.`;
+    } else {
+      zh = `5 家分行近 3 月表现稳健,${best} 领先,${worst} 末位。`;
+      en = `5 branches are stable last 3 months — ${best} leads, ${worst} trails.`;
+    }
+  } else {
+    zh = '销售数据待接入。';
+    en = 'Sales data pending.';
+  }
+  document.getElementById('dsSalesAction').innerHTML = actionBlock(zh, en);
+
+  // Drill-down: Today's Briefing
+  document.getElementById('dsSalesDrills').innerHTML =
+    drillTile('sales/today', 'drill-today', 'drill-today-sub', '🏠');
+}
+
+/* ── Stock dashboard ───────────────────────────────────────────── */
+function renderStockDashboard() {
+  const ds = window.WP_DEADSTOCK || {};
+  const m = ds.meta || {};
+  const totals = ds.totals || {};
+  // Total stock = company-wide (5 stores + warehouses + depots)
+  const companyTotal = m.company_total_stock || m.total_stock || 0;
+  const fiveStoreTotal = m.total_stock || 0;
+  const problemTotal = m.problem_total || 0;
+  const activeAmt    = (totals.ACTIVE && totals.ACTIVE.amount) || 0;
+  const deadAmt      = ((totals.DEAD     && totals.DEAD.amount)     || 0) +
+                       ((totals.COMPANY_DEAD && totals.COMPANY_DEAD.amount) || 0);
+
+  document.getElementById('dsStockCards').innerHTML =
+    dsCard(t('ds-stock-total'),   'RM ' + fmtMoney(companyTotal),
+           (LANG === 'zh' ? '公司全部' : 'company-wide') + ' · ' + (m.company_rows_total || 0) + ' rows') +
+    dsCard(t('ds-stock-active'),  'RM ' + fmtMoney(activeAmt),
+           (LANG === 'zh' ? '5 家活跃门市' : '5 active stores')) +
+    dsCard(t('ds-stock-problem'), 'RM ' + fmtMoney(problemTotal),
+           fmtPct(m.problem_pct) + ' ' + (LANG === 'zh' ? '问题率' : 'problem'),
+           problemTotal > 0 ? 'warn' : '') +
+    dsCard(t('ds-stock-dead'),    'RM ' + fmtMoney(deadAmt),
+           (totals.DEAD ? totals.DEAD.rows : 0) + ' DEAD · ' +
+           (totals.COMPANY_DEAD ? totals.COMPANY_DEAD.rows : 0) + ' Co-DEAD',
+           deadAmt > 0 ? 'danger' : '');
+
+  // Chart: F-N-S split (donut)
+  const labels = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k =>
+    LANG === 'zh' ? ({ACTIVE:'活跃',SLOW:'慢销',DEAD:'呆滞',MISPLACED:'错位',COMPANY_DEAD:'全公司无销'}[k]) : k);
+  const data   = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k => (totals[k] && totals[k].amount) || 0);
+  const colors = [BRAND_GREEN, BRAND_AMBER, BRAND_DANGER, '#7C8FA6', '#5C6770'];
+  document.getElementById('dsStockChartTitle').textContent =
+    LANG === 'zh' ? 'F-N-S 速度分布 (5 家活跃门市)' : 'F-N-S movement split (5 active stores)';
+  drawChart('dsStockChart', {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } },
+    },
+  });
+
+  // 👉 action: problem inventory threshold
+  const problemPct = m.problem_pct || 0;
+  let zh, en;
+  if (problemPct > 30) {  // threshold: >30% → critical
+    zh = `问题库存占比 ${problemPct}%(目标 < 25%)。先看呆死货 + 错位调货,3 个月内释放 RM ${fmtMoney(problemTotal)}。`;
+    en = `Problem inventory is ${problemPct}% (target <25%). Hit the dead-stock + misplaced lists this quarter to release RM ${fmtMoney(problemTotal)}.`;
+  } else if (problemPct > 20) {
+    zh = `问题库存 ${problemPct}%,可控但要持续清理。`;
+    en = `Problem inventory ${problemPct}% — manageable but keep clearing.`;
+  } else {
+    zh = `库存健康,问题占比 ${problemPct}%(目标 < 25%)。`;
+    en = `Inventory healthy — only ${problemPct}% problem (target <25%).`;
+  }
+  document.getElementById('dsStockAction').innerHTML = actionBlock(zh, en);
+
+  document.getElementById('dsStockDrills').innerHTML =
+    drillTile('stock/dead',      'drill-deadstock',  'drill-deadstock-sub',  '📦') +
+    drillTile('stock/transfer',  'drill-transfers',  'drill-transfers-sub',  '🔁') +
+    drillTile('stock/warehouse', 'drill-warehouse',  'drill-warehouse-sub',  '🏪');
+}
+
+/* ── Purchasing dashboard ──────────────────────────────────────── */
+function renderPurchasingDashboard() {
+  const td = window.WP_TODAY || {};
+  const po = td.po_exceptions || {};
+  const sum = po.summary || {};
+  const overdueRows  = (po.overdue || []);
+  const delayedRows  = (po.delayed || []);
+  const overdueAmt = overdueRows.reduce((a, r) => a + (r.amount || 0), 0);
+  const delayedAmt = delayedRows.reduce((a, r) => a + (r.amount || 0), 0);
+
+  document.getElementById('dsPurchCards').innerHTML =
+    dsCard(t('ds-purch-overdue'),     fmt(sum.n_overdue || overdueRows.length),
+           (LANG === 'zh' ? '逾期未到货' : 'past expected date'),
+           (sum.n_overdue || 0) > 50 ? 'danger' : '') +
+    dsCard(t('ds-purch-delayed'),     fmt(sum.n_delayed || delayedRows.length),
+           (LANG === 'zh' ? '已收但超时' : 'arrived late'),
+           (sum.n_delayed || 0) > 200 ? 'warn' : '') +
+    dsCard(t('ds-purch-overdue-amt'), 'RM ' + fmtMoney(overdueAmt), '') +
+    dsCard(t('ds-purch-delayed-amt'), 'RM ' + fmtMoney(delayedAmt), '');
+
+  // Chart: histogram of overdue ages
+  const buckets = [0, 0, 0, 0, 0];  // 0-30 / 31-60 / 61-90 / 91-180 / 180+
+  overdueRows.forEach(r => {
+    const d = r.days_overdue || r.days || 0;
+    if (d <= 30) buckets[0]++;
+    else if (d <= 60) buckets[1]++;
+    else if (d <= 90) buckets[2]++;
+    else if (d <= 180) buckets[3]++;
+    else buckets[4]++;
+  });
+  const labels = ['0-30','31-60','61-90','91-180','180+'];
+  document.getElementById('dsPurchChartTitle').textContent =
+    LANG === 'zh' ? '逾期 PO 龄段分布' : 'Overdue PO age buckets';
+  drawChart('dsPurchChart', {
+    type: 'bar',
+    data: { labels, datasets: [{
+      data: buckets,
+      backgroundColor: [BRAND_GREEN_SOFT, BRAND_AMBER, BRAND_AMBER, BRAND_DANGER, BRAND_DANGER],
+    }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+
+  // 👉 action: 180+ overdue → cancel; >50 overdue total → first-call
+  const ancient = buckets[4];
+  let zh, en;
+  if (ancient > 0) {  // threshold: any 180+ days → cancel
+    zh = `${ancient} 张 PO 逾期 180 天+,基本不会到了 — 直接取消,腾出账面。`;
+    en = `${ancient} POs are 180+ days overdue — almost certainly won't arrive. Cancel them and clean the books.`;
+  } else if ((sum.n_overdue || 0) > 50) {
+    zh = `逾期 ${sum.n_overdue} 张,先打电话给排前 10 名供应商。`;
+    en = `${sum.n_overdue} overdue POs — start with the top 10 suppliers by amount.`;
+  } else {
+    zh = '采购异常受控,继续保持供应商通话节奏。';
+    en = 'Purchase exceptions under control — keep up the supplier call cadence.';
+  }
+  document.getElementById('dsPurchAction').innerHTML = actionBlock(zh, en);
+
+  document.getElementById('dsPurchDrills').innerHTML =
+    drillTile('purchasing/exceptions', 'drill-po-exc', 'drill-po-exc-sub', '🛒');
+}
+
+/* ── Customers dashboard ──────────────────────────────────────── */
+function renderCustomersDashboard() {
+  const cd = window.WP_CUSTOMERS || {};
+  const churn = (window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.summary) || {};
+  const win = window.PERIOD || '6m';
+  // Buckets schema: [{ key: '<1y'|'1-5y'|'5-8y'|'8y+', n, amt, ... }]
+  const buckets = (cd.buckets_by_window && cd.buckets_by_window[win]) || [];
+  const winSum = (cd.summary_by_window && cd.summary_by_window[win]) || cd.summary || {};
+  const totalMembers = (cd.summary && cd.summary.total_members) || winSum.total_members || 0;
+  const activeInWin = winSum.n_active || 0;
+
+  // 5y+ veteran share — sum members where the key starts with a digit ≥ 5
+  let vetShare = 0, totBucketMembers = 0;
+  buckets.forEach(b => {
+    totBucketMembers += b.n || 0;
+    const lbl = (b.key || '').toLowerCase();
+    const m = lbl.match(/^(\d+)/);
+    if (m && parseInt(m[1], 10) >= 5) vetShare += b.n || 0;
+  });
+  const vetPct = totBucketMembers ? (vetShare / totBucketMembers * 100) : (winSum.pct_5plus_n || 0);
+
+  document.getElementById('dsCustCards').innerHTML =
+    dsCard(t('ds-cust-members'), fmt(totalMembers), '') +
+    dsCard(t('ds-cust-active'),  fmt(activeInWin), periodLabel(win)) +
+    dsCard(t('ds-cust-old'),     fmtPct(vetPct), fmt(vetShare) + (LANG === 'zh' ? ' 会员' : ' members')) +
+    dsCard(t('ds-cust-lapsed'),  fmt(churn.n_high_value || 0),
+           'RM ' + fmtMoney(churn.lifetime_rm || 0) + ' lifetime',
+           (churn.n_high_value || 0) > 1000 ? 'warn' : '');
+
+  // Chart: age tier members bar
+  const labels = buckets.map(b => b.key || '—');
+  const data   = buckets.map(b => b.n || 0);
+  document.getElementById('dsCustChartTitle').textContent =
+    LANG === 'zh' ? '会员龄段分布' : 'Members by age tier';
+  drawChart('dsCustChart', {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: BRAND_GREEN }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  // 👉 action: lapsed count + vet share
+  let zh, en;
+  if ((churn.n_high_value || 0) > 1000) {  // threshold: >1k lapsed → first-call
+    zh = `${fmt(churn.n_high_value)} 高值会员 6 个月+ 没回 — 老客流失清单是优先电话名单。`;
+    en = `${fmt(churn.n_high_value)} high-value members idle 6+ months — lapsed list is the priority call sheet.`;
+  } else if (vetPct < 30) {
+    zh = `5 年+ 老客只占 ${vetPct.toFixed(0)}%,品牌资产单薄,需投资留客。`;
+    en = `5y+ veterans are only ${vetPct.toFixed(0)}% of base — brand equity is thin, invest in retention.`;
+  } else {
+    zh = '会员资产结构健康,继续维护中老客户。';
+    en = 'Member-base structure is healthy — keep nurturing.';
+  }
+  document.getElementById('dsCustAction').innerHTML = actionBlock(zh, en);
+
+  document.getElementById('dsCustDrills').innerHTML =
+    drillTile('customers/lapsed',   'drill-churn',    'drill-churn-sub',    '👥') +
+    drillTile('customers/insights', 'drill-insights', 'drill-insights-sub', '📊');
+}
+
+/* ── Products dashboard ──────────────────────────────────────── */
+function renderProductsDashboard() {
+  const fd = window.WP_FINANCIAL || {};
+  const ds = window.WP_DEADSTOCK || {};
+  const brands = fd.brands || [];
+  const totals = ds.totals || {};
+  const allRows = ds.rows || [];
+  const skuSet = new Set(allRows.map(r => r.code));
+  const activeSkus = (totals.ACTIVE && totals.ACTIVE.rows) || 0;
+  const avgGp = brands.length ? (brands.reduce((a, b) => a + (b.gp_pct || 0), 0) / brands.length) : 0;
+
+  document.getElementById('dsProdCards').innerHTML =
+    dsCard(t('ds-prod-skus'),    fmt(skuSet.size), 'in stock') +
+    dsCard(t('ds-prod-brands'),  fmt(fd.brand_count || brands.length), '') +
+    dsCard(t('ds-prod-gp'),      fmtPct(avgGp), '',
+           avgGp < 20 ? 'danger' : avgGp < 25 ? 'warn' : '') +
+    dsCard(t('ds-prod-active'),  fmt(activeSkus), 'sold last 6m');
+
+  // Chart: top 10 brands by GP
+  const top = brands.slice(0, 10);
+  const labels = top.map(b => b.brand || '—');
+  const data   = top.map(b => b.gp_pct || 0);
+  document.getElementById('dsProdChartTitle').textContent =
+    LANG === 'zh' ? '品牌毛利率排行 (Top 10)' : 'Brand GP% — Top 10';
+  drawChart('dsProdChart', {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: BRAND_GREEN }] },
+    options: {
+      indexAxis: 'y',
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => v + '%' } } },
+    },
+  });
+
+  // 👉 action: weakest brand or aggregate
+  const weak = brands.find(b => (b.ltm_sales || 0) > 50000 && (b.gp_pct || 0) < 20);
+  let zh, en;
+  if (weak) {
+    zh = `${weak.brand} GP 仅 ${weak.gp_pct}%,LTM 销售 RM ${fmtMoney(weak.ltm_sales)} — 检视定价或淘汰。`;
+    en = `${weak.brand} GP only ${weak.gp_pct}%, LTM sales RM ${fmtMoney(weak.ltm_sales)} — review pricing or phase out.`;
+  } else if (avgGp < 20) {
+    zh = `平均品牌 GP 仅 ${avgGp.toFixed(1)}%,组合需重新洗牌。`;
+    en = `Avg brand GP only ${avgGp.toFixed(1)}% — portfolio needs rebalancing.`;
+  } else {
+    zh = `品牌组合健康,平均 GP ${avgGp.toFixed(1)}%。`;
+    en = `Brand portfolio healthy — avg GP ${avgGp.toFixed(1)}%.`;
+  }
+  document.getElementById('dsProdAction').innerHTML = actionBlock(zh, en);
+
+  // Drill-downs not yet built
+  document.getElementById('dsProdDrills').innerHTML =
+    drillTile('finance/depth', 'drill-financial', 'drill-financial-sub', '💰') +
+    drillTile('#', 'drill-soon', 'drill-soon-sub', '🏷️', true);
+}
+
+/* ── Finance dashboard ──────────────────────────────────────── */
+function renderFinanceDashboard() {
+  const fd = window.WP_FINANCIAL || {};
+  const h = fd.headline || {};
+  const cats = fd.categories || [];
+  const months = (fd.months || []).slice().reverse();   // ascending for chart
+
+  document.getElementById('dsFinCards').innerHTML =
+    dsCard(t('ds-fin-collection'), 'RM ' + fmtMoney(h.sales_collection || 0), '') +
+    dsCard(t('ds-fin-expenses'),   'RM ' + fmtMoney(h.total_expenses   || 0), '') +
+    dsCard(t('ds-fin-net'),        fmtPct(h.net_pct || 0),
+           'RM ' + fmtMoney(h.net || 0),
+           (h.net_pct || 0) < 0 ? 'danger' : (h.net_pct || 0) < 5 ? 'warn' : '') +
+    dsCard(t('ds-fin-hr'),         fmtPct(h.hr_pct_sales || 0),
+           (LANG === 'zh' ? '目标 28%' : 'target 28%'),
+           (h.hr_pct_sales || 0) > 30 ? 'danger' : (h.hr_pct_sales || 0) > 28 ? 'warn' : '');
+
+  // Chart: 7 cats stacked bars over months
+  const labels = months.map(m => (m || '').slice(5));
+  const datasets = cats.map((c, i) => ({
+    label: c.name,
+    data: (c.series || []).slice().reverse(),
+    backgroundColor: ['#1F5F4A','#7AAE9C','#D8A23B','#C04D3F','#5C6770','#7C8FA6','#A8B5C5'][i % 7],
+    stack: 's1',
+  }));
+  document.getElementById('dsFinChartTitle').textContent =
+    LANG === 'zh' ? '7 大费用 — 月度堆叠' : '7 cost categories — monthly stack';
+  drawChart('dsFinChart', {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10 } } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+    },
+  });
+
+  // 👉 action: HR threshold + net%
+  let zh, en;
+  if ((h.hr_pct_sales || 0) > 30) {  // threshold: >30% HR/sales → flag
+    zh = `HR 占销售 ${h.hr_pct_sales}%,远超 28% 目标 — 工资优化是首要议题。`;
+    en = `HR is ${h.hr_pct_sales}% of sales (target 28%) — payroll optimisation is priority #1.`;
+  } else if ((h.net_pct || 0) < 5) {
+    zh = `净利率仅 ${h.net_pct}% — 检视费用结构或定价。`;
+    en = `Net margin only ${h.net_pct}% — review expense structure or pricing.`;
+  } else {
+    zh = (fd.meta && fd.meta.diag_zh) || '7 大费用与目标对齐,无异常。';
+    en = (fd.meta && fd.meta.diag_en) || '7 categories within target; no anomalies.';
+  }
+  document.getElementById('dsFinAction').innerHTML = actionBlock(zh, en);
+
+  document.getElementById('dsFinDrills').innerHTML =
+    drillTile('finance/depth', 'drill-financial', 'drill-financial-sub', '💰');
+}
+
+/* ── HR dashboard (placeholder — V1 next cut adds real data) ── */
+function renderHrDashboard() {
+  const fd = window.WP_FINANCIAL || {};
+  const h = fd.headline || {};
+  // HR data isn't sourced yet — show what we can derive from FMM
+  document.getElementById('dsHrCards').innerHTML =
+    dsCard(t('ds-hr-headcount'), '—', LANG === 'zh' ? '数据待接入' : 'data coming next cut') +
+    dsCard(t('ds-hr-rev-head'),  '—', LANG === 'zh' ? '数据待接入' : 'data coming next cut') +
+    dsCard(t('ds-hr-pct'),       fmtPct(h.hr_pct_sales || 0),
+           (LANG === 'zh' ? '从 FMM 反算' : 'derived from FMM'),
+           (h.hr_pct_sales || 0) > 30 ? 'danger' : '') +
+    dsCard(t('ds-hr-branches'),  '5', LANG === 'zh' ? '活跃门市' : 'active stores');
+
+  // Empty chart placeholder
+  document.getElementById('dsHrChartTitle').textContent =
+    LANG === 'zh' ? '人手数据待接入下一刀' : 'Headcount data — next cut';
+  drawChart('dsHrChart', {
+    type: 'bar',
+    data: { labels: ['W01','W02','W03','W05','W07'], datasets: [{ data: [0,0,0,0,0], backgroundColor: BRAND_GREEN_SOFT }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  let zh, en;
+  if ((h.hr_pct_sales || 0) > 30) {  // threshold: HR > 30% sales
+    zh = `HR 占销售 ${h.hr_pct_sales}%(目标 28%)。先接 HR2000 拿到准确人手 + 工资数据再决策。`;
+    en = `HR is ${h.hr_pct_sales}% of sales (target 28%). Hook up HR2000 first for accurate headcount + payroll before acting.`;
+  } else {
+    zh = '人事数据下一刀接入,届时给出每分行人手 + 人均产值。';
+    en = 'Headcount + revenue per head land next cut once HR2000 is wired up.';
+  }
+  document.getElementById('dsHrAction').innerHTML = actionBlock(zh, en);
+
+  document.getElementById('dsHrDrills').innerHTML =
+    drillTile('#', 'drill-soon', 'drill-soon-sub', '👷', true);
+}
 
 /* ── Candidate generation: collect signals across 4 dimensions ─── */
 function collectTodayCandidates() {
@@ -3844,6 +4703,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target) setView(target);
     });
   }
+
+  // V1 第 5 刀: drill-link tiles on every domain dashboard route to drill-down
+  document.body.addEventListener('click', e => {
+    const tile = e.target.closest('.drill-link[data-drill]');
+    if (!tile) return;
+    const target = tile.getAttribute('data-drill');
+    if (!target || target === '#' || tile.classList.contains('disabled')) return;
+    setView(target);
+  });
 
   // V1 第 2 刀: churn page search + CSV
   const ccSearch = document.getElementById('ccSearch');

@@ -98,6 +98,28 @@ for (ym, code, branch, qty) in all_rows:
         sku_branch_qty_last12[code][branch] += qty
 
 # ── Raw CS (current stock) ──────────────────────────────────────────
+# Two passes through the same sheet:
+#   pass A — count EVERY row across ALL locations to compute company-wide
+#            total stock value (5 active stores + WLO/W11/WL1/WSR warehouse
+#            depots etc.). The Stock main dashboard surfaces this so the
+#            "总库存值" reflects the whole business, not just shelf displays.
+#   pass B — only the 5 active stores get classified into ACTIVE/SLOW/DEAD/
+#            MISPLACED/COMPANY_DEAD because dead-stock classification needs
+#            sales history per branch — warehouse depots have no sales by
+#            design.
+ws = wb["Raw CS"]
+company_total_stock = 0.0
+company_rows_total  = 0
+company_by_branch   = {}   # branch -> on_hand
+for r in ws.iter_rows(min_row=2, values_only=True):
+    if not r or r[0] is None: continue
+    code, branch, qty, unit_cost, on_hand = r[0], r[1], r[2], r[3], r[4]
+    branch = str(branch).strip() if branch else ''
+    on_hand = float(on_hand or 0)
+    company_total_stock += on_hand
+    company_rows_total  += 1
+    company_by_branch[branch] = company_by_branch.get(branch, 0.0) + on_hand
+
 ws = wb["Raw CS"]
 classified = []  # list of dicts
 for r in ws.iter_rows(min_row=2, values_only=True):
@@ -222,9 +244,14 @@ payload = {
         "source":       "202604 - SALES VS STOCK VS PO VS GRN.V2.xlsx",
         "active_branches": ACTIVE,
         "branch_names": BRANCH_NAMES,
+        # 5 active store totals (used by the 5-store breakdown / dead-stock dashboard)
         "total_stock":  round(total_stock, 2),
         "problem_total": round(problem_total, 2),
         "problem_pct":  round(problem_total / total_stock * 100, 1) if total_stock else 0,
+        # Company-wide totals (used by the Stock main dashboard headline number)
+        "company_total_stock": round(company_total_stock, 2),
+        "company_rows_total":  company_rows_total,
+        "company_by_branch":   {b: round(v, 2) for b, v in company_by_branch.items()},
     },
     "totals":    totals_clean,
     "by_branch": by_branch,

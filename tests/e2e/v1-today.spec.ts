@@ -16,12 +16,17 @@ const SHOTS_DIR = path.resolve(__dirname, '..', 'shots');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
 
 async function loginOwner(page: Page) {
+  // V1 第 5 刀: default landing view changed from 'today' → 'sales' (the
+  // 7-domain top-level menu's default). Navigate explicitly to today after
+  // login so the existing Today Overview assertions remain meaningful.
   await page.goto(PAGE_URL);
   await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
   await page.fill('#loginUser', 'owner');
   await page.fill('#loginPw', 'Owner@2026');
   await page.click('#loginBtn');
   await page.waitForSelector('#app.ready', { timeout: 5000 });
+  await page.waitForSelector('#view-sales.on', { timeout: 5000 });
+  await page.evaluate(() => (window as any).setView('today'));
   await page.waitForSelector('#view-today.on', { timeout: 5000 });
 }
 
@@ -54,11 +59,21 @@ test.describe('Round 1 — Today data accuracy', () => {
     expect(td.snapshot).toBe('2026-03');
   });
 
-  test('Owner lands on Today Overview by default', async ({ page }) => {
-    await loginOwner(page);
+  test('Owner lands on Sales (7-domain default)', async ({ page }) => {
+    // After V1 第 5 刀, owner default landing is 'sales' not 'today'.
+    // We bypass loginOwner here because that helper navigates to 'today'
+    // for the rest of the suite — this test specifically asserts the raw
+    // default landing view post-login.
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
+    await page.fill('#loginUser', 'owner');
+    await page.fill('#loginPw', 'Owner@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.waitForSelector('#view-sales.on', { timeout: 5000 });
     const onView = await page.evaluate(() =>
       Array.from(document.querySelectorAll('.view.on')).map(v => (v as HTMLElement).id));
-    expect(onView).toEqual(['view-today']);
+    expect(onView).toEqual(['view-sales']);
   });
 
   test('banner shows total + problem inventory amounts', async ({ page }) => {
@@ -120,10 +135,16 @@ test.describe('Round 2 — Today functional', () => {
     expect(onView).toContain('view-' + target);
   });
 
-  test('today nav menu is active on Owner default', async ({ page }) => {
+  test('today nav menu is active when on today view', async ({ page }) => {
+    // After V1 第 5 刀 the loginOwner helper jumps to 'today'. The 'today'
+    // leaf is a drill-down of Sales — both 'sales' (parent) and 'today'
+    // (leaf) carry .active. We check that 'sales' is among the actives,
+    // since 'today' itself isn't in the visible 7-domain menu anymore.
     await loginOwner(page);
-    const active = await page.locator('nav.menu .sub-item.active').getAttribute('data-view');
-    expect(active).toBe('today');
+    const actives = await page.locator('nav.menu .sub-item.active').evaluateAll(
+      els => els.map(e => e.getAttribute('data-view')));
+    // 'sales' is the visible domain; 'today' is the legacy hidden anchor.
+    expect(actives).toContain('sales');
   });
 
   test('language toggle reflows banner + cards', async ({ page }) => {
@@ -186,16 +207,19 @@ test.describe('Round 2 — Today functional', () => {
     expect(txt).toContain('833');   // delayed
   });
 
-  test('today menu nav-cust-churn opens churn list', async ({ page }) => {
+  test('drill-down to lapsed customers via Customers domain', async ({ page }) => {
+    // V1 第 5 刀: churn list is now a drill-down of the Customers domain
+    // dashboard. The legacy #navChurn anchor still exists but is hidden.
+    // We exercise the canonical path-form route 'customers/lapsed'.
     await loginOwner(page);
-    await page.click('#navChurn');
+    await page.evaluate(() => (window as any).setView('customers/lapsed'));
     await page.waitForSelector('#view-customer-churn.on');
     expect(await page.locator('#view-customer-churn .page-title').textContent()).toMatch(/Lapsed Customers/);
   });
 
-  test('today menu nav-po-exc opens PO exceptions', async ({ page }) => {
+  test('drill-down to PO exceptions via Purchasing domain', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navPoExc');
+    await page.evaluate(() => (window as any).setView('purchasing/exceptions'));
     await page.waitForSelector('#view-po-exceptions.on');
     expect(await page.locator('#view-po-exceptions .page-title').textContent()).toMatch(/Purchase Exceptions/);
   });

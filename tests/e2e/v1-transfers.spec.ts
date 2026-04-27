@@ -93,16 +93,23 @@ test.describe('Round 1 — Transfer engine accuracy', () => {
 });
 
 test.describe('Round 2 — Functional', () => {
-  test('owner sees deadstock + transfers + warehouse menu items', async ({ page }) => {
+  test('owner sees Stock domain menu item (parent of dead/transfers/warehouse drill-downs)', async ({ page }) => {
+    // V1 第 5 刀: deadstock / transfers / warehouse are drill-downs of the
+    // Stock domain. The visible menu shows the 7 domains; the legacy
+    // sub-anchors are kept in DOM for back-compat but hidden.
     await loginOwner(page);
-    await expect(page.locator('#navDeadstock')).toBeVisible();
-    await expect(page.locator('#navTransfers')).toBeVisible();
-    await expect(page.locator('#navWarehouse')).toBeVisible();
+    await expect(page.locator('#navStock')).toBeVisible();
+    // Hidden legacy anchors still resolve via setView (drill-down paths).
+    const stockDrillResolves = await page.evaluate(() => {
+      (window as any).setView('stock/transfer');
+      return document.querySelector('#view-transfers.on') !== null;
+    });
+    expect(stockDrillResolves).toBe(true);
   });
 
   test('navigating to transfers shows 4-column kanban with summary', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('stock/transfer'));
     await expect(page.locator('#view-transfers.on')).toBeVisible();
     const cols = await page.locator('.kanban .col').count();
     expect(cols).toBe(4);
@@ -115,7 +122,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('approve moves card from Pending to In progress', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const beforePending = await page.locator('.kanban .col').nth(0).locator('.card').count();
     const beforeApproved = await page.locator('.kanban .col').nth(1).locator('.card').count();
     await page.locator('.kanban .col').nth(0).locator('.card').first()
@@ -128,7 +135,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('cancel with reason moves card to Not done', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     page.once('dialog', d => d.accept('Test reason'));
     const beforeCancel = await page.locator('.kanban .col').nth(3).locator('.card').count();
     await page.locator('.kanban .col').nth(0).locator('.card').first()
@@ -141,7 +148,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('pending column renders 3 buckets (A / B / C) with counts that sum to total', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const groups = page.locator('.kanban .col').nth(0).locator('.bucket-group');
     await expect(groups).toHaveCount(3);
     // Bucket A is open by default, B and C collapsed
@@ -162,7 +169,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('clicking a bucket head toggles its expansion', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const bucketB = page.locator('.bucket-group.bucket-B');
     await expect(bucketB).toHaveClass(/collapsed/);
     await bucketB.locator('.bucket-head').click();
@@ -173,7 +180,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('bucket A has Accept-all button that approves every card in bucket A', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const aCount = await page.locator('.bucket-group.bucket-A .card.bA').count();
     expect(aCount).toBeGreaterThan(0);
     const beforeApproved = await page.locator('.kanban .col').nth(1).locator('.card').count();
@@ -187,7 +194,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('bucket B card shows full 5-store table with src + dst tags', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     // Open bucket B
     await page.locator('.bucket-group.bucket-B .bucket-head').click();
     const firstB = page.locator('.bucket-group.bucket-B .card.bB').first();
@@ -200,7 +207,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('bucket B redirect button changes destination and approves', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     await page.locator('.bucket-group.bucket-B .bucket-head').click();
     const firstB = page.locator('.bucket-group.bucket-B .card.bB').first();
     const id = await firstB.getAttribute('data-id');
@@ -215,7 +222,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('bucket C card is single-line and has accept + skip', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     await page.locator('.bucket-group.bucket-C .bucket-head').click();
     const firstC = page.locator('.bucket-group.bucket-C .card.bC').first();
     await expect(firstC).toBeVisible();
@@ -239,11 +246,11 @@ test.describe('Round 2 — Functional', () => {
 
   test('warehouse list shows approved + done/cancelled actions', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     // Approve one, then jump to warehouse view
     await page.locator('.kanban .col').nth(0).locator('.card').first()
       .locator('button[data-act="approve"]').click();
-    await page.click('#navWarehouse');
+    await page.evaluate(() => (window as any).setView('warehouse'));
     await expect(page.locator('#view-warehouse.on')).toBeVisible();
     const rows = await page.locator('.wh-list .wh-row').count();
     expect(rows).toBeGreaterThan(0);
@@ -262,7 +269,7 @@ test.describe('Round 2 — Functional', () => {
   test('warehouse user can mark done / can\'t', async ({ page }) => {
     // First, owner approves one
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const firstCard = page.locator('.kanban .col').nth(0).locator('.card').first();
     const id = await firstCard.getAttribute('data-id');
     await firstCard.locator('button[data-act="approve"]').click();
@@ -278,13 +285,13 @@ test.describe('Round 2 — Functional', () => {
 
   test('localStorage state persists across reload', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const firstCard = page.locator('.kanban .col').nth(0).locator('.card').first();
     const id = await firstCard.getAttribute('data-id');
     await firstCard.locator('button[data-act="approve"]').click();
     await page.reload();
     await page.waitForSelector('#app.ready');
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     // The id should appear in approved column now
     const stillApproved = await page.locator('.kanban .col').nth(1)
       .locator('.card[data-id="' + id + '"]').count();
@@ -293,7 +300,7 @@ test.describe('Round 2 — Functional', () => {
 
   test('language toggle EN ↔ 中 on transfer view', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     await page.click('#langZH');
     await expect(page.locator('#view-transfers.on .page-title')).toContainText('调货建议');
     await page.click('#langEN');
@@ -302,14 +309,14 @@ test.describe('Round 2 — Functional', () => {
 
   test('transfer title shows dynamic count + total', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const title = await page.locator('#view-transfers.on .page-title').textContent();
     expect(title).toMatch(/Transfer Suggestions · \d+ suggestions · RM [\d,]+/);
   });
 
   test('cancel button is neutral grey, not red', async ({ page }) => {
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     const btn = page.locator('.kanban .col').nth(0).locator('.card').first()
       .locator('button[data-act="cancel"]');
     // The cancel button must not carry the 'warn' (red) class
@@ -340,7 +347,7 @@ test.describe('Round 3 — Responsive', () => {
   test('desktop 1280x800 kanban renders without overflow', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await loginOwner(page);
-    await page.click('#navTransfers');
+    await page.evaluate(() => (window as any).setView('transfers'));
     await page.screenshot({ path: path.join(SHOTS_DIR, 'transfers-desktop-1280.png'), fullPage: false, timeout: 15000 });
     const overflow = await page.evaluate(() => document.body.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);
