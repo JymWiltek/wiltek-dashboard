@@ -704,6 +704,16 @@ footer.app-footer {
 .toolbar.cc-filters .filter-label { font-size: 12px; color: var(--text-meta); font-weight: 500; }
 .toolbar.cc-filters select { height: 36px; padding: 0 28px 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; color: var(--text); }
 
+/* ── Period (window) selector for Customer Insights ─────────────── */
+.toolbar.ci-window-bar { gap: 12px; flex-wrap: wrap; align-items: center; padding: 0; background: transparent; box-shadow: none; margin-top: 4px; margin-bottom: 4px; }
+.toolbar.ci-window-bar .filter-label { font-size: 12px; color: var(--text-meta); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.ci-window { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.ci-window button { background: #fff; border: 0; padding: 8px 14px; font-size: 13px; color: var(--text-meta); cursor: pointer; border-right: 1px solid var(--line); font-family: inherit; }
+.ci-window button:last-child { border-right: 0; }
+.ci-window button.on { background: var(--brand); color: #fff; font-weight: 600; }
+.ci-window button:hover:not(.on) { background: var(--brand-soft); color: var(--brand); }
+.ci-window-meta { font-size: 12px; color: var(--text-meta); font-variant-numeric: tabular-nums; }
+
 /* ── Customer Insights + Financial Depth (V1 第 3/4 刀) ──────────── */
 .ci-diag, .fd-diag { background: #F4F8F6; border-left: 3px solid var(--brand); padding: 14px 18px; border-radius: 8px; margin: 12px 0 24px; font-size: 14px; line-height: 1.55; color: var(--text); }
 .ci-cards, .fd-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 8px; }
@@ -947,6 +957,18 @@ footer.app-footer {
         <h1 class="page-title" data-i18n="ci-title">Customer Insights</h1>
         <p class="page-sub" data-i18n="ci-sub">Members tiered by enrol age — see where the moat lives and where to invest.</p>
 
+        <!-- Window selector: drills purchase amount + visits to a recent period -->
+        <div class="toolbar ci-window-bar">
+          <span class="filter-label" data-i18n="ci-window-label">Period</span>
+          <div class="ci-window" id="ciWindow" role="tablist">
+            <button type="button" data-window="1m"  data-i18n="ci-w-1m">Last 1m</button>
+            <button type="button" data-window="3m"  data-i18n="ci-w-3m">Last 3m</button>
+            <button type="button" data-window="6m"  data-i18n="ci-w-6m">Last 6m</button>
+            <button type="button" data-window="12m" class="on" data-i18n="ci-w-12m">Last 12m</button>
+          </div>
+          <span class="ci-window-meta" id="ciWindowMeta"></span>
+        </div>
+
         <div class="ci-diag" id="ciDiag"></div>
 
         <div class="ci-cards" id="ciCards"></div>
@@ -960,14 +982,25 @@ footer.app-footer {
 
         <div class="today-section-title">
           <span data-i18n="ci-cross-title">Customer type × membership age</span>
-          <span class="meta" data-i18n="ci-cross-sub">members · LTM RM</span>
+          <span class="meta" id="ciCrossSub"></span>
         </div>
         <div class="ci-table-wrap">
           <table class="ci-table" id="ciCrossTable"><thead></thead><tbody></tbody></table>
         </div>
 
+        <!-- Race / walk-in breakdown — manual count, Jan-Mar 2026 -->
         <div class="today-section-title">
-          <span data-i18n="ci-top-title">Top 100 members (last 12 months)</span>
+          <span data-i18n="ci-race-title">Walk-in by race · Jan–Mar 2026</span>
+          <span class="meta" data-i18n="ci-race-sub">manual count · POS doesn't record race</span>
+        </div>
+        <div class="ci-table-wrap">
+          <table class="ci-table" id="ciRaceTable"><thead></thead><tbody></tbody></table>
+        </div>
+        <p class="fd-note" id="ciRaceNote"></p>
+
+        <div class="today-section-title">
+          <span data-i18n="ci-top-title">Top 100 members</span>
+          <span class="meta" id="ciTopWindowLabel"></span>
         </div>
         <div class="toolbar cc-filters">
           <label class="filter-label" data-i18n="cc-fl-branch">Store</label>
@@ -1281,7 +1314,14 @@ const STR = {
     "ci-bucket-col-rep": "Repeat % (≥2 visits)",
     "ci-cross-title": "Customer type × membership age",
     "ci-cross-sub": "members · 12M sales RM",
-    "ci-top-title": "Top 100 members (last 12 months)",
+    "ci-window-label": "Period",
+    "ci-w-1m": "Last 1m",
+    "ci-w-3m": "Last 3m",
+    "ci-w-6m": "Last 6m",
+    "ci-w-12m": "Last 12m",
+    "ci-race-title": "Walk-in by race · Jan–Mar 2026",
+    "ci-race-sub": "manual count · POS doesn't record race",
+    "ci-top-title": "Top 100 members",
     "ci-search-ph": "Search member…",
     "ci-csv-name": "Wiltek_CustomerInsights_",
     "ci-col-rank": "#",
@@ -1521,7 +1561,14 @@ const STR = {
     "ci-bucket-col-rep": "复购率 (≥2 单)",
     "ci-cross-title": "顾客类型 × 会员龄",
     "ci-cross-sub": "会员数 · 12M 销售 RM",
-    "ci-top-title": "Top 100 会员(过去 12 月)",
+    "ci-window-label": "期间",
+    "ci-w-1m": "最近 1 月",
+    "ci-w-3m": "最近 3 月",
+    "ci-w-6m": "最近 6 月",
+    "ci-w-12m": "最近 12 月",
+    "ci-race-title": "种族进店分布 · 2026 年 1–3 月",
+    "ci-race-sub": "人手统计 · POS 不记录种族",
+    "ci-top-title": "Top 100 会员",
     "ci-search-ph": "搜索会员…",
     "ci-csv-name": "Wiltek_CustomerInsights_",
     "ci-col-rank": "排名",
@@ -2411,6 +2458,7 @@ let PE_TAB = 'overdue';
 let CI_SEARCH = '';
 let CI_BRANCH = '';
 let CI_TYPE   = '';
+let CI_WINDOW = '12m';   // V1 第 3 刀 patch: period selector (1m / 3m / 6m / 12m)
 
 /* ── Candidate generation: collect signals across 4 dimensions ─── */
 function collectTodayCandidates() {
@@ -2820,17 +2868,43 @@ function renderPoExceptions() {
   bodyEl.innerHTML = head + body + tail;
 }
 
-/* ── Render Customer Insights (V1 第 3 刀) ─────────────────────── */
+/* ── Render Customer Insights (V1 第 3 刀 + patch) ──────────────── */
+function ciAmtField(w) { return ({'1m':'m1_amt','3m':'m3_amt','6m':'m6_amt','12m':'ltm_amt'})[w] || 'ltm_amt'; }
+function ciVisField(w) { return ({'1m':'m1_visits','3m':'m3_visits','6m':'m6_visits','12m':'ltm_visits'})[w] || 'ltm_visits'; }
+function ciWindowLabel(w) {
+  const map = LANG === 'zh'
+    ? {'1m':'最近 1 月','3m':'最近 3 月','6m':'最近 6 月','12m':'最近 12 月'}
+    : {'1m':'Last 1m','3m':'Last 3m','6m':'Last 6m','12m':'Last 12m'};
+  return map[w] || w;
+}
 function renderCustInsights() {
   const ci = window.WP_CUSTOMERS || {};
-  if (!ci.summary) return;
-  const s = ci.summary;
+  if (!ci.summary && !ci.summary_by_window) return;
+  const W = CI_WINDOW;
+  const af = ciAmtField(W), vf = ciVisField(W);
+  const sw = (ci.summary_by_window && ci.summary_by_window[W]) || ci.summary || {};
+  const wlabel = ciWindowLabel(W);
 
-  // Diagnosis line
+  // Highlight active window button
+  document.querySelectorAll('#ciWindow button[data-window]').forEach(b => {
+    b.classList.toggle('on', b.getAttribute('data-window') === W);
+  });
+
+  // Window meta line: active members + total RM in this window
+  const wMeta = document.getElementById('ciWindowMeta');
+  if (wMeta) {
+    wMeta.textContent = (LANG === 'zh'
+      ? wlabel + ' · 活跃 ' + fmt(sw.n_active || 0) + ' 人 · RM ' + fmtMoney(sw.amt_total || 0)
+      : wlabel + ' · ' + fmt(sw.n_active || 0) + ' active · RM ' + fmtMoney(sw.amt_total || 0));
+  }
+
+  // Diagnosis line — uses the active window
   const diagEl = document.getElementById('ciDiag');
   if (diagEl) {
-    const moat = s.pct_5plus_n >= 25 && s.pct_5plus_ltm >= 25;
-    const decline = s.pct_5plus_ltm < 20;
+    const pctN = sw.pct_5plus_n || 0;
+    const pctA = sw.pct_5plus_amt || 0;
+    const moat = pctN >= 25 && pctA >= 25;
+    const decline = pctA < 20;
     const verdict = moat
       ? (LANG === 'zh' ? '这是 Wiltek 的真正护城河 — 老客是金。'
                        : 'This is Wiltek\'s real moat — the loyal core.')
@@ -2840,14 +2914,14 @@ function renderCustInsights() {
         : (LANG === 'zh' ? '老客盘稳定,继续维护。'
                          : 'Long-tenure base is steady — keep nurturing.');
     diagEl.textContent = (LANG === 'zh'
-      ? '全公司 ' + fmt(s.total_members) + ' 名会员中,5 年+ 老客 ' + fmt(s.n_5_8 + s.n_8plus) +
-        ' 人(占 ' + s.pct_5plus_n + '%)贡献了 12M 销售的 ' + s.pct_5plus_ltm + '%。' + verdict
-      : 'Of ' + fmt(s.total_members) + ' members, ' + fmt(s.n_5_8 + s.n_8plus) +
-        ' (' + s.pct_5plus_n + '%) have been with us 5+ years and contribute ' +
-        s.pct_5plus_ltm + '% of last-12M sales. ' + verdict);
+      ? '全公司 ' + fmt(sw.total_members || 0) + ' 名会员中,5 年+ 老客 ' + fmt((sw.n_5_8||0) + (sw.n_8plus||0)) +
+        ' 人(占 ' + pctN + '%)贡献了' + wlabel + '销售的 ' + pctA + '%。' + verdict
+      : 'Of ' + fmt(sw.total_members || 0) + ' members, ' + fmt((sw.n_5_8||0) + (sw.n_8plus||0)) +
+        ' (' + pctN + '%) have been with us 5+ years and contribute ' +
+        pctA + '% of ' + wlabel.toLowerCase() + ' sales. ' + verdict);
   }
 
-  // Number cards
+  // Number cards (window-aware)
   const cardsEl = document.getElementById('ciCards');
   if (cardsEl) {
     const card = (label, val, sub) =>
@@ -2855,54 +2929,118 @@ function renderCustInsights() {
       '<div class="value num">' + val + '</div>' +
       '<div class="sub">' + sub + '</div></div>';
     cardsEl.innerHTML =
-      card(t('ci-card-total'), fmt(s.total_members),
-           '12M RM ' + fmtMoney(s.ltm_total)) +
-      card(t('ci-card-1-5'), fmt(s.n_1_5),
-           '12M RM ' + fmtMoney(s.ltm_1_5)) +
-      card(t('ci-card-5-8'), fmt(s.n_5_8),
-           '12M RM ' + fmtMoney(s.ltm_5_8)) +
-      card(t('ci-card-8plus'), fmt(s.n_8plus),
-           '12M RM ' + fmtMoney(s.ltm_8plus));
+      card(t('ci-card-total'), fmt(sw.total_members || 0),
+           wlabel + ' RM ' + fmtMoney(sw.amt_total || 0)) +
+      card(t('ci-card-1-5'), fmt(sw.n_1_5 || 0),
+           wlabel + ' RM ' + fmtMoney(sw.amt_1_5 || 0)) +
+      card(t('ci-card-5-8'), fmt(sw.n_5_8 || 0),
+           wlabel + ' RM ' + fmtMoney(sw.amt_5_8 || 0)) +
+      card(t('ci-card-8plus'), fmt(sw.n_8plus || 0),
+           wlabel + ' RM ' + fmtMoney(sw.amt_8plus || 0));
   }
 
-  // Bucket table
+  // Bucket table — window-aware
+  const buckets_w = (ci.buckets_by_window && ci.buckets_by_window[W]) || [];
   const btab = document.getElementById('ciBucketTable');
   if (btab) {
     btab.querySelector('thead').innerHTML =
       '<tr><th>' + t('ci-bucket-col-bucket') + '</th>' +
       '<th class="num">' + t('ci-bucket-col-n') + '</th>' +
-      '<th class="num">' + t('ci-bucket-col-ltm') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? wlabel + ' 销售' : wlabel + ' RM') + '</th>' +
       '<th class="num">' + t('ci-bucket-col-aov') + '</th>' +
       '<th class="num">' + t('ci-bucket-col-rep') + '</th></tr>';
-    btab.querySelector('tbody').innerHTML = (ci.buckets || []).map(b =>
+    btab.querySelector('tbody').innerHTML = buckets_w.map(b =>
       '<tr><td>' + b.key + '</td>' +
         '<td class="num">' + fmt(b.n) + '</td>' +
-        '<td class="num">RM ' + fmtMoney(b.ltm_amt) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(b.amt) + '</td>' +
         '<td class="num">RM ' + fmt(b.aov) + '</td>' +
         '<td class="num">' + b.repeat_pct + '%</td></tr>'
     ).join('');
   }
 
-  // Cross table
+  // Cross-table sub-label
+  const ciCrossSubEl = document.getElementById('ciCrossSub');
+  if (ciCrossSubEl) {
+    ciCrossSubEl.textContent = (LANG === 'zh' ? '会员数 · ' + wlabel + ' RM' : 'members · ' + wlabel + ' RM');
+  }
+
+  // Cross table — window-aware
+  const cross_w = (ci.cross_by_window && ci.cross_by_window[W]) || {};
   const ctab = document.getElementById('ciCrossTable');
   if (ctab) {
-    const buckets = ['<1y','1-5y','5-8y','8y+'];
+    const ageB = ['<1y','1-5y','5-8y','8y+'];
     const types = ci.types || ['Walk-in','Contractor','Interior Designer','Other'];
     ctab.querySelector('thead').innerHTML =
       '<tr><th>' + t('ci-col-type') + '</th>' +
-      buckets.map(b => '<th class="num">' + b + '</th>').join('') +
+      ageB.map(b => '<th class="num">' + b + '</th>').join('') +
       '</tr>';
     ctab.querySelector('tbody').innerHTML = types.map(tp => {
-      const cells = buckets.map(b => {
-        const c = (ci.cross && ci.cross[tp] && ci.cross[tp][b]) || { n: 0, ltm_amt: 0 };
+      const cells = ageB.map(b => {
+        const c = (cross_w[tp] && cross_w[tp][b]) || { n: 0, amt: 0 };
         return '<td class="num">' + fmt(c.n) + '<br>' +
-               '<span class="sl-meta">RM ' + fmtMoney(c.ltm_amt) + '</span></td>';
+               '<span class="sl-meta">RM ' + fmtMoney(c.amt) + '</span></td>';
       }).join('');
       return '<tr><td>' + tp + '</td>' + cells + '</tr>';
     }).join('');
   }
 
-  // Top 100 list (with filters)
+  // Race / walk-in section (Jan-Mar 2026 manual count)
+  const rtab = document.getElementById('ciRaceTable');
+  const rnote = document.getElementById('ciRaceNote');
+  if (rtab && ci.race) {
+    const rd = ci.race;
+    const labelKey = LANG === 'zh' ? 'label_zh' : 'label_en';
+    const sumArr = a => (a || []).reduce((s, x) => s + (x || 0), 0);
+    const head =
+      '<tr>' +
+      '<th>' + (LANG === 'zh' ? '种族' : 'Race') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '进店' : 'Walk-in') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '购买' : 'Purchase') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '成交率' : 'Closing rate') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '总营收' : 'Revenue') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '均消费' : 'Avg basket') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+      '</tr>';
+    const grandRev = sumArr(rd.totals && rd.totals.amount);
+    const body = (rd.races || []).map(r => {
+      const wi = sumArr(r.walkin), pu = sumArr(r.purchase), rev = sumArr(r.amount);
+      const cr = wi ? (pu / wi * 100) : 0;
+      const basket = pu ? (rev / pu) : 0;
+      const share = grandRev ? (rev / grandRev * 100) : 0;
+      return '<tr>' +
+        '<td>' + escapeHtml(r[labelKey]) + '</td>' +
+        '<td class="num">' + fmt(wi) + '</td>' +
+        '<td class="num">' + fmt(pu) + '</td>' +
+        '<td class="num">' + cr.toFixed(1) + '%</td>' +
+        '<td class="num">RM ' + fmtMoney(rev) + '</td>' +
+        '<td class="num">RM ' + fmt(Math.round(basket)) + '</td>' +
+        '<td class="num">' + share.toFixed(1) + '%</td>' +
+      '</tr>';
+    }).join('');
+    // Total row
+    const T = rd.totals || {};
+    const wiT = sumArr(T.walkin), puT = sumArr(T.purchase), revT = sumArr(T.amount);
+    const tr = '<tr style="font-weight:600;background:#FAFBFB">' +
+      '<td>' + (LANG === 'zh' ? '合计' : 'Total') + '</td>' +
+      '<td class="num">' + fmt(wiT) + '</td>' +
+      '<td class="num">' + fmt(puT) + '</td>' +
+      '<td class="num">' + (wiT ? (puT/wiT*100).toFixed(1) : 0) + '%</td>' +
+      '<td class="num">RM ' + fmtMoney(revT) + '</td>' +
+      '<td class="num">RM ' + fmt(puT ? Math.round(revT/puT) : 0) + '</td>' +
+      '<td class="num">100.0%</td>' +
+    '</tr>';
+    rtab.querySelector('thead').innerHTML = head;
+    rtab.querySelector('tbody').innerHTML = body + tr;
+    if (rnote) rnote.textContent = (LANG === 'zh' ? rd.note_zh : rd.note_en) || '';
+  }
+
+  // Top 100 list section meta + window label
+  const topMetaEl = document.getElementById('ciTopWindowLabel');
+  if (topMetaEl) {
+    topMetaEl.textContent = '· ' + wlabel;
+  }
+
+  // Top 100 list (with filters + window-driven sort)
   const sb = document.getElementById('ciSearch');
   if (sb) sb.placeholder = t('ci-search-ph');
   const cb = document.getElementById('ciCsvBtn');
@@ -2912,6 +3050,7 @@ function renderCustInsights() {
   const filtered = all
     .filter(r => !CI_BRANCH || r.branch === CI_BRANCH)
     .filter(r => !CI_TYPE   || (r.cust_type || 'Other') === CI_TYPE)
+    .filter(r => (r[af] || 0) > 0)   // hide members with no activity in this window
     .filter(r => {
       if (!CI_SEARCH) return true;
       const q = CI_SEARCH.toLowerCase();
@@ -2919,7 +3058,7 @@ function renderCustInsights() {
              String(r.mc || '').toLowerCase().includes(q) ||
              String(r.branch || '').toLowerCase().includes(q);
     })
-    .sort((a, b) => (b.ltm_amt || 0) - (a.ltm_amt || 0))
+    .sort((a, b) => (b[af] || 0) - (a[af] || 0))
     .slice(0, 100);
 
   const listEl = document.getElementById('ciTopList');
@@ -2931,7 +3070,7 @@ function renderCustInsights() {
   const head = '<div class="sl-row head">' +
     '<div>' + t('ci-col-store') + '</div>' +
     '<div>' + t('ci-col-name') + '</div>' +
-    '<div class="sl-num">' + t('ci-col-ltm') + '</div>' +
+    '<div class="sl-num">' + (LANG === 'zh' ? wlabel + ' 销售' : wlabel + ' RM') + '</div>' +
     '<div class="sl-num opt">' + t('ci-col-vis') + '</div>' +
     '<div class="sl-num opt">' + t('ci-col-age') + '</div>' +
   '</div>';
@@ -2940,7 +3079,7 @@ function renderCustInsights() {
       '<div><span class="sl-tag brand">' + r.branch + '</span></div>' +
       '<div><div class="sl-pri">#' + (i+1) + ' ' + escapeHtml(r.name || r.mc) + '</div>' +
       '<div class="sl-meta">' + escapeHtml(r.mc) + ' · ' + escapeHtml(r.cust_type || 'Other') + '</div></div>' +
-      '<div class="sl-num">RM ' + fmtMoney(r.ltm_amt) + '</div>' +
+      '<div class="sl-num">RM ' + fmtMoney(r[af] || 0) + '</div>' +
       '<div class="sl-num opt">' + (r.ltm_visits || 0) + '</div>' +
       '<div class="sl-num opt sl-meta">' + (r.age_bucket || '—') + '</div>' +
     '</div>'
@@ -2950,17 +3089,20 @@ function renderCustInsights() {
 function exportCustInsightsCSV() {
   const ci = window.WP_CUSTOMERS || {};
   const all = ci.all || ci.top100 || [];
+  const af = ciAmtField(CI_WINDOW), vf = ciVisField(CI_WINDOW);
   const rows = all
     .filter(r => !CI_BRANCH || r.branch === CI_BRANCH)
     .filter(r => !CI_TYPE   || (r.cust_type || 'Other') === CI_TYPE)
-    .sort((a, b) => (b.ltm_amt || 0) - (a.ltm_amt || 0))
+    .filter(r => (r[af] || 0) > 0)
+    .sort((a, b) => (b[af] || 0) - (a[af] || 0))
     .slice(0, 100);
-  const head = ['rank','store','member','name','cust_type','age_years','age_bucket','ltm_rm','ltm_visits','last_seen'];
+  const head = ['rank','store','member','name','cust_type','age_years','age_bucket',
+                'window','window_rm','window_visits','last_seen'];
   const lines = [head.join(',')];
   rows.forEach((r, i) => {
     const out = [
       i+1, r.branch, r.mc, r.name, r.cust_type, r.age_years, r.age_bucket,
-      r.ltm_amt, r.ltm_visits, r.last
+      CI_WINDOW, r[af], r[vf], r.last
     ].map(v => {
       if (v == null) return '';
       const s = String(v);
@@ -3153,6 +3295,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const ciCsvBtn = document.getElementById('ciCsvBtn');
   if (ciCsvBtn) ciCsvBtn.addEventListener('click', exportCustInsightsCSV);
+
+  // V1 第 3 刀 patch: window selector (1m / 3m / 6m / 12m)
+  const ciWindow = document.getElementById('ciWindow');
+  if (ciWindow) {
+    ciWindow.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-window]');
+      if (!btn) return;
+      CI_WINDOW = btn.getAttribute('data-window');
+      renderCustInsights();
+    });
+  }
 
   // V1 第 2 刀: PO exceptions tab toggle
   const peTabs = document.getElementById('peTabs');

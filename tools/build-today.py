@@ -19,8 +19,52 @@ OUT_CUST  = "/Users/jymchee/wiltek-repo/assets/customers-data.js"
 NOW_YM = (2026, 3)
 NOW_DT = datetime(2026, 3, 31)
 LTM_CUTOFF = datetime(2025, 4, 1)   # last twelve months from snapshot
+M6_CUTOFF  = datetime(2025, 10, 1)  # last 6 months
+M3_CUTOFF  = datetime(2026, 1, 1)   # last 3 months
+M1_CUTOFF  = datetime(2026, 3, 1)   # last 1 month
 
 ACTIVE_BRANCHES = {"W01", "W02", "W03", "W05", "W07"}
+
+# Race / walk-in data — from legacy /Users/jymchee/Desktop/Claude use/Wiltek_MASTER.html
+# (CUST26 dataset, Jan–Mar 2026 — manual count, not in Sheet27).
+# Walk-in = total foot traffic (incl. non-buyers); CR = closing rate; basket = avg ticket.
+RACE_DATA = {
+    "months": ["2026-01", "2026-02", "2026-03"],
+    "races": [
+        {"key": "chinese",  "label_en": "Chinese",  "label_zh": "华族",
+         "walkin": [683, 468, 565], "purchase": [531, 367, 407],
+         "amount": [179646, 130036.38, 136072.60],
+         "basket": [338.32, 354.32, 334.33], "cr": [0.7775, 0.7842, 0.7204]},
+        {"key": "malay",    "label_en": "Malay",    "label_zh": "马来族",
+         "walkin": [896, 825, 764], "purchase": [692, 652, 589],
+         "amount": [300092.10, 267007.32, 224020],
+         "basket": [433.66, 409.52, 380.34], "cr": [0.7723, 0.7903, 0.7709]},
+        {"key": "indian",   "label_en": "Indian",   "label_zh": "印度族",
+         "walkin": [56, 48, 61], "purchase": [48, 41, 52],
+         "amount": [18428, 12941.60, 11448],
+         "basket": [383.92, 315.65, 220.15], "cr": [0.8571, 0.8542, 0.8525]},
+        {"key": "others",   "label_en": "Others",   "label_zh": "其他",
+         "walkin": [23, 24, 27], "purchase": [20, 21, 22],
+         "amount": [6063.50, 3573, 7388.05],
+         "basket": [303.18, 170.14, 335.82], "cr": [0.8696, 0.875, 0.8148]},
+    ],
+    "totals": {
+        "walkin":   [1658, 1365, 1417],
+        "purchase": [1291, 1081, 1070],
+        "amount":   [504229.60, 413558.30, 378928.65],
+        "basket":   [390.57, 382.57, 354.14],
+        "cr":       [0.7786, 0.7919, 0.7551],
+    },
+    "by_branch": {
+        "W01": {"walkin": 408, "purchase": 306, "amount": 98926,  "basket": 323.29, "cr": 0.75},
+        "W02": {"walkin": 551, "purchase": 391, "amount": 151629, "basket": 387.80, "cr": 0.7096},
+        "W03": {"walkin": 427, "purchase": 304, "amount": 142021, "basket": 467.17, "cr": 0.7119},
+        "W05": {"walkin": 296, "purchase": 265, "amount": 122197, "basket": 461.12, "cr": 0.8953},
+        "W07": {"walkin": 614, "purchase": 436, "amount": 161534, "basket": 370.49, "cr": 0.71},
+    },
+    "note_en": "Manual count of foot traffic by race, Jan–Mar 2026. POS doesn't track race — branches log this separately. WCO/W11 excluded.",
+    "note_zh": "各店人手记录的进店种族数据,2026年1-3月。POS 不记种族,各店单独统计。WCO/W11 不计入。",
+}
 
 # Cust-type code → display label (raw codes in xlsx are 1-letter)
 CT_LABEL = {
@@ -51,6 +95,9 @@ mem = defaultdict(lambda: {
     "visits": set(), "name": "", "branches": defaultdict(float), "loy": "",
     "enrol": None, "cust_type": "",
     "ltm_amt": 0.0, "ltm_visits": set(),
+    "m6_amt": 0.0,  "m6_visits":  set(),
+    "m3_amt": 0.0,  "m3_visits":  set(),
+    "m1_amt": 0.0,  "m1_visits":  set(),
 })
 for r in ws.iter_rows(min_row=2, values_only=True):
     if not r or r[0] is None: continue
@@ -72,10 +119,19 @@ for r in ws.iter_rows(min_row=2, values_only=True):
         if 1990 <= enrol.year <= 2026:
             d["enrol"] = enrol
     if ct and not d["cust_type"]: d["cust_type"] = ct_norm(ct)
-    # LTM (last 12 months from snapshot)
+    # Window aggregates (LTM / 6m / 3m / 1m from snapshot)
     if month >= LTM_CUTOFF:
         d["ltm_amt"] += amt_f
         d["ltm_visits"].add(bill)
+    if month >= M6_CUTOFF:
+        d["m6_amt"] += amt_f
+        d["m6_visits"].add(bill)
+    if month >= M3_CUTOFF:
+        d["m3_amt"] += amt_f
+        d["m3_visits"].add(bill)
+    if month >= M1_CUTOFF:
+        d["m1_amt"] += amt_f
+        d["m1_visits"].add(bill)
 wb.close()
 print(f"  Total members: {len(mem):,}")
 
@@ -136,6 +192,12 @@ for mc, d in mem.items():
         "age_bucket": bucket,
         "ltm_amt": round(d["ltm_amt"], 0),
         "ltm_visits": len(d["ltm_visits"]),
+        "m6_amt": round(d["m6_amt"], 0),
+        "m6_visits": len(d["m6_visits"]),
+        "m3_amt": round(d["m3_amt"], 0),
+        "m3_visits": len(d["m3_visits"]),
+        "m1_amt": round(d["m1_amt"], 0),
+        "m1_visits": len(d["m1_visits"]),
         "lifetime_amt": round(d["amt"], 0),
         "last": d["last"].strftime("%Y-%m"),
     })
@@ -143,56 +205,78 @@ print(f"  CI members (enrol+active+purchased): {len(ci_rows):,}")
 
 BUCKETS = ["<1y", "1-5y", "5-8y", "8y+"]
 TYPES   = ["Walk-in", "Contractor", "Interior Designer", "Other"]
+WINDOWS = ["1m", "3m", "6m", "12m"]   # most-recent-first selectable windows
 
-# Per-bucket aggregate
-bucket_agg = {b: {"n": 0, "ltm_amt": 0.0, "ltm_visits": 0, "n_repeat": 0} for b in BUCKETS}
-for r in ci_rows:
-    b = bucket_agg[r["age_bucket"]]
-    b["n"] += 1
-    b["ltm_amt"] += r["ltm_amt"]
-    b["ltm_visits"] += r["ltm_visits"]
-    if r["ltm_visits"] >= 2: b["n_repeat"] += 1
-for b, v in bucket_agg.items():
-    n_with_ltm = sum(1 for r in ci_rows if r["age_bucket"] == b and r["ltm_visits"] >= 1)
-    v["aov"] = round(v["ltm_amt"] / v["ltm_visits"], 0) if v["ltm_visits"] else 0
-    v["repeat_pct"] = round(100 * v["n_repeat"] / n_with_ltm, 1) if n_with_ltm else 0
-    v["ltm_amt"] = round(v["ltm_amt"], 0)
+def amt_field(w): return {"1m": "m1_amt", "3m": "m3_amt", "6m": "m6_amt", "12m": "ltm_amt"}[w]
+def vis_field(w): return {"1m": "m1_visits", "3m": "m3_visits", "6m": "m6_visits", "12m": "ltm_visits"}[w]
 
-# Cross-table type × bucket
-cross = {tp: {b: {"n": 0, "ltm_amt": 0.0} for b in BUCKETS} for tp in TYPES}
-for r in ci_rows:
-    cell = cross[r["cust_type"] if r["cust_type"] in TYPES else "Other"][r["age_bucket"]]
-    cell["n"] += 1
-    cell["ltm_amt"] += r["ltm_amt"]
-for tp in TYPES:
-    for b in BUCKETS:
-        cross[tp][b]["ltm_amt"] = round(cross[tp][b]["ltm_amt"], 0)
+# Per-bucket aggregate, per window — so the browser can switch windows w/o recomputing
+bucket_agg_by_window = {}
+for w in WINDOWS:
+    af, vf = amt_field(w), vis_field(w)
+    bagg = {b: {"n": 0, "amt": 0.0, "visits": 0, "n_repeat": 0, "n_active": 0} for b in BUCKETS}
+    for r in ci_rows:
+        b = bagg[r["age_bucket"]]
+        b["n"] += 1
+        b["amt"] += r[af]
+        b["visits"] += r[vf]
+        if r[vf] >= 1: b["n_active"] += 1
+        if r[vf] >= 2: b["n_repeat"] += 1
+    for b, v in bagg.items():
+        v["aov"] = round(v["amt"] / v["visits"], 0) if v["visits"] else 0
+        v["repeat_pct"] = round(100 * v["n_repeat"] / v["n_active"], 1) if v["n_active"] else 0
+        v["amt"] = round(v["amt"], 0)
+    bucket_agg_by_window[w] = bagg
 
-# Top 100 by LTM amt
+# Cross-table type × bucket, per window
+cross_by_window = {}
+for w in WINDOWS:
+    af = amt_field(w)
+    cr = {tp: {b: {"n": 0, "amt": 0.0} for b in BUCKETS} for tp in TYPES}
+    for r in ci_rows:
+        tp = r["cust_type"] if r["cust_type"] in TYPES else "Other"
+        cell = cr[tp][r["age_bucket"]]
+        cell["n"] += 1
+        cell["amt"] += r[af]
+    for tp in TYPES:
+        for b in BUCKETS:
+            cr[tp][b]["amt"] = round(cr[tp][b]["amt"], 0)
+    cross_by_window[w] = cr
+
+# Top 100 default by LTM (browser re-sorts when window changes)
 ci_rows_top = sorted(ci_rows, key=lambda x: -x["ltm_amt"])[:100]
 
-# Headline numbers
-total_n = len(ci_rows)
-n_5plus = sum(1 for r in ci_rows if r["age_bucket"] in ("5-8y", "8y+"))
-ltm_total = sum(r["ltm_amt"] for r in ci_rows)
-ltm_5plus = sum(r["ltm_amt"] for r in ci_rows if r["age_bucket"] in ("5-8y", "8y+"))
-ci_summary = {
-    "total_members": total_n,
-    "n_lt1": bucket_agg["<1y"]["n"],
-    "n_1_5": bucket_agg["1-5y"]["n"],
-    "n_5_8": bucket_agg["5-8y"]["n"],
-    "n_8plus": bucket_agg["8y+"]["n"],
-    "ltm_total": round(ltm_total, 0),
-    "ltm_lt1": bucket_agg["<1y"]["ltm_amt"],
-    "ltm_1_5": bucket_agg["1-5y"]["ltm_amt"],
-    "ltm_5_8": bucket_agg["5-8y"]["ltm_amt"],
-    "ltm_8plus": bucket_agg["8y+"]["ltm_amt"],
-    "pct_5plus_n": round(100 * n_5plus / total_n, 1) if total_n else 0,
-    "pct_5plus_ltm": round(100 * ltm_5plus / ltm_total, 1) if ltm_total else 0,
-    "snapshot": ym_str(NOW_YM),
-}
-print(f"  CI: 5y+ members {n_5plus:,} ({ci_summary['pct_5plus_n']}%) "
-      f"contributed {ci_summary['pct_5plus_ltm']}% of LTM sales")
+# Headline numbers per window
+def summary_for(w):
+    af = amt_field(w)
+    bagg = bucket_agg_by_window[w]
+    total_n = len(ci_rows)
+    n_5plus = bagg["5-8y"]["n"] + bagg["8y+"]["n"]
+    total_amt = sum(r[af] for r in ci_rows)
+    amt_5plus = sum(r[af] for r in ci_rows if r["age_bucket"] in ("5-8y", "8y+"))
+    n_active  = sum(1 for r in ci_rows if r[af] > 0)
+    return {
+        "total_members": total_n,
+        "n_active": n_active,
+        "n_lt1":   bagg["<1y"]["n"],
+        "n_1_5":   bagg["1-5y"]["n"],
+        "n_5_8":   bagg["5-8y"]["n"],
+        "n_8plus": bagg["8y+"]["n"],
+        "amt_total": round(total_amt, 0),
+        "amt_lt1":   bagg["<1y"]["amt"],
+        "amt_1_5":   bagg["1-5y"]["amt"],
+        "amt_5_8":   bagg["5-8y"]["amt"],
+        "amt_8plus": bagg["8y+"]["amt"],
+        "pct_5plus_n":   round(100 * n_5plus / total_n, 1) if total_n else 0,
+        "pct_5plus_amt": round(100 * amt_5plus / total_amt, 1) if total_amt else 0,
+    }
+
+ci_summary_by_window = {w: summary_for(w) for w in WINDOWS}
+ci_summary = ci_summary_by_window["12m"]   # default for legacy fields
+ci_summary["snapshot"] = ym_str(NOW_YM)
+print(f"  CI windows: " + " · ".join(
+    f"{w}: {ci_summary_by_window[w]['n_active']:,} active / RM {ci_summary_by_window[w]['amt_total']:,.0f}"
+    for w in WINDOWS))
 
 # ── Procurement exceptions (C1) ──────────────────────────────────────
 print("\nReading sales/stock/PO xlsx …")
@@ -337,21 +421,28 @@ payload_cust = {
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "snapshot": ym_str(NOW_YM),
     },
-    "summary": ci_summary,
-    "buckets": [
-        {
-            "key": b,
-            "n": bucket_agg[b]["n"],
-            "ltm_amt": bucket_agg[b]["ltm_amt"],
-            "aov": bucket_agg[b]["aov"],
-            "repeat_pct": bucket_agg[b]["repeat_pct"],
-        }
-        for b in BUCKETS
-    ],
-    "cross": cross,
+    "summary": ci_summary,                           # legacy default (12m)
+    "summary_by_window": ci_summary_by_window,
+    "buckets_by_window": {
+        w: [
+            {
+                "key": b,
+                "n": bucket_agg_by_window[w][b]["n"],
+                "amt": bucket_agg_by_window[w][b]["amt"],
+                "aov": bucket_agg_by_window[w][b]["aov"],
+                "repeat_pct": bucket_agg_by_window[w][b]["repeat_pct"],
+                "n_active": bucket_agg_by_window[w][b]["n_active"],
+            }
+            for b in BUCKETS
+        ]
+        for w in WINDOWS
+    },
+    "cross_by_window": cross_by_window,
+    "windows": WINDOWS,
     "types": TYPES,
     "top100": ci_rows_top,
     "all": ci_rows,           # for filter computations in browser
+    "race": RACE_DATA,        # walk-in by ethnicity (Jan-Mar 2026, manual count)
 }
 
 with open(OUT_CUST, "w", encoding="utf-8") as f:
