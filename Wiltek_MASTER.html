@@ -93,13 +93,52 @@ header.app-header .data-date {
   font-size: 13px; color: var(--text-meta);
 }
 header.app-header .role-chip strong { color: var(--text-primary); font-weight: 600; }
-header.app-header .lang-toggle {
+header.app-header .lang-toggle,
+header.app-header .period-toggle {
   display: inline-flex; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
 }
-header.app-header .lang-toggle button {
-  padding: 5px 10px; background: var(--bg); border: 0; color: var(--text-meta); font-size: 12px;
+header.app-header .lang-toggle button,
+header.app-header .period-toggle button {
+  padding: 5px 10px; background: var(--bg); border: 0; color: var(--text-meta); font-size: 12px; cursor: pointer;
 }
-header.app-header .lang-toggle button.on { background: var(--brand); color: #fff; }
+header.app-header .lang-toggle button.on,
+header.app-header .period-toggle button.on { background: var(--brand); color: #fff; font-weight: 600; }
+header.app-header .period-toggle button:hover { color: var(--brand); }
+header.app-header .period-toggle button.on:hover { color: #fff; }
+
+/* 数字 + 图 + 行动 trio: 👉 action block (light green bg, 5-sec read) */
+.action-block {
+  background: #EAF4EE;
+  border-left: 3px solid var(--brand);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 10px 0 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+.action-block .ab-icon { margin-right: 6px; }
+.action-block .ab-label { font-weight: 600; color: var(--brand); margin-right: 4px; }
+.action-block.flat { background: #F4F8F5; border-left-color: var(--text-light); color: var(--text-meta); }
+
+/* Chart wrappers: keep canvases inside container, prevent layout-thrash on mobile */
+.chart-wrap {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; margin: 12px 0 8px;
+  position: relative;
+}
+.chart-wrap canvas {
+  /* Chart.js uses parent height when maintainAspectRatio:false; clamp it so the
+     chart stops at a predictable height and doesn't intercept clicks below */
+  max-width: 100%; max-height: 240px; display: block;
+}
+.chart-wrap.chart-wrap-tall canvas { max-height: 320px; }
+.chart-wrap .chart-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
+.chart-wrap .chart-meta { font-size: 11px; color: var(--text-light); margin-top: 6px; }
+.period-empty {
+  background: #F8F9FA; border: 1px dashed var(--border); border-radius: 8px;
+  padding: 18px; text-align: center; color: var(--text-light); font-size: 13px; margin: 8px 0;
+}
 header.app-header .logout-btn {
   background: transparent; border: 1px solid var(--border); border-radius: 6px;
   padding: 6px 10px; color: var(--text-meta); font-size: 13px;
@@ -811,6 +850,13 @@ footer.app-footer {
         <button id="viewAsOwner" type="button" onclick="setViewAs('owner')" data-i18n="viewas-owner">Owner</button>
         <button id="viewAsWarehouse" type="button" onclick="setViewAs('warehouse')" data-i18n="viewas-warehouse">Warehouse</button>
       </div>
+      <!-- Global period selector — drives every page that has a time window -->
+      <div class="period-toggle" id="periodToggle" role="tablist" title="Period (1m / 3m / 6m / 12m)">
+        <button type="button" data-period="1m"  data-i18n="period-1m">1m</button>
+        <button type="button" data-period="3m"  data-i18n="period-3m">3m</button>
+        <button type="button" data-period="6m"  class="on" data-i18n="period-6m">6m</button>
+        <button type="button" data-period="12m" data-i18n="period-12m">12m</button>
+      </div>
       <div class="lang-toggle" role="tablist">
         <button id="langEN" class="on" type="button" onclick="setLang('en')">EN</button>
         <button id="langZH" type="button" onclick="setLang('zh')">中</button>
@@ -949,6 +995,10 @@ footer.app-footer {
           <div class="spacer"></div>
           <button class="csv-btn" type="button" id="ccCsvBtn">Export CSV</button>
         </div>
+        <div class="chart-wrap"><div class="chart-title" id="ccChartTitle"></div>
+          <canvas id="ccChart" height="120" aria-label="Lapsed customers by store"></canvas>
+        </div>
+        <div id="ccAction"></div>
         <div class="simple-list" id="ccList"></div>
       </div>
 
@@ -957,15 +1007,8 @@ footer.app-footer {
         <h1 class="page-title" data-i18n="ci-title">Customer Insights</h1>
         <p class="page-sub" data-i18n="ci-sub">Members tiered by enrol age — see where the moat lives and where to invest.</p>
 
-        <!-- Window selector: drills purchase amount + visits to a recent period -->
+        <!-- Period is set globally in the header; this row just shows the active window meta -->
         <div class="toolbar ci-window-bar">
-          <span class="filter-label" data-i18n="ci-window-label">Period</span>
-          <div class="ci-window" id="ciWindow" role="tablist">
-            <button type="button" data-window="1m"  data-i18n="ci-w-1m">Last 1m</button>
-            <button type="button" data-window="3m"  data-i18n="ci-w-3m">Last 3m</button>
-            <button type="button" data-window="6m"  data-i18n="ci-w-6m">Last 6m</button>
-            <button type="button" data-window="12m" class="on" data-i18n="ci-w-12m">Last 12m</button>
-          </div>
           <span class="ci-window-meta" id="ciWindowMeta"></span>
         </div>
 
@@ -979,6 +1022,10 @@ footer.app-footer {
         <div class="ci-table-wrap">
           <table class="ci-table" id="ciBucketTable"><thead></thead><tbody></tbody></table>
         </div>
+        <div class="chart-wrap"><div class="chart-title" id="ciAgeChartTitle"></div>
+          <canvas id="ciAgeChart" height="120" aria-label="Age contribution chart"></canvas>
+        </div>
+        <div id="ciAgeAction"></div>
 
         <div class="today-section-title">
           <span data-i18n="ci-cross-title">Customer type × membership age</span>
@@ -987,6 +1034,10 @@ footer.app-footer {
         <div class="ci-table-wrap">
           <table class="ci-table" id="ciCrossTable"><thead></thead><tbody></tbody></table>
         </div>
+        <div class="chart-wrap"><div class="chart-title" id="ciTypeChartTitle"></div>
+          <canvas id="ciTypeChart" height="140" aria-label="Customer type chart"></canvas>
+        </div>
+        <div id="ciTypeAction"></div>
 
         <!-- Race / walk-in breakdown — manual count, Jan-Mar 2026 -->
         <div class="today-section-title">
@@ -996,6 +1047,10 @@ footer.app-footer {
         <div class="ci-table-wrap">
           <table class="ci-table" id="ciRaceTable"><thead></thead><tbody></tbody></table>
         </div>
+        <div class="chart-wrap"><div class="chart-title" id="ciRaceChartTitle"></div>
+          <canvas id="ciRaceChart" height="140" aria-label="Race funnel"></canvas>
+        </div>
+        <div id="ciRaceAction"></div>
         <p class="fd-note" id="ciRaceNote"></p>
 
         <div class="today-section-title">
@@ -1044,6 +1099,10 @@ footer.app-footer {
         <div class="ci-table-wrap">
           <table class="ci-table" id="fdCatTable"><thead></thead><tbody></tbody></table>
         </div>
+        <div class="chart-wrap"><div class="chart-title" id="fdCatsChartTitle"></div>
+          <canvas id="fdCatsChart" height="140" aria-label="Cost categories trend"></canvas>
+        </div>
+        <div id="fdCatsAction"></div>
 
         <div class="today-section-title">
           <span data-i18n="fd-brand-title">Brand GP ranking — last 12 months</span>
@@ -1051,6 +1110,10 @@ footer.app-footer {
         <div class="ci-table-wrap">
           <table class="ci-table" id="fdBrandTable"><thead></thead><tbody></tbody></table>
         </div>
+        <div class="chart-wrap"><div class="chart-title" id="fdBrandChartTitle"></div>
+          <canvas id="fdBrandChart" height="140" aria-label="Brand GP scatter"></canvas>
+        </div>
+        <div id="fdBrandAction"></div>
         <p class="fd-note" data-i18n="fd-brand-note">Brand GP derived from Raw Sale × per-item PO cost. May differ slightly from FMM Sheet 3 reconciled figures.</p>
       </div>
 
@@ -1060,10 +1123,14 @@ footer.app-footer {
         <p class="page-sub" data-i18n="pe-sub">Open POs that haven't arrived and orders that took too long — clean up before next batch.</p>
 
         <div class="simple-list-summary" id="peSummary"></div>
+        <div class="chart-wrap"><div class="chart-title" id="peChartTitle"></div>
+          <canvas id="peChart" height="120" aria-label="PO days histogram"></canvas>
+        </div>
         <div class="simple-list" id="peList">
           <div class="sl-tabs" id="peTabs"></div>
           <div id="peListBody"></div>
         </div>
+        <div id="peAction"></div>
       </div>
 
       <!-- ── View: Owner Transfer Suggestions (kanban) ─────────── -->
@@ -1094,6 +1161,8 @@ footer.app-footer {
   </main>
 </div>
 
+<!-- Chart.js — used by 数字+图+行动 trio across views -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="users.js"></script>
 <script src="session.js"></script>
 <script src="auditlog.js"></script>
@@ -1319,6 +1388,22 @@ const STR = {
     "ci-w-3m": "Last 3m",
     "ci-w-6m": "Last 6m",
     "ci-w-12m": "Last 12m",
+    "period-label": "Period",
+    "period-1m": "1m",
+    "period-3m": "3m",
+    "period-6m": "6m",
+    "period-12m": "12m",
+    "period-window": "window",
+    "period-short-tip": "Period too short — switch to a longer window above to see this view.",
+    "ab-label": "Action",
+    "ci-chart-age": "Age contribution to RM",
+    "ci-chart-mix": "Members vs revenue · {w}",
+    "ci-chart-type": "Customer type · {w} RM",
+    "ci-chart-race": "Walk-in funnel by race",
+    "cc-chart-title": "Lapsed customers by store · top spenders",
+    "pe-chart-title": "Open POs by days waiting",
+    "fd-chart-cats": "7 cost categories trend",
+    "fd-chart-brands": "Brand GP% × LTM RM",
     "ci-race-title": "Walk-in by race · Jan–Mar 2026",
     "ci-race-sub": "manual count · POS doesn't record race",
     "ci-top-title": "Top 100 members",
@@ -1566,6 +1651,22 @@ const STR = {
     "ci-w-3m": "最近 3 月",
     "ci-w-6m": "最近 6 月",
     "ci-w-12m": "最近 12 月",
+    "period-label": "期间",
+    "period-1m": "1 月",
+    "period-3m": "3 月",
+    "period-6m": "6 月",
+    "period-12m": "12 月",
+    "period-window": "期间",
+    "period-short-tip": "所选期间太短 — 切换到更长期间(顶端)才有数据可看。",
+    "ab-label": "建议",
+    "ci-chart-age": "会员龄对销售贡献",
+    "ci-chart-mix": "会员数 vs 销售 · {w}",
+    "ci-chart-type": "顾客类型 · {w} RM",
+    "ci-chart-race": "种族成交漏斗",
+    "cc-chart-title": "门市流失高客 · Top 消费",
+    "pe-chart-title": "未到货 PO · 等待天数分布",
+    "fd-chart-cats": "7 大费用走势",
+    "fd-chart-brands": "品牌 GP% × 销售 RM",
     "ci-race-title": "种族进店分布 · 2026 年 1–3 月",
     "ci-race-sub": "人手统计 · POS 不记录种族",
     "ci-top-title": "Top 100 会员",
@@ -1681,6 +1782,10 @@ function enterApp() {
   setupViewAsSwitcher(s.role);
   applyMenuVisibility();
 
+  // Honor ?status= from URL (drives the dead stock 6-tab default selection)
+  const urlStatus = statusFromUrl();
+  if (urlStatus) CUR_TAB = urlStatus;
+
   buildCategoryFilter();
   applyLang();
   renderHero();
@@ -1779,9 +1884,24 @@ function renderTabs() {
   el.innerHTML = html;
   el.querySelectorAll('.tab').forEach(b => {
     b.addEventListener('click', () => {
-      CUR_TAB = b.getAttribute('data-tab');
+      const next = b.getAttribute('data-tab');
+      // Click-active-card-again-resets-to-All — Jym's spec for the 6-card filter bug
+      CUR_TAB = (CUR_TAB === next && next !== 'all') ? 'all' : next;
       EXPANDED_ROW = null;
+      // Make sure the class-filter chips don't fight the tab — show all classes
+      // when a specific tab is selected so visibleRows() filter on `r.cls === CUR_TAB` actually shows rows
+      if (CUR_TAB !== 'all' && !CLASS_SET.has(CUR_TAB)) CLASS_SET.add(CUR_TAB);
+      persistStatusToUrl(CUR_TAB);
+      if (typeof setView === 'function') {
+        // Make sure URL reflects the correct view too
+        try {
+          const u = new URL(window.location.href);
+          u.searchParams.set('view', 'deadstock');
+          history.replaceState(null, '', u.toString());
+        } catch(_) {}
+      }
       renderTabs();
+      renderClassFilter();
       renderTable();
       if (window.innerWidth < 700) document.getElementById('detail').scrollIntoView({behavior:'smooth', block:'start'});
     });
@@ -2458,7 +2578,123 @@ let PE_TAB = 'overdue';
 let CI_SEARCH = '';
 let CI_BRANCH = '';
 let CI_TYPE   = '';
-let CI_WINDOW = '12m';   // V1 第 3 刀 patch: period selector (1m / 3m / 6m / 12m)
+// CI_WINDOW kept as alias for backwards refs; real source-of-truth is window.PERIOD
+function CI_WINDOW_GET() { return (window.PERIOD || '6m'); }
+
+/* ── Global PERIOD state (1m / 3m / 6m / 12m) ─────────────────────
+   Default: 6m. Source of truth for every page that has a time window.
+   URL: ?period=6m. localStorage: wp_period. Triggers re-render of all views. */
+const PERIOD_VALID = ['1m','3m','6m','12m'];
+function periodFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const p = u.searchParams.get('period');
+    if (p && PERIOD_VALID.indexOf(p) !== -1) return p;
+  } catch(_) {}
+  return null;
+}
+function periodLabel(p) {
+  return ({en:{'1m':'Last 1m','3m':'Last 3m','6m':'Last 6m','12m':'Last 12m'},
+           zh:{'1m':'最近 1 月','3m':'最近 3 月','6m':'最近 6 月','12m':'最近 12 月'}})[LANG][p] || p;
+}
+function persistPeriodToUrl() {
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set('period', window.PERIOD || '6m');
+    history.replaceState(null, '', u.toString());
+  } catch(_) {}
+}
+function setPeriod(p) {
+  if (PERIOD_VALID.indexOf(p) === -1) return;
+  window.PERIOD = p;
+  try { localStorage.setItem('wp_period', p); } catch(_){}
+  persistPeriodToUrl();
+  document.querySelectorAll('#periodToggle button[data-period]').forEach(b => {
+    b.classList.toggle('on', b.getAttribute('data-period') === p);
+  });
+  // Re-render every period-aware view
+  rerenderActiveView();
+}
+function rerenderActiveView() {
+  // Always rebuild deadstock pieces so its hero/branch numbers stay coherent
+  if (typeof renderHero === 'function')        renderHero();
+  if (typeof renderTabs === 'function')        renderTabs();
+  if (typeof renderBranchCards === 'function') renderBranchCards();
+  if (typeof renderTable === 'function')       renderTable();
+  if (CUR_VIEW === 'today')             renderToday();
+  else if (CUR_VIEW === 'transfers')    renderTransfers();
+  else if (CUR_VIEW === 'warehouse')    renderWarehouse();
+  else if (CUR_VIEW === 'customer-churn') renderChurn();
+  else if (CUR_VIEW === 'po-exceptions')  renderPoExceptions();
+  else if (CUR_VIEW === 'cust-insights')  renderCustInsights();
+  else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
+}
+// Bootstrap default: URL > localStorage > 6m
+window.PERIOD = periodFromUrl()
+  || (function(){ try { const v = localStorage.getItem('wp_period'); return PERIOD_VALID.indexOf(v) !== -1 ? v : null; } catch(_){ return null; } })()
+  || '6m';
+
+/* ── ?status= sync for dead stock view ──────────────────────────── */
+const STATUS_VALID = ['all','ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'];
+function persistStatusToUrl(s) {
+  try {
+    const u = new URL(window.location.href);
+    if (s && s !== 'all') u.searchParams.set('status', s.toLowerCase());
+    else u.searchParams.delete('status');
+    history.replaceState(null, '', u.toString());
+  } catch(_) {}
+}
+function statusFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const raw = u.searchParams.get('status');
+    if (!raw) return null;
+    // Accept lowercase shortcut from URL (e.g. ?status=dead → DEAD)
+    const upper = raw.toUpperCase();
+    if (STATUS_VALID.indexOf(upper) !== -1) return upper;
+    if (raw === 'all') return 'all';
+    return null;
+  } catch(_) { return null; }
+}
+
+/* ── Action block helper (👉 + 1-sentence) ───────────────────────
+   Used by every chart section to give Owner a 5-second-read recommendation.
+   Threshold comments live next to each call site so the rule stays explicit. */
+function actionBlock(zhText, enText, opts) {
+  opts = opts || {};
+  const flat = opts.flat ? ' flat' : '';
+  const text = LANG === 'zh' ? zhText : enText;
+  const label = t('ab-label');  // "Action" / "建议"
+  return '<div class="action-block' + flat + '">' +
+    '<span class="ab-icon">👉</span>' +
+    '<span class="ab-label">' + label + ':</span>' +
+    text +
+  '</div>';
+}
+
+/* ── Chart helper: destroy existing chart on a canvas before drawing ── */
+const _CHARTS = {};
+function destroyChart(id) {
+  if (_CHARTS[id]) { try { _CHARTS[id].destroy(); } catch(_){} delete _CHARTS[id]; }
+}
+function drawChart(id, config) {
+  if (typeof Chart === 'undefined') return null;
+  destroyChart(id);
+  const el = document.getElementById(id);
+  if (!el) return null;
+  // Disable animations so layout settles before any click — keeps Playwright's
+  // elementFromPoint check stable when tabs/buttons sit near a chart container.
+  config.options = config.options || {};
+  config.options.animation = false;
+  // Default font small to keep aspect predictable
+  if (!config.options.plugins) config.options.plugins = {};
+  _CHARTS[id] = new Chart(el.getContext('2d'), config);
+  return _CHARTS[id];
+}
+const BRAND_GREEN = '#1F5F4A';
+const BRAND_GREEN_SOFT = '#7AAE9C';
+const BRAND_AMBER = '#D8A23B';
+const BRAND_DANGER = '#C04D3F';
 
 /* ── Candidate generation: collect signals across 4 dimensions ─── */
 function collectTodayCandidates() {
@@ -2748,6 +2984,52 @@ function renderChurn() {
       '</div>';
   }
 
+  // ── Churn chart: lapsed lifetime RM by store (bar) ──
+  // Threshold: worst store > 30% of lifetime-RM share → priority store
+  const ccChartT = document.getElementById('ccChartTitle');
+  if (ccChartT) ccChartT.textContent = t('cc-chart-title');
+  const byBranch = {};
+  rows.forEach(r => {
+    const b = r.branch || '—';
+    if (!byBranch[b]) byBranch[b] = { n: 0, amt: 0, top: null };
+    byBranch[b].n += 1;
+    byBranch[b].amt += r.amount || 0;
+    if (!byBranch[b].top || (r.amount > byBranch[b].top.amount)) byBranch[b].top = r;
+  });
+  const branches = Object.keys(byBranch).sort((a,b) => byBranch[b].amt - byBranch[a].amt);
+  if (branches.length) {
+    drawChart('ccChart', {
+      type: 'bar',
+      data: {
+        labels: branches,
+        datasets: [{
+          label: LANG === 'zh' ? '终身消费 RM' : 'Lifetime RM',
+          data: branches.map(b => byBranch[b].amt),
+          backgroundColor: branches.map(b => byBranch[b].amt === byBranch[branches[0]].amt ? BRAND_DANGER : BRAND_GREEN)
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: c => 'RM ' + Math.round(c.raw).toLocaleString() + ' · ' + byBranch[c.label].n + (LANG==='zh'?' 人':' people')
+        }}},
+        scales: { y: { beginAtZero: true, ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } } }
+      }
+    });
+    const totalAmt = branches.reduce((s, b) => s + byBranch[b].amt, 0);
+    const worst = branches[0];
+    const worstShare = totalAmt ? +(byBranch[worst].amt / totalAmt * 100).toFixed(1) : 0;
+    const top = byBranch[worst].top || {};
+    const ccActZh = '本周先打 ' + worst + '(' + byBranch[worst].n + ' 人,占 ' + worstShare +
+      '%)— 头号客户 ' + (top.name || top.mc || '—') + ' 终身 RM ' + Math.round(top.amount || 0).toLocaleString() + ',先回访他。';
+    const ccActEn = 'Call ' + worst + ' first this week (' + byBranch[worst].n + ' lapsed, ' + worstShare +
+      '% of $) — top spender ' + (top.name || top.mc || '—') + ' worth RM ' + Math.round(top.amount || 0).toLocaleString() + '.';
+    document.getElementById('ccAction').innerHTML = actionBlock(ccActZh, ccActEn);
+  } else {
+    drawChart('ccChart', { type: 'bar', data: { labels: [], datasets: [] } });
+    document.getElementById('ccAction').innerHTML = '';
+  }
+
   const listEl = document.getElementById('ccList');
   if (!listEl) return;
   if (!rows.length) {
@@ -2835,6 +3117,57 @@ function renderPoExceptions() {
     ).join('');
   }
 
+  // ── Chart: open PO days-waiting histogram (overdue only — cleanest signal) ──
+  // Threshold: any 180+ bucket → cancel/escalate. >90 days bucket > 20% of count → bottleneck supplier
+  const peChartT = document.getElementById('peChartTitle');
+  if (peChartT) peChartT.textContent = t('pe-chart-title');
+  const overdue = pe.overdue || [];
+  if (overdue.length) {
+    const buckets = [
+      { label: '0–30',   from: 0,   to: 30  },
+      { label: '31–60',  from: 31,  to: 60  },
+      { label: '61–90',  from: 61,  to: 90  },
+      { label: '91–180', from: 91,  to: 180 },
+      { label: '180+',   from: 181, to: 1e9 },
+    ];
+    const counts = buckets.map(b => overdue.filter(r => r.days >= b.from && r.days <= b.to).length);
+    const amts   = buckets.map(b => overdue.filter(r => r.days >= b.from && r.days <= b.to).reduce((sx, r) => sx + (r.amount || 0), 0));
+    drawChart('peChart', {
+      type: 'bar',
+      data: {
+        labels: buckets.map(b => b.label + (LANG === 'zh' ? ' 天' : 'd')),
+        datasets: [{
+          label: LANG === 'zh' ? '未到货 PO 数量' : 'Open POs',
+          data: counts,
+          backgroundColor: buckets.map((b,i) => b.from >= 181 ? BRAND_DANGER : b.from >= 91 ? BRAND_AMBER : BRAND_GREEN)
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: c => c.raw + (LANG==='zh'?' 张 · RM ':' POs · RM ') + Math.round(amts[c.dataIndex]).toLocaleString()
+        }}},
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+    const n180 = counts[4], amt180 = amts[4];
+    const n90 = counts[3], n60 = counts[2];
+    const peActZh = n180 > 0
+      ? '180+ 天还在路上的 ' + n180 + ' 张 PO(RM ' + Math.round(amt180).toLocaleString() + ')— 直接发邮件取消或追供应商,这周必须清。'
+      : (n90 > 5
+        ? '91–180 天 ' + n90 + ' 张 — 这批已经过分,本周内逐张催货并定 deadline。'
+        : '60 天内仍可控,但 ' + n60 + ' 张 61–90 天的要本周打电话确认进度。');
+    const peActEn = n180 > 0
+      ? n180 + ' POs over 180 days (RM ' + Math.round(amt180).toLocaleString() + ') — email-cancel or escalate this week.'
+      : (n90 > 5
+        ? n90 + ' POs in 91–180d — chase each one this week with a hard deadline.'
+        : 'Manageable. Confirm the ' + n60 + ' POs in 61–90d range with phone calls this week.');
+    document.getElementById('peAction').innerHTML = actionBlock(peActZh, peActEn);
+  } else {
+    drawChart('peChart', { type: 'bar', data: { labels: [], datasets: [] } });
+    document.getElementById('peAction').innerHTML = '';
+  }
+
   const rows = PE_TAB === 'overdue' ? pe.overdue : pe.delayed;
   const bodyEl = document.getElementById('peListBody');
   if (!bodyEl) return;
@@ -2880,15 +3213,12 @@ function ciWindowLabel(w) {
 function renderCustInsights() {
   const ci = window.WP_CUSTOMERS || {};
   if (!ci.summary && !ci.summary_by_window) return;
-  const W = CI_WINDOW;
+  const W = CI_WINDOW_GET();
   const af = ciAmtField(W), vf = ciVisField(W);
   const sw = (ci.summary_by_window && ci.summary_by_window[W]) || ci.summary || {};
   const wlabel = ciWindowLabel(W);
 
-  // Highlight active window button
-  document.querySelectorAll('#ciWindow button[data-window]').forEach(b => {
-    b.classList.toggle('on', b.getAttribute('data-window') === W);
-  });
+  // (Period selector is global — see header. The local CI window toolbar was removed.)
 
   // Window meta line: active members + total RM in this window
   const wMeta = document.getElementById('ciWindowMeta');
@@ -2939,6 +3269,58 @@ function renderCustInsights() {
            wlabel + ' RM ' + fmtMoney(sw.amt_8plus || 0));
   }
 
+  // ── Chart 1: Age contribution to RM (100% horizontal stacked bar) ──
+  // Action thresholds: 8y+ amt% < 5% → "old members shrinking"; else "moat steady"
+  const ciAgeT = document.getElementById('ciAgeChartTitle');
+  if (ciAgeT) ciAgeT.textContent = t('ci-chart-age') + ' · ' + wlabel;
+  const amt_lt1 = sw.amt_lt1 || 0;
+  const amt_1_5 = sw.amt_1_5 || 0;
+  const amt_5_8 = sw.amt_5_8 || 0;
+  const amt_8p  = sw.amt_8plus || 0;
+  const amt_total = amt_lt1 + amt_1_5 + amt_5_8 + amt_8p;
+  if (amt_total > 0) {
+    const pct = v => +(v / amt_total * 100).toFixed(1);
+    drawChart('ciAgeChart', {
+      type: 'bar',
+      data: {
+        labels: [LANG === 'zh' ? '销售贡献' : 'Revenue share'],
+        datasets: [
+          { label: '<1y',  data: [pct(amt_lt1)], backgroundColor: '#D8E5DF' },
+          { label: '1-5y', data: [pct(amt_1_5)], backgroundColor: BRAND_GREEN_SOFT },
+          { label: '5-8y', data: [pct(amt_5_8)], backgroundColor: BRAND_GREEN },
+          { label: '8y+',  data: [pct(amt_8p)],  backgroundColor: BRAND_AMBER },
+        ],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: {
+          label: (c) => c.dataset.label + ': ' + c.raw + '%'
+        }}},
+        scales: {
+          x: { stacked: true, max: 100, ticks: { callback: v => v + '%' } },
+          y: { stacked: true }
+        }
+      }
+    });
+    const pct8p = pct(amt_8p);
+    // Threshold: 8y+ < 5% of revenue → moat eroding
+    const ageActZh = pct8p < 5
+      ? '8 年+ 老客只贡献 ' + pct8p + '% — 启动「老客回访」名单,目标本月拨打 50 通。'
+      : pct8p < 15
+        ? '8 年+ 老客贡献 ' + pct8p + ',稳但需补充 — 推荐推进 1–5 年客户的会员升级活动。'
+        : '8 年+ 老客贡献 ' + pct8p + ',护城河结实 — 优先加码 KOL 内容稳老客。';
+    const ageActEn = pct8p < 5
+      ? '8y+ members contribute only ' + pct8p + '%. Launch a re-call list — target 50 calls this month.'
+      : pct8p < 15
+        ? '8y+ at ' + pct8p + '% — stable but thin. Push 1–5y cohort upgrades to refill the moat.'
+        : '8y+ at ' + pct8p + '% — moat is solid. Double down on KOL content to keep them.';
+    document.getElementById('ciAgeAction').innerHTML = actionBlock(ageActZh, ageActEn);
+  } else {
+    drawChart('ciAgeChart', { type: 'bar', data: { labels: [], datasets: [] } });
+    document.getElementById('ciAgeAction').innerHTML =
+      '<div class="period-empty">' + t('period-short-tip') + '</div>';
+  }
+
   // Bucket table — window-aware
   const buckets_w = (ci.buckets_by_window && ci.buckets_by_window[W]) || [];
   const btab = document.getElementById('ciBucketTable');
@@ -2956,6 +3338,63 @@ function renderCustInsights() {
         '<td class="num">RM ' + fmt(b.aov) + '</td>' +
         '<td class="num">' + b.repeat_pct + '%</td></tr>'
     ).join('');
+  }
+
+  // ── Chart 2: Customer type × age — grouped bars (members vs RM) ──
+  // Action threshold: max-RM type contributes < 30% → fragmented; else "anchor type"
+  const cross_w_full = (ci.cross_by_window && ci.cross_by_window[W]) || {};
+  const types_full = ci.types || ['Walk-in','Contractor','Interior Designer','Other'];
+  const typeTotals = types_full.map(tp => {
+    const ageB = ['<1y','1-5y','5-8y','8y+'];
+    let n = 0, amt = 0;
+    ageB.forEach(b => {
+      const c = (cross_w_full[tp] && cross_w_full[tp][b]) || { n: 0, amt: 0 };
+      n += c.n; amt += c.amt;
+    });
+    return { type: tp, n: n, amt: amt };
+  });
+  const ciTypeT = document.getElementById('ciTypeChartTitle');
+  if (ciTypeT) ciTypeT.textContent = t('ci-chart-type').replace('{w}', wlabel);
+  const totalRM = typeTotals.reduce((s, x) => s + x.amt, 0);
+  if (totalRM > 0) {
+    drawChart('ciTypeChart', {
+      type: 'bar',
+      data: {
+        labels: typeTotals.map(x => x.type),
+        datasets: [{
+          label: LANG === 'zh' ? wlabel + ' 销售 RM' : wlabel + ' RM',
+          data: typeTotals.map(x => x.amt),
+          backgroundColor: BRAND_GREEN
+        }, {
+          label: LANG === 'zh' ? '会员数' : 'Members',
+          data: typeTotals.map(x => x.n),
+          backgroundColor: BRAND_AMBER,
+          yAxisID: 'y1'
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }},
+        scales: {
+          y:  { beginAtZero: true, position: 'left',  title: { display: true, text: 'RM' }, ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } },
+          y1: { beginAtZero: true, position: 'right', title: { display: true, text: LANG === 'zh' ? '会员数' : 'Members' }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+    const top = typeTotals.slice().sort((a,b)=>b.amt - a.amt)[0];
+    const topShare = totalRM ? +(top.amt / totalRM * 100).toFixed(1) : 0;
+    // Threshold: top type < 30% → fragmented mix (no anchor)
+    const typeActZh = topShare < 30
+      ? '客户类型分散 — ' + top.type + ' 仅占 ' + topShare + '%,无主力。建议本月聚焦 Contractor/Designer 一档,减半 ad budget 在散户。'
+      : top.type + ' 占 ' + topShare + ',为主要金主 — 维持其专属服务,其他类型只给基础体验。';
+    const typeActEn = topShare < 30
+      ? 'Mix is fragmented — top type ' + top.type + ' is only ' + topShare + '% of RM. Pick one (Contractor or Designer) and concentrate marketing this month.'
+      : top.type + ' is ' + topShare + '% of RM — keep VIP service for them, baseline for others.';
+    document.getElementById('ciTypeAction').innerHTML = actionBlock(typeActZh, typeActEn);
+  } else {
+    drawChart('ciTypeChart', { type: 'bar', data: { labels: [], datasets: [] } });
+    document.getElementById('ciTypeAction').innerHTML =
+      '<div class="period-empty">' + t('period-short-tip') + '</div>';
   }
 
   // Cross-table sub-label
@@ -3032,6 +3471,48 @@ function renderCustInsights() {
     rtab.querySelector('thead').innerHTML = head;
     rtab.querySelector('tbody').innerHTML = body + tr;
     if (rnote) rnote.textContent = (LANG === 'zh' ? rd.note_zh : rd.note_en) || '';
+
+    // ── Chart 3: Race walk-in funnel (paired bars: walk-in vs purchase) ──
+    // Action: max-revenue race vs max-CR race — if different, push the underconverter
+    const ciRaceT = document.getElementById('ciRaceChartTitle');
+    if (ciRaceT) ciRaceT.textContent = t('ci-chart-race');
+    const races = (rd.races || []);
+    const sumA = a => (a || []).reduce((s, x) => s + (x || 0), 0);
+    const labels = races.map(r => r[labelKey]);
+    const walkin  = races.map(r => sumA(r.walkin));
+    const purchase = races.map(r => sumA(r.purchase));
+    const revs    = races.map(r => sumA(r.amount));
+    drawChart('ciRaceChart', {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: LANG === 'zh' ? '进店' : 'Walk-in',  data: walkin,  backgroundColor: BRAND_GREEN_SOFT },
+          { label: LANG === 'zh' ? '购买' : 'Purchase', data: purchase, backgroundColor: BRAND_GREEN }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }},
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+    if (races.length) {
+      const closeRate = races.map((r,i) => walkin[i] ? purchase[i] / walkin[i] * 100 : 0);
+      const maxRevIdx = revs.indexOf(Math.max(...revs));
+      const maxCrIdx  = closeRate.indexOf(Math.max(...closeRate));
+      // Threshold: when biggest spender ≠ best closer → mismatched marketing focus
+      const sameRace = maxRevIdx === maxCrIdx;
+      const raceActZh = sameRace
+        ? labels[maxRevIdx] + ' 既是金主又是高成交 — 加码店内体验保住这群人。'
+        : '金主是 ' + labels[maxRevIdx] + ',但成交率最高的是 ' + labels[maxCrIdx] +
+          ' — 调整门市话术对 ' + labels[maxRevIdx] + ' 加强,转化拉到对等水平。';
+      const raceActEn = sameRace
+        ? labels[maxRevIdx] + ' is both top spender and top closer — protect this segment with in-store experience upgrades.'
+        : 'Top spender is ' + labels[maxRevIdx] + ' but top closer is ' + labels[maxCrIdx] +
+          ' — coach floor staff to lift ' + labels[maxRevIdx] + ' close-rate.';
+      document.getElementById('ciRaceAction').innerHTML = actionBlock(raceActZh, raceActEn);
+    }
   }
 
   // Top 100 list section meta + window label
@@ -3089,7 +3570,8 @@ function renderCustInsights() {
 function exportCustInsightsCSV() {
   const ci = window.WP_CUSTOMERS || {};
   const all = ci.all || ci.top100 || [];
-  const af = ciAmtField(CI_WINDOW), vf = ciVisField(CI_WINDOW);
+  const W = CI_WINDOW_GET();
+  const af = ciAmtField(W), vf = ciVisField(W);
   const rows = all
     .filter(r => !CI_BRANCH || r.branch === CI_BRANCH)
     .filter(r => !CI_TYPE   || (r.cust_type || 'Other') === CI_TYPE)
@@ -3102,7 +3584,7 @@ function exportCustInsightsCSV() {
   rows.forEach((r, i) => {
     const out = [
       i+1, r.branch, r.mc, r.name, r.cust_type, r.age_years, r.age_bucket,
-      CI_WINDOW, r[af], r[vf], r.last
+      W, r[af], r[vf], r.last
     ].map(v => {
       if (v == null) return '';
       const s = String(v);
@@ -3151,6 +3633,50 @@ function renderFinancialDepth() {
            (LANG === 'zh' ? '销售 - 费用' : 'sales − expenses')) +
       card(t('fd-card-netpct'), h.net_pct + '%',
            (LANG === 'zh' ? '净利率' : 'net margin'));
+  }
+
+  // ── Chart: 7 cost categories stacked-area trend (last 6 months) ──
+  // Action: HR > 30% of sales → flag; any cat MoM > +20% → flag spike
+  const cats = fd.categories || [];
+  const months = (fd.months || []).slice().reverse();   // oldest → newest for chart
+  const colors = [BRAND_GREEN, BRAND_GREEN_SOFT, BRAND_AMBER, '#A4C8B8', '#67937D', '#D8A23B', '#C04D3F'];
+  const fdCatsT = document.getElementById('fdCatsChartTitle');
+  if (fdCatsT) fdCatsT.textContent = t('fd-chart-cats');
+  if (cats.length && months.length) {
+    drawChart('fdCatsChart', {
+      type: 'line',
+      data: {
+        labels: months,
+        datasets: cats.map((c, i) => ({
+          label: c.name,
+          data: (c.series || []).slice().reverse(),
+          backgroundColor: colors[i % colors.length],
+          borderColor: colors[i % colors.length],
+          fill: true, stack: 'total', tension: 0.25, pointRadius: 2
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          y: { stacked: true, ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } }
+        }
+      }
+    });
+    const hrPct = h.hr_pct_sales || 0;
+    const spikes = cats.filter(c => (c.mom_pct || 0) > 20);
+    // Threshold comments: HR > 30% → red line; any cat MoM > +20% → spike alert
+    const fdCatsActZh = hrPct > 30
+      ? 'HR 占销售 ' + hrPct + '%(目标 28%)— 暂停新招聘,计划下季精简结构。'
+      : spikes.length
+        ? '本月异常涨幅:' + spikes.map(c => c.name + ' +' + c.mom_pct + '%').join('、') + ' — 逐项审计开支单据。'
+        : '7 大费用稳定,无异常。本月维持原节奏。';
+    const fdCatsActEn = hrPct > 30
+      ? 'HR is ' + hrPct + '% of sales (target 28%) — freeze hiring and plan structural cuts next quarter.'
+      : spikes.length
+        ? 'Spikes this month: ' + spikes.map(c => c.name + ' +' + c.mom_pct + '%').join(', ') + ' — audit invoices.'
+        : '7 categories stable — no anomalies. Hold the line.';
+    document.getElementById('fdCatsAction').innerHTML = actionBlock(fdCatsActZh, fdCatsActEn);
   }
 
   // 7 categories table with sparkline
@@ -3203,10 +3729,67 @@ function renderFinancialDepth() {
       '</tr>';
     }).join('');
   }
+
+  // ── Chart: brand GP% × LTM RM scatter (with 25% red-line) ──
+  // Threshold: any brand with sales > 50k AND gp_pct < 20 → "phase out / re-price"
+  const fdBrandT = document.getElementById('fdBrandChartTitle');
+  if (fdBrandT) fdBrandT.textContent = t('fd-chart-brands');
+  const brands = (fd.brands || []).filter(b => (b.ltm_sales || 0) > 5000);
+  if (brands.length) {
+    drawChart('fdBrandChart', {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: LANG === 'zh' ? '品牌 GP% · LTM 销售' : 'Brand GP% · LTM Sales',
+          data: brands.map(b => ({ x: b.ltm_sales, y: b.gp_pct, brand: b.brand })),
+          backgroundColor: brands.map(b => b.gp_pct < 20 ? BRAND_DANGER : b.gp_pct < 25 ? BRAND_AMBER : BRAND_GREEN),
+          pointRadius: 5
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => c.raw.brand + ' · GP ' + c.raw.y + '% · RM ' + Math.round(c.raw.x).toLocaleString() } }
+        },
+        scales: {
+          x: { type: 'logarithmic', title: { display: true, text: LANG === 'zh' ? 'LTM 销售 (log scale)' : 'LTM Sales (log)' },
+               ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } },
+          y: { title: { display: true, text: 'GP %' }, suggestedMin: 0, suggestedMax: 60 }
+        }
+      }
+    });
+    const weak = brands.filter(b => b.ltm_sales > 50000 && b.gp_pct < 20);
+    const fdBActZh = weak.length
+      ? '低毛利大销量品牌:' + weak.slice(0,3).map(b => b.brand + ' (' + b.gp_pct + '%)').join('、') +
+        ' — 与厂家重谈采购,谈不下来就下架。'
+      : '所有重点品牌 GP% 都 ≥ 20% — 维持谈判节奏。';
+    const fdBActEn = weak.length
+      ? 'Low-margin big sellers: ' + weak.slice(0,3).map(b => b.brand + ' (' + b.gp_pct + '%)').join(', ') +
+        ' — renegotiate with factory or phase out.'
+      : 'All major brands ≥ 20% GP — keep negotiation rhythm.';
+    document.getElementById('fdBrandAction').innerHTML = actionBlock(fdBActZh, fdBActEn);
+  }
 }
 
 /* ── Wire up ──────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  // Global period selector — must come first so default-render uses correct PERIOD.
+  const periodToggle = document.getElementById('periodToggle');
+  if (periodToggle) {
+    // Reflect bootstrap value
+    periodToggle.querySelectorAll('button[data-period]').forEach(b => {
+      b.classList.toggle('on', b.getAttribute('data-period') === window.PERIOD);
+    });
+    periodToggle.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-period]');
+      if (!btn) return;
+      setPeriod(btn.getAttribute('data-period'));
+    });
+  }
+  // Persist initial PERIOD into URL so users see ?period= immediately
+  persistPeriodToUrl();
+
   document.getElementById('searchBox').addEventListener('input', e => {
     SEARCH = e.target.value || '';
     EXPANDED_ROW = null;
@@ -3296,16 +3879,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ciCsvBtn = document.getElementById('ciCsvBtn');
   if (ciCsvBtn) ciCsvBtn.addEventListener('click', exportCustInsightsCSV);
 
-  // V1 第 3 刀 patch: window selector (1m / 3m / 6m / 12m)
-  const ciWindow = document.getElementById('ciWindow');
-  if (ciWindow) {
-    ciWindow.addEventListener('click', e => {
-      const btn = e.target.closest('button[data-window]');
-      if (!btn) return;
-      CI_WINDOW = btn.getAttribute('data-window');
-      renderCustInsights();
-    });
-  }
+  // (Period selector is global — see periodToggle handler below.)
 
   // V1 第 2 刀: PO exceptions tab toggle
   const peTabs = document.getElementById('peTabs');
