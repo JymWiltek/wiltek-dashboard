@@ -242,3 +242,81 @@ test.describe('Round 3 — Today responsive', () => {
     expect(overflow).toBeLessThanOrEqual(2);
   });
 });
+
+test.describe('Round 4 — V1 第6刀: 6-domain architecture + sanity', () => {
+  test('menu shows 6 domains, no Stock/Purchasing top-level', async ({ page }) => {
+    await loginOwner(page);
+    const visibleNavs = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('nav.menu > .group:not(.legacy-nav) .sub-item[data-view]'))
+        .map(el => el.getAttribute('data-view')));
+    expect(visibleNavs).toEqual(['sales','inventory','customers','products','finance','hr']);
+  });
+
+  test('inventory dashboard renders required strings (总库存值/在途 PO/F-N-S/lead time)', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => (window as any).setView('inventory'));
+    await page.waitForSelector('#view-inventory.on');
+    const html = await page.locator('#view-inventory').innerHTML();
+    expect(html).toContain('总库存值');
+    expect(html).toContain('在途 PO');
+    expect(html).toContain('F-N-S');
+    expect(html).toContain('lead time');
+  });
+
+  test('sales dashboard renders depth sections (品类/80/20/Top 20/价格带/四象限)', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => (window as any).setView('sales'));
+    await page.waitForSelector('#view-sales.on');
+    const html = await page.locator('#view-sales').innerHTML();
+    expect(html).toContain('品类');
+    expect(html).toContain('80/20');
+    expect(html).toContain('Top 20');
+    expect(html).toContain('价格带');
+    expect(html).toContain('四象限');
+  });
+
+  test('products dashboard renders SKU 总数 + 品牌结构 strings', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => (window as any).setView('products'));
+    await page.waitForSelector('#view-products.on');
+    const html = await page.locator('#view-products').innerHTML();
+    expect(html).toContain('SKU 总数');
+    expect(html).toContain('品牌结构');
+  });
+
+  test('admin/sanity route resolves and shows sanity table', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => (window as any).setView('admin/sanity'));
+    await page.waitForSelector('#view-admin-sanity.on');
+    const rows = await page.locator('#adminSanityTable tbody tr.sanity-row').count();
+    expect(rows).toBeGreaterThanOrEqual(6);
+  });
+
+  test('all sanity checks pass (cross-source consistency)', async ({ page }) => {
+    await loginOwner(page);
+    const fails = await page.evaluate(() => {
+      const checks = (window as any).runSanityChecks();
+      return checks.filter((c: any) => !c.pass).map((c: any) => c.check + ' :: ' + c.detail);
+    });
+    expect(fails).toEqual([]);
+  });
+
+  test('status light renders in header and clicks → admin/sanity', async ({ page }) => {
+    await loginOwner(page);
+    await expect(page.locator('#dataSanityLight')).toBeVisible();
+    await page.click('#dataSanityLight');
+    await page.waitForSelector('#view-admin-sanity.on');
+  });
+
+  test('legacy stock/purchasing routes still resolve to inventory', async ({ page }) => {
+    await loginOwner(page);
+    const ok = await page.evaluate(() => {
+      (window as any).setView('stock');
+      const a = document.querySelector('#view-inventory.on') !== null;
+      (window as any).setView('purchasing');
+      const b = document.querySelector('#view-inventory.on') !== null;
+      return a && b;
+    });
+    expect(ok).toBe(true);
+  });
+});

@@ -808,6 +808,25 @@ footer.app-footer {
 .fd-spark span.last { opacity: 1; }
 .fd-note { font-size: 12px; color: var(--text-meta); margin: 8px 4px 0; line-height: 1.5; }
 
+/* V1 第6刀: Sales/Inventory/Products extended sections */
+.ds-section { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
+.ds-section-title { font-size: 16px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
+.ds-section-sub { font-size: 12px; color: var(--text-meta); margin: 0 0 12px; line-height: 1.5; }
+
+/* Status light in header */
+.sanity-light {
+  background: transparent; border: 1px solid var(--line); border-radius: 50%;
+  width: 32px; height: 32px; padding: 0; cursor: pointer;
+  font-size: 14px; line-height: 1; display: inline-flex;
+  align-items: center; justify-content: center; transition: transform 0.1s;
+}
+.sanity-light:hover { transform: scale(1.1); border-color: var(--brand); }
+
+/* Sanity table status cells */
+.sanity-row.pass td.status { color: #5EAA85; font-weight: 600; }
+.sanity-row.warn td.status { color: #E8A93B; font-weight: 600; }
+.sanity-row.fail td.status { color: var(--danger, #C04848); font-weight: 600; }
+
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .ci-cards, .fd-cards, .ds-cards { grid-template-columns: repeat(2, 1fr); }
@@ -893,6 +912,8 @@ footer.app-footer {
         <button id="langEN" class="on" type="button" onclick="setLang('en')">EN</button>
         <button id="langZH" type="button" onclick="setLang('zh')">中</button>
       </div>
+      <!-- V1 第6刀: data integrity status light. 🟢 all checks pass · 🟡 some warnings · 🔴 contradictions -->
+      <button id="dataSanityLight" class="sanity-light" type="button" title="Data sanity status — click for details" onclick="setView('admin/sanity')" aria-label="Data sanity status">🟢</button>
       <button class="logout-btn" type="button" onclick="doLogout()" id="logoutBtn">Sign out</button>
     </div>
   </header>
@@ -907,14 +928,15 @@ footer.app-footer {
         ranking between the 7 — flat list per spec.
       -->
       <div class="group">
+        <!-- 6-domain top-level menu (V1 第 6 刀): Stock + Purchasing
+             collapsed into a single Inventory domain. The legacy
+             stock/purchasing routes still resolve via VIEW_ROUTES
+             aliases, but they're not in the visible menu anymore. -->
         <div class="sub-item" data-view="sales" id="navSales" onclick="setView('sales')" style="padding-left:12px">
           <span class="icon">📊</span><span data-i18n="nav-sales">Sales</span>
         </div>
-        <div class="sub-item" data-view="stock" id="navStock" onclick="setView('stock')" style="padding-left:12px">
-          <span class="icon">📦</span><span data-i18n="nav-stock">Stock</span>
-        </div>
-        <div class="sub-item" data-view="purchasing" id="navPurchasing" onclick="setView('purchasing')" style="padding-left:12px">
-          <span class="icon">🛒</span><span data-i18n="nav-purchasing">Purchasing</span>
+        <div class="sub-item" data-view="inventory" id="navInventory" onclick="setView('inventory')" style="padding-left:12px">
+          <span class="icon">📦</span><span data-i18n="nav-inventory">Inventory</span>
         </div>
         <div class="sub-item" data-view="customers" id="navCustomers" onclick="setView('customers')" style="padding-left:12px">
           <span class="icon">👥</span><span data-i18n="nav-customers">Customers</span>
@@ -944,6 +966,12 @@ footer.app-footer {
         <div class="sub-item" data-view="customer-churn" id="navChurn" onclick="setView('customer-churn')">churn</div>
         <div class="sub-item" data-view="cust-insights" id="navCustInsights" onclick="setView('cust-insights')">insights</div>
         <div class="sub-item" data-view="financial-depth" id="navFinDepth" onclick="setView('financial-depth')">finance</div>
+        <!-- V1 第6刀: Stock + Purchasing collapsed into Inventory.
+             These ids stay so legacy code/tests referring to them keep working;
+             clicking either routes to the new Inventory dashboard. -->
+        <div class="sub-item" data-view="stock" id="navStock" onclick="setView('inventory')">stock</div>
+        <div class="sub-item" data-view="purchasing" id="navPurchasing" onclick="setView('inventory')">purchasing</div>
+        <div class="sub-item" data-view="admin-sanity" id="navAdminSanity" onclick="setView('admin/sanity')">admin-sanity</div>
       </div>
     </nav>
 
@@ -971,31 +999,65 @@ footer.app-footer {
         </div>
         <div id="dsSalesAction"></div>
         <div class="drill-links" id="dsSalesDrills"></div>
+        <!-- V1 第6刀: Sales depth — 品类 / 80-20 / Top 20 / 价格带 / 四象限 -->
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-sales-cat-title">品类 — Sales by category</h2>
+          <p class="ds-section-sub" data-i18n="ds-sales-cat-sub">Top 10 product categories by 12-month sales (LTM amount, RM).</p>
+          <div id="dsSalesCatTable"></div>
+        </section>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-sales-pareto-title">80/20 帕累托 — Pareto curve</h2>
+          <p class="ds-section-sub" data-i18n="ds-sales-pareto-sub">How many SKUs produce 80% of sales? (the leaner, the more concentrated)</p>
+          <div id="dsSalesParetoSummary"></div>
+          <div class="chart-wrap"><div class="chart-title" id="dsSalesParetoTitle"></div>
+            <canvas id="dsSalesParetoChart" height="120" aria-label="Pareto cumulative curve"></canvas>
+          </div>
+        </section>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-sales-top20-title">Top 20 SKU — Best sellers</h2>
+          <p class="ds-section-sub" data-i18n="ds-sales-top20-sub">Top 20 SKUs by 12-month revenue. Protect the supply chain on these.</p>
+          <div id="dsSalesTop20Table"></div>
+        </section>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-sales-price-title">价格带 — Price-band distribution</h2>
+          <p class="ds-section-sub" data-i18n="ds-sales-price-sub">SKU count + LTM revenue across 5 unit-cost bands (RM).</p>
+          <div class="chart-wrap"><div class="chart-title" id="dsSalesPriceTitle"></div>
+            <canvas id="dsSalesPriceChart" height="120" aria-label="Price band distribution"></canvas>
+          </div>
+        </section>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-sales-quad-title">四象限 — Volume × Margin matrix</h2>
+          <p class="ds-section-sub" data-i18n="ds-sales-quad-sub">Brand GP% (Y-axis) × LTM sales (X-axis). Stars / Cash cows / Question marks / Dogs.</p>
+          <div class="chart-wrap"><div class="chart-title" id="dsSalesQuadTitle"></div>
+            <canvas id="dsSalesQuadChart" height="160" aria-label="Brand quadrant"></canvas>
+          </div>
+          <div id="dsSalesQuadLegend" class="ds-section-sub"></div>
+        </section>
       </div>
 
-      <!-- ── View: Stock (main domain dashboard) ───────────────── -->
-      <div class="view" id="view-stock">
-        <h1 class="page-title" data-i18n="ds-stock-title">Stock</h1>
-        <p class="page-sub" data-i18n="ds-stock-sub">Company-wide inventory · Active vs Slow vs Dead split · 5 stores at a glance.</p>
-        <div class="ds-cards" id="dsStockCards"></div>
-        <div class="chart-wrap"><div class="chart-title" id="dsStockChartTitle"></div>
-          <canvas id="dsStockChart" height="140" aria-label="Stock F-N-S split"></canvas>
+      <!-- ── View: Inventory (V1 第6刀: merges Stock + Purchasing) ── -->
+      <div class="view" id="view-inventory">
+        <h1 class="page-title" data-i18n="ds-inv-title">Inventory</h1>
+        <p class="page-sub" data-i18n="ds-inv-sub">总库存值 · 在途 PO · F-N-S 健康度 · 平均 lead time · all in one place.</p>
+        <div class="ds-cards" id="dsInvCards"></div>
+        <div class="chart-wrap"><div class="chart-title" id="dsInvChartTitle"></div>
+          <canvas id="dsInvChart" height="140" aria-label="F-N-S split"></canvas>
         </div>
-        <div id="dsStockAction"></div>
-        <div class="drill-links" id="dsStockDrills"></div>
+        <div id="dsInvAction"></div>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-inv-lead-title">Lead time — PO age & supplier discipline</h2>
+          <p class="ds-section-sub" data-i18n="ds-inv-lead-sub">Lead-time distribution from delayed POs (closed) + age buckets for in-transit POs (open).</p>
+          <div class="chart-wrap"><div class="chart-title" id="dsInvLeadTitle"></div>
+            <canvas id="dsInvLeadChart" height="120" aria-label="Lead-time distribution"></canvas>
+          </div>
+        </section>
+        <div class="drill-links" id="dsInvDrills"></div>
       </div>
 
-      <!-- ── View: Purchasing (main domain dashboard) ──────────── -->
-      <div class="view" id="view-purchasing">
-        <h1 class="page-title" data-i18n="ds-purch-title">Purchasing</h1>
-        <p class="page-sub" data-i18n="ds-purch-sub">Open POs · overdue receipts · lead-time discipline · drill-down to exception lists.</p>
-        <div class="ds-cards" id="dsPurchCards"></div>
-        <div class="chart-wrap"><div class="chart-title" id="dsPurchChartTitle"></div>
-          <canvas id="dsPurchChart" height="120" aria-label="PO age histogram"></canvas>
-        </div>
-        <div id="dsPurchAction"></div>
-        <div class="drill-links" id="dsPurchDrills"></div>
-      </div>
+      <!-- Legacy hidden anchor views (kept for back-compat with route resolution).
+           These never render content directly; the corresponding domain view does. -->
+      <div class="view" id="view-stock" style="display:none"><div class="ds-cards" id="dsStockCards"></div><div id="dsStockChartTitle"></div><canvas id="dsStockChart" style="display:none"></canvas><div id="dsStockAction"></div><div id="dsStockDrills"></div></div>
+      <div class="view" id="view-purchasing" style="display:none"><div class="ds-cards" id="dsPurchCards"></div><div id="dsPurchChartTitle"></div><canvas id="dsPurchChart" style="display:none"></canvas><div id="dsPurchAction"></div><div id="dsPurchDrills"></div></div>
 
       <!-- ── View: Customers (main domain dashboard) ───────────── -->
       <div class="view" id="view-customers">
@@ -1012,12 +1074,17 @@ footer.app-footer {
       <!-- ── View: Products (main domain dashboard) ────────────── -->
       <div class="view" id="view-products">
         <h1 class="page-title" data-i18n="ds-prod-title">Products</h1>
-        <p class="page-sub" data-i18n="ds-prod-sub">SKU coverage · brand GP ranking · F-N-S movement · drill-down coming.</p>
+        <p class="page-sub" data-i18n="ds-prod-sub">SKU 总数 · 品牌结构 · F-N-S movement · drill-down coming.</p>
         <div class="ds-cards" id="dsProdCards"></div>
         <div class="chart-wrap"><div class="chart-title" id="dsProdChartTitle"></div>
           <canvas id="dsProdChart" height="140" aria-label="Brand GP ranking"></canvas>
         </div>
         <div id="dsProdAction"></div>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="ds-prod-brand-title">品牌结构 — Brand portfolio</h2>
+          <p class="ds-section-sub" data-i18n="ds-prod-brand-sub">All brands ranked by LTM sales — the long tail of the catalog.</p>
+          <div id="dsProdBrandTable"></div>
+        </section>
         <div class="drill-links" id="dsProdDrills"></div>
       </div>
 
@@ -1280,6 +1347,19 @@ footer.app-footer {
         <div class="wh-list" id="whList"></div>
       </div>
 
+      <!-- ── View: Admin Sanity (V1 第6刀: hidden, accessed via /admin/sanity) ── -->
+      <div class="view" id="view-admin-sanity">
+        <h1 class="page-title">Admin · Data Sanity</h1>
+        <p class="page-sub">Logical-consistency checks across data sources. No fixed benchmarks — only cross-source contradictions are flagged.</p>
+        <div id="adminSanitySummary"></div>
+        <div class="ci-table-wrap">
+          <table class="ci-table" id="adminSanityTable"><thead><tr><th>#</th><th>Check</th><th>Source A</th><th>Source B</th><th>Status</th><th>Detail</th></tr></thead><tbody></tbody></table>
+        </div>
+        <p class="page-sub" style="margin-top:24px;font-size:11px;opacity:0.7">
+          Hidden from main menu — bookmark <code>/Wiltek_MASTER.html?view=admin/sanity</code> to access.
+        </p>
+      </div>
+
       <footer class="app-footer">
         <span data-i18n="footer">Wiltek Portal V1 cut 1 · Snapshot</span>
         <span class="num" id="footerSnapshot"></span>
@@ -1357,14 +1437,31 @@ const STR = {
     "nav-exit": "18-Month Exit",
     "nav-users": "User Management",
     "later": "V1 next cut",
-    /* 7-domain top-level menu (V1 第 5 刀) */
+    /* 6-domain top-level menu (V1 第 6 刀: Stock+Purchasing → Inventory) */
     "nav-sales": "Sales",
+    "nav-inventory": "Inventory",
     "nav-stock": "Stock",
     "nav-purchasing": "Purchasing",
     "nav-customers": "Customers",
     "nav-products": "Products",
     "nav-finance": "Finance",
     "nav-hr": "HR",
+    "ds-inv-title": "Inventory",
+    "ds-inv-sub":   "总库存值 · 在途 PO · F-N-S 健康度 · 平均 lead time · all in one place.",
+    "ds-inv-lead-title": "Lead time — PO age & supplier discipline",
+    "ds-inv-lead-sub":   "Lead-time distribution from delayed POs (closed) + age buckets for in-transit POs (open).",
+    "ds-sales-cat-title":    "品类 — Sales by category",
+    "ds-sales-cat-sub":      "Top 10 product categories by 12-month sales (LTM amount, RM).",
+    "ds-sales-pareto-title": "80/20 帕累托 — Pareto curve",
+    "ds-sales-pareto-sub":   "How many SKUs produce 80% of sales? (the leaner, the more concentrated)",
+    "ds-sales-top20-title":  "Top 20 SKU — Best sellers",
+    "ds-sales-top20-sub":    "Top 20 SKUs by 12-month revenue. Protect the supply chain on these.",
+    "ds-sales-price-title":  "价格带 — Price-band distribution",
+    "ds-sales-price-sub":    "SKU count + LTM revenue across 5 unit-cost bands (RM).",
+    "ds-sales-quad-title":   "四象限 — Volume × Margin matrix",
+    "ds-sales-quad-sub":     "Brand GP% (Y-axis) × LTM sales (X-axis). Stars / Cash cows / Question marks / Dogs.",
+    "ds-prod-brand-title":   "品牌结构 — Brand portfolio",
+    "ds-prod-brand-sub":     "All brands ranked by LTM sales — the long tail of the catalog.",
     /* Domain dashboard titles + sub-headlines */
     "ds-sales-title":  "Sales",
     "ds-sales-sub":    "5 active stores · today + period sales · drill-down to per-store hubs.",
@@ -1375,7 +1472,7 @@ const STR = {
     "ds-cust-title":   "Customers",
     "ds-cust-sub":     "Active members · age tier mix · lapsed list · drill-down to insights + RFM.",
     "ds-prod-title":   "Products",
-    "ds-prod-sub":     "SKU coverage · brand GP ranking · F-N-S movement · drill-down coming.",
+    "ds-prod-sub":     "SKU 总数 · 品牌结构 · F-N-S movement · drill-down coming.",
     "ds-fin-title":    "Finance",
     "ds-fin-sub":      "Sales collection · 7 cost categories · payroll discipline · drill-down to brand GP.",
     "ds-hr-title":     "HR",
@@ -1697,14 +1794,31 @@ const STR = {
     "nav-exit": "18 个月退出",
     "nav-users": "用户管理",
     "later": "V1 下一刀",
-    /* 7-domain top-level menu (V1 第 5 刀) */
+    /* 6-domain top-level menu (V1 第 6 刀: 库存 + 采购 → 库存) */
     "nav-sales": "销售",
+    "nav-inventory": "库存",
     "nav-stock": "库存",
     "nav-purchasing": "采购",
     "nav-customers": "顾客",
     "nav-products": "产品",
     "nav-finance": "财务",
     "nav-hr": "人事",
+    "ds-inv-title": "库存",
+    "ds-inv-sub":   "总库存值 · 在途 PO · F-N-S 健康度 · 平均 lead time · 一站式洞察。",
+    "ds-inv-lead-title": "Lead time — PO 龄段 + 供应商纪律",
+    "ds-inv-lead-sub":   "延迟 PO (已收) 的 lead-time 分布 + 在途 PO (未收) 的龄段。",
+    "ds-sales-cat-title":    "品类 — 按品类销售",
+    "ds-sales-cat-sub":      "Top 10 品类 · 12 个月销售估算 (RM)。",
+    "ds-sales-pareto-title": "80/20 帕累托",
+    "ds-sales-pareto-sub":   "几个 SKU 贡献 80% 销售?越窄越集中。",
+    "ds-sales-top20-title":  "Top 20 SKU — 销售冠军",
+    "ds-sales-top20-sub":    "12m 销售前 20 名 SKU — 优先保护供应链。",
+    "ds-sales-price-title":  "价格带 — 单价分布",
+    "ds-sales-price-sub":    "5 个单价区间的 SKU 数 + LTM 销售。",
+    "ds-sales-quad-title":   "四象限 — 销量 × 毛利",
+    "ds-sales-quad-sub":     "品牌 GP% × LTM 销售 — Stars / Cash cows / Question marks / Dogs。",
+    "ds-prod-brand-title":   "品牌结构 — 品牌组合",
+    "ds-prod-brand-sub":     "全部品牌按 LTM 销售排名 — 长尾结构。",
     /* Domain dashboard titles + sub-headlines */
     "ds-sales-title":  "销售",
     "ds-sales-sub":    "5 家活跃门市 · 今日 + 期间销售 · 下钻到分行枢纽。",
@@ -2090,6 +2204,9 @@ function enterApp() {
     initialView = url && VIEW_ROUTES[url] ? url : 'sales';
   }
   setView(initialView);
+
+  // V1 第6刀: run sanity checks once at app entry, paint the status light
+  try { if (typeof updateSanityLight === 'function') updateSanityLight(); } catch(_){}
 
   try { window.AuditLog && window.AuditLog.log('login_success', s.userId, 'role=' + s.role); } catch(_){}
 }
@@ -2512,23 +2629,32 @@ const BUCKET_OPEN = { A: true, B: false, C: false };
    menu items keep working.
 */
 const VIEW_ROUTES = {
-  // 7-domain top-level
+  // 6-domain top-level (V1 第6刀: Stock+Purchasing → Inventory)
   'sales':           'sales',
-  'stock':           'stock',
-  'purchasing':      'purchasing',
+  'inventory':       'inventory',
   'customers':       'customers',
   'products':        'products',
   'finance':         'finance',
   'hr':              'hr',
+  // Legacy aliases — old top-level keys now resolve to Inventory
+  'stock':           'inventory',
+  'purchasing':      'inventory',
   // Drill-down paths (slash-form) → leaf view + optional pre-filter
-  'sales/today':       { view: 'today' },
-  'stock/dead':        { view: 'deadstock', status: 'DEAD' },
-  'stock/transfer':    { view: 'transfers' },
-  'stock/warehouse':   { view: 'warehouse' },
-  'customers/lapsed':  { view: 'customer-churn' },
-  'customers/insights':{ view: 'cust-insights' },
+  'sales/today':         { view: 'today' },
+  'inventory/dead':      { view: 'deadstock', status: 'DEAD' },
+  'inventory/transfer':  { view: 'transfers' },
+  'inventory/warehouse': { view: 'warehouse' },
+  'inventory/po':        { view: 'po-exceptions' },
+  // Legacy slash-form aliases (for back-compat with bookmarks/tests)
+  'stock/dead':          { view: 'deadstock', status: 'DEAD' },
+  'stock/transfer':      { view: 'transfers' },
+  'stock/warehouse':     { view: 'warehouse' },
   'purchasing/exceptions': { view: 'po-exceptions' },
-  'finance/depth':     { view: 'financial-depth' },
+  'customers/lapsed':    { view: 'customer-churn' },
+  'customers/insights':  { view: 'cust-insights' },
+  'finance/depth':       { view: 'financial-depth' },
+  // Hidden admin route (V1 第6刀: data sanity panel)
+  'admin/sanity':        { view: 'admin-sanity' },
   // Existing flat views — preserved for back-compat
   'today':           'today',
   'deadstock':       'deadstock',
@@ -2538,8 +2664,9 @@ const VIEW_ROUTES = {
   'cust-insights':   'cust-insights',
   'po-exceptions':   'po-exceptions',
   'financial-depth': 'financial-depth',
+  'admin-sanity':    'admin-sanity',
 };
-const TOP_LEVEL_DOMAINS = ['sales','stock','purchasing','customers','products','finance','hr'];
+const TOP_LEVEL_DOMAINS = ['sales','inventory','customers','products','finance','hr'];
 
 function persistViewToUrl(v) {
   try {
@@ -2592,12 +2719,12 @@ function setView(v) {
   // Render whichever leaf is active. New 7-domain dashboards have their
   // own renderers; existing leaf views keep their renderers unchanged.
   if (leaf === 'sales')           renderSalesDashboard();
-  else if (leaf === 'stock')      renderStockDashboard();
-  else if (leaf === 'purchasing') renderPurchasingDashboard();
+  else if (leaf === 'inventory')  renderInventoryDashboard();
   else if (leaf === 'customers')  renderCustomersDashboard();
   else if (leaf === 'products')   renderProductsDashboard();
   else if (leaf === 'finance')    renderFinanceDashboard();
   else if (leaf === 'hr')         renderHrDashboard();
+  else if (leaf === 'admin-sanity') renderAdminSanity();
   else if (leaf === 'transfers')  renderTransfers();
   else if (leaf === 'warehouse')  renderWarehouse();
   else if (leaf === 'today')      renderToday();
@@ -2618,8 +2745,8 @@ function setView(v) {
 }
 
 function leafToParentDomain(leaf) {
-  if (leaf === 'deadstock' || leaf === 'transfers' || leaf === 'warehouse') return 'stock';
-  if (leaf === 'po-exceptions') return 'purchasing';
+  // V1 第6刀: Stock + Purchasing collapsed under Inventory
+  if (leaf === 'deadstock' || leaf === 'transfers' || leaf === 'warehouse' || leaf === 'po-exceptions') return 'inventory';
   if (leaf === 'customer-churn' || leaf === 'cust-insights') return 'customers';
   if (leaf === 'financial-depth') return 'finance';
   if (leaf === 'today') return 'sales';
@@ -3030,14 +3157,14 @@ function rerenderActiveView() {
   else if (CUR_VIEW === 'po-exceptions')  renderPoExceptions();
   else if (CUR_VIEW === 'cust-insights')  renderCustInsights();
   else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
-  // 7-domain main dashboards re-render on period change too
+  // 6-domain main dashboards re-render on period change too
   else if (CUR_VIEW === 'sales')      renderSalesDashboard();
-  else if (CUR_VIEW === 'stock')      renderStockDashboard();
-  else if (CUR_VIEW === 'purchasing') renderPurchasingDashboard();
+  else if (CUR_VIEW === 'inventory')  renderInventoryDashboard();
   else if (CUR_VIEW === 'customers')  renderCustomersDashboard();
   else if (CUR_VIEW === 'products')   renderProductsDashboard();
   else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
   else if (CUR_VIEW === 'hr')         renderHrDashboard();
+  else if (CUR_VIEW === 'admin-sanity') renderAdminSanity();
 }
 // Bootstrap default: URL > localStorage > 6m
 window.PERIOD = periodFromUrl()
@@ -3554,6 +3681,465 @@ function renderHrDashboard() {
   document.getElementById('dsHrDrills').innerHTML =
     drillTile('#', 'drill-soon', 'drill-soon-sub', '👷', true);
 }
+
+/* ── Inventory dashboard (V1 第6刀: merges Stock + Purchasing) ── */
+function renderInventoryDashboard() {
+  const ds  = window.WP_DEADSTOCK || {};
+  const m   = ds.meta   || {};
+  const totals = ds.totals || {};
+  const td  = window.WP_TODAY || {};
+  const po  = td.po_exceptions || {};
+  const sum = po.summary || {};
+  const overdueRows = po.overdue || [];
+  const delayedRows = po.delayed || [];
+
+  const companyTotal = m.company_total_stock || m.total_stock || 0;
+  const overdueAmt   = overdueRows.reduce((a, r) => a + (r.amount || 0), 0);
+  const inTransitN   = sum.n_overdue || overdueRows.length;
+
+  // F-N-S health = (DEAD + COMPANY_DEAD) / total stock
+  const deadAmt = ((totals.DEAD && totals.DEAD.amount) || 0) +
+                  ((totals.COMPANY_DEAD && totals.COMPANY_DEAD.amount) || 0);
+  const fivStoreTotal = m.total_stock || 1;
+  const fnsDeadPct = fivStoreTotal ? (deadAmt / fivStoreTotal * 100) : 0;
+
+  // Lead time avg from delayed PO `days` field (closed POs that arrived late)
+  let leadAvg = 0;
+  if (delayedRows.length) {
+    const sumDays = delayedRows.reduce((a, r) => a + (r.days || 0), 0);
+    leadAvg = sumDays / delayedRows.length;
+  }
+
+  document.getElementById('dsInvCards').innerHTML =
+    dsCard(LANG === 'zh' ? '总库存值' : 'Total inventory value',
+           'RM ' + fmtMoney(companyTotal),
+           (LANG === 'zh' ? '公司全部 · ' : 'company-wide · ') + fmt(m.company_rows_total || 0) + ' rows') +
+    dsCard(LANG === 'zh' ? '在途 PO' : 'In-transit POs',
+           fmt(inTransitN),
+           'RM ' + fmtMoney(overdueAmt) + (LANG === 'zh' ? ' 未到货' : ' open'),
+           inTransitN > 100 ? 'warn' : '') +
+    dsCard(LANG === 'zh' ? 'F-N-S 健康度' : 'F-N-S health',
+           (100 - fnsDeadPct).toFixed(1) + '%',
+           (LANG === 'zh' ? '呆滞占比 ' : 'dead share ') + fnsDeadPct.toFixed(1) + '%',
+           fnsDeadPct > 30 ? 'danger' : fnsDeadPct > 20 ? 'warn' : '') +
+    dsCard(LANG === 'zh' ? '平均 lead time' : 'Avg lead time',
+           leadAvg.toFixed(0) + (LANG === 'zh' ? ' 天' : ' days'),
+           (LANG === 'zh' ? '基于 ' : 'from ') + fmt(delayedRows.length) + (LANG === 'zh' ? ' 张延迟 PO' : ' delayed POs'),
+           leadAvg > 60 ? 'warn' : '');
+
+  // F-N-S donut chart
+  const labels = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k =>
+    LANG === 'zh' ? ({ACTIVE:'活跃',SLOW:'慢销',DEAD:'呆滞',MISPLACED:'错位',COMPANY_DEAD:'全公司无销'}[k]) : k);
+  const data   = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k => (totals[k] && totals[k].amount) || 0);
+  const colors = [BRAND_GREEN, BRAND_AMBER, BRAND_DANGER, '#7C8FA6', '#5C6770'];
+  document.getElementById('dsInvChartTitle').textContent =
+    LANG === 'zh' ? 'F-N-S 速度分布 (5 家活跃门市)' : 'F-N-S movement split (5 active stores)';
+  drawChart('dsInvChart', {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors }] },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } },
+  });
+
+  // Lead time histogram from delayed PO `days`
+  const ltBuckets = [0,0,0,0,0]; // 0-30 / 31-60 / 61-90 / 91-180 / 180+
+  delayedRows.forEach(r => {
+    const d = r.days || 0;
+    if (d <= 30) ltBuckets[0]++;
+    else if (d <= 60) ltBuckets[1]++;
+    else if (d <= 90) ltBuckets[2]++;
+    else if (d <= 180) ltBuckets[3]++;
+    else ltBuckets[4]++;
+  });
+  document.getElementById('dsInvLeadTitle').textContent =
+    LANG === 'zh' ? 'Lead time 分布 (延迟 PO · 天)' : 'Lead-time distribution (delayed POs · days)';
+  drawChart('dsInvLeadChart', {
+    type: 'bar',
+    data: { labels: ['0-30','31-60','61-90','91-180','180+'],
+            datasets: [{ data: ltBuckets, backgroundColor: [BRAND_GREEN_SOFT, BRAND_AMBER, BRAND_AMBER, BRAND_DANGER, BRAND_DANGER] }] },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+  });
+
+  // 👉 action — combine signals
+  const problemPct = m.problem_pct || 0;
+  let zh, en;
+  if (fnsDeadPct > 30) {
+    zh = `呆滞库存占 ${fnsDeadPct.toFixed(0)}% (5 家活跃门市)。先打开呆死货清单,本季释放 RM ${fmtMoney(deadAmt)}。`;
+    en = `Dead stock is ${fnsDeadPct.toFixed(0)}% of 5-store inventory — open the dead-stock list and release RM ${fmtMoney(deadAmt)} this quarter.`;
+  } else if (inTransitN > 100) {
+    zh = `${fmt(inTransitN)} 张 PO 在途未到 (RM ${fmtMoney(overdueAmt)}) — 打电话给 Top 10 供应商。`;
+    en = `${fmt(inTransitN)} POs in-transit (RM ${fmtMoney(overdueAmt)}) — start with the top 10 suppliers by amount.`;
+  } else if (problemPct > 25) {
+    zh = `问题库存占比 ${problemPct}% (目标 < 25%) — 错位调货 + 慢销清理是优先项。`;
+    en = `Problem inventory ${problemPct}% (target <25%) — misplaced transfer + slow-mover clearance are priorities.`;
+  } else {
+    zh = `库存健康,F-N-S 健康度 ${(100 - fnsDeadPct).toFixed(0)}%,在途 PO ${fmt(inTransitN)} 张。`;
+    en = `Inventory healthy — F-N-S health ${(100 - fnsDeadPct).toFixed(0)}%, ${fmt(inTransitN)} POs in transit.`;
+  }
+  document.getElementById('dsInvAction').innerHTML = actionBlock(zh, en);
+
+  document.getElementById('dsInvDrills').innerHTML =
+    drillTile('inventory/dead',      'drill-deadstock', 'drill-deadstock-sub', '📦') +
+    drillTile('inventory/transfer',  'drill-transfers', 'drill-transfers-sub', '🔁') +
+    drillTile('inventory/warehouse', 'drill-warehouse', 'drill-warehouse-sub', '🏪') +
+    drillTile('inventory/po',        'drill-po-exc',    'drill-po-exc-sub',    '🛒');
+}
+
+/* ── Sales depth: 品类 / 80-20 / Top 20 / 价格带 / 四象限 ──────── */
+function renderSalesDepth() {
+  const ds = window.WP_DEADSTOCK || {};
+  const fd = window.WP_FINANCIAL || {};
+  const rows = ds.rows || [];
+  const sku12m = ds.sku_total_12m || {};
+
+  /* 品类 — top 10 categories by 12m sales (proxy: sum of sku_total_12m × unit_cost
+     across rows in each category. We don't have direct revenue-per-category, so
+     we use unit_cost × 12m qty as a sales proxy.) */
+  const catAgg = {};
+  rows.forEach(r => {
+    const cat = (r.category || 'Uncategorised').trim() || 'Uncategorised';
+    const q   = (sku12m[r.code] || 0);
+    const rev = q * (r.unit_cost || 0);
+    if (!catAgg[cat]) catAgg[cat] = { sales: 0, qty: 0, skus: new Set() };
+    catAgg[cat].sales += rev;
+    catAgg[cat].qty   += q;
+    catAgg[cat].skus.add(r.code);
+  });
+  const topCats = Object.entries(catAgg)
+    .map(([k, v]) => ({ cat: k, sales: v.sales, qty: v.qty, skus: v.skus.size }))
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 10);
+  const totalCatSales = topCats.reduce((a, c) => a + c.sales, 0) || 1;
+  const catTbl = '<table class="ci-table"><thead><tr>' +
+    '<th>' + (LANG === 'zh' ? '品类' : 'Category') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'SKU 数' : 'SKUs') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '12m 销售估算 (RM)' : 'Est. 12m sales (RM)') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+    '</tr></thead><tbody>' +
+    topCats.map(c => '<tr>' +
+      '<td>' + escapeHtml(c.cat) + '</td>' +
+      '<td class="num">' + fmt(c.skus) + '</td>' +
+      '<td class="num">' + fmtMoney(Math.round(c.sales)) + '</td>' +
+      '<td class="num">' + (c.sales / totalCatSales * 100).toFixed(1) + '%</td>' +
+    '</tr>').join('') +
+    '</tbody></table>';
+  document.getElementById('dsSalesCatTable').innerHTML = '<div class="ci-table-wrap">' + catTbl + '</div>';
+
+  /* 80/20 帕累托 — rank SKUs by 12m revenue, find threshold for 80% */
+  const skuRev = rows.map(r => ({ code: r.code, rev: (sku12m[r.code] || 0) * (r.unit_cost || 0) }))
+    .filter(x => x.rev > 0)
+    .sort((a, b) => b.rev - a.rev);
+  const totalRev = skuRev.reduce((a, x) => a + x.rev, 0) || 1;
+  let cum = 0, eighty = 0;
+  for (let i = 0; i < skuRev.length; i++) {
+    cum += skuRev[i].rev;
+    if (cum / totalRev >= 0.8) { eighty = i + 1; break; }
+  }
+  const eightyPct = skuRev.length ? (eighty / skuRev.length * 100) : 0;
+  document.getElementById('dsSalesParetoSummary').innerHTML =
+    '<div class="action-block"><span class="action-arrow">👉</span><span>' +
+    (LANG === 'zh'
+      ? `<strong>${fmt(eighty)} / ${fmt(skuRev.length)}</strong> SKU (${eightyPct.toFixed(1)}%) 贡献 80% 销售。供应链先保护这批。`
+      : `<strong>${fmt(eighty)} / ${fmt(skuRev.length)}</strong> SKUs (${eightyPct.toFixed(1)}%) generate 80% of revenue. Protect supply on these first.`) +
+    '</span></div>';
+  // Cumulative curve chart
+  const step = Math.max(1, Math.floor(skuRev.length / 50));
+  const labels = [], dataPct = [];
+  let running = 0;
+  for (let i = 0; i < skuRev.length; i += step) {
+    running += skuRev.slice(i, i + step).reduce((a, x) => a + x.rev, 0);
+    labels.push(i + step);
+    dataPct.push(running / totalRev * 100);
+  }
+  document.getElementById('dsSalesParetoTitle').textContent =
+    LANG === 'zh' ? 'Pareto 累积曲线' : 'Pareto cumulative curve';
+  drawChart('dsSalesParetoChart', {
+    type: 'line',
+    data: { labels, datasets: [{ data: dataPct, borderColor: BRAND_GREEN, fill: false, tension: 0.1, pointRadius: 0 }] },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { title: { display: true, text: LANG === 'zh' ? 'SKU 排名' : 'SKU rank' } },
+                y: { beginAtZero: true, max: 100, title: { display: true, text: '%' } } } },
+  });
+
+  /* Top 20 SKU */
+  const top20 = skuRev.slice(0, 20);
+  const codeMap = {};
+  rows.forEach(r => { if (!codeMap[r.code]) codeMap[r.code] = r; });
+  const top20Tbl = '<table class="ci-table"><thead><tr>' +
+    '<th>#</th>' +
+    '<th>' + (LANG === 'zh' ? 'SKU' : 'SKU') + '</th>' +
+    '<th>' + (LANG === 'zh' ? '描述' : 'Description') + '</th>' +
+    '<th>' + (LANG === 'zh' ? '品类' : 'Category') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '12m 销售 (RM)' : '12m sales (RM)') + '</th>' +
+    '</tr></thead><tbody>' +
+    top20.map((s, i) => {
+      const r = codeMap[s.code] || {};
+      return '<tr><td>' + (i + 1) + '</td>' +
+        '<td>' + escapeHtml(s.code) + '</td>' +
+        '<td>' + escapeHtml((r.desc || '').slice(0, 60)) + '</td>' +
+        '<td>' + escapeHtml((r.category || '—').slice(0, 30)) + '</td>' +
+        '<td class="num">' + fmtMoney(Math.round(s.rev)) + '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>';
+  document.getElementById('dsSalesTop20Table').innerHTML = '<div class="ci-table-wrap">' + top20Tbl + '</div>';
+
+  /* 价格带 — distribution by unit_cost band */
+  const bands = [
+    { label: '<RM50',     min: 0,    max: 50,    n: 0, rev: 0 },
+    { label: 'RM50-150',  min: 50,   max: 150,   n: 0, rev: 0 },
+    { label: 'RM150-500', min: 150,  max: 500,   n: 0, rev: 0 },
+    { label: 'RM500-1k',  min: 500,  max: 1000,  n: 0, rev: 0 },
+    { label: 'RM1k+',     min: 1000, max: 1e9,   n: 0, rev: 0 },
+  ];
+  rows.forEach(r => {
+    const uc = r.unit_cost || 0;
+    const rev = (sku12m[r.code] || 0) * uc;
+    for (const b of bands) {
+      if (uc >= b.min && uc < b.max) { b.n++; b.rev += rev; break; }
+    }
+  });
+  document.getElementById('dsSalesPriceTitle').textContent =
+    LANG === 'zh' ? '价格带 — SKU 数 + 12m 销售估算' : 'Price bands — SKU count + 12m sales';
+  drawChart('dsSalesPriceChart', {
+    type: 'bar',
+    data: { labels: bands.map(b => b.label),
+      datasets: [
+        { label: LANG === 'zh' ? 'SKU 数' : 'SKUs', data: bands.map(b => b.n), backgroundColor: BRAND_GREEN_SOFT, yAxisID: 'y' },
+        { label: LANG === 'zh' ? '12m 销售 (RM)' : '12m sales (RM)', data: bands.map(b => Math.round(b.rev)), backgroundColor: BRAND_GREEN, yAxisID: 'y1' },
+      ] },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      scales: {
+        y:  { beginAtZero: true, position: 'left' },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } },
+      } },
+  });
+
+  /* 四象限 — Brand quadrant: GP% (Y) × LTM sales (X) */
+  const brands = (fd.brands || []).filter(b => b.ltm_sales > 0);
+  const xMid = brands.length ? brands.map(b => b.ltm_sales).sort((a, b) => a - b)[Math.floor(brands.length / 2)] : 0;
+  const yMid = 25; // GP% midline
+  document.getElementById('dsSalesQuadTitle').textContent =
+    LANG === 'zh' ? `Brand 四象限 (中线: GP=${yMid}%, 销售=RM ${fmtMoney(Math.round(xMid))})` : `Brand quadrant (midlines: GP=${yMid}%, sales=RM ${fmtMoney(Math.round(xMid))})`;
+  drawChart('dsSalesQuadChart', {
+    type: 'scatter',
+    data: { datasets: [{
+      label: LANG === 'zh' ? '品牌' : 'Brand',
+      data: brands.map(b => ({ x: b.ltm_sales, y: b.gp_pct, label: b.brand })),
+      backgroundColor: brands.map(b =>
+        (b.gp_pct >= yMid && b.ltm_sales >= xMid) ? BRAND_GREEN :  // ⭐ Star
+        (b.gp_pct >= yMid && b.ltm_sales <  xMid) ? BRAND_AMBER : // ❓ Question
+        (b.gp_pct <  yMid && b.ltm_sales >= xMid) ? '#7C8FA6' :   // 🐮 Cash cow
+        BRAND_DANGER                                              // 🐶 Dog
+      ),
+      pointRadius: 6,
+    }] },
+    options: { maintainAspectRatio: false, responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const d = ctx.raw;
+          return `${d.label}: RM ${fmtMoney(Math.round(d.x))} · GP ${d.y}%`;
+        } } },
+      },
+      scales: {
+        x: { title: { display: true, text: LANG === 'zh' ? 'LTM 销售 (RM)' : 'LTM sales (RM)' }, beginAtZero: true },
+        y: { title: { display: true, text: 'GP %' }, beginAtZero: true },
+      } },
+  });
+  // Quadrant counts for legend
+  const q = { star: 0, cow: 0, q: 0, dog: 0 };
+  brands.forEach(b => {
+    if (b.gp_pct >= yMid && b.ltm_sales >= xMid) q.star++;
+    else if (b.gp_pct >= yMid) q.q++;
+    else if (b.ltm_sales >= xMid) q.cow++;
+    else q.dog++;
+  });
+  document.getElementById('dsSalesQuadLegend').innerHTML = LANG === 'zh'
+    ? `⭐ Stars (高销·高利): ${q.star} · 🐮 Cash cows (高销·低利): ${q.cow} · ❓ Question marks (低销·高利): ${q.q} · 🐶 Dogs (低销·低利): ${q.dog}`
+    : `⭐ Stars: ${q.star} · 🐮 Cash cows: ${q.cow} · ❓ Question marks: ${q.q} · 🐶 Dogs: ${q.dog}`;
+}
+// Wrap original Sales render to also paint depth sections
+const _origRenderSales = renderSalesDashboard;
+renderSalesDashboard = function() {
+  _origRenderSales();
+  try { renderSalesDepth(); } catch (e) { console.warn('Sales depth render failed:', e); }
+};
+
+/* ── Products depth: 品牌结构 (full brand portfolio) ──────────── */
+function renderProductsDepth() {
+  const fd = window.WP_FINANCIAL || {};
+  const brands = (fd.brands || []).slice().sort((a, b) => (b.ltm_sales || 0) - (a.ltm_sales || 0));
+  const totalSales = brands.reduce((a, b) => a + (b.ltm_sales || 0), 0) || 1;
+  const tbl = '<table class="ci-table"><thead><tr>' +
+    '<th>#</th>' +
+    '<th>' + (LANG === 'zh' ? '品牌' : 'Brand') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'LTM 销售 (RM)' : 'LTM sales (RM)') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+    '<th class="num">GP %</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '数量' : 'Qty') + '</th>' +
+    '</tr></thead><tbody>' +
+    brands.map((b, i) => '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + escapeHtml(b.brand || '—') + '</td>' +
+      '<td class="num">' + fmtMoney(b.ltm_sales || 0) + '</td>' +
+      '<td class="num">' + ((b.ltm_sales || 0) / totalSales * 100).toFixed(1) + '%</td>' +
+      '<td class="num">' + (b.gp_pct || 0).toFixed(1) + '%</td>' +
+      '<td class="num">' + fmt(b.qty || 0) + '</td>' +
+    '</tr>').join('') +
+    '</tbody></table>';
+  document.getElementById('dsProdBrandTable').innerHTML = '<div class="ci-table-wrap">' + tbl + '</div>';
+}
+const _origRenderProducts = renderProductsDashboard;
+renderProductsDashboard = function() {
+  _origRenderProducts();
+  try { renderProductsDepth(); } catch (e) { console.warn('Products depth render failed:', e); }
+};
+
+/* ── Sanity check engine (V1 第6刀 E1) ──────────────────────────
+   Logical-consistency checks across data sources. NOT benchmarks —
+   we don't decide what the numbers "should" be; we only flag
+   contradictions between two sources or counts that don't add up. */
+function runSanityChecks() {
+  const ds = window.WP_DEADSTOCK || {};
+  const td = window.WP_TODAY || {};
+  const cd = window.WP_CUSTOMERS || {};
+  const fd = window.WP_FINANCIAL || {};
+  const checks = [];
+
+  // 1. DEAD totals.amount sum equals by-branch DEAD sum (5 stores)
+  const totDead = (ds.totals && ds.totals.DEAD && ds.totals.DEAD.amount) || 0;
+  const sumDead = Object.values(ds.by_branch || {}).reduce((a, b) => a + (b.DEAD || 0), 0);
+  checks.push({
+    check: 'DEAD totals = sum of 5 active branches',
+    a: 'totals.DEAD.amount = ' + fmtMoney(Math.round(totDead)),
+    b: 'sum(by_branch[*].DEAD) = ' + fmtMoney(Math.round(sumDead)),
+    pass: Math.abs(totDead - sumDead) < 1,
+    detail: 'diff = ' + fmtMoney(Math.round(Math.abs(totDead - sumDead))),
+  });
+
+  // 2. company_total_stock >= 5-store total (warehouses must have ≥ 0)
+  const company = (ds.meta && ds.meta.company_total_stock) || 0;
+  const fiveStore = (ds.meta && ds.meta.total_stock) || 0;
+  checks.push({
+    check: 'Company total ≥ 5-store total',
+    a: 'meta.company_total_stock = RM ' + fmtMoney(Math.round(company)),
+    b: 'meta.total_stock (5 stores) = RM ' + fmtMoney(Math.round(fiveStore)),
+    pass: company >= fiveStore,
+    detail: 'warehouse contribution = RM ' + fmtMoney(Math.round(company - fiveStore)),
+  });
+
+  // 3. PO overdue array length must not exceed summary total (truncation OK, surplus = contradiction)
+  const sN = (td.po_exceptions && td.po_exceptions.summary && td.po_exceptions.summary.n_overdue) || 0;
+  const aN = (td.po_exceptions && td.po_exceptions.overdue && td.po_exceptions.overdue.length) || 0;
+  checks.push({
+    check: 'PO overdue array ≤ summary total',
+    a: 'summary.n_overdue = ' + fmt(sN),
+    b: 'overdue[].length = ' + fmt(aN),
+    pass: aN <= sN,
+    detail: aN < sN ? 'array truncated to top ' + fmt(aN) + ' of ' + fmt(sN) : 'exact match',
+  });
+
+  // 4. PO delayed array length must not exceed summary total (truncation OK, surplus = contradiction)
+  const sD = (td.po_exceptions && td.po_exceptions.summary && td.po_exceptions.summary.n_delayed) || 0;
+  const aD = (td.po_exceptions && td.po_exceptions.delayed && td.po_exceptions.delayed.length) || 0;
+  checks.push({
+    check: 'PO delayed array ≤ summary total',
+    a: 'summary.n_delayed = ' + fmt(sD),
+    b: 'delayed[].length = ' + fmt(aD),
+    pass: aD <= sD,
+    detail: aD < sD ? 'array truncated to top ' + fmt(aD) + ' of ' + fmt(sD) : 'exact match',
+  });
+
+  // 5. Customers: summary.members ≈ all[].length
+  const summaryMembers = (cd.summary && (cd.summary.total_members || cd.summary.members)) || 0;
+  const allLen = (cd.all && cd.all.length) || 0;
+  checks.push({
+    check: 'Customer summary.members ≈ all[].length',
+    a: 'summary total = ' + fmt(summaryMembers),
+    b: 'all[].length = ' + fmt(allLen),
+    pass: summaryMembers === 0 || allLen === 0 || Math.abs(summaryMembers - allLen) / Math.max(summaryMembers, allLen) < 0.05,
+    detail: 'diff = ' + fmt(Math.abs(summaryMembers - allLen)),
+  });
+
+  // 6. Financial: net = sales_collection − total_expenses
+  const h = fd.headline || {};
+  const expectNet = (h.sales_collection || 0) - (h.total_expenses || 0);
+  checks.push({
+    check: 'Financial net = sales − expenses',
+    a: 'headline.net = RM ' + fmtMoney(Math.round(h.net || 0)),
+    b: 'computed = RM ' + fmtMoney(Math.round(expectNet)),
+    pass: Math.abs((h.net || 0) - expectNet) < 100,
+    detail: 'diff = RM ' + fmtMoney(Math.round(Math.abs((h.net || 0) - expectNet))),
+  });
+
+  // 7. DEAD rows count consistency (totals.DEAD.rows ≈ rows[cls=DEAD].length)
+  const totDeadRows = (ds.totals && ds.totals.DEAD && ds.totals.DEAD.rows) || 0;
+  const rowsDead = (ds.rows || []).filter(r => r.cls === 'DEAD').length;
+  checks.push({
+    check: 'DEAD row count consistency',
+    a: 'totals.DEAD.rows = ' + fmt(totDeadRows),
+    b: 'rows[cls=DEAD].length = ' + fmt(rowsDead),
+    pass: totDeadRows === rowsDead,
+    detail: 'diff = ' + fmt(Math.abs(totDeadRows - rowsDead)),
+  });
+
+  // 8. Brand count: financial.brands array ≤ brand_count
+  const brandsLen = (fd.brands && fd.brands.length) || 0;
+  const brandCount = fd.brand_count || 0;
+  checks.push({
+    check: 'Brand list ≤ brand_count',
+    a: 'brands[].length = ' + fmt(brandsLen),
+    b: 'brand_count = ' + fmt(brandCount),
+    pass: brandsLen <= brandCount,
+    detail: brandsLen + ' shown of ' + brandCount,
+  });
+
+  return checks;
+}
+window.runSanityChecks = runSanityChecks;
+
+function updateSanityLight() {
+  try {
+    const checks = runSanityChecks();
+    const fails = checks.filter(c => !c.pass);
+    const light = document.getElementById('dataSanityLight');
+    if (!light) return;
+    if (fails.length === 0)      light.textContent = '🟢';
+    else if (fails.length <= 1)  light.textContent = '🟡';
+    else                          light.textContent = '🔴';
+    light.title = fails.length
+      ? fails.length + ' sanity check(s) failed — click for details'
+      : 'All sanity checks pass';
+  } catch (_) {}
+}
+window.updateSanityLight = updateSanityLight;
+
+function renderAdminSanity() {
+  const checks = runSanityChecks();
+  const fails = checks.filter(c => !c.pass).length;
+  const summary = document.getElementById('adminSanitySummary');
+  summary.innerHTML = '<div class="action-block"><span class="action-arrow">' +
+    (fails === 0 ? '🟢' : fails <= 1 ? '🟡' : '🔴') + '</span><span><strong>' +
+    (checks.length - fails) + ' / ' + checks.length + '</strong> checks pass. ' +
+    (fails === 0 ? 'No cross-source contradictions detected.' : fails + ' need attention.') +
+    '</span></div>';
+  const tbody = document.querySelector('#adminSanityTable tbody');
+  tbody.innerHTML = checks.map((c, i) =>
+    '<tr class="sanity-row ' + (c.pass ? 'pass' : 'fail') + '">' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + escapeHtml(c.check) + '</td>' +
+      '<td>' + escapeHtml(c.a) + '</td>' +
+      '<td>' + escapeHtml(c.b) + '</td>' +
+      '<td class="status">' + (c.pass ? 'PASS' : 'FAIL') + '</td>' +
+      '<td>' + escapeHtml(c.detail) + '</td>' +
+    '</tr>').join('');
+}
+window.renderAdminSanity = renderAdminSanity;
 
 /* ── Candidate generation: collect signals across 4 dimensions ─── */
 function collectTodayCandidates() {

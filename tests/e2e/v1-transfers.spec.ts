@@ -93,18 +93,20 @@ test.describe('Round 1 — Transfer engine accuracy', () => {
 });
 
 test.describe('Round 2 — Functional', () => {
-  test('owner sees Stock domain menu item (parent of dead/transfers/warehouse drill-downs)', async ({ page }) => {
-    // V1 第 5 刀: deadstock / transfers / warehouse are drill-downs of the
-    // Stock domain. The visible menu shows the 7 domains; the legacy
-    // sub-anchors are kept in DOM for back-compat but hidden.
+  test('owner sees Inventory domain menu item (parent of dead/transfers/warehouse/po drill-downs)', async ({ page }) => {
+    // V1 第 6 刀: Stock + Purchasing collapsed into Inventory. Legacy
+    // 'stock/transfer' and 'purchasing/exceptions' paths still resolve.
     await loginOwner(page);
-    await expect(page.locator('#navStock')).toBeVisible();
-    // Hidden legacy anchors still resolve via setView (drill-down paths).
-    const stockDrillResolves = await page.evaluate(() => {
+    await expect(page.locator('#navInventory')).toBeVisible();
+    // Both new and legacy drill-down paths still resolve via setView.
+    const drillResolves = await page.evaluate(() => {
+      (window as any).setView('inventory/transfer');
+      const newPath = document.querySelector('#view-transfers.on') !== null;
       (window as any).setView('stock/transfer');
-      return document.querySelector('#view-transfers.on') !== null;
+      const legacyPath = document.querySelector('#view-transfers.on') !== null;
+      return newPath && legacyPath;
     });
-    expect(stockDrillResolves).toBe(true);
+    expect(drillResolves).toBe(true);
   });
 
   test('navigating to transfers shows 4-column kanban with summary', async ({ page }) => {
