@@ -3431,13 +3431,23 @@ function setSnapshot(ym, opts) {
   // Reflect in picker
   const sel = document.getElementById('monthPicker');
   if (sel) sel.value = ym;
-  // Update dynamic Snapshot label immediately (refresh will repaint with live data)
+  // Update dynamic Snapshot label immediately
   try { updateDataDateLabel(); } catch(_) {}
   try { updateFooterSnapshot(); } catch(_) {}
-  // Re-fetch live endpoints scoped to picked month, then repaint.
-  if (!(opts && opts.skipRefresh)) {
+  // V1 第三刀 (2026-05-06 night): NO RE-FETCH on month change.
+  // All months are pre-loaded into WP_SALES_LIVE.sales_by_branch_month +
+  // WP_CUSTOMERS.summary_by_month on first entry; switching the snapshot
+  // is a pure-frontend re-render from cache. Refresh button is the only
+  // path that hits the network. Acceptance: <100ms switch, no spinner.
+  // Customer dashboard's per-snapshot windows still depend on a server
+  // recompute (raw-row scan), so opts.refetch=true still works for
+  // power-users who want fresh customer windows on snapshot change.
+  if (opts && opts.refetch) {
     if (typeof refreshLiveData === 'function') refreshLiveData({ silent: true });
+    return;
   }
+  // Pure cache-driven re-render
+  try { rerenderActiveView(); } catch(_) {}
 }
 window.setSnapshot = setSnapshot;
 // Bootstrap default: URL > localStorage > <empty until first /api/customers reply>
@@ -3572,47 +3582,73 @@ function drillTile(viewKey, labelKey, subKey, icon, disabled) {
 }
 
 /* ── Sales dashboard ───────────────────────────────────────────────
-   V1 第二刀 验收 fix (2026-05-06): SINGLE-MONTH ISOLATION.
-   Source-of-truth: WP_CUSTOMERS.sales_by_branch_month[BR][SNAPSHOT].
-   Mandate from Jym: "选月份就显示那个月,不要任何聪明逻辑。"
-   - DELETED Today's-sales estimate (was last_3m / 90)
-   - DELETED Period-sales card with MoM% (was last_3m vs prev_3m)
-   - DELETED "last 3-month" chart
-   - DELETED drop_pct urgency action text
-   Cards now: 该月销售总额 / Top branch (该月) / Lowest branch (该月).
-   Chart: one bar per active branch, value = sales_by_branch_month[BR][SNAPSHOT].
-   Switching month = different numbers (acceptance: 3/4/5 月数字 must differ). */
+   V1 第三刀 (2026-05-06 night): SOURCE-OF-TRUTH FIX.
+   Now reads WP_SALES_LIVE.sales_by_branch_month — derived from the Sales
+   workbook's "Raw sale" tab (every till transaction, not just members).
+   Previously used WP_CUSTOMERS.sales_by_branch_month which is the
+   members-only subset and undercounted by ~4-7× per branch.
+   Self-test (2026-03):
+     CustomerBuy → W01 RM 33k   (WRONG — members only)
+     Raw sale    → W01 RM 55k   ✓ matches Sheet
+     Raw sale total all branches → RM 372,608.31  ✓ matches status bar
+
+   V1 第二刀 verbatim mandate: "选月份就显示那个月,不要任何聪明逻辑。"
+   Cards: 该月销售总额 (ALL branches incl. W11/WCO so it matches the Sheet
+          status bar Jym uses for verification) / Top retail branch /
+          Lowest retail branch.
+   Chart: 5 active retail branches only.
+   No rolling logic. */
 function renderSalesDashboard() {
+  // Primary: Raw sale aggregate (all transactions). Fallback: CustomerBuy.
+  const sl = window.WP_SALES_LIVE || {};
   const cd = window.WP_CUSTOMERS || {};
-  const sbm = cd.sales_by_branch_month || {};
+  const sbm = (sl._raw_ok && sl.sales_by_branch_month)
+    || sl.sales_by_branch_month
+    || cd.sales_by_branch_month
+    || {};
   const snap = window.SNAPSHOT || (cd.meta && cd.meta.snapshot) || '';
   const ACTIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
-  // V1 第7刀: branch-scope filter — when in Branch Manager view, only that branch
-  const branches = (isBranchScoped()
+  // V1 第7刀: branch-scope filter — when in Branch Manager view, only that branch.
+  const chartBranches = (isBranchScoped()
     ? (ACTIVE.includes(BRANCH_VIEW) ? [BRANCH_VIEW] : [])
     : ACTIVE
-  ).filter(b => sbm[b]);  // hide branches with zero data for this snapshot
+  ).filter(b => sbm[b]);
 
-  // Per-branch sale for the SELECTED snapshot month — no rolling, no estimate.
+  // Per-branch sale for the SELECTED snapshot month
   const monthSales = {};
-  branches.forEach(b => { monthSales[b] = (sbm[b] && sbm[b][snap]) || 0; });
+  chartBranches.forEach(b => { monthSales[b] = (sbm[b] && sbm[b][snap]) || 0; });
 
-  let monthTotal = 0, best = null, worst = null;
-  branches.forEach(b => {
+  // ALL-branch total for the "Month sales" card (Jym verifies against Sheet
+  // status bar which sums every branch). When branch-scoped, scope to that.
+  let monthTotalAll = 0;
+  if (isBranchScoped()) {
+    monthTotalAll = (sbm[BRANCH_VIEW] && sbm[BRANCH_VIEW][snap]) || 0;
+  } else {
+    for (const b of Object.keys(sbm)) {
+      monthTotalAll += (sbm[b] && sbm[b][snap]) || 0;
+    }
+  }
+
+  // Top/Lowest within active retail set
+  let best = null, worst = null;
+  chartBranches.forEach(b => {
     const v = monthSales[b];
-    monthTotal += v;
     if (best  === null || v > monthSales[best])  best  = b;
     if (worst === null || v < monthSales[worst]) worst = b;
   });
 
   const monthLabel = snap || '—';
+  const subText = isBranchScoped()
+    ? (LANG === 'zh' ? snap + ' · ' + BRANCH_VIEW + ' 分行' : snap + ' · ' + BRANCH_VIEW)
+    : (LANG === 'zh' ? snap + ' · 全部分行' : snap + ' · all branches');
   document.getElementById('dsSalesCards').innerHTML =
-    dsCard(t('ds-sales-month'), 'RM ' + fmtMoney(monthTotal),
-           (LANG === 'zh' ? snap + ' · ' + branches.length + ' 家分行' : snap + ' · ' + branches.length + ' branches')) +
+    dsCard(t('ds-sales-month'), 'RM ' + fmtMoney(monthTotalAll), subText) +
     dsCard(t('ds-sales-best'),  best  || '—',
            best  ? 'RM ' + fmtMoney(monthSales[best])  + ' · ' + monthLabel : '') +
     dsCard(t('ds-sales-worst'), worst || '—',
            worst ? 'RM ' + fmtMoney(monthSales[worst]) + ' · ' + monthLabel : '');
+  // For backwards compat with the old chart code below, alias `branches`.
+  const branches = chartBranches;
 
   // Chart: per-branch sales for SNAPSHOT month only.
   const labels = branches;
@@ -3808,11 +3844,24 @@ function renderCustomersDashboard() {
       .sort((a, b) => (a.key < b.key ? -1 : 1));
     winSum = { total_members: totalMembers, n_active: activeInWin };
   } else {
-    // Buckets schema: [{ key: '<1y'|'1-5y'|'5-8y'|'8y+', n, amt, ... }]
-    buckets = (cd.buckets_by_window && cd.buckets_by_window[win]) || [];
-    winSum = (cd.summary_by_window && cd.summary_by_window[win]) || cd.summary || {};
-    totalMembers = (cd.summary && cd.summary.total_members) || winSum.total_members || 0;
-    activeInWin = winSum.n_active || 0;
+    // V1 第三刀: prefer per-month cache (instant snapshot switch, no refetch).
+    // Falls back to per-window snapshot-relative aggregates from older payloads.
+    const snap = window.SNAPSHOT;
+    const monthSum = snap && cd.summary_by_month && cd.summary_by_month[snap];
+    const monthBuckets = snap && cd.buckets_by_month && cd.buckets_by_month[snap];
+    if (monthSum && monthBuckets) {
+      // Cache hit — snapshot-month numbers from precomputed map.
+      buckets = monthBuckets;
+      winSum = monthSum;
+      totalMembers = monthSum.total_members || 0;
+      activeInWin = monthSum.n_active || 0;
+    } else {
+      // Buckets schema: [{ key: '<1y'|'1-5y'|'5-8y'|'8y+', n, amt, ... }]
+      buckets = (cd.buckets_by_window && cd.buckets_by_window[win]) || [];
+      winSum = (cd.summary_by_window && cd.summary_by_window[win]) || cd.summary || {};
+      totalMembers = (cd.summary && cd.summary.total_members) || winSum.total_members || 0;
+      activeInWin = winSum.n_active || 0;
+    }
   }
 
   // 5y+ veteran share — sum members where the key starts with a digit ≥ 5
@@ -4656,7 +4705,9 @@ async function fetchCustomersLive(ts) {
       meta: { ...(window.WP_CUSTOMERS.meta||{}), generated: j.fetched_at, snapshot: j.snapshot, _live: true },
       summary: j.summary,
       summary_by_window: j.summary_by_window,
+      summary_by_month: j.summary_by_month || {},
       buckets_by_window: j.buckets_by_window,
+      buckets_by_month: j.buckets_by_month || {},
       cross_by_window: j.cross_by_window,
       sales_by_branch_month: j.sales_by_branch_month || {},
       top100: j.top100,

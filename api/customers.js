@@ -347,10 +347,71 @@ function buildPayload(rows, snapshotYm) {
     });
   }
 
+  // V1 第三刀 (2026-05-06 night): per-month aggregates for instant
+  // client-side snapshot switching. Each value is the SINGLE-MONTH
+  // (1m window) summary for that YM. Frontend reads
+  // summary_by_month[SNAPSHOT] on month-pick — no server round-trip.
+  const summary_by_month = {};
+  const buckets_by_month = {};
+  // Group rows by YM for fast per-month rebuild
+  const rows_by_ym = {};
+  for (const r of rows) {
+    const ym = ymStr(r.ym);
+    if (!rows_by_ym[ym]) rows_by_ym[ym] = [];
+    rows_by_ym[ym].push(r);
+  }
+  for (const ym of Object.keys(rows_by_ym)) {
+    const ymRows = rows_by_ym[ym];
+    let amt = 0;
+    const bills = new Set();
+    const members = new Set();
+    const bagg = {};
+    for (const b of BUCKETS) bagg[b] = { n: 0, amt: 0, members: new Set() };
+    for (const r of ymRows) {
+      amt += r.amt;
+      if (r.bill) bills.add(r.bill);
+      if (r.mc) members.add(r.mc);
+      // Bucket: requires age which is in mem.get(r.mc).enrol — use ci_rows lookup
+    }
+    // Cross-link bucket aggregates by member age
+    const ciByMc = new Map(ci_rows.map(c => [c.mc, c]));
+    for (const r of ymRows) {
+      const ci = ciByMc.get(String(r.mc));
+      if (!ci) continue;
+      const cell = bagg[ci.age_bucket];
+      if (!cell) continue;
+      cell.amt += r.amt;
+      cell.members.add(r.mc);
+    }
+    for (const b of BUCKETS) {
+      bagg[b].n = bagg[b].members.size;
+      bagg[b].amt = Math.round(bagg[b].amt);
+      delete bagg[b].members;
+    }
+    summary_by_month[ym] = {
+      total_members: ci_rows.length,    // membership universe — stable across months
+      n_active: members.size,            // members who transacted in THIS month
+      n_bills: bills.size,
+      amt_total: Math.round(amt),
+      n_lt1: bagg['<1y'].n, n_1_5: bagg['1-5y'].n, n_5_8: bagg['5-8y'].n, n_8plus: bagg['8y+'].n,
+      amt_lt1: bagg['<1y'].amt, amt_1_5: bagg['1-5y'].amt, amt_5_8: bagg['5-8y'].amt, amt_8plus: bagg['8y+'].amt,
+      pct_5plus_n: members.size ? Math.round(1000 * (bagg['5-8y'].n + bagg['8y+'].n) / members.size) / 10 : 0,
+      pct_5plus_amt: amt ? Math.round(1000 * (bagg['5-8y'].amt + bagg['8y+'].amt) / amt) / 10 : 0,
+      snapshot: ym,
+    };
+    buckets_by_month[ym] = BUCKETS.map(b => ({
+      key: b, n: bagg[b].n, amt: bagg[b].amt,
+      aov: bagg[b].n ? Math.round(bagg[b].amt / bagg[b].n) : 0,
+      repeat_pct: 0, n_active: bagg[b].n,
+    }));
+  }
+
   return {
     summary,
     summary_by_window,
+    summary_by_month,
     buckets_by_window: buckets_by_window_arr,
+    buckets_by_month,
     cross_by_window,
     sales_by_branch_month,
     top100,

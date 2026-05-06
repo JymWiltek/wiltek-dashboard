@@ -1162,3 +1162,178 @@ test.describe('Round 8 — V1 第二刀 验收: month picker isolates Sales KPIs
     expect(visible).toBe(false);
   });
 });
+
+/* ════════════════════════════════════════════════════════════════════
+   Round 9 — V1 第三刀: cache + Raw-sale source-of-truth
+   ----------------------------------------------------------------------
+   Bug 1 fix: Sales dashboard now reads WP_SALES_LIVE.sales_by_branch_month
+              (from Raw sale tab — every transaction). The old CustomerBuy
+              path was members-only (~33k for W01 Mar-26 vs the actual 55k).
+   Bug 2 fix: setSnapshot no longer triggers /api/customers re-fetch.
+              All months are in the first payload's summary_by_month +
+              sales_by_branch_month. Switch = pure local re-render.
+   ════════════════════════════════════════════════════════════════════ */
+test.describe('Round 9 — V1 第三刀: Raw sale source + month-switch cache', () => {
+  const PAGE_URL = 'http://localhost:4173/Wiltek_MASTER.html';
+
+  function buildSalesPayload() {
+    return {
+      ok: true,
+      fetched_at: '2026-05-06T20:00:00.000Z',
+      source: 'live:google-sheets',
+      sheet_id: 'TEST_SALES',
+      months: ['2026-01','2026-02','2026-03','2026-04'],
+      groups: ['Faucet'],
+      matrix: {}, by_month: {}, by_group: { Faucet: { po: 0, grn: 0 } },
+      latest_month: '2026-04',
+      rows_n: 0,
+      // V1 第三刀: Raw sale tab aggregate (per-branch × per-month Amount).
+      // Numbers chosen to match real Sheet for Mar-26 verification.
+      sales_by_branch_month: {
+        W01: { '2026-01': 80813, '2026-02': 38371, '2026-03': 55491, '2026-04': 65408 },
+        W02: { '2026-01': 134593, '2026-02': 79628, '2026-03': 100038, '2026-04': 109822 },
+        W03: { '2026-01': 91424, '2026-02': 70257, '2026-03': 75727, '2026-04': 82060 },
+        W05: { '2026-01': 95554, '2026-02': 113778, '2026-03': 43487, '2026-04': 82149 },
+        W07: { '2026-01': 78720, '2026-02': 60302, '2026-03': 68158, '2026-04': 63630 },
+        W11: { '2026-01': 36049, '2026-02': 26870, '2026-03': 29655, '2026-04': 16741 },
+        WCO: { '2026-01': 235,   '2026-02': 2586,  '2026-03': 52,    '2026-04': 5299  },
+      },
+      months_seen: ['2026-01','2026-02','2026-03','2026-04'],
+      branches_seen: ['W01','W02','W03','W05','W07','W11','WCO'],
+      _raw_ok: true,
+      active_branches: ['W01','W02','W03','W05','W07'],
+    };
+  }
+  function buildCustomersPayload(snapshot: string) {
+    return {
+      ok: true,
+      fetched_at: '2026-05-06T20:00:00.000Z',
+      source: 'live:google-sheets',
+      sheet_id: 'TEST',
+      months_seen: ['2026-01','2026-02','2026-03','2026-04'],
+      snapshot,
+      requested_month: snapshot,
+      summary: { total_members: 12550, n_active: 6329, amt_total: 4474700, snapshot,
+        n_lt1: 0, n_1_5: 0, n_5_8: 0, n_8plus: 0,
+        amt_lt1: 0, amt_1_5: 0, amt_5_8: 0, amt_8plus: 0,
+        pct_5plus_n: 0, pct_5plus_amt: 0 },
+      summary_by_window: { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      buckets_by_window: { '1m': [], '3m': [], '6m': [], '12m': [] },
+      cross_by_window:   { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      sales_by_branch_month: {},  // Sales dashboard prefers WP_SALES_LIVE
+      summary_by_month: {
+        '2026-01': { total_members: 12550, n_active: 800, amt_total: 481000, snapshot: '2026-01' },
+        '2026-02': { total_members: 12550, n_active: 700, amt_total: 362000, snapshot: '2026-02' },
+        '2026-03': { total_members: 12550, n_active: 650, amt_total: 343000, snapshot: '2026-03' },
+        '2026-04': { total_members: 12550, n_active: 900, amt_total: 403000, snapshot: '2026-04' },
+      },
+      buckets_by_month: {
+        '2026-01': [{ key: '<1y', n: 100, amt: 100000, aov: 1000, repeat_pct: 0, n_active: 100 }],
+        '2026-02': [{ key: '<1y', n: 90,  amt: 90000,  aov: 1000, repeat_pct: 0, n_active: 90  }],
+        '2026-03': [{ key: '<1y', n: 80,  amt: 80000,  aov: 1000, repeat_pct: 0, n_active: 80  }],
+        '2026-04': [{ key: '<1y', n: 110, amt: 110000, aov: 1000, repeat_pct: 0, n_active: 110 }],
+      },
+      top100: [], windows: ['1m','3m','6m','12m'],
+      types: ['Walk-in','Contractor','Interior Designer','Other'],
+      churn: { summary: { n_total: 0, n_high_value: 0, lifetime_rm: 0, cutoff_months: 6, high_value_threshold: 1000 }, rows: [] },
+      diagnostics: { snapshot, n_rows: 0, n_members: 12550, n_ci_rows: 0, n_churn: 0 },
+    };
+  }
+
+  async function loginOwner(page) {
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
+    await page.fill('#loginUser', 'owner');
+    await page.fill('#loginPw', 'Owner@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+  }
+
+  test('Sales dashboard total = ALL-branch sum (matches Sheet status bar)', async ({ page }) => {
+    await page.route('**/api/customers*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload('2026-03')) }));
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._raw_ok === true, { timeout: 5000 });
+
+    await page.evaluate(() => (window as any).setView('sales'));
+    await page.waitForSelector('#dsSalesCards', { timeout: 5000 });
+
+    // Mar-26 ALL-branch total: 55491+100038+75727+43487+68158+29655+52 = 372,608
+    await page.selectOption('#monthPicker', '2026-03');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-03', { timeout: 5000 });
+    // Wait for repaint
+    await page.waitForFunction(() => {
+      const t = document.getElementById('dsSalesChartTitle');
+      return !!t && (t.textContent || '').includes('2026-03');
+    }, { timeout: 5000 });
+    const monthSalesValue = await page.locator('#dsSalesCards .ds-card').first().locator('.value').innerText();
+    expect(monthSalesValue.replace(/\s/g,'')).toContain('372,608');
+  });
+
+  test('switching month does NOT re-fetch /api/customers or /api/sales (cache hit)', async ({ page }) => {
+    let custCalls = 0, salesCalls = 0;
+    await page.route('**/api/customers*', route => {
+      custCalls++;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload('2026-04')) });
+    });
+    await page.route('**/api/sales*', route => {
+      salesCalls++;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) });
+    });
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    // Wait for the autofire silent refresh to complete
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._raw_ok === true, { timeout: 5000 });
+    const beforeCust = custCalls, beforeSales = salesCalls;
+    expect(beforeCust).toBeGreaterThanOrEqual(1);   // initial fetch happened
+    expect(beforeSales).toBeGreaterThanOrEqual(1);
+
+    // Three rapid month switches — each must be a CACHE HIT, no network.
+    await page.evaluate(() => (window as any).setView('sales'));
+    await page.selectOption('#monthPicker', '2026-03');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-03', { timeout: 5000 });
+    await page.selectOption('#monthPicker', '2026-02');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-02', { timeout: 5000 });
+    await page.selectOption('#monthPicker', '2026-01');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-01', { timeout: 5000 });
+    // Give a generous beat for any rogue async refetch
+    await page.waitForTimeout(500);
+
+    expect(custCalls).toBe(beforeCust);    // no extra customer fetch
+    expect(salesCalls).toBe(beforeSales);  // no extra sales fetch
+  });
+
+  test('Sales dashboard prefers WP_SALES_LIVE over WP_CUSTOMERS for sales_by_branch_month', async ({ page }) => {
+    // Ship a poison value via WP_CUSTOMERS to prove WP_SALES_LIVE wins.
+    const custPoison = buildCustomersPayload('2026-04');
+    custPoison.sales_by_branch_month = {
+      W01: { '2026-04': 9999999 }, W02: { '2026-04': 9999999 },
+      W03: { '2026-04': 9999999 }, W05: { '2026-04': 9999999 },
+      W07: { '2026-04': 9999999 },
+    };
+    await page.route('**/api/customers*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(custPoison) }));
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._raw_ok === true, { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView('sales'));
+    await page.selectOption('#monthPicker', '2026-04');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-04', { timeout: 5000 });
+    await page.waitForFunction(() => {
+      const t = document.getElementById('dsSalesChartTitle');
+      return !!t && (t.textContent || '').includes('2026-04');
+    }, { timeout: 5000 });
+    const html = await page.locator('#dsSalesCards').innerHTML();
+    expect(html).not.toContain('9,999,999');
+    expect(html).not.toContain('49,999,995');  // 5x poison
+    // WP_SALES_LIVE Mar-26 W01 + ... + WCO = 425,109 ALL-branch for 2026-04
+    expect(html.replace(/\s/g,'')).toContain('425,109');
+  });
+});

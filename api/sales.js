@@ -1,23 +1,34 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Wiltek Portal — Live Sales (PO + GRN by Month × Main Group) endpoint
+// Wiltek Portal — Live Sales endpoint
 //
 // V1 第二刀 (2026-05-06): replaces the xlsx-build path for the Sales view.
-// Reads the public Google Sheet "Sales/PO/Inventory" (anyone-with-link viewer)
-// and parses the CSV export directly. Returns shape compatible with how
-// the dashboard consumes /api/proxy?type=sales today, plus a normalized
-// month-keyed matrix the frontend can pivot client-side.
+// V1 第三刀 (2026-05-06 night): pulls TWO tabs from the Sales workbook —
+//   1. Default tab  (MONTH × MAIN GROUP × AMT PO × AMT GRN)  — kept as-is
+//      for legacy consumers (purchasing-by-group analytics).
+//   2. "Raw sale"  (Month × Code × Branch × Qty × Amount)    — new source-of-
+//      truth for the Sales dashboard. Per-branch per-month TOTAL Amount,
+//      matches what Jym sees in the Sheet status bar (filter Mar-26 →
+//      RM 372,608.31). The CustomerBuy-derived sales_by_branch_month was
+//      a SUBSET (members only); switching to Raw sale fixes that.
 //
 // Sheet (link-shared, public read):
 //   1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II
-//
-// CSV columns:  MONTH (e.g. "Mar-26"), MAIN GROUP, AMT PO, AMT GRN
-// CSV size: ~465 rows covering Oct-23 .. Mar-26 (2.5+ years)
+//   Default tab: PO/GRN aggregates (~465 rows)
+//   "Raw sale" tab: per-transaction sale rows (~58k rows, Jan-23 .. current)
 //
 // No server cache — caller adds ?t=<ts> to bust browser cache.
 // ═══════════════════════════════════════════════════════════════════════
 
 const SHEET_ID = '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II';
 const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+// Raw sale tab — gviz CSV export by sheet name (handles tabs the default
+// /export endpoint won't reach). URL-encoded "Raw sale" → "Raw%20sale".
+const RAW_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Raw%20sale`;
+// Active branches for the dashboard rollup. W11 + WCO appear in Raw sale
+// (RM 29k + RM 52 in Mar-26) but the executive view scopes to the 5
+// retail stores. We expose all branches in the response so the frontend
+// can decide which to display.
+const ACTIVE_BRANCHES = ['W01', 'W02', 'W03', 'W05', 'W07'];
 
 // CSV parser — handles "1,122.00" quoted thousands.
 function parseCsvLine(line) {
@@ -60,6 +71,56 @@ function monthLabelToYm(label) {
   let yy = parseInt(m[2], 10);
   if (yy < 100) yy = 2000 + yy;
   return `${yy}-${String(mm).padStart(2,'0')}`;
+}
+
+// Parse the "Raw sale" tab CSV → per-branch per-month Amount aggregate.
+// Columns:  Month | Code | Branch | Qty | Amount (RM)
+// Returns:  { sales_by_branch_month: { 'W01': { '2026-03': 55491, ... }, ... },
+//             months_seen, branches_seen, n_rows }
+function buildRawSaleAggregates(text) {
+  const grid = parseCsv(text);
+  if (!grid.length) return { sales_by_branch_month: {}, months_seen: [], branches_seen: [], n_rows: 0 };
+  // Header check (gviz wraps each cell in quotes, so case/spacing flexible)
+  const hdr = grid[0].map(s => String(s||'').trim().toLowerCase());
+  if (!hdr.includes('month') || !hdr.includes('branch')) {
+    throw new Error(`Raw sale unexpected header: ${grid[0].slice(0,5).join('|')}`);
+  }
+  const I_MONTH  = hdr.indexOf('month');
+  const I_BRANCH = hdr.indexOf('branch');
+  // "Amount (RM)" or just "Amount"
+  let I_AMT = hdr.findIndex(h => /^amount/.test(h));
+  if (I_AMT < 0) I_AMT = 4;
+
+  const sbm = {};
+  const monthsSet = new Set();
+  const branchesSet = new Set();
+  let n = 0;
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i];
+    if (!r || r.length < 3) continue;
+    const ym = monthLabelToYm(r[I_MONTH]);
+    if (!ym) continue;
+    const br = String(r[I_BRANCH]||'').trim();
+    if (!br) continue;
+    const amt = parseNum(r[I_AMT]);
+    if (!sbm[br]) sbm[br] = {};
+    sbm[br][ym] = (sbm[br][ym] || 0) + amt;
+    monthsSet.add(ym);
+    branchesSet.add(br);
+    n++;
+  }
+  // Round to whole ringgit
+  for (const br of Object.keys(sbm)) {
+    for (const ym of Object.keys(sbm[br])) {
+      sbm[br][ym] = Math.round(sbm[br][ym]);
+    }
+  }
+  return {
+    sales_by_branch_month: sbm,
+    months_seen: [...monthsSet].sort(),
+    branches_seen: [...branchesSet].sort(),
+    n_rows: n,
+  };
 }
 
 function buildResponse(text) {
@@ -146,22 +207,45 @@ export default async function handler(req, res) {
   if (req.method !== 'GET')     { res.status(405).json({ ok: false, error: 'GET only' }); return; }
 
   try {
-    const r = await fetch(CSV_URL, { redirect: 'follow' });
-    if (!r.ok) {
-      res.status(502).json({ ok: false, error: `upstream HTTP ${r.status}`, sheet_id: SHEET_ID });
+    // Fetch both tabs in parallel — Raw sale tab is ~3MB, default tab ~25KB.
+    const [rDefault, rRaw] = await Promise.all([
+      fetch(CSV_URL,     { redirect: 'follow' }),
+      fetch(RAW_CSV_URL, { redirect: 'follow' }),
+    ]);
+    if (!rDefault.ok) {
+      res.status(502).json({ ok: false, error: `upstream HTTP ${rDefault.status}`, sheet_id: SHEET_ID });
       return;
     }
-    const text = await r.text();
+    const text = await rDefault.text();
     if (text.startsWith('<') || /You need access|ServiceLogin/i.test(text)) {
       res.status(502).json({ ok: false, error: 'sheet not link-shared (login wall)', sheet_id: SHEET_ID });
       return;
     }
     const payload = buildResponse(text);
-    res.status(200).json(payload);
+
+    // Raw sale tab — graceful degrade if it's missing / locked / down
+    let raw = { sales_by_branch_month: {}, months_seen: [], branches_seen: [], n_rows: 0, _raw_ok: false, _raw_error: null };
+    if (rRaw.ok) {
+      try {
+        const rawText = await rRaw.text();
+        if (!rawText.startsWith('<') && !/You need access|ServiceLogin/i.test(rawText)) {
+          const a = buildRawSaleAggregates(rawText);
+          raw = { ...a, _raw_ok: true, _raw_error: null, active_branches: ACTIVE_BRANCHES };
+        } else {
+          raw._raw_error = 'login wall';
+        }
+      } catch (e) {
+        raw._raw_error = e.message;
+      }
+    } else {
+      raw._raw_error = `upstream HTTP ${rRaw.status}`;
+    }
+
+    res.status(200).json({ ...payload, ...raw, active_branches: ACTIVE_BRANCHES });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message, where: 'sales handler' });
   }
 }
 
 // Exported for unit tests
-export const __test = { parseCsv, parseNum, monthLabelToYm, buildResponse };
+export const __test = { parseCsv, parseNum, monthLabelToYm, buildResponse, buildRawSaleAggregates };
