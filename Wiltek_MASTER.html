@@ -971,13 +971,15 @@ footer.app-footer {
       <select id="monthPicker" class="branch-picker" onchange="setSnapshot(this.value)" title="Snapshot month — every dashboard scopes to this month">
         <option value="">—</option>
       </select>
-      <!-- Global period selector — drives every page that has a time window.
-           Window is interpreted RELATIVE to the picked Snapshot month above:
-           e.g. snapshot=2026-04 + period=3m  →  Feb 2026 .. Apr 2026 inclusive. -->
-      <div class="period-toggle" id="periodToggle" role="tablist" title="Period window (relative to Snapshot month)">
-        <button type="button" data-period="1m"  data-i18n="period-1m">1m</button>
+      <!-- V1 第二刀 (2026-05-06): period toggle HIDDEN.
+           Jym's mandate: "选月份就显示那个月,不要任何聪明逻辑。"
+           Every dashboard now scopes to the single SNAPSHOT month (above).
+           No rolling 1m/3m/6m/12m windows in the UI — power-user override
+           still possible via ?period=3m URL param if absolutely needed. -->
+      <div class="period-toggle" id="periodToggle" role="tablist" title="Period window (relative to Snapshot month)" style="display:none">
+        <button type="button" data-period="1m"  class="on" data-i18n="period-1m">1m</button>
         <button type="button" data-period="3m"  data-i18n="period-3m">3m</button>
-        <button type="button" data-period="6m"  class="on" data-i18n="period-6m">6m</button>
+        <button type="button" data-period="6m"  data-i18n="period-6m">6m</button>
         <button type="button" data-period="12m" data-i18n="period-12m">12m</button>
       </div>
       <div class="lang-toggle" role="tablist">
@@ -1560,9 +1562,10 @@ const STR = {
     "ds-fin-sub":      "Sales collection · 7 cost categories · payroll discipline · drill-down to brand GP.",
     "ds-hr-title":     "HR",
     "ds-hr-sub":       "Headcount · revenue per head · branch-level staffing — detailed drill-downs coming next cut.",
-    /* Card labels — Sales */
-    "ds-sales-today":   "Today's sales",
-    "ds-sales-period":  "Period sales",
+    /* Card labels — Sales (V1 第二刀: single-month isolation, no rolling) */
+    "ds-sales-month":   "Month sales",
+    "ds-sales-today":   "Today's sales",   /* legacy — unused after 第二刀 */
+    "ds-sales-period":  "Period sales",    /* legacy — unused after 第二刀 */
     "ds-sales-best":    "Top branch",
     "ds-sales-worst":   "Lowest branch",
     /* Card labels — Stock */
@@ -1919,9 +1922,10 @@ const STR = {
     "ds-fin-sub":      "销售回款 · 7 大费用 · 工资纪律 · 下钻到品牌毛利。",
     "ds-hr-title":     "人事",
     "ds-hr-sub":       "总员工数 · 人均产值 · 各分行人手 — 下钻待补。",
-    /* Card labels — Sales */
-    "ds-sales-today":   "今日销售",
-    "ds-sales-period":  "期间销售",
+    /* Card labels — Sales (V1 第二刀: 仅显示选中月份,不滚动) */
+    "ds-sales-month":   "该月销售总额",
+    "ds-sales-today":   "今日销售",     /* legacy — 第二刀后已弃用 */
+    "ds-sales-period":  "期间销售",     /* legacy — 第二刀后已弃用 */
     "ds-sales-best":    "销冠门市",
     "ds-sales-worst":   "末位门市",
     /* Card labels — Stock */
@@ -3380,10 +3384,13 @@ function rerenderActiveView() {
   else if (CUR_VIEW === 'hr')         renderHrDashboard();
   else if (CUR_VIEW === 'admin-sanity') renderAdminSanity();
 }
-// Bootstrap default: URL > localStorage > 6m
+// V1 第二刀 (2026-05-06): default 1m — single-month isolation per Jym's mandate.
+// 3m/6m/12m are still navigable (button hidden in UI, URL/localStorage still work
+// for power-user override) but no longer the default — every dashboard now
+// shows a single SNAPSHOT month by default.
 window.PERIOD = periodFromUrl()
   || (function(){ try { const v = localStorage.getItem('wp_period'); return PERIOD_VALID.indexOf(v) !== -1 ? v : null; } catch(_){ return null; } })()
-  || '6m';
+  || '1m';
 
 /* ── Global SNAPSHOT state (YYYY-MM) — V1 第二刀 ─────────────────
    The "as-of" month every dashboard scopes to. Default = latest month
@@ -3564,52 +3571,54 @@ function drillTile(viewKey, labelKey, subKey, icon, disabled) {
   '</div>';
 }
 
-/* ── Sales dashboard ───────────────────────────────────────────── */
+/* ── Sales dashboard ───────────────────────────────────────────────
+   V1 第二刀 验收 fix (2026-05-06): SINGLE-MONTH ISOLATION.
+   Source-of-truth: WP_CUSTOMERS.sales_by_branch_month[BR][SNAPSHOT].
+   Mandate from Jym: "选月份就显示那个月,不要任何聪明逻辑。"
+   - DELETED Today's-sales estimate (was last_3m / 90)
+   - DELETED Period-sales card with MoM% (was last_3m vs prev_3m)
+   - DELETED "last 3-month" chart
+   - DELETED drop_pct urgency action text
+   Cards now: 该月销售总额 / Top branch (该月) / Lowest branch (该月).
+   Chart: one bar per active branch, value = sales_by_branch_month[BR][SNAPSHOT].
+   Switching month = different numbers (acceptance: 3/4/5 月数字 must differ). */
 function renderSalesDashboard() {
-  const td = window.WP_TODAY || {};
-  // Source: branch_sales_trend → { 'W01': { last_3m, prev_3m, drop_pct }, ... }
-  // We don't have today-only sales yet, so we use last_3m as the period
-  // window and call out per-branch performance + drop% as the actionable
-  // signal. When intraday data lands, the today_sales card switches to
-  // a real "today" number — the structure here doesn't change.
-  const trendAll = td.branch_sales_trend || {};
-  // V1 第7刀: branch-scope filter — when in Branch Manager view, only show that branch
-  const trend = isBranchScoped()
-    ? (trendAll[BRANCH_VIEW] ? { [BRANCH_VIEW]: trendAll[BRANCH_VIEW] } : {})
-    : trendAll;
-  const branches = Object.keys(trend).sort();
-  const periodLabelStr = periodLabel(window.PERIOD || '6m');
+  const cd = window.WP_CUSTOMERS || {};
+  const sbm = cd.sales_by_branch_month || {};
+  const snap = window.SNAPSHOT || (cd.meta && cd.meta.snapshot) || '';
+  const ACTIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
+  // V1 第7刀: branch-scope filter — when in Branch Manager view, only that branch
+  const branches = (isBranchScoped()
+    ? (ACTIVE.includes(BRANCH_VIEW) ? [BRANCH_VIEW] : [])
+    : ACTIVE
+  ).filter(b => sbm[b]);  // hide branches with zero data for this snapshot
 
-  let periodTotal = 0, prevTotal = 0;
-  let best = null, worst = null;
+  // Per-branch sale for the SELECTED snapshot month — no rolling, no estimate.
+  const monthSales = {};
+  branches.forEach(b => { monthSales[b] = (sbm[b] && sbm[b][snap]) || 0; });
+
+  let monthTotal = 0, best = null, worst = null;
   branches.forEach(b => {
-    const r = trend[b] || {};
-    periodTotal += r.last_3m || 0;
-    prevTotal   += r.prev_3m || 0;
-    if (!best  || (r.last_3m || 0) > (trend[best ]?.last_3m || -Infinity)) best  = b;
-    if (!worst || (r.last_3m || 0) < (trend[worst]?.last_3m ||  Infinity)) worst = b;
+    const v = monthSales[b];
+    monthTotal += v;
+    if (best  === null || v > monthSales[best])  best  = b;
+    if (worst === null || v < monthSales[worst]) worst = b;
   });
-  const todayEstimate = Math.round(periodTotal / 90);  // last_3m ≈ 90 days
-  const overallDrop = prevTotal ? ((periodTotal - prevTotal) / prevTotal * 100) : 0;
 
+  const monthLabel = snap || '—';
   document.getElementById('dsSalesCards').innerHTML =
-    dsCard(t('ds-sales-today'),  'RM ' + fmtMoney(todayEstimate),
-           (LANG === 'zh' ? '估算 (last 3m / 90)' : 'estimate (last 3m / 90)')) +
-    dsCard(t('ds-sales-period'), 'RM ' + fmtMoney(periodTotal),
-           (LANG === 'zh' ? '最近 3 月 · ' : 'last 3m · ') +
-             (overallDrop >= 0 ? '+' : '') + overallDrop.toFixed(1) + '% MoM',
-           overallDrop < -10 ? 'danger' : overallDrop < 0 ? 'warn' : '') +
-    dsCard(t('ds-sales-best'),   best  || '—',
-           best  ? 'RM ' + fmtMoney(trend[best ].last_3m  || 0)  : '') +
-    dsCard(t('ds-sales-worst'),  worst || '—',
-           worst ? 'RM ' + fmtMoney(trend[worst].last_3m || 0) : '',
-           worst && (trend[worst].drop_pct < -20) ? 'danger' : '');
+    dsCard(t('ds-sales-month'), 'RM ' + fmtMoney(monthTotal),
+           (LANG === 'zh' ? snap + ' · ' + branches.length + ' 家分行' : snap + ' · ' + branches.length + ' branches')) +
+    dsCard(t('ds-sales-best'),  best  || '—',
+           best  ? 'RM ' + fmtMoney(monthSales[best])  + ' · ' + monthLabel : '') +
+    dsCard(t('ds-sales-worst'), worst || '—',
+           worst ? 'RM ' + fmtMoney(monthSales[worst]) + ' · ' + monthLabel : '');
 
-  // Chart: 5 branches last_3m sales bar
+  // Chart: per-branch sales for SNAPSHOT month only.
   const labels = branches;
-  const data   = branches.map(b => trend[b].last_3m || 0);
+  const data   = branches.map(b => monthSales[b]);
   document.getElementById('dsSalesChartTitle').textContent =
-    LANG === 'zh' ? '5 家分行近 3 个月销售' : 'Last 3-month sales by branch';
+    (LANG === 'zh' ? '各分行销售 · ' : 'Sales by branch · ') + monthLabel;
   drawChart('dsSalesChart', {
     type: 'bar',
     data: { labels, datasets: [{ data, backgroundColor: BRAND_GREEN }] },
@@ -3620,24 +3629,23 @@ function renderSalesDashboard() {
     },
   });
 
-  // 👉 action: worst-branch drop or top/bottom gap
+  // 👉 action: top-vs-bottom gap (single-month, no MoM/drop).
   let zh, en;
-  if (worst && (trend[worst].drop_pct || 0) < -20) {  // threshold: drop >20% → urgent
-    zh = `${worst} 近 3 月销售跌 ${Math.abs(trend[worst].drop_pct).toFixed(0)}% — 立即排查人手、客流或库存问题。`;
-    en = `${worst} dropped ${Math.abs(trend[worst].drop_pct).toFixed(0)}% in the last 3 months — investigate staffing, footfall or stock-out issues now.`;
-  } else if (best && worst) {
-    const gap = trend[best].last_3m - trend[worst].last_3m;
-    const gapPct = trend[best].last_3m ? gap / trend[best].last_3m * 100 : 0;
-    if (gapPct > 50) {  // threshold: >50% gap top vs bottom
-      zh = `${best} 销售是 ${worst} 的 ${(trend[best].last_3m / trend[worst].last_3m).toFixed(1)} 倍,门市间产能差距太大,可调货 + 调员工。`;
-      en = `${best} is ${(trend[best].last_3m / trend[worst].last_3m).toFixed(1)}× ${worst}'s sales — large capacity gap, consider stock + staff rebalancing.`;
+  if (best && worst && best !== worst && monthSales[worst] > 0) {
+    const ratio = monthSales[best] / monthSales[worst];
+    if (ratio > 1.5) {
+      zh = `${monthLabel}: ${best} 销售是 ${worst} 的 ${ratio.toFixed(1)} 倍,门市间产能差距大,可调货 + 调员工。`;
+      en = `${monthLabel}: ${best} is ${ratio.toFixed(1)}× ${worst}'s sales — large branch capacity gap, consider stock + staff rebalancing.`;
     } else {
-      zh = `5 家分行近 3 月表现稳健,${best} 领先,${worst} 末位。`;
-      en = `5 branches are stable last 3 months — ${best} leads, ${worst} trails.`;
+      zh = `${monthLabel}: 5 家分行表现接近,${best} 领先,${worst} 末位。`;
+      en = `${monthLabel}: branches are tightly grouped — ${best} leads, ${worst} trails.`;
     }
+  } else if (best && worst && best === worst) {
+    zh = `${monthLabel}: 仅 ${best} 一家分行有数据。`;
+    en = `${monthLabel}: only ${best} has data.`;
   } else {
-    zh = '销售数据待接入。';
-    en = 'Sales data pending.';
+    zh = `${monthLabel}: 销售数据待接入。`;
+    en = `${monthLabel}: sales data pending.`;
   }
   document.getElementById('dsSalesAction').innerHTML = actionBlock(zh, en);
 
@@ -4650,6 +4658,7 @@ async function fetchCustomersLive(ts) {
       summary_by_window: j.summary_by_window,
       buckets_by_window: j.buckets_by_window,
       cross_by_window: j.cross_by_window,
+      sales_by_branch_month: j.sales_by_branch_month || {},
       top100: j.top100,
       windows: j.windows,
       types: j.types,

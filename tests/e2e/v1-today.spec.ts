@@ -721,6 +721,16 @@ test.describe('Round 7 — V1 第二刀: Month picker + Sales/Customers live + R
       summary_by_window: { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
       buckets_by_window: { '1m': [], '3m': [], '6m': [], '12m': [] },
       cross_by_window:   { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      // V1 第二刀: per-branch per-month sales (drives Sales dashboard cards/chart)
+      // Numbers vary per snapshot so each month picker selection produces
+      // a different total (acceptance test: 3/4/5 月数字均不同).
+      sales_by_branch_month: {
+        W01: { '2026-01': 28000, '2026-02': 31000, '2026-03': 33644, '2026-04': 65408, '2026-05': 41000 },
+        W02: { '2026-01': 47000, '2026-02': 49500, '2026-03': 52968, '2026-04': 109822, '2026-05': 60000 },
+        W03: { '2026-01': 35000, '2026-02': 36500, '2026-03': 37927, '2026-04': 82060, '2026-05': 44000 },
+        W05: { '2026-01': 18000, '2026-02': 20000, '2026-03': 22643, '2026-04': 82149, '2026-05': 26000 },
+        W07: { '2026-01': 26000, '2026-02': 28500, '2026-03': 30793, '2026-04': 63630, '2026-05': 35000 },
+      },
       top100: [],
       windows: ['1m','3m','6m','12m'],
       types:   ['Walk-in','Contractor','Interior Designer','Other'],
@@ -987,5 +997,168 @@ test.describe('Round 7 — V1 第二刀: Month picker + Sales/Customers live + R
     await page.evaluate(() => (window as any).setSnapshot('2026-03'));
     await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-03', { timeout: 5000 });
     expect(page.url()).toMatch(/[?&]month=2026-03/);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════
+   Round 8 — V1 第二刀 验收: SINGLE-MONTH ISOLATION
+   ----------------------------------------------------------------------
+   Jym's mandate (2026-05-06): "选月份就显示那个月,不要任何聪明逻辑。"
+   Acceptance test verbatim:
+     1. Sales tab + 选 2026-03 → 记录所有数字
+     2. 选 2026-04 → 数字必须跟 (1) 不一样
+     3. 选 2026-05 → 数字必须跟 (1)(2) 都不一样
+   Any duplication across snapshots = FAIL.
+   ════════════════════════════════════════════════════════════════════ */
+test.describe('Round 8 — V1 第二刀 验收: month picker isolates Sales KPIs', () => {
+  const PAGE_URL = 'http://localhost:4173/Wiltek_MASTER.html';
+
+  function buildCustomersPayload(snapshot: string) {
+    return {
+      ok: true,
+      fetched_at: '2026-05-06T08:00:00.000Z',
+      source: 'live:google-sheets',
+      sheet_id: 'TEST',
+      months_seen: ['2026-01','2026-02','2026-03','2026-04','2026-05'],
+      snapshot,
+      requested_month: snapshot,
+      summary: { total_members: 12550, n_active: 6329, amt_total: 4474700, snapshot,
+        n_lt1: 0, n_1_5: 0, n_5_8: 0, n_8plus: 0,
+        amt_lt1: 0, amt_1_5: 0, amt_5_8: 0, amt_8plus: 0,
+        pct_5plus_n: 0, pct_5plus_amt: 0 },
+      summary_by_window: { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      buckets_by_window: { '1m': [], '3m': [], '6m': [], '12m': [] },
+      cross_by_window:   { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      // Distinct values per month — every column differs from every other column
+      sales_by_branch_month: {
+        W01: { '2026-03': 33644, '2026-04': 65408, '2026-05': 41000 },
+        W02: { '2026-03': 52968, '2026-04': 109822, '2026-05': 60000 },
+        W03: { '2026-03': 37927, '2026-04': 82060, '2026-05': 44000 },
+        W05: { '2026-03': 22643, '2026-04': 82149, '2026-05': 26000 },
+        W07: { '2026-03': 30793, '2026-04': 63630, '2026-05': 35000 },
+      },
+      top100: [], windows: ['1m','3m','6m','12m'],
+      types: ['Walk-in','Contractor','Interior Designer','Other'],
+      churn: { summary: { n_total: 0, n_high_value: 0, lifetime_rm: 0, cutoff_months: 6, high_value_threshold: 1000 }, rows: [] },
+      diagnostics: { snapshot, n_rows: 0, n_members: 12550, n_ci_rows: 0, n_churn: 0 },
+    };
+  }
+  function buildSalesPayload() {
+    return { ok: true, fetched_at: '2026-05-06T08:00:00.000Z', source: 'live', sheet_id: 'X',
+      months: ['2026-01','2026-02','2026-03','2026-04'], groups: ['Faucet'],
+      matrix: {}, by_month: {}, by_group: { Faucet: { po: 0, grn: 0 } },
+      latest_month: '2026-04', rows_n: 0 };
+  }
+
+  async function loginOwner(page) {
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
+    await page.fill('#loginUser', 'owner');
+    await page.fill('#loginPw', 'Owner@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+  }
+
+  test('Sales tab KPI numbers are different for 2026-03, 2026-04, 2026-05', async ({ page }) => {
+    await page.route('**/api/customers*', route => {
+      const u = new URL(route.request().url());
+      const m = u.searchParams.get('month') || '2026-05';
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload(m)) });
+    });
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS && (window as any).WP_CUSTOMERS._live === true, { timeout: 5000 });
+
+    // Navigate to Sales tab
+    await page.evaluate(() => (window as any).setView('sales'));
+    await page.waitForSelector('#dsSalesCards', { timeout: 5000 });
+
+    async function snapshotSalesKpis(month: string) {
+      await page.selectOption('#monthPicker', month);
+      await page.waitForFunction((m) => (window as any).SNAPSHOT === m, month, { timeout: 5000 });
+      // Wait until renderSalesDashboard repaints with the new snapshot's number
+      await page.waitForFunction((m) => {
+        const wrap = document.getElementById('dsSalesCards');
+        const title = document.getElementById('dsSalesChartTitle');
+        return !!wrap && wrap.children.length === 3 && !!title && title.textContent?.includes(m);
+      }, month, { timeout: 5000 });
+      const cards = await page.locator('#dsSalesCards .ds-card .value').allInnerTexts();
+      const chartTitle = await page.locator('#dsSalesChartTitle').innerText();
+      return { cards, chartTitle };
+    }
+
+    const m3 = await snapshotSalesKpis('2026-03');
+    const m4 = await snapshotSalesKpis('2026-04');
+    const m5 = await snapshotSalesKpis('2026-05');
+
+    // 1. Each chart title carries its own snapshot — proves single-month chart binding
+    expect(m3.chartTitle).toContain('2026-03');
+    expect(m4.chartTitle).toContain('2026-04');
+    expect(m5.chartTitle).toContain('2026-05');
+
+    // 2. The "month sales" card (1st card) MUST differ across all three picks.
+    //    Mock totals: 03 = 177,975 | 04 = 403,069 | 05 = 206,000.
+    expect(m3.cards[0]).not.toBe(m4.cards[0]);
+    expect(m3.cards[0]).not.toBe(m5.cards[0]);
+    expect(m4.cards[0]).not.toBe(m5.cards[0]);
+
+    // 3. The Top-branch and Lowest-branch *RM* sub-text differ too (cards 2 + 3
+    //    show the branch name as the headline; their meta line carries the RM amount).
+    const cardMetas = async () =>
+      page.locator('#dsSalesCards .ds-card .sub').allInnerTexts();
+    await page.selectOption('#monthPicker', '2026-03');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-03', { timeout: 5000 });
+    const meta3 = await cardMetas();
+    await page.selectOption('#monthPicker', '2026-04');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-04', { timeout: 5000 });
+    const meta4 = await cardMetas();
+    expect(meta3.join('|')).not.toBe(meta4.join('|'));
+  });
+
+  test('renderSalesDashboard reads sales_by_branch_month, not legacy branch_sales_trend', async ({ page }) => {
+    // Sanity: legacy field must no longer drive the dashboard. We provide a
+    // VALID sales_by_branch_month but a STALE branch_sales_trend with very
+    // different numbers; the dashboard must show the SBM numbers.
+    await page.route('**/api/customers*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(buildCustomersPayload('2026-04')),
+    }));
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS && (window as any).WP_CUSTOMERS._live === true, { timeout: 5000 });
+
+    // Stuff a poison value into the legacy field and re-render; output must NOT contain it.
+    await page.evaluate(() => {
+      (window as any).WP_TODAY = (window as any).WP_TODAY || {};
+      (window as any).WP_TODAY.branch_sales_trend = {
+        W01: { last_3m: 9999999, prev_3m: 0, drop_pct: 0 },
+      };
+    });
+    await page.evaluate(() => (window as any).setView('sales'));
+    await page.waitForSelector('#dsSalesCards .ds-card', { timeout: 5000 });
+    const html = await page.locator('#dsSalesCards').innerHTML();
+    expect(html).not.toContain('9,999,999');
+    expect(html).not.toContain('9999999');
+    // And the rolling labels must be gone:
+    expect(html.toLowerCase()).not.toContain('last 3m');
+    expect(html.toLowerCase()).not.toContain('estimate');
+    expect(html).not.toContain('% mom');
+  });
+
+  test('period toggle (3m/6m/12m) is hidden — no rolling logic in UI', async ({ page }) => {
+    await page.route('**/api/customers*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload('2026-04')) }));
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    const visible = await page.locator('#periodToggle').isVisible();
+    expect(visible).toBe(false);
   });
 });

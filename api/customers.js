@@ -130,6 +130,25 @@ function buildPayload(rows, snapshotYm) {
   const k_m3   = k_now - 2;
   const k_m1   = k_now;
 
+  // ── Per-branch per-month sales (V1 第二刀 验收 fix, 2026-05-06) ──
+  // Source-of-truth for the Sales dashboard cards/chart. Selected SNAPSHOT
+  // month → use sales_by_branch_month[BR][SNAPSHOT] for that one month only.
+  // No "last 3m", no MoM, no estimates — Jym's mandate is single-month isolation.
+  const sales_by_branch_month = {};
+  for (const r of rows) {
+    if (!r.branch) continue;
+    if (!ACTIVE_BRANCHES.has(r.branch)) continue;
+    if (!r.amt) continue;
+    const ym = ymStr(r.ym);
+    if (!sales_by_branch_month[r.branch]) sales_by_branch_month[r.branch] = {};
+    sales_by_branch_month[r.branch][ym] = (sales_by_branch_month[r.branch][ym] || 0) + r.amt;
+  }
+  for (const br of Object.keys(sales_by_branch_month)) {
+    for (const ym of Object.keys(sales_by_branch_month[br])) {
+      sales_by_branch_month[br][ym] = Math.round(sales_by_branch_month[br][ym]);
+    }
+  }
+
   // ── Member master pass ──
   const mem = new Map();
   for (const r of rows) {
@@ -333,6 +352,7 @@ function buildPayload(rows, snapshotYm) {
     summary_by_window,
     buckets_by_window: buckets_by_window_arr,
     cross_by_window,
+    sales_by_branch_month,
     top100,
     windows: WINDOWS,
     types: TYPES,
