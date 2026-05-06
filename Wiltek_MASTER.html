@@ -706,6 +706,116 @@ header.app-header .refresh-btn.loading::before {
 .today-roles .tr-card.live .tr-status { color: var(--ok); }
 .today-roles .tr-card.idle .tr-status { color: var(--text-light); }
 
+/* ── V1 第三刀 · Today landing — status row + 5-store traffic + 6-domain grid ── */
+.today-status {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 24px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 28px;
+  margin-bottom: 18px;
+}
+.today-status .tst-light {
+  font-size: 56px; line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.08));
+}
+.today-status .tst-summary { min-width: 0; }
+.today-status .tst-headline {
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 4px; line-height: 1.4;
+}
+.today-status .tst-headline.danger { color: var(--danger); }
+.today-status .tst-headline.warn   { color: var(--warn); }
+.today-status .tst-headline.ok     { color: var(--ok); }
+.today-status .tst-sub {
+  font-size: 13px; color: var(--text-meta); line-height: 1.6;
+}
+.today-status .tst-runway {
+  text-align: right; padding-left: 16px; border-left: 1px solid var(--border);
+}
+.today-status .tst-runway .tst-r-label {
+  font-size: 11px; color: var(--text-meta);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+}
+.today-status .tst-runway .tst-r-value {
+  font-size: 26px; font-weight: 700; color: var(--text-primary);
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.today-status .tst-runway .tst-r-value.danger { color: var(--danger); }
+.today-status .tst-runway .tst-r-value.warn   { color: var(--warn); }
+.today-status .tst-runway .tst-r-value.ok     { color: var(--ok); }
+.today-status .tst-runway .tst-r-sub {
+  font-size: 11px; color: var(--text-meta); margin-top: 4px;
+}
+@media (max-width: 720px) {
+  .today-status { grid-template-columns: auto 1fr; row-gap: 14px; }
+  .today-status .tst-runway { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--border); padding: 14px 0 0; text-align: left; }
+}
+
+/* Layer 2 — Mark as done button on action cards */
+.today-card .td-mark-done {
+  align-self: start;
+  background: transparent; color: var(--text-meta);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; font-size: 11px; font-weight: 500;
+  cursor: pointer; margin-top: 4px;
+}
+.today-card .td-mark-done:hover { background: var(--surface); color: var(--text-primary); }
+.today-card .td-actions-col {
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-end; align-self: center;
+}
+.td-restore-bar {
+  display: flex; gap: 10px; justify-content: flex-end; align-items: center;
+  font-size: 12px; color: var(--text-meta); margin: -6px 0 16px;
+}
+.td-restore-bar button {
+  background: transparent; border: 1px dashed var(--border); border-radius: 6px;
+  padding: 4px 10px; font-size: 11px; color: var(--text-meta); cursor: pointer;
+}
+.td-restore-bar button:hover { color: var(--text-primary); border-color: var(--brand); }
+
+/* Layer 3 — 5-store traffic snapshot (override stock grid) */
+.today-stores.traffic .ts-row {
+  grid-template-columns: 70px 1fr 90px 100px 80px 90px;
+}
+.today-stores.traffic .ts-row .ts-anom.high { color: var(--danger); font-weight: 600; }
+.today-stores.traffic .ts-row .ts-anom.mid  { color: var(--warn); font-weight: 600; }
+.today-stores.traffic .ts-row .ts-anom.low  { color: var(--ok); font-weight: 500; }
+.today-stores.traffic .ts-row .ts-anom { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Layer 4 — 6-domain health grid */
+.today-domain-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;
+  margin-bottom: 8px;
+}
+@media (max-width: 980px) { .today-domain-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .today-domain-grid { grid-template-columns: repeat(2, 1fr); } }
+.today-domain-grid .tdg-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-top: 3px solid var(--neutral);
+  border-radius: var(--radius);
+  padding: 14px 14px 12px;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.today-domain-grid .tdg-card:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+.today-domain-grid .tdg-card.h-ok    { border-top-color: var(--ok); }
+.today-domain-grid .tdg-card.h-warn  { border-top-color: var(--warn); }
+.today-domain-grid .tdg-card.h-bad   { border-top-color: var(--danger); }
+.today-domain-grid .tdg-card.h-na    { border-top-color: var(--neutral); opacity: 0.7; }
+.today-domain-grid .tdg-icon { font-size: 20px; line-height: 1; margin-bottom: 6px; }
+.today-domain-grid .tdg-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+.today-domain-grid .tdg-status {
+  font-size: 11px; color: var(--text-meta);
+  font-variant-numeric: tabular-nums; line-height: 1.4;
+}
+.today-domain-grid .tdg-card.h-ok    .tdg-status { color: var(--ok); }
+.today-domain-grid .tdg-card.h-warn  .tdg-status { color: var(--warn); }
+.today-domain-grid .tdg-card.h-bad   .tdg-status { color: var(--danger); }
+
 /* ── V1 第 2 刀 · Customer churn + PO exceptions list pages ─────── */
 .simple-list {
   background: var(--bg); border: 1px solid var(--border);
@@ -1226,25 +1336,36 @@ footer.app-footer {
         </div>
       </div>
 
-      <!-- ── View: Owner Today Overview (V1 第 2 刀) ──────────── -->
+      <!-- ── View: Owner Today (V1 第三刀 · 4 layers) ─────────────── -->
       <div class="view" id="view-today">
+        <!-- Layer 1: status light + Cash Runway -->
+        <div class="today-status" id="todayStatus"></div>
+
+        <!-- Legacy banner (kept for back-compat / date headline) -->
         <div class="today-banner" id="todayBanner"></div>
 
+        <!-- Layer 2: Action Plan (3 things to do today) -->
         <div class="today-section-title">
           <span data-i18n="td-cards-title">3 things to look at today</span>
           <span class="meta" data-i18n="td-cards-sub">auto-selected from this week's data</span>
         </div>
+        <div class="td-restore-bar" id="todayRestoreBar" style="display:none"></div>
         <div class="today-cards" id="todayCards"></div>
 
+        <!-- Layer 3: 5-store traffic snapshot -->
         <div class="today-section-title">
           <span data-i18n="td-stores-title">5 stores at a glance</span>
         </div>
-        <div class="today-stores" id="todayStores"></div>
+        <div class="today-stores traffic" id="todayStores"></div>
 
+        <!-- Layer 4: 6-domain health grid -->
         <div class="today-section-title">
-          <span data-i18n="td-roles-title">Team status</span>
+          <span data-i18n="td-domain-title">6 domains — health</span>
         </div>
-        <div class="today-roles" id="todayRoles"></div>
+        <div class="today-domain-grid" id="todayDomainGrid"></div>
+
+        <!-- (Legacy) Team status row — kept hidden behind new domain grid -->
+        <div class="today-roles" id="todayRoles" style="display:none"></div>
       </div>
 
       <!-- ── View: Customer Churn (V1 第 2 刀) ─────────────────── -->
@@ -1723,6 +1844,30 @@ const STR = {
     "td-card-churn-interp": "Lifetime spend RM {amt}. Top: {top} ({tspend}) — last seen {last}.",
     "td-card-churn-action": "Pick top 5 below. Whatsapp them this week with a personal note, no promo.",
 
+    "td-status-ok":   "Business healthy — keep doing what's working.",
+    "td-status-warn": "Yellow zone — {bad} domain(s) need attention.",
+    "td-status-bad":  "Red alert — {bad} domain(s) in trouble. Act today.",
+    "td-status-na":   "Live data still loading — refresh in a moment.",
+    "td-runway-label": "Cash runway",
+    "td-runway-months": "{n} months",
+    "td-runway-burn": "Burning · {n} months",
+    "td-runway-na": "—",
+    "td-runway-sub": "trailing 6m net P/L ÷ avg monthly expense",
+    "td-mark-done": "Mark as done",
+    "td-restore": "Show {n} dismissed",
+    "td-restore-clear": "Restore all",
+    "td-domain-title": "6 domains — health",
+    "td-dom-sales":     "Sales",
+    "td-dom-inventory": "Inventory",
+    "td-dom-customers": "Customers",
+    "td-dom-products":  "Products",
+    "td-dom-finance":   "Finance",
+    "td-dom-hr":        "HR",
+    "td-store-visits":  "Visits",
+    "td-store-aov":     "AOV RM",
+    "td-store-cr":      "CR %",
+    "td-store-anom":    "Anomalies",
+
     "cc-title": "Lapsed Customers",
     "cc-sub": "High-lifetime members who haven't shopped in 6+ months — first call list.",
     "cc-summary-total": "Lapsed",
@@ -2083,6 +2228,30 @@ const STR = {
     "td-card-churn-interp": "终身消费 RM {amt}。最大:{top}(RM {tspend})— 最后见 {last}。",
     "td-card-churn-action": "选下面前 5 位,这周 WhatsApp 一条个人消息,不要促销。",
 
+    "td-status-ok":   "公司健康 — 保持现在的做法。",
+    "td-status-warn": "黄灯 — {bad} 个领域需要关注。",
+    "td-status-bad":  "红灯 — {bad} 个领域有麻烦,今天就要处理。",
+    "td-status-na":   "数据加载中 — 稍候点 Refresh。",
+    "td-runway-label": "现金缓冲",
+    "td-runway-months": "{n} 个月",
+    "td-runway-burn": "在烧 · {n} 个月",
+    "td-runway-na": "—",
+    "td-runway-sub": "近 6 月累计净利 ÷ 月均支出",
+    "td-mark-done": "标记完成",
+    "td-restore": "查看 {n} 已隐藏",
+    "td-restore-clear": "全部恢复",
+    "td-domain-title": "6 大领域健康度",
+    "td-dom-sales":     "销售",
+    "td-dom-inventory": "库存",
+    "td-dom-customers": "顾客",
+    "td-dom-products":  "产品",
+    "td-dom-finance":   "财务",
+    "td-dom-hr":        "HR",
+    "td-store-visits":  "客流",
+    "td-store-aov":     "客单价 RM",
+    "td-store-cr":      "成交率",
+    "td-store-anom":    "异常",
+
     "cc-title": "老客流失清单",
     "cc-sub": "高终身消费但 6+ 月没回头的会员 — 优先打电话名单。",
     "cc-summary-total": "流失数",
@@ -2292,14 +2461,15 @@ function enterApp() {
 
   // Initial view:
   //   - warehouse role → warehouse list (their job, no menu access)
-  //   - owner → URL ?view= if present (deep link), else 'sales' (the new
-  //     7-domain default landing per V1 第 5 刀 spec)
+  //   - owner → URL ?view= if present (deep link), else 'today' (V1 第三刀:
+  //     Today is the new owner landing — status light + 3 actions + 5-store
+  //     traffic + 6-domain health. Sales is one click away.)
   let initialView;
   if (VIEW_AS === 'warehouse') {
     initialView = 'warehouse';
   } else {
     const url = viewFromUrl();
-    initialView = url && VIEW_ROUTES[url] ? url : 'sales';
+    initialView = url && VIEW_ROUTES[url] ? url : 'today';
   }
   setView(initialView);
 
@@ -2958,9 +3128,11 @@ function setViewAs(mode) {
   syncRoleUrl();
   publishRoleState();
   // Jump to that role's default page
+  // V1 第三刀: owner default = 'today'. Branch manager still lands on 'sales'
+  // (their branch's sales is what they care about).
   if (mode === 'warehouse') setView('warehouse');
   else if (mode === 'branch') setView('sales');
-  else setView('sales');
+  else setView('today');
 }
 function setBranch(code) {
   if (!code) return;
@@ -5011,16 +5183,19 @@ function collectTodayCandidates() {
 /* ── Pick top 3 spanning ≥ 2 dimensions ─────────────────────────── */
 function pickTodayThree(candidates) {
   if (!candidates.length) return [];
-  candidates.sort((a, b) => b.urgency - a.urgency);
+  // V1 第三刀: filter dismissed kinds (Mark as done). Persist to localStorage.
+  const dismissed = getDismissedTodayKinds();
+  const live = candidates.filter(c => !dismissed.has(c.kind));
+  live.sort((a, b) => b.urgency - a.urgency);
   const dims = new Set();
   const picked = [];
   // First pass: take highest-urgency candidate per dimension
-  for (const c of candidates) {
+  for (const c of live) {
     if (picked.length >= 3) break;
     if (!dims.has(c.dim)) { picked.push(c); dims.add(c.dim); }
   }
   // Second pass: fill remaining slots from any dimension
-  for (const c of candidates) {
+  for (const c of live) {
     if (picked.length >= 3) break;
     if (!picked.includes(c)) picked.push(c);
   }
@@ -5034,12 +5209,248 @@ function urgencyTier(value) {
   return 'low';
 }
 
-/* ── Render Today Overview ──────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────────────
+   V1 第三刀 — Today helpers: dismissals, FMM-driven Cash Runway,
+   per-domain health tiers, per-branch traffic snapshot.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* Mark-as-done: persist dismissed action-card kinds in localStorage. */
+const TD_DISMISS_KEY = 'wp_today_dismissed_v1';
+function getDismissedTodayKinds() {
+  try {
+    const raw = localStorage.getItem(TD_DISMISS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch(_) { return new Set(); }
+}
+function dismissTodayKind(kind) {
+  if (!kind) return;
+  const s = getDismissedTodayKinds(); s.add(kind);
+  try { localStorage.setItem(TD_DISMISS_KEY, JSON.stringify([...s])); } catch(_){}
+}
+function restoreAllTodayKinds() {
+  try { localStorage.removeItem(TD_DISMISS_KEY); } catch(_){}
+}
+
+/* Cash runway from FMM: trailing 6m cumulative net P/L ÷ avg monthly expense.
+   Positive = months of cushion built up; negative = burning that many months.
+   Returns { months: Number|null, status: 'ok'|'warn'|'bad'|'na', burning: Bool }. */
+function computeCashRunway() {
+  const fd = window.WP_FINANCIAL || {};
+  const sc = Array.isArray(fd.sales_coll_series) ? fd.sales_coll_series : [];
+  const cats = Array.isArray(fd.categories) ? fd.categories : [];
+  if (!sc.length || !cats.length) return { months: null, status: 'na', burning: false };
+
+  // Per-month expense = sum(cat.series[m]) for m in 0..N-1
+  const N = sc.length;
+  let cumNet = 0, sumExp = 0;
+  for (let m = 0; m < N; m++) {
+    let exp = 0;
+    for (const c of cats) {
+      const s = Array.isArray(c.series) ? c.series : [];
+      exp += +s[m] || 0;
+    }
+    cumNet += (+sc[m] || 0) - exp;
+    sumExp += exp;
+  }
+  const avgExp = sumExp / N;
+  if (!avgExp || !isFinite(avgExp)) return { months: null, status: 'na', burning: false };
+  const months = cumNet / avgExp;
+  const burning = months < 0;
+  let status;
+  if (months >= 3)      status = 'ok';
+  else if (months >= 1) status = 'warn';
+  else                  status = 'bad';
+  return { months, status, burning };
+}
+
+/* Per-domain health — 6 cards. Each returns { key, icon, status, statusText, jump }. */
+function computeDomainHealth() {
+  const ds  = window.WP_DEADSTOCK || {};
+  const fd  = window.WP_FINANCIAL || {};
+  const cd  = window.WP_CUSTOMERS || {};
+  const sl  = window.WP_SALES_LIVE || {};
+  const td  = window.WP_TODAY || {};
+  const out = [];
+
+  // Sales — month-over-month change of latest 2 ALL-branch totals from raw sale.
+  let salesStatus = 'na', salesText = '—';
+  const sbm = (sl._raw_ok && sl.sales_by_branch_month) || sl.sales_by_branch_month || {};
+  const months = Array.isArray(sl.months_seen) ? sl.months_seen.slice() : (Array.isArray(sl.months) ? sl.months.slice() : []);
+  months.sort();
+  if (months.length >= 2) {
+    const cur = months[months.length - 1], prev = months[months.length - 2];
+    let curTotal = 0, prevTotal = 0;
+    for (const b of Object.keys(sbm)) {
+      curTotal  += (sbm[b] && sbm[b][cur])  || 0;
+      prevTotal += (sbm[b] && sbm[b][prev]) || 0;
+    }
+    if (prevTotal > 0) {
+      const mom = (curTotal - prevTotal) / prevTotal;
+      const pct = (mom * 100);
+      if      (mom >= -0.05) salesStatus = 'ok';
+      else if (mom >= -0.15) salesStatus = 'warn';
+      else                   salesStatus = 'bad';
+      salesText = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '% MoM';
+    } else if (curTotal > 0) { salesStatus = 'ok'; salesText = 'RM ' + fmtMoney(curTotal); }
+  }
+  out.push({ key: 'sales', icon: '💰', name: t('td-dom-sales'), status: salesStatus, statusText: salesText, jump: 'sales' });
+
+  // Inventory — problem stock %.
+  let invStatus = 'na', invText = '—';
+  const dsm = ds.meta || {};
+  if (typeof dsm.problem_pct === 'number') {
+    const p = dsm.problem_pct;
+    if      (p < 25) invStatus = 'ok';
+    else if (p < 40) invStatus = 'warn';
+    else             invStatus = 'bad';
+    invText = fmtPct(p) + ' problem';
+  }
+  out.push({ key: 'inventory', icon: '📦', name: t('td-dom-inventory'), status: invStatus, statusText: invText, jump: 'inventory' });
+
+  // Customers — high-value churn count.
+  let custStatus = 'na', custText = '—';
+  const churnSum = (td.churn && td.churn.summary) || {};
+  if (typeof churnSum.n_high_value === 'number') {
+    const n = churnSum.n_high_value;
+    if      (n < 50)  custStatus = 'ok';
+    else if (n < 200) custStatus = 'warn';
+    else              custStatus = 'bad';
+    custText = fmt(n) + ' lapsed';
+  }
+  out.push({ key: 'customers', icon: '👥', name: t('td-dom-customers'), status: custStatus, statusText: custText, jump: 'customers' });
+
+  // Products — average brand GP%.
+  let prodStatus = 'na', prodText = '—';
+  const brands = Array.isArray(fd.brands) ? fd.brands : [];
+  if (brands.length) {
+    const avgGp = brands.reduce((a, b) => a + (b.gp_pct || 0), 0) / brands.length;
+    if      (avgGp >= 25) prodStatus = 'ok';
+    else if (avgGp >= 20) prodStatus = 'warn';
+    else                  prodStatus = 'bad';
+    prodText = avgGp.toFixed(1) + '% avg GP';
+  }
+  out.push({ key: 'products', icon: '🏷️', name: t('td-dom-products'), status: prodStatus, statusText: prodText, jump: 'products' });
+
+  // Finance — net%.
+  let finStatus = 'na', finText = '—';
+  const h = fd.headline || {};
+  if (typeof h.net_pct === 'number') {
+    const n = h.net_pct;
+    if      (n >= 5) finStatus = 'ok';
+    else if (n >= 0) finStatus = 'warn';
+    else             finStatus = 'bad';
+    finText = (n >= 0 ? '+' : '') + n.toFixed(1) + '% net';
+  }
+  out.push({ key: 'finance', icon: '📈', name: t('td-dom-finance'), status: finStatus, statusText: finText, jump: 'finance' });
+
+  // HR — payroll % of sales (target 28%).
+  let hrStatus = 'na', hrText = '—';
+  if (typeof h.hr_pct_sales === 'number') {
+    const p = h.hr_pct_sales;
+    if      (p <= 28) hrStatus = 'ok';
+    else if (p <= 32) hrStatus = 'warn';
+    else              hrStatus = 'bad';
+    hrText = p.toFixed(0) + '% of sales';
+  }
+  out.push({ key: 'hr', icon: '👤', name: t('td-dom-hr'), status: hrStatus, statusText: hrText, jump: 'hr' });
+
+  return out;
+}
+
+/* Roll up domain health into one status light. 🟢 = none bad, 🟡 = ≤2 bad, 🔴 = ≥3 bad. */
+function computeOverallStatus(domains) {
+  let bad = 0, warn = 0, na = 0;
+  for (const d of domains) {
+    if (d.status === 'bad')  bad++;
+    else if (d.status === 'warn') warn++;
+    else if (d.status === 'na')   na++;
+  }
+  const live = domains.length - na;
+  if (live === 0) return { light: '⚪', tone: 'na', bad, warn, na };
+  if (bad >= 1)            return { light: '🔴', tone: 'bad',  bad, warn, na };
+  if (warn >= 2)           return { light: '🟡', tone: 'warn', bad, warn, na };
+  return { light: '🟢', tone: 'ok', bad, warn, na };
+}
+
+/* Per-branch traffic for the 5-store row. Pulls from WP_CUSTOMERS.race.by_branch
+   (live floatation feed) — visits / AOV / CR / anomaly count. */
+function computeBranchTraffic() {
+  const cd = window.WP_CUSTOMERS || {};
+  const ds = window.WP_DEADSTOCK || {};
+  const td = window.WP_TODAY || {};
+  const race = cd.race || {};
+  const byBranch = race.by_branch || {};
+  const months = Array.isArray(race.months) ? race.months : [];
+  const lastIdx = months.length ? months.length - 1 : -1;
+  // 5 active branches (canonical order)
+  const active = ['W01','W02','W03','W05','W07'];
+  const rows = active.map(code => {
+    const b = byBranch[code] || {};
+    const walkin   = lastIdx >= 0 && b.walkin   ? (+b.walkin[lastIdx]   || 0) : 0;
+    const purchase = lastIdx >= 0 && b.purchase ? (+b.purchase[lastIdx] || 0) : 0;
+    const amount   = lastIdx >= 0 && b.amount   ? (+b.amount[lastIdx]   || 0) : 0;
+    const aov      = purchase > 0 ? amount / purchase : 0;
+    const cr       = walkin > 0 ? purchase / walkin : 0;
+    // Anomalies = inventory problem % flag + low-CR flag
+    const dsByBr = (ds.by_branch || {})[code] || {};
+    const probPct = dsByBr.problem_pct || 0;
+    let anomalies = 0;
+    if (probPct >= 30) anomalies++;
+    if (walkin > 0 && cr < 0.5) anomalies++;
+    if (walkin > 0 && aov < 200) anomalies++;
+    return { code, name: dsByBr.name || code, walkin, aov, cr, anomalies };
+  });
+  return rows;
+}
+
+/* ── Render Today (V1 第三刀 · 4 layers) ────────────────────────── */
 function renderToday() {
   const ds = window.WP_DEADSTOCK || {};
-  const m = ds.meta || {};
+  const m  = ds.meta || {};
 
-  // Banner
+  // Layer 1 — status light + Cash Runway
+  const statusEl = document.getElementById('todayStatus');
+  const domains  = computeDomainHealth();
+  const overall  = computeOverallStatus(domains);
+  const runway   = computeCashRunway();
+  if (statusEl) {
+    let headlineKey = 'td-status-na', headlineCls = '';
+    if      (overall.tone === 'ok')   { headlineKey = 'td-status-ok';   headlineCls = 'ok'; }
+    else if (overall.tone === 'warn') { headlineKey = 'td-status-warn'; headlineCls = 'warn'; }
+    else if (overall.tone === 'bad')  { headlineKey = 'td-status-bad';  headlineCls = 'danger'; }
+    const headline = t(headlineKey).replace('{bad}', String(Math.max(overall.bad, overall.warn)));
+
+    let runwayValue, runwayCls = '';
+    if (runway.status === 'na') {
+      runwayValue = t('td-runway-na');
+      runwayCls   = '';
+    } else if (runway.burning) {
+      runwayValue = t('td-runway-burn').replace('{n}', Math.abs(runway.months).toFixed(1));
+      runwayCls   = 'danger';
+    } else {
+      runwayValue = t('td-runway-months').replace('{n}', runway.months.toFixed(1));
+      runwayCls   = runway.status === 'ok' ? 'ok' : runway.status === 'warn' ? 'warn' : 'danger';
+    }
+    statusEl.innerHTML =
+      '<div class="tst-light" id="todayStatusLight" data-tone="' + overall.tone + '">' + overall.light + '</div>' +
+      '<div class="tst-summary">' +
+        '<div class="tst-headline ' + headlineCls + '" id="todayStatusHeadline">' + headline + '</div>' +
+        '<div class="tst-sub">' +
+          domains.filter(d => d.status === 'bad' || d.status === 'warn')
+                 .map(d => d.icon + ' ' + d.name + ' · ' + d.statusText).join('   ') +
+          (overall.tone === 'ok' ? domains.map(d => d.icon + ' ' + d.name + ' · ' + d.statusText).slice(0,3).join('   ') : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="tst-runway">' +
+        '<div class="tst-r-label">' + t('td-runway-label') + '</div>' +
+        '<div class="tst-r-value ' + runwayCls + '" id="todayRunway">' + runwayValue + '</div>' +
+        '<div class="tst-r-sub">' + t('td-runway-sub') + '</div>' +
+      '</div>';
+  }
+
+  // Legacy banner (date + headline)
   const banner = document.getElementById('todayBanner');
   if (banner) {
     const today = new Date();
@@ -5056,10 +5467,13 @@ function renderToday() {
       '<div class="td-headline">' + head + '</div>';
   }
 
-  // 3 cards
-  const cardsEl = document.getElementById('todayCards');
+  // Layer 2 — Action Plan (3 cards) with Mark-as-done
+  const cardsEl   = document.getElementById('todayCards');
+  const restoreEl = document.getElementById('todayRestoreBar');
   const candidates = collectTodayCandidates();
   const top3 = pickTodayThree(candidates);
+  const dismissed = getDismissedTodayKinds();
+  const dismissedCount = candidates.filter(c => dismissed.has(c.kind)).length;
   if (cardsEl) {
     if (!top3.length) {
       cardsEl.innerHTML = '<div class="today-card empty">' + t('td-empty') + '</div>';
@@ -5074,53 +5488,61 @@ function renderToday() {
             '<div class="td-action-label">' + t('td-action-label') + '</div>' +
             '<div class="td-action">' + c.action + '</div>' +
           '</div>' +
-          '<button class="td-jump" type="button" data-jump-btn="' + c.jump + '">' + t('td-jump') + '</button>' +
+          '<div class="td-actions-col">' +
+            '<button class="td-jump" type="button" data-jump-btn="' + c.jump + '">' + t('td-jump') + '</button>' +
+            '<button class="td-mark-done" type="button" data-mark-done="' + c.kind + '">' + t('td-mark-done') + '</button>' +
+          '</div>' +
         '</div>';
       }).join('');
     }
   }
+  if (restoreEl) {
+    if (dismissedCount > 0) {
+      restoreEl.style.display = '';
+      restoreEl.innerHTML =
+        '<span>' + t('td-restore').replace('{n}', dismissedCount) + '</span>' +
+        '<button type="button" id="todayRestoreBtn">' + t('td-restore-clear') + '</button>';
+    } else {
+      restoreEl.style.display = 'none';
+      restoreEl.innerHTML = '';
+    }
+  }
 
-  // 5-store table
+  // Layer 3 — 5-store traffic snapshot
   const storesEl = document.getElementById('todayStores');
   if (storesEl) {
-    const branches = Object.entries(ds.by_branch || {})
-      .sort((a, b) => b[1].problem_pct - a[1].problem_pct);
+    const traffic = computeBranchTraffic();
     const head = '<div class="ts-row head">' +
       '<div>' + t('td-store-id') + '</div>' +
       '<div>' + t('td-store-name') + '</div>' +
-      '<div class="ts-num opt">' + t('td-store-stock') + '</div>' +
-      '<div class="ts-num opt">' + t('td-store-problem') + '</div>' +
-      '<div class="ts-num">' + t('td-store-pct') + '</div>' +
+      '<div class="ts-num">' + t('td-store-visits') + '</div>' +
+      '<div class="ts-num">' + t('td-store-aov') + '</div>' +
+      '<div class="ts-num">' + t('td-store-cr') + '</div>' +
+      '<div class="ts-num">' + t('td-store-anom') + '</div>' +
     '</div>';
-    const rows = branches.map(p => {
-      const id = p[0], b = p[1];
-      const pctCls = b.problem_pct >= 50 ? 'high' : b.problem_pct >= 30 ? 'mid' : 'low';
+    const rows = traffic.map(b => {
+      const anomCls = b.anomalies >= 2 ? 'high' : b.anomalies === 1 ? 'mid' : 'low';
       return '<div class="ts-row">' +
-        '<div class="ts-id">' + id + '</div>' +
-        '<div class="ts-name">' + b.name + '</div>' +
-        '<div class="ts-num opt">RM ' + fmtMoney(b.total) + '</div>' +
-        '<div class="ts-num opt">RM ' + fmtMoney(b.problem) + '</div>' +
-        '<div class="ts-num ts-pct ' + pctCls + '">' + fmtPct(b.problem_pct) + '</div>' +
+        '<div class="ts-id">' + b.code + '</div>' +
+        '<div class="ts-name">' + escapeHtml(b.name || b.code) + '</div>' +
+        '<div class="ts-num">' + (b.walkin ? fmt(b.walkin) : '—') + '</div>' +
+        '<div class="ts-num">' + (b.aov ? fmtMoney(b.aov) : '—') + '</div>' +
+        '<div class="ts-num">' + (b.cr ? (b.cr * 100).toFixed(1) + '%' : '—') + '</div>' +
+        '<div class="ts-num ts-anom ' + anomCls + '">' + (b.anomalies > 0 ? ('⚠ ' + b.anomalies) : '✓ 0') + '</div>' +
       '</div>';
     }).join('');
     storesEl.innerHTML = head + rows;
   }
 
-  // Role status row
-  const rolesEl = document.getElementById('todayRoles');
-  if (rolesEl) {
-    const roles = [
-      { key: 'owner',     live: true,  label: t('td-role-owner') },
-      { key: 'warehouse', live: true,  label: t('td-role-warehouse') },
-      { key: 'finance',   live: false, label: t('td-role-finance') },
-      { key: 'marketing', live: false, label: t('td-role-marketing') },
-    ];
-    rolesEl.innerHTML = roles.map(r => {
-      const cls = r.live ? 'live' : 'idle';
-      const status = r.live ? '✅ ' + t('td-role-live') : '⚪ ' + t('td-role-idle');
-      return '<div class="tr-card ' + cls + '">' +
-        '<div class="tr-name">' + r.label + '</div>' +
-        '<div class="tr-status">' + status + '</div>' +
+  // Layer 4 — 6-domain health grid
+  const gridEl = document.getElementById('todayDomainGrid');
+  if (gridEl) {
+    gridEl.innerHTML = domains.map(d => {
+      const cls = d.status === 'ok' ? 'h-ok' : d.status === 'warn' ? 'h-warn' : d.status === 'bad' ? 'h-bad' : 'h-na';
+      return '<div class="tdg-card ' + cls + '" data-domain-jump="' + d.jump + '" data-domain-key="' + d.key + '">' +
+        '<div class="tdg-icon">' + d.icon + '</div>' +
+        '<div class="tdg-name">' + d.name + '</div>' +
+        '<div class="tdg-status">' + d.statusText + '</div>' +
       '</div>';
     }).join('');
   }
@@ -6032,14 +6454,47 @@ document.addEventListener('DOMContentLoaded', () => {
     handleWarehouseAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'));
   });
 
-  // V1 第 2 刀: today cards click-to-jump
+  // V1 第 2 刀: today cards click-to-jump  (V1 第三刀: + Mark-as-done)
   const tdCards = document.getElementById('todayCards');
   if (tdCards) {
     tdCards.addEventListener('click', e => {
+      // Mark as done — dismiss this kind, persist, re-render Today.
+      const doneBtn = e.target.closest('[data-mark-done]');
+      if (doneBtn) {
+        e.stopPropagation();
+        const kind = doneBtn.getAttribute('data-mark-done');
+        if (kind) {
+          dismissTodayKind(kind);
+          try { renderToday(); } catch(_){}
+        }
+        return;
+      }
       const btn = e.target.closest('[data-jump-btn]');
       const card = e.target.closest('.today-card[data-jump]');
       const target = btn ? btn.getAttribute('data-jump-btn') : (card ? card.getAttribute('data-jump') : null);
       if (target) setView(target);
+    });
+  }
+
+  // V1 第三刀: domain-grid card → jump to that domain dashboard
+  const tdGrid = document.getElementById('todayDomainGrid');
+  if (tdGrid) {
+    tdGrid.addEventListener('click', e => {
+      const card = e.target.closest('[data-domain-jump]');
+      if (!card) return;
+      const target = card.getAttribute('data-domain-jump');
+      if (target) setView(target);
+    });
+  }
+
+  // V1 第三刀: Restore-all dismissed action items
+  const tdRestoreBar = document.getElementById('todayRestoreBar');
+  if (tdRestoreBar) {
+    tdRestoreBar.addEventListener('click', e => {
+      const btn = e.target.closest('#todayRestoreBtn');
+      if (!btn) return;
+      restoreAllTodayKinds();
+      try { renderToday(); } catch(_){}
     });
   }
 
