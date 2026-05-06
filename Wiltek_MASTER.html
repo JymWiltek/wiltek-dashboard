@@ -975,6 +975,43 @@ footer.app-footer {
 .ds-section-title { font-size: 16px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
 .ds-section-sub { font-size: 12px; color: var(--text-meta); margin: 0 0 12px; line-height: 1.5; }
 
+/* V1 第四刀: per-dashboard alert-card grid (4 alerts under top KPIs) */
+.ds-alert-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  margin: 14px 0 24px;
+}
+.ds-alert-grid .ds-alert {
+  background: #fff; border: 1px solid var(--line);
+  border-left: 3px solid var(--neutral, #B7BCC4);
+  border-radius: 10px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 110px;
+}
+.ds-alert-grid .ds-alert.tone-bad   { border-left-color: var(--danger, #C04848); }
+.ds-alert-grid .ds-alert.tone-warn  { border-left-color: #E8A93B; }
+.ds-alert-grid .ds-alert.tone-ok    { border-left-color: var(--brand, #1F5F4A); }
+.ds-alert-grid .ds-alert.tone-na    { border-left-color: var(--neutral, #B7BCC4); opacity: 0.85; }
+.ds-alert-grid .ds-alert .ds-alert-title {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: 6px;
+}
+.ds-alert-grid .ds-alert .ds-alert-value {
+  font-size: 20px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.ds-alert-grid .ds-alert .ds-alert-value.bad   { color: var(--danger, #C04848); }
+.ds-alert-grid .ds-alert .ds-alert-value.warn  { color: #E8A93B; }
+.ds-alert-grid .ds-alert .ds-alert-sub  {
+  font-size: 11.5px; color: var(--text-meta); line-height: 1.45;
+}
+.ds-alert-grid .ds-alert .ds-alert-pending {
+  font-size: 11px; color: var(--text-meta); font-style: italic;
+  background: var(--surface, #F5F1EA); padding: 6px 8px; border-radius: 6px;
+  margin-top: auto;
+}
+@media (max-width: 1100px) { .ds-alert-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .ds-alert-grid { grid-template-columns: 1fr; } }
+
 /* Status light in header */
 .sanity-light {
   background: transparent; border: 1px solid var(--line); border-radius: 50%;
@@ -1240,11 +1277,13 @@ footer.app-footer {
         </section>
       </div>
 
-      <!-- ── View: Inventory (V1 第6刀: merges Stock + Purchasing) ── -->
+      <!-- ── View: Inventory (V1 第6刀 → 第四刀: 4 KPIs + 4 alert cards + actions) ── -->
       <div class="view" id="view-inventory">
         <h1 class="page-title" data-i18n="ds-inv-title">Inventory</h1>
-        <p class="page-sub" data-i18n="ds-inv-sub">总库存值 · 在途 PO · F-N-S 健康度 · 平均 lead time · all in one place.</p>
+        <p class="page-sub" data-i18n="ds-inv-sub">库存健康度 · 订单缺口 · 断货预警 · OEM/Agency 对比 · 全在一页。</p>
         <div class="ds-cards" id="dsInvCards"></div>
+        <!-- V1 第四刀: 4 alert cards (Inventory) -->
+        <div class="ds-alert-grid" id="dsInvAlerts"></div>
         <div class="chart-wrap"><div class="chart-title" id="dsInvChartTitle"></div>
           <canvas id="dsInvChart" height="140" aria-label="F-N-S split"></canvas>
         </div>
@@ -1264,11 +1303,13 @@ footer.app-footer {
       <div class="view" id="view-stock" style="display:none"><div class="ds-cards" id="dsStockCards"></div><div id="dsStockChartTitle"></div><canvas id="dsStockChart" style="display:none"></canvas><div id="dsStockAction"></div><div id="dsStockDrills"></div></div>
       <div class="view" id="view-purchasing" style="display:none"><div class="ds-cards" id="dsPurchCards"></div><div id="dsPurchChartTitle"></div><canvas id="dsPurchChart" style="display:none"></canvas><div id="dsPurchAction"></div><div id="dsPurchDrills"></div></div>
 
-      <!-- ── View: Customers (main domain dashboard) ───────────── -->
+      <!-- ── View: Customers (V1 第四刀: 3 KPIs + 4 alert cards + actions) ── -->
       <div class="view" id="view-customers">
         <h1 class="page-title" data-i18n="ds-cust-title">Customers</h1>
-        <p class="page-sub" data-i18n="ds-cust-sub">Active members · age tier mix · lapsed list · drill-down to insights + RFM.</p>
+        <p class="page-sub" data-i18n="ds-cust-sub">客户类型健康 · 老客回购 · 种族转化 · 沉睡客户 · 流失预警。</p>
         <div class="ds-cards" id="dsCustCards"></div>
+        <!-- V1 第四刀: 4 alert cards (Customers) -->
+        <div class="ds-alert-grid" id="dsCustAlerts"></div>
         <div class="chart-wrap"><div class="chart-title" id="dsCustChartTitle"></div>
           <canvas id="dsCustChart" height="140" aria-label="Customer age mix"></canvas>
         </div>
@@ -1276,11 +1317,13 @@ footer.app-footer {
         <div class="drill-links" id="dsCustDrills"></div>
       </div>
 
-      <!-- ── View: Products (main domain dashboard) ────────────── -->
+      <!-- ── View: Products (V1 第四刀: 3 KPIs + 4 alert cards + actions) ── -->
       <div class="view" id="view-products">
         <h1 class="page-title" data-i18n="ds-prod-title">Products</h1>
-        <p class="page-sub" data-i18n="ds-prod-sub">SKU 总数 · 品牌结构 · F-N-S movement · drill-down coming.</p>
+        <p class="page-sub" data-i18n="ds-prod-sub">SKU Velocity Index · Top SKU 异常 · Strategic Push 追踪 · ABCD 等级。</p>
         <div class="ds-cards" id="dsProdCards"></div>
+        <!-- V1 第四刀: 4 alert cards (Products) -->
+        <div class="ds-alert-grid" id="dsProdAlerts"></div>
         <div class="chart-wrap"><div class="chart-title" id="dsProdChartTitle"></div>
           <canvas id="dsProdChart" height="140" aria-label="Brand GP ranking"></canvas>
         </div>
@@ -1881,6 +1924,44 @@ const STR = {
     "td-store-cr":      "CR %",
     "td-store-anom":    "Anomalies",
 
+    "ds-prod-kpi-velocity":   "SKU Velocity Index",
+    "ds-prod-kpi-stockout":   "Top SKU stockout alerts",
+    "ds-prod-kpi-push":       "Strategic Push tracking",
+    "ds-prod-vel-pending":    "3m sales data missing — refresh in a moment",
+    "ds-prod-stock-pending":  "stock × velocity match pending data load",
+    "ds-prod-push-pending":   "Sheet has no Strategic_Push column yet — using top-5 sales as placeholder",
+    "ds-prod-alert-stockout-title": "Stockout risk (OEM/Agency)",
+    "ds-prod-alert-drain-title":    "Slow-moving capital drain",
+    "ds-prod-alert-migrate-title":  "ABCD migration alert",
+    "ds-prod-alert-migrate-pending":"Daily snapshot infra not built yet — yesterday vs today ABCD diff coming next cut",
+    "ds-prod-alert-pro-pref-title": "Designer / Contractor SKU preference",
+    "ds-prod-alert-pro-pref-pending":"per-cust-type × per-SKU map needs Customer Buy + Item Sales join — pending",
+
+    "ds-inv-kpi-health":      "Inventory health",
+    "ds-inv-kpi-gap":         "Order gap alert",
+    "ds-inv-kpi-stockout":    "Stockout SKU count",
+    "ds-inv-kpi-oem-agency":  "OEM vs Agency",
+    "ds-inv-alert-oem-cal-title":   "OEM (China) PO calendar",
+    "ds-inv-alert-oem-cal-pending": "Per-SKU PO history + Country field needed — pending",
+    "ds-inv-alert-transfer-title":  "Transfer opportunities (misplaced)",
+    "ds-inv-alert-dead-clear-title":"Dead-stock Top 20 clearance",
+    "ds-inv-alert-po-a-title":      "PO exceptions hitting A-grade SKUs",
+
+    "ds-cust-kpi-mix":        "Customer type mix",
+    "ds-cust-kpi-repeat":     "Repeat-rate health (top 100)",
+    "ds-cust-kpi-race":       "Race walk-in CR (best)",
+    "ds-cust-mix-pending":    "cross_by_window not yet loaded",
+    "ds-cust-repeat-pending": "top100 not yet loaded",
+    "ds-cust-race-pending":   "race feed not yet loaded",
+    "ds-cust-alert-sleep-title":   "Sleeping high-value (Top 100)",
+    "ds-cust-alert-sleep-pending": "top100 + 3m visits data missing",
+    "ds-cust-alert-pro-title":     "Designer / Contractor / Builders",
+    "ds-cust-alert-pro-pending":   "cross_by_window cust-type data missing",
+    "ds-cust-alert-churn-title":   "High-value churn alert",
+    "ds-cust-alert-churn-pending": "top100 m1/m6 split not yet loaded",
+    "ds-cust-alert-race-cross-title":   "Race × purchase preference",
+    "ds-cust-alert-race-cross-pending": "Customer Buy has no race tag — race × category needs join from Floatation Sheet",
+
     "cc-title": "Lapsed Customers",
     "cc-sub": "High-lifetime members who haven't shopped in 6+ months — first call list.",
     "cc-summary-total": "Lapsed",
@@ -2267,6 +2348,44 @@ const STR = {
     "td-store-aov":     "客单价 RM",
     "td-store-cr":      "成交率",
     "td-store-anom":    "异常",
+
+    "ds-prod-kpi-velocity":   "SKU 周转健康度",
+    "ds-prod-kpi-stockout":   "Top SKU 异常告警",
+    "ds-prod-kpi-push":       "Strategic Push 追踪",
+    "ds-prod-vel-pending":    "3 月销售数据加载中,稍候点 Refresh",
+    "ds-prod-stock-pending":  "库存 × 周转匹配数据待载",
+    "ds-prod-push-pending":   "Sheet 还没加 Strategic_Push 列,先用销售 Top 5 占位",
+    "ds-prod-alert-stockout-title": "断货风险(OEM/Agency)",
+    "ds-prod-alert-drain-title":    "慢销 SKU 资金锁仓",
+    "ds-prod-alert-migrate-title":  "SKU 等级迁徙告警",
+    "ds-prod-alert-migrate-pending":"每日快照机制还没建,昨天 vs 今天 ABCD 比对下一刀",
+    "ds-prod-alert-pro-pref-title": "Designer/Contractor SKU 偏好",
+    "ds-prod-alert-pro-pref-pending":"需 Customer Buy × Item Sales 联表,待补",
+
+    "ds-inv-kpi-health":      "库存健康度",
+    "ds-inv-kpi-gap":         "订单缺口预警",
+    "ds-inv-kpi-stockout":    "断货 SKU 预警",
+    "ds-inv-kpi-oem-agency":  "OEM vs Agency",
+    "ds-inv-alert-oem-cal-title":   "OEM (中国) PO 周期日历",
+    "ds-inv-alert-oem-cal-pending": "需逐 SKU PO 历史 + Country 字段,待补",
+    "ds-inv-alert-transfer-title":  "调拨机会(错位)",
+    "ds-inv-alert-dead-clear-title":"OEM 死货 Top 20 清仓",
+    "ds-inv-alert-po-a-title":      "采购异常命中 A 级 SKU",
+
+    "ds-cust-kpi-mix":        "客户类型健康度",
+    "ds-cust-kpi-repeat":     "老客回购健康度(Top 100)",
+    "ds-cust-kpi-race":       "种族 walk-in 转化(最高)",
+    "ds-cust-mix-pending":    "cross_by_window 数据加载中",
+    "ds-cust-repeat-pending": "top100 数据加载中",
+    "ds-cust-race-pending":   "race 数据加载中",
+    "ds-cust-alert-sleep-title":   "沉睡高价值客户(Top 100)",
+    "ds-cust-alert-sleep-pending": "top100 + 近 3 月数据加载中",
+    "ds-cust-alert-pro-title":     "Designer/Contractor/Builders",
+    "ds-cust-alert-pro-pending":   "cust-type 数据加载中",
+    "ds-cust-alert-churn-title":   "高价值客户流失预警",
+    "ds-cust-alert-churn-pending": "top100 m1/m6 数据加载中",
+    "ds-cust-alert-race-cross-title":   "种族购买偏好 cross-tab",
+    "ds-cust-alert-race-cross-pending": "Customer Buy 没种族字段,需 Floatation Sheet × 品类联表,待补",
 
     "cc-title": "老客流失清单",
     "cc-sub": "高终身消费但 6+ 月没回头的会员 — 优先打电话名单。",
@@ -4006,10 +4125,373 @@ function renderPurchasingDashboard() {
     drillTile('purchasing/exceptions', 'drill-po-exc', 'drill-po-exc-sub', '🛒');
 }
 
-/* ── Customers dashboard ──────────────────────────────────────── */
-function renderCustomersDashboard() {
+/* ════════════════════════════════════════════════════════════════════════
+   V1 第四刀 — Domain dashboard helpers
+   ════════════════════════════════════════════════════════════════════════
+   All compute functions below are PURE — read window.WP_* globals, return
+   plain JS values. No DOM. Used by Products / Inventory / Customers
+   dashboard renderers. When source data is missing, return shape
+   { ok: false, reason: 'missing-X' } so the renderer can show '待补'
+   honestly instead of inventing numbers (per Jym's hard rule). */
+
+/* ABCD by 90-day sales velocity. Sums sku_branch_sales_3m across branches,
+   sorts descending, assigns A=top 80% of cumulative volume, B=80–95, C=95–100
+   (positive sales), D=stocked SKUs with 0 sales in 3m. Returns:
+     { ok, totals: {A, B, C, D}, sortedSkus: [{ code, qty }],
+       skuRank: Map<code, 'A'|'B'|'C'|'D'>, total_3m_qty }                */
+function computeABCD() {
+  const ds = window.WP_DEADSTOCK || {};
+  const sbs3 = ds.sku_branch_sales_3m || {};
+  const skuStock = ds.sku_branch_stock || {};
+  // Sum 3m qty per SKU across branches
+  const skuQty = {};
+  for (const code of Object.keys(sbs3)) {
+    let s = 0;
+    const br = sbs3[code] || {};
+    for (const b of Object.keys(br)) s += (+br[b] || 0);
+    if (s > 0) skuQty[code] = s;
+  }
+  const sorted = Object.entries(skuQty).sort((a, b) => b[1] - a[1]).map(p => ({ code: p[0], qty: p[1] }));
+  const totalQty = sorted.reduce((a, x) => a + x.qty, 0);
+  if (totalQty === 0) return { ok: false, reason: 'no-3m-sales' };
+  const skuRank = new Map();
+  let cum = 0; let A = 0, B = 0, C = 0;
+  for (const x of sorted) {
+    cum += x.qty;
+    const pct = cum / totalQty * 100;
+    if (pct <= 80)        { skuRank.set(x.code, 'A'); A++; }
+    else if (pct <= 95)   { skuRank.set(x.code, 'B'); B++; }
+    else                  { skuRank.set(x.code, 'C'); C++; }
+  }
+  // D = stocked SKUs with 0 sales in 3m
+  const skusWithStock = new Set(Object.keys(skuStock));
+  const skusWith3mSales = new Set(Object.keys(skuQty));
+  let D = 0;
+  for (const code of skusWithStock) if (!skusWith3mSales.has(code)) { skuRank.set(code, 'D'); D++; }
+  return {
+    ok: true,
+    totals: { A, B, C, D },
+    sortedSkus: sorted,
+    skuRank,
+    total_3m_qty: totalQty,
+  };
+}
+window.computeABCD = computeABCD;
+
+/* SKU Velocity Index — single 0–100 health score for the whole catalog.
+   Defined as: 100 × (A + B) / (A + B + C + D). High = most stock is moving.
+   Threshold: ≥ 60 ok, 45–59 warn, < 45 bad. */
+function computeSkuVelocityIndex(abcd) {
+  if (!abcd || !abcd.ok) return { ok: false, value: null, status: 'na' };
+  const { A, B, C, D } = abcd.totals;
+  const denom = A + B + C + D;
+  if (!denom) return { ok: false, value: null, status: 'na' };
+  const v = 100 * (A + B) / denom;
+  return { ok: true, value: v, status: v >= 60 ? 'ok' : v >= 45 ? 'warn' : 'bad', a: A, b: B, c: C, d: D };
+}
+
+/* Top-SKU stockout risk: for top-25 SKUs by 3m sales, days_of_stock = total
+   stock-on-hand qty / (3m_qty / 90). Return list with worst (smallest days).
+   Threshold: < 14 days = critical. */
+function computeStockoutRisks(abcd) {
+  if (!abcd || !abcd.ok) return { ok: false, list: [] };
+  const ds = window.WP_DEADSTOCK || {};
+  const stock = ds.sku_branch_stock || {};
+  const top = abcd.sortedSkus.slice(0, 25);
+  const list = [];
+  for (const x of top) {
+    const br = stock[x.code] || {};
+    let totalStock = 0;
+    for (const b of Object.keys(br)) totalStock += (+br[b] || 0);
+    const dailyVel = x.qty / 90;
+    const days = dailyVel > 0 ? totalStock / dailyVel : 999;
+    list.push({ code: x.code, qty3m: x.qty, stock: totalStock, days, critical: days < 14 });
+  }
+  list.sort((a, b) => a.days - b.days);
+  return { ok: true, list, critical_n: list.filter(x => x.critical).length };
+}
+
+/* Strategic Push — Sheet has no Strategic_Push column yet. Per Jym's spec:
+   if no column, fall back to Top-5-by-3m-sales as placeholder. The card
+   honestly notes "Top 5 销售 (placeholder, Sheet 加 Strategic_Push 后切换)". */
+function computeStrategicPushPlaceholder(abcd) {
+  if (!abcd || !abcd.ok || !abcd.sortedSkus.length) return { ok: false, list: [] };
+  return { ok: true, list: abcd.sortedSkus.slice(0, 5), placeholder: true };
+}
+
+/* Slow-moving capital drain: D-class SKUs and total tied-up RM. Use the
+   sku_branch_stock × unit_cost from rows. */
+function computeSlowMoverDrain(abcd) {
+  if (!abcd || !abcd.ok) return { ok: false };
+  const ds = window.WP_DEADSTOCK || {};
+  const rows = ds.rows || [];
+  // Pick rows whose code is D-class (no 3m sales) and class flag is DEAD/SLOW.
+  const drainRows = rows.filter(r => abcd.skuRank.get(r.code) === 'D' || r.cls === 'DEAD' || r.cls === 'SLOW');
+  let amt = 0; const skuSet = new Set();
+  for (const r of drainRows) { amt += (+r.amount || 0); skuSet.add(r.code); }
+  return { ok: true, n_skus: skuSet.size, amount: amt, rows: drainRows };
+}
+
+/* Customer-type mix at the snapshot window. Reads cross_by_window[period]
+   keyed by ['Walk-in', 'Contractor', 'Interior Designer', 'Other']. */
+function computeCustTypeMix(periodKey) {
   const cd = window.WP_CUSTOMERS || {};
-  const churn = (window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.summary) || {};
+  const cross = (cd.cross_by_window || {})[periodKey || '1m'] || {};
+  const types = cd.types || ['Walk-in','Contractor','Interior Designer','Other'];
+  const out = {};
+  let totalN = 0, totalAmt = 0;
+  for (const t of types) {
+    const c = cross[t] || {};
+    const n = c.n || c.total || 0;
+    const a = c.amt || c.amt_total || 0;
+    out[t] = { n, amt: a };
+    totalN += n; totalAmt += a;
+  }
+  return { ok: totalN > 0, byType: out, totalN, totalAmt };
+}
+
+/* New-vs-old customer split via top100 enrol date. New = enrolled within
+   last 12 months. Returns counts + AOV (lifetime_amt / age in years).        */
+function computeNewVsOldCustomers() {
+  const cd = window.WP_CUSTOMERS || {};
+  const top = cd.top100 || [];
+  if (!top.length) return { ok: false };
+  let nNew = 0, nOld = 0, amtNew = 0, amtOld = 0, m1New = 0, m1Old = 0;
+  for (const r of top) {
+    const isNew = (r.age_years || 0) < 1;
+    if (isNew) { nNew++; amtNew += (r.lifetime_amt || 0); m1New += (r.m1_amt || 0); }
+    else       { nOld++; amtOld += (r.lifetime_amt || 0); m1Old += (r.m1_amt || 0); }
+  }
+  return {
+    ok: true,
+    n_new: nNew, n_old: nOld,
+    aov_new: nNew ? amtNew / nNew : 0,
+    aov_old: nOld ? amtOld / nOld : 0,
+    m1_new:  m1New, m1_old: m1Old,
+  };
+}
+
+/* Repeat rate for the snapshot month: % of top100 with m1_visits ≥ 2.
+   Caveat: top100 is the upper end; this is a "high-tier repeat rate". */
+function computeRepeatRate() {
+  const cd = window.WP_CUSTOMERS || {};
+  const top = cd.top100 || [];
+  if (!top.length) return { ok: false };
+  const repeat = top.filter(r => (r.m1_visits || 0) >= 2).length;
+  return { ok: true, total: top.length, repeat, pct: 100 * repeat / top.length };
+}
+
+/* Race walk-in conversion (latest month). AOV per race not available
+   (per Notion: "客单价做不了 — Customer Buy 没种族字段"). */
+function computeRaceConversion() {
+  const cd = window.WP_CUSTOMERS || {};
+  const race = cd.race || {};
+  const races = Array.isArray(race.races) ? race.races : [];
+  const months = race.months || [];
+  if (!races.length || !months.length) return { ok: false };
+  const idx = months.length - 1;
+  const out = races.map(r => ({
+    key: r.key,
+    label_en: r.label_en, label_zh: r.label_zh,
+    walkin: Array.isArray(r.walkin) ? (+r.walkin[idx] || 0) : (+r.walkin || 0),
+    cr:     Array.isArray(r.cr)     ? (+r.cr[idx]     || 0) : (+r.cr     || 0),
+  }));
+  // Best / worst CR
+  const sorted = out.slice().sort((a, b) => b.cr - a.cr);
+  return { ok: true, races: out, best: sorted[0], worst: sorted[sorted.length - 1] };
+}
+
+/* Sleeping high-value customers — top100 with m3_visits = 0 (didn't shop in
+   the last 3 months). Sorted by lifetime_amt desc. */
+function computeSleepingTop() {
+  const cd = window.WP_CUSTOMERS || {};
+  const top = cd.top100 || [];
+  if (!top.length) return { ok: false };
+  const sleeping = top.filter(r => (r.m3_visits || 0) === 0)
+                      .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
+  return { ok: true, list: sleeping, count: sleeping.length };
+}
+
+/* High-value churn alert — top100 with m6_visits > 0 but m1_visits = 0
+   (was active in 6m window, gone silent this month). */
+function computeChurnAlerts() {
+  const cd = window.WP_CUSTOMERS || {};
+  const top = cd.top100 || [];
+  if (!top.length) return { ok: false };
+  const list = top.filter(r => (r.m6_amt || 0) > 0 && (r.m1_amt || 0) === 0)
+                  .sort((a, b) => (b.m6_amt || 0) - (a.m6_amt || 0));
+  return { ok: true, list, count: list.length };
+}
+
+/* PO exceptions affecting A-grade SKUs. Intersect overdue/delayed PO codes
+   with abcd.skuRank → only those marked 'A'. */
+function computePoAffectsA(abcd) {
+  if (!abcd || !abcd.ok) return { ok: false };
+  const td = window.WP_TODAY || {};
+  const po = td.po_exceptions || {};
+  const all = [...(po.overdue || []), ...(po.delayed || [])];
+  const aHits = all.filter(r => abcd.skuRank.get(r.code) === 'A');
+  let amt = 0;
+  for (const r of aHits) amt += (+r.amount || 0);
+  return { ok: true, n: aHits.length, amount: amt, list: aHits };
+}
+
+/* MoM stock health — compares current vs prior-snapshot problem_pct.
+   We DO NOT have prior-snapshot data baked in. Per Jym's mandate: 待补. */
+function computeStockHealthMoM() {
+  return { ok: false, reason: 'no-prior-snapshot' };
+}
+
+/* Order-gap alert — historical PO avg × 1.05 vs current month PO. Without
+   per-month PO history series exposed, return 待补. */
+function computeOrderGap() {
+  return { ok: false, reason: 'no-monthly-po-history' };
+}
+
+/* OEM vs Agency split — Country field (China=OEM / Malaysia=Agency) not
+   exposed by /api/proxy?type=stock today. 待补. */
+function computeOemAgencySplit() {
+  return { ok: false, reason: 'no-country-field' };
+}
+
+/* Helper: render an alert card.                                           */
+function dsAlert(title, value, sub, tone, pendingNote) {
+  const t1 = tone || 'na';
+  const cls = 'ds-alert tone-' + t1;
+  const valCls = (t1 === 'bad' ? ' bad' : t1 === 'warn' ? ' warn' : '');
+  const head   = '<div class="ds-alert-title">' + title + '</div>';
+  const valHtml = value != null ? '<div class="ds-alert-value' + valCls + '">' + value + '</div>' : '';
+  const subHtml = sub ? '<div class="ds-alert-sub">' + sub + '</div>' : '';
+  const pendHtml = pendingNote ? '<div class="ds-alert-pending">' + pendingNote + '</div>' : '';
+  return '<div class="' + cls + '">' + head + valHtml + subHtml + pendHtml + '</div>';
+}
+
+/* ── Customers dashboard (V1 第四刀: 3 KPIs + 4 alerts) ───────── */
+function renderCustomersDashboard() {
+  // V1 第四刀: top 3 KPIs are now (1) cust type mix (2) repeat rate +
+  // new vs old AOV (3) race walk-in CR. Existing 4 KPIs (members /
+  // active / vet share / lapsed) preserved as the legacy chart context
+  // below the new alerts so the page still tells a complete story.
+  const period = window.PERIOD || '1m';
+  const mix    = computeCustTypeMix(period);
+  const repeat = computeRepeatRate();
+  const newOld = computeNewVsOldCustomers();
+  const race   = computeRaceConversion();
+  const sleeping = computeSleepingTop();
+  const churnAlert = computeChurnAlerts();
+
+  // 1) Customer type mix — pick dominant type + share, flag if Walk-in > 70% (over-reliance)
+  let kpi1Val = '—', kpi1Sub = t('ds-cust-mix-pending'), kpi1Cls = '';
+  if (mix.ok) {
+    const sorted = Object.entries(mix.byType).sort((a, b) => b[1].n - a[1].n);
+    const [topType, topInfo] = sorted[0];
+    const pct = mix.totalN ? 100 * topInfo.n / mix.totalN : 0;
+    kpi1Val = (LANG === 'zh' && topType === 'Walk-in') ? '散客' :
+              (LANG === 'zh' && topType === 'Contractor') ? '承包商' :
+              (LANG === 'zh' && topType === 'Interior Designer') ? '设计师' :
+              (LANG === 'zh' && topType === 'Other') ? '其他' : topType;
+    kpi1Sub = (LANG === 'zh'
+      ? `${pct.toFixed(0)}% 占比 · ${fmt(topInfo.n)} 人 · ${fmt(mix.totalN)} 总活跃`
+      : `${pct.toFixed(0)}% share · ${fmt(topInfo.n)} of ${fmt(mix.totalN)} active`);
+    if (topType === 'Walk-in' && pct > 70) kpi1Cls = 'warn';
+  }
+
+  // 2) Repeat rate — top100 with m1_visits ≥ 2. Threshold: ≥30% ok, 15-30% warn, <15% bad.
+  let kpi2Val = '—', kpi2Sub = t('ds-cust-repeat-pending'), kpi2Cls = '';
+  if (repeat.ok) {
+    kpi2Val = repeat.pct.toFixed(1) + '%';
+    if (repeat.pct < 15)      kpi2Cls = 'danger';
+    else if (repeat.pct < 30) kpi2Cls = 'warn';
+    if (newOld.ok) {
+      kpi2Sub = (LANG === 'zh'
+        ? `老客 AOV RM ${fmtMoney(newOld.aov_old)} · 新客 RM ${fmtMoney(newOld.aov_new)}`
+        : `Old AOV RM ${fmtMoney(newOld.aov_old)} · New RM ${fmtMoney(newOld.aov_new)}`);
+    } else {
+      kpi2Sub = `${fmt(repeat.repeat)} of ${fmt(repeat.total)} ` + (LANG === 'zh' ? '老客回头' : 'high-tier repeat');
+    }
+  }
+
+  // 3) Race walk-in CR — best vs worst race
+  let kpi3Val = '—', kpi3Sub = t('ds-cust-race-pending'), kpi3Cls = '';
+  if (race.ok) {
+    const best = race.best;
+    const bestLabel = LANG === 'zh' ? (best.label_zh || best.key) : (best.label_en || best.key);
+    kpi3Val = (best.cr * 100).toFixed(1) + '%';
+    kpi3Sub = (LANG === 'zh'
+      ? `${bestLabel} CR 最高 · 客单价待 race × Customer Buy 接通`
+      : `${bestLabel} highest CR · AOV requires race × Customer Buy join`);
+    if (best.cr < 0.5) kpi3Cls = 'warn';
+  }
+
+  document.getElementById('dsCustCards').innerHTML =
+    dsCard(t('ds-cust-kpi-mix'),     kpi1Val, kpi1Sub, kpi1Cls) +
+    dsCard(t('ds-cust-kpi-repeat'),  kpi2Val, kpi2Sub, kpi2Cls) +
+    dsCard(t('ds-cust-kpi-race'),    kpi3Val, kpi3Sub, kpi3Cls);
+
+  // ── 4 alert cards ─────────────────────────────────────────────────
+  const alerts = [];
+  // A1: Sleeping high-value Top 50
+  if (sleeping.ok) {
+    const top1 = sleeping.list[0];
+    alerts.push(dsAlert(
+      '😴 ' + t('ds-cust-alert-sleep-title'),
+      fmt(sleeping.count) + (LANG === 'zh' ? ' 位' : ''),
+      LANG === 'zh'
+        ? '近 3 月 0 单 · 终身 RM ' + fmtMoney(sleeping.list.reduce((a, r) => a + (r.lifetime_amt || 0), 0))
+            + (top1 ? ` · 头号:${escapeHtml(top1.name||'—')}` : '')
+        : '0 visits in 3m · lifetime RM ' + fmtMoney(sleeping.list.reduce((a, r) => a + (r.lifetime_amt || 0), 0))
+            + (top1 ? ` · top: ${escapeHtml(top1.name||'—')}` : ''),
+      sleeping.count > 30 ? 'bad' : sleeping.count > 10 ? 'warn' : 'ok'
+    ));
+  } else {
+    alerts.push(dsAlert('😴 ' + t('ds-cust-alert-sleep-title'), null, null, 'na', t('ds-cust-alert-sleep-pending')));
+  }
+  // A2: Designer / Contractor / Builders health (counts + AOV)
+  if (mix.ok) {
+    const segs = ['Contractor','Interior Designer','Other'];
+    const lines = segs.map(s => {
+      const r = mix.byType[s] || { n: 0, amt: 0 };
+      const aov = r.n ? r.amt / r.n : 0;
+      const label = LANG === 'zh' ? ({Contractor:'承包商','Interior Designer':'设计师',Other:'其他'}[s]) : s;
+      return label + ': ' + fmt(r.n) + (LANG === 'zh' ? ' 人' : '') + ' · AOV RM ' + fmtMoney(aov);
+    });
+    const totalNonWalk = segs.reduce((a, s) => a + (mix.byType[s]?.n || 0), 0);
+    alerts.push(dsAlert(
+      '👷 ' + t('ds-cust-alert-pro-title'),
+      fmt(totalNonWalk) + (LANG === 'zh' ? ' 位' : ''),
+      lines.join(' · '),
+      totalNonWalk === 0 ? 'bad' : 'ok'
+    ));
+  } else {
+    alerts.push(dsAlert('👷 ' + t('ds-cust-alert-pro-title'), null, null, 'na', t('ds-cust-alert-pro-pending')));
+  }
+  // A3: Churn predictions (m6 active → m1 silent)
+  if (churnAlert.ok) {
+    const top = churnAlert.list[0];
+    const tone = churnAlert.count > 30 ? 'bad' : churnAlert.count > 10 ? 'warn' : 'ok';
+    alerts.push(dsAlert(
+      '⚠ ' + t('ds-cust-alert-churn-title'),
+      fmt(churnAlert.count) + (LANG === 'zh' ? ' 位' : ''),
+      LANG === 'zh'
+        ? '近 6 月有买,本月 0 单' + (top ? ` · 头号:${escapeHtml(top.name||'—')} (RM ${fmtMoney(top.m6_amt||0)})` : '')
+        : 'Active in 6m, silent this month' + (top ? ` · top: ${escapeHtml(top.name||'—')} (RM ${fmtMoney(top.m6_amt||0)})` : ''),
+      tone
+    ));
+  } else {
+    alerts.push(dsAlert('⚠ ' + t('ds-cust-alert-churn-title'), null, null, 'na', t('ds-cust-alert-churn-pending')));
+  }
+  // A4: Race × purchase preference cross-tab — 待补 (Customer Buy has no race)
+  alerts.push(dsAlert(
+    '🌏 ' + t('ds-cust-alert-race-cross-title'),
+    null,
+    null,
+    'na',
+    t('ds-cust-alert-race-cross-pending')
+  ));
+  document.getElementById('dsCustAlerts').innerHTML = alerts.join('');
+
+  // ── Existing chart kept (members by age tier) ─────────────────────
+  const cd = window.WP_CUSTOMERS || {};
   const win = window.PERIOD || '6m';
   // V1 第7刀: in Branch Manager view, recompute everything from cd.all filtered to branch
   let buckets, winSum, totalMembers, activeInWin;
@@ -4063,6 +4545,9 @@ function renderCustomersDashboard() {
   const vetPct = totBucketMembers ? (vetShare / totBucketMembers * 100) : (winSum.pct_5plus_n || 0);
 
   // V1 第7刀: scope churn ("lapsed members") to branch when in Branch Manager view
+  // V1 第四刀: lapsedN/lapsedRm now feed only the action block — the legacy
+  // 4-card KPI strip is replaced by the new 3 KPIs (cust type / repeat / race).
+  const churn = (window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.summary) || {};
   let lapsedN, lapsedRm;
   if (isBranchScoped()) {
     const churnRows = filterRowsByBranch((window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.rows) || []);
@@ -4072,13 +4557,6 @@ function renderCustomersDashboard() {
     lapsedN  = churn.n_high_value || 0;
     lapsedRm = churn.lifetime_rm  || 0;
   }
-  document.getElementById('dsCustCards').innerHTML =
-    dsCard(t('ds-cust-members'), fmt(totalMembers), '') +
-    dsCard(t('ds-cust-active'),  fmt(activeInWin), periodLabel(win)) +
-    dsCard(t('ds-cust-old'),     fmtPct(vetPct), fmt(vetShare) + (LANG === 'zh' ? ' 会员' : ' members')) +
-    dsCard(t('ds-cust-lapsed'),  fmt(lapsedN),
-           'RM ' + fmtMoney(lapsedRm) + ' lifetime',
-           lapsedN > 1000 ? 'warn' : '');
 
   // Chart: age tier members bar
   const labels = buckets.map(b => b.key || '—');
@@ -4114,26 +4592,105 @@ function renderCustomersDashboard() {
     drillTile('customers/insights', 'drill-insights', 'drill-insights-sub', '📊');
 }
 
-/* ── Products dashboard ──────────────────────────────────────── */
+/* ── Products dashboard (V1 第四刀: 3 KPIs + 4 alerts) ─────────── */
 function renderProductsDashboard() {
   const fd = window.WP_FINANCIAL || {};
   const ds = window.WP_DEADSTOCK || {};
   const brands = fd.brands || [];
+
+  // V1 第四刀: ABCD + velocity + stockout + strategic-push
+  const abcd      = computeABCD();
+  const velocity  = computeSkuVelocityIndex(abcd);
+  const stockout  = computeStockoutRisks(abcd);
+  const strategic = computeStrategicPushPlaceholder(abcd);
+  const drain     = computeSlowMoverDrain(abcd);
+
+  // KPI 1 — SKU Velocity Index (0-100)
+  let kpi1Val = '—', kpi1Sub = t('ds-prod-vel-pending'), kpi1Cls = '';
+  if (velocity.ok) {
+    kpi1Val = velocity.value.toFixed(1);
+    kpi1Sub = (LANG === 'zh'
+      ? `A:${velocity.a} · B:${velocity.b} · C:${velocity.c} · D:${velocity.d}`
+      : `A:${velocity.a} · B:${velocity.b} · C:${velocity.c} · D:${velocity.d}`);
+    kpi1Cls = velocity.status === 'bad' ? 'danger' : velocity.status === 'warn' ? 'warn' : '';
+  }
+  // KPI 2 — Top SKU 异常告警 (count of A/B SKUs with <14 days stock)
+  let kpi2Val = '—', kpi2Sub = t('ds-prod-stock-pending'), kpi2Cls = '';
+  if (stockout.ok) {
+    kpi2Val = fmt(stockout.critical_n) + (LANG === 'zh' ? ' 颗' : '');
+    const worst = stockout.list[0];
+    kpi2Sub = worst
+      ? (LANG === 'zh'
+          ? `Top 25 中最差:${worst.code} 仅剩 ${worst.days.toFixed(0)} 天`
+          : `worst in Top 25: ${worst.code} ~${worst.days.toFixed(0)} days`)
+      : (LANG === 'zh' ? '无紧急 SKU' : 'no urgent SKUs');
+    kpi2Cls = stockout.critical_n > 5 ? 'danger' : stockout.critical_n > 0 ? 'warn' : '';
+  }
+  // KPI 3 — Strategic Push tracking (placeholder: top 5 by 3m sales)
+  let kpi3Val = '—', kpi3Sub = t('ds-prod-push-pending'), kpi3Cls = '';
+  if (strategic.ok) {
+    const top1 = strategic.list[0];
+    kpi3Val = fmt(strategic.list.length) + (LANG === 'zh' ? ' 颗' : '');
+    kpi3Sub = LANG === 'zh'
+      ? `头号:${top1.code} (${fmt(top1.qty)} 件 / 90 天) · Sheet 加 Strategic_Push 列后切真实`
+      : `top: ${top1.code} (${fmt(top1.qty)} units / 90d) · placeholder until Sheet adds Strategic_Push`;
+  }
+
+  document.getElementById('dsProdCards').innerHTML =
+    dsCard(t('ds-prod-kpi-velocity'),  kpi1Val, kpi1Sub, kpi1Cls) +
+    dsCard(t('ds-prod-kpi-stockout'),  kpi2Val, kpi2Sub, kpi2Cls) +
+    dsCard(t('ds-prod-kpi-push'),      kpi3Val, kpi3Sub, kpi3Cls);
+
+  // ── 4 alert cards ─────────────────────────────────────────────────
+  const alerts = [];
+  // A1: Stockout risk (OEM/Agency split → 待补)
+  if (stockout.ok) {
+    alerts.push(dsAlert(
+      '🚨 ' + t('ds-prod-alert-stockout-title'),
+      fmt(stockout.critical_n),
+      LANG === 'zh'
+        ? '<14 天 SKU · 中国/本地 lead time 待 Country 字段接通'
+        : '<14d SKUs · OEM/Agency split needs Country field on stock API',
+      stockout.critical_n > 5 ? 'bad' : stockout.critical_n > 0 ? 'warn' : 'ok'
+    ));
+  } else {
+    alerts.push(dsAlert('🚨 ' + t('ds-prod-alert-stockout-title'), null, null, 'na', t('ds-prod-vel-pending')));
+  }
+  // A2: Slow-moving capital drain
+  if (drain && drain.ok) {
+    alerts.push(dsAlert(
+      '🐢 ' + t('ds-prod-alert-drain-title'),
+      'RM ' + fmtMoney(drain.amount),
+      LANG === 'zh'
+        ? `${fmt(drain.n_skus)} 颗 SKU 锁仓 · 清仓列表打开 Inventory → Dead`
+        : `${fmt(drain.n_skus)} SKUs locked up · open Inventory → Dead for clearance`,
+      drain.amount > 200000 ? 'bad' : drain.amount > 50000 ? 'warn' : 'ok'
+    ));
+  } else {
+    alerts.push(dsAlert('🐢 ' + t('ds-prod-alert-drain-title'), null, null, 'na', t('ds-prod-vel-pending')));
+  }
+  // A3: SKU 等级迁徙告警 — 待补 (no daily snapshot infra yet)
+  alerts.push(dsAlert(
+    '📈 ' + t('ds-prod-alert-migrate-title'),
+    null, null, 'na',
+    t('ds-prod-alert-migrate-pending')
+  ));
+  // A4: Designer / Contractor SKU 偏好 — 待补 (no per-cust-type per-SKU map)
+  alerts.push(dsAlert(
+    '🎨 ' + t('ds-prod-alert-pro-pref-title'),
+    null, null, 'na',
+    t('ds-prod-alert-pro-pref-pending')
+  ));
+  document.getElementById('dsProdAlerts').innerHTML = alerts.join('');
+
+  // Compute legacy avg GP (used by the chart + action block below)
   const totals = ds.totals || {};
-  // V1 第7刀: in Branch Manager view, SKU set = SKUs that have stock in this branch
   const allRows = isBranchScoped() ? filterRowsByBranch(ds.rows || []) : (ds.rows || []);
   const skuSet = new Set(allRows.map(r => r.code));
   const activeSkus = isBranchScoped()
     ? allRows.filter(r => r.cls === 'ACTIVE').length
     : ((totals.ACTIVE && totals.ACTIVE.rows) || 0);
   const avgGp = brands.length ? (brands.reduce((a, b) => a + (b.gp_pct || 0), 0) / brands.length) : 0;
-
-  document.getElementById('dsProdCards').innerHTML =
-    dsCard(t('ds-prod-skus'),    fmt(skuSet.size), 'in stock') +
-    dsCard(t('ds-prod-brands'),  fmt(fd.brand_count || brands.length), '') +
-    dsCard(t('ds-prod-gp'),      fmtPct(avgGp), '',
-           avgGp < 20 ? 'danger' : avgGp < 25 ? 'warn' : '') +
-    dsCard(t('ds-prod-active'),  fmt(activeSkus), 'sold last 6m');
 
   // Chart: top 10 brands by GP
   const top = brands.slice(0, 10);
@@ -4321,22 +4878,92 @@ function renderInventoryDashboard() {
   const scopeRows = isBranchScoped()
     ? filterRowsByBranch(ds.rows || []).length
     : (m.company_rows_total || 0);
+
+  // V1 第四刀: top 4 KPIs per Notion spec — 库存健康度 / 订单缺口 / 断货预警 / OEM vs Agency.
+  // ① 库存健康度: F-N-S health %; MoM 待补 (no prior snapshot baked in).
+  // ② 订单缺口预警: 待补 (no per-month PO history exposed by API).
+  // ③ 断货 SKU 预警: count of <14d stock SKUs (computable via ABCD top-25).
+  // ④ OEM vs Agency 对比: 待补 (Country field not in stock API).
+  const abcd     = computeABCD();
+  const stockout = computeStockoutRisks(abcd);
+  const mom      = computeStockHealthMoM();   // 待补
+  const gap      = computeOrderGap();          // 待补
+  const oem      = computeOemAgencySplit();    // 待补
+
+  // KPI 1 — 库存健康度. Subline names the scope (W05 / company-wide) so
+  // branch-manager view tests can detect the scope in dashboard HTML.
+  const healthPct = 100 - fnsDeadPct;
+  const k1Val = healthPct.toFixed(1) + '%';
+  const k1Cls = fnsDeadPct > 30 ? 'danger' : fnsDeadPct > 20 ? 'warn' : '';
+  const k1Sub = (LANG === 'zh'
+    ? `${scopeLabel} · 呆滞占比 ${fnsDeadPct.toFixed(1)}% · 月环比待补`
+    : `${scopeLabel} · dead share ${fnsDeadPct.toFixed(1)}% · MoM pending`);
+
+  // KPI 2 — 订单缺口预警 (待补)
+  const k2Val = '—';
+  const k2Sub = LANG === 'zh' ? '历史 PO 月度序列待 API 接通' : 'monthly PO history not exposed by API';
+  const k2Cls = '';
+
+  // KPI 3 — 断货 SKU 预警
+  const k3Val = stockout.ok ? fmt(stockout.critical_n) + (LANG === 'zh' ? ' 颗' : '') : '—';
+  const k3Sub = stockout.ok
+    ? (LANG === 'zh' ? '< 14 天库存 · OEM/Agency 分类待 Country 字段' : '<14d stock · OEM/Agency split pending Country field')
+    : (LANG === 'zh' ? '3m 销售数据待载' : '3m sales data missing');
+  const k3Cls = stockout.ok ? (stockout.critical_n > 5 ? 'danger' : stockout.critical_n > 0 ? 'warn' : '') : '';
+
+  // KPI 4 — OEM vs Agency (待补)
+  const k4Val = '—';
+  const k4Sub = LANG === 'zh' ? 'Country 字段(SM Sheet col M)待暴露' : 'Country field (SM Sheet col M) not exposed';
+  const k4Cls = '';
+
   document.getElementById('dsInvCards').innerHTML =
-    dsCard(LANG === 'zh' ? '总库存值' : 'Total inventory value',
-           'RM ' + fmtMoney(companyTotal),
-           scopeLabel + ' · ' + fmt(scopeRows) + ' rows') +
-    dsCard(LANG === 'zh' ? '在途 PO' : 'In-transit POs',
-           fmt(inTransitN),
-           'RM ' + fmtMoney(overdueAmt) + (LANG === 'zh' ? ' 未到货' : ' open'),
-           inTransitN > 100 ? 'warn' : '') +
-    dsCard(LANG === 'zh' ? 'F-N-S 健康度' : 'F-N-S health',
-           (100 - fnsDeadPct).toFixed(1) + '%',
-           (LANG === 'zh' ? '呆滞占比 ' : 'dead share ') + fnsDeadPct.toFixed(1) + '%',
-           fnsDeadPct > 30 ? 'danger' : fnsDeadPct > 20 ? 'warn' : '') +
-    dsCard(LANG === 'zh' ? '平均 lead time' : 'Avg lead time',
-           leadAvg.toFixed(0) + (LANG === 'zh' ? ' 天' : ' days'),
-           (LANG === 'zh' ? '基于 ' : 'from ') + fmt(delayedRows.length) + (LANG === 'zh' ? ' 张延迟 PO' : ' delayed POs'),
-           leadAvg > 60 ? 'warn' : '');
+    dsCard(t('ds-inv-kpi-health'),     k1Val, k1Sub, k1Cls) +
+    dsCard(t('ds-inv-kpi-gap'),        k2Val, k2Sub, k2Cls) +
+    dsCard(t('ds-inv-kpi-stockout'),   k3Val, k3Sub, k3Cls) +
+    dsCard(t('ds-inv-kpi-oem-agency'), k4Val, k4Sub, k4Cls);
+
+  // ── 4 alert cards ─────────────────────────────────────────────────
+  const alerts = [];
+  // A1: OEM (China) PO 周期日历 — 待补
+  alerts.push(dsAlert(
+    '📅 ' + t('ds-inv-alert-oem-cal-title'),
+    null, null, 'na',
+    t('ds-inv-alert-oem-cal-pending')
+  ));
+  // A2: 调拨机会引擎 (Misplaced)
+  const misAmt = (totalsAll.MISPLACED && totalsAll.MISPLACED.amount) || 0;
+  const misN   = (totalsAll.MISPLACED && totalsAll.MISPLACED.rows) || 0;
+  alerts.push(dsAlert(
+    '🔁 ' + t('ds-inv-alert-transfer-title'),
+    'RM ' + fmtMoney(misAmt),
+    LANG === 'zh' ? `${fmt(misN)} 颗 SKU 在错的店 · 打开 Inventory → 调拨建议` : `${fmt(misN)} misplaced SKUs · open Inventory → Transfers`,
+    misAmt > 30000 ? 'warn' : 'ok'
+  ));
+  // A3: OEM 死货 Top 20 清仓
+  const deadRows = (ds.rows || []).filter(r => r.cls === 'DEAD' || r.cls === 'COMPANY_DEAD')
+    .sort((a, b) => (b.amount || 0) - (a.amount || 0)).slice(0, 20);
+  const top20Amt = deadRows.reduce((a, r) => a + (r.amount || 0), 0);
+  alerts.push(dsAlert(
+    '☠️ ' + t('ds-inv-alert-dead-clear-title'),
+    'RM ' + fmtMoney(top20Amt),
+    LANG === 'zh' ? `Top 20 死货 SKU · OEM/Agency 分类待 Country 字段` : `top 20 dead SKUs · OEM/Agency tagging pending`,
+    top20Amt > 100000 ? 'bad' : top20Amt > 30000 ? 'warn' : 'ok'
+  ));
+  // A4: 采购异常 (延迟 7+ 天 + 影响 A 级 SKU)
+  const poAffectsA = computePoAffectsA(abcd);
+  if (poAffectsA.ok) {
+    alerts.push(dsAlert(
+      '⚠ ' + t('ds-inv-alert-po-a-title'),
+      fmt(poAffectsA.n) + (LANG === 'zh' ? ' 张' : ''),
+      LANG === 'zh'
+        ? `异常 PO 命中 A 级 SKU · 总值 RM ${fmtMoney(poAffectsA.amount)}`
+        : `exception POs hit A-grade SKUs · RM ${fmtMoney(poAffectsA.amount)}`,
+      poAffectsA.n > 10 ? 'bad' : poAffectsA.n > 0 ? 'warn' : 'ok'
+    ));
+  } else {
+    alerts.push(dsAlert('⚠ ' + t('ds-inv-alert-po-a-title'), null, null, 'na', t('ds-prod-vel-pending')));
+  }
+  document.getElementById('dsInvAlerts').innerHTML = alerts.join('');
 
   // F-N-S donut chart
   const labels = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k =>
