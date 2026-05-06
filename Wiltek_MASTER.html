@@ -1123,6 +1123,16 @@ footer.app-footer {
         ranking between the 7 — flat list per spec.
       -->
       <div class="group">
+        <!-- V1 第三刀: 🏠 Today is the owner default landing — a 4-layer
+             briefing (status light + Cash Runway / Action Plan / 5-store
+             traffic / 6-domain health). Lives at the TOP of the menu so
+             owner can always come back to the bird's-eye view in one
+             click. The legacy hidden #navToday anchor below is kept for
+             back-compat with existing tests; this visible nav-today-top is
+             the one the user sees and clicks. -->
+        <div class="sub-item" data-view="today" id="navTodayTop" onclick="setView('today')" style="padding-left:12px">
+          <span class="icon">🏠</span><span data-i18n="nav-today">Today Overview</span>
+        </div>
         <!-- 6-domain top-level menu (V1 第 6 刀): Stock + Purchasing
              collapsed into a single Inventory domain. The legacy
              stock/purchasing routes still resolve via VIEW_ROUTES
@@ -3066,7 +3076,7 @@ function leafToParentDomain(leaf) {
   if (leaf === 'deadstock' || leaf === 'transfers' || leaf === 'warehouse' || leaf === 'po-exceptions') return 'inventory';
   if (leaf === 'customer-churn' || leaf === 'cust-insights') return 'customers';
   if (leaf === 'financial-depth') return 'finance';
-  if (leaf === 'today') return 'sales';
+  // V1 第三刀: 'today' is now its own top-level menu item — no parent.
   return null;
 }
 

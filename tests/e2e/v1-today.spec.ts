@@ -143,15 +143,17 @@ test.describe('Round 2 — Today functional', () => {
   });
 
   test('today nav menu is active when on today view', async ({ page }) => {
-    // After V1 第 5 刀 the loginOwner helper jumps to 'today'. The 'today'
-    // leaf is a drill-down of Sales — both 'sales' (parent) and 'today'
-    // (leaf) carry .active. We check that 'sales' is among the actives,
-    // since 'today' itself isn't in the visible 7-domain menu anymore.
+    // V1 第三刀: 'today' is its own top-level menu item (#navTodayTop).
+    // No more parent-domain mapping to 'sales'. After login on 'today'
+    // the only data-view="today" anchors carry .active.
     await loginOwner(page);
     const actives = await page.locator('nav.menu .sub-item.active').evaluateAll(
       els => els.map(e => e.getAttribute('data-view')));
-    // 'sales' is the visible domain; 'today' is the legacy hidden anchor.
-    expect(actives).toContain('sales');
+    expect(actives).toContain('today');
+    // 🏠 Today is the FIRST visible top-level menu item
+    const firstVisibleNav = await page.evaluate(() =>
+      document.querySelectorAll('nav.menu .group:not(.legacy-nav) .sub-item[data-view]')[0]?.getAttribute('data-view'));
+    expect(firstVisibleNav).toBe('today');
   });
 
   test('language toggle reflows banner + cards', async ({ page }) => {
@@ -251,12 +253,14 @@ test.describe('Round 3 — Today responsive', () => {
 });
 
 test.describe('Round 4 — V1 第6刀: 6-domain architecture + sanity', () => {
-  test('menu shows 6 domains, no Stock/Purchasing top-level', async ({ page }) => {
+  test('menu shows Today + 6 domains, no Stock/Purchasing top-level', async ({ page }) => {
+    // V1 第三刀: 🏠 Today is the new first visible nav item, ahead of the
+    // 6 domains. Stock/Purchasing legacy aliases stay in .legacy-nav.
     await loginOwner(page);
     const visibleNavs = await page.evaluate(() =>
       Array.from(document.querySelectorAll('nav.menu > .group:not(.legacy-nav) .sub-item[data-view]'))
         .map(el => el.getAttribute('data-view')));
-    expect(visibleNavs).toEqual(['sales','inventory','customers','products','finance','hr']);
+    expect(visibleNavs).toEqual(['today','sales','inventory','customers','products','finance','hr']);
   });
 
   test('inventory dashboard renders required strings (总库存值/在途 PO/F-N-S/lead time)', async ({ page }) => {
