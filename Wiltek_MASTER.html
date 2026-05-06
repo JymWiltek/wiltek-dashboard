@@ -1860,9 +1860,12 @@ const STR = {
     "td-status-na":   "Live data still loading — refresh in a moment.",
     "td-runway-label": "Cash runway",
     "td-runway-months": "{n} months",
-    "td-runway-burn": "Burning · {n} months",
-    "td-runway-na": "—",
-    "td-runway-sub": "trailing 6m net P/L ÷ avg monthly expense",
+    "td-runway-buffer": "{n} mo buffer",
+    "td-runway-pending": "Data pending",
+    "td-runway-sub": "cash on hand ÷ monthly burn",
+    "td-runway-sub-burning":    "RM {cash} cash ÷ trailing 6m burn",
+    "td-runway-sub-profitable": "RM {cash} cash · profitable on avg",
+    "td-runway-sub-pending":    "FMM live data still loading — Refresh in a moment",
     "td-mark-done": "Mark as done",
     "td-restore": "Show {n} dismissed",
     "td-restore-clear": "Restore all",
@@ -2242,11 +2245,14 @@ const STR = {
     "td-status-warn": "黄灯 — {bad} 个领域需要关注。",
     "td-status-bad":  "红灯 — {bad} 个领域有麻烦,今天就要处理。",
     "td-status-na":   "数据加载中 — 稍候点 Refresh。",
-    "td-runway-label": "现金缓冲",
+    "td-runway-label": "现金跑道",
     "td-runway-months": "{n} 个月",
-    "td-runway-burn": "在烧 · {n} 个月",
-    "td-runway-na": "—",
-    "td-runway-sub": "近 6 月累计净利 ÷ 月均支出",
+    "td-runway-buffer": "{n} 个月缓冲",
+    "td-runway-pending": "数据待补",
+    "td-runway-sub": "现金 ÷ 月均烧钱速度",
+    "td-runway-sub-burning":    "现金 RM {cash} ÷ 近 6 月烧钱速度",
+    "td-runway-sub-profitable": "现金 RM {cash} · 平均盈利",
+    "td-runway-sub-pending":    "FMM 数据加载中,稍候点 Refresh",
     "td-mark-done": "标记完成",
     "td-restore": "查看 {n} 已隐藏",
     "td-restore-clear": "全部恢复",
@@ -5243,16 +5249,37 @@ function restoreAllTodayKinds() {
   try { localStorage.removeItem(TD_DISMISS_KEY); } catch(_){}
 }
 
-/* Cash runway from FMM: trailing 6m cumulative net P/L ÷ avg monthly expense.
-   Positive = months of cushion built up; negative = burning that many months.
-   Returns { months: Number|null, status: 'ok'|'warn'|'bad'|'na', burning: Bool }. */
+/* Cash Runway — REAL formula: cash on hand ÷ monthly burn rate.
+   Cash comes from live FMM (window.__wpLive.financial.liability.raw):
+   sums every bank-account row inside the "CASH IN BANK" section.
+   Burn rate = -1 × avg monthly net P/L (over trailing 6m). If business is
+   profitable on average, no burn → display cash as months-of-expense buffer.
+   If FMM live data hasn't loaded yet, return status='na' (UI shows
+   "数据待补") — never invent a number. */
 function computeCashRunway() {
+  // 1. Cash on hand — parse FMM liability.raw "CASH IN BANK" section.
+  const live = (window.__wpLive && window.__wpLive.financial) || null;
+  let cash = null;
+  if (live && live.liability && Array.isArray(live.liability.raw)) {
+    let inCashSection = false;
+    cash = 0;
+    for (const r of live.liability.raw) {
+      const lbl = String(r.label || '').toUpperCase();
+      if (/CASH IN BANK/.test(lbl)) { inCashSection = true; continue; }
+      // Section ends at next sub-total / loan / overdraft / hp header
+      if (/SUB[ -]*TOTAL|TERM LOAN|OVERDRAFT|HIRE PURCHASE|O\.A\.F/.test(lbl)) {
+        inCashSection = false;
+      }
+      if (inCashSection && typeof r.value === 'number') cash += r.value;
+    }
+  }
+  if (cash == null) return { months: null, status: 'na', burning: false, cash: null, basis: null };
+
+  // 2. Avg monthly net P/L (over trailing 6m) — from baked WP_FINANCIAL.
   const fd = window.WP_FINANCIAL || {};
   const sc = Array.isArray(fd.sales_coll_series) ? fd.sales_coll_series : [];
   const cats = Array.isArray(fd.categories) ? fd.categories : [];
-  if (!sc.length || !cats.length) return { months: null, status: 'na', burning: false };
-
-  // Per-month expense = sum(cat.series[m]) for m in 0..N-1
+  if (!sc.length || !cats.length) return { months: null, status: 'na', burning: false, cash, basis: null };
   const N = sc.length;
   let cumNet = 0, sumExp = 0;
   for (let m = 0; m < N; m++) {
@@ -5264,15 +5291,28 @@ function computeCashRunway() {
     cumNet += (+sc[m] || 0) - exp;
     sumExp += exp;
   }
-  const avgExp = sumExp / N;
-  if (!avgExp || !isFinite(avgExp)) return { months: null, status: 'na', burning: false };
-  const months = cumNet / avgExp;
-  const burning = months < 0;
-  let status;
-  if (months >= 3)      status = 'ok';
-  else if (months >= 1) status = 'warn';
-  else                  status = 'bad';
-  return { months, status, burning };
+  const avgMonthlyNet = cumNet / N;       // negative ⇒ burning
+  const avgMonthlyExp = sumExp / N;
+
+  // 3. Compute runway.
+  if (avgMonthlyNet >= 0) {
+    // Profitable on average — runway is "infinite". Show cash as months of
+    // operating expense the cash buffer alone would cover (a sanity cushion).
+    if (!avgMonthlyExp) return { months: null, status: 'na', burning: false, cash, basis: 'profitable' };
+    const months = cash / avgMonthlyExp;
+    return {
+      months, cash, burning: false, basis: 'profitable',
+      status: months >= 3 ? 'ok' : months >= 1 ? 'warn' : 'bad',
+    };
+  } else {
+    // Burning — runway = cash / monthly burn rate.
+    const burnRate = Math.abs(avgMonthlyNet);
+    const months = cash / burnRate;
+    return {
+      months, cash, burning: true, basis: 'burning',
+      status: months >= 6 ? 'ok' : months >= 3 ? 'warn' : 'bad',
+    };
+  }
 }
 
 /* Per-domain health — 6 cards. Each returns { key, icon, status, statusText, jump }. */
@@ -5385,31 +5425,45 @@ function computeOverallStatus(domains) {
 }
 
 /* Per-branch traffic for the 5-store row. Pulls from WP_CUSTOMERS.race.by_branch
-   (live floatation feed) — visits / AOV / CR / anomaly count. */
+   (live floatation feed). The /api/floatation endpoint returns SCALAR
+   per-branch values (walkin/purchase/amount/basket/cr) — the active period
+   total — not per-month arrays. computeBranchTraffic must read the scalar
+   directly. (Earlier V1 第三刀 attempted [lastIdx] indexing on scalars,
+   producing undefined → "—" in the UI; that was the bug Jym caught.) */
+// Expose for tests
+window.computeCashRunway = computeCashRunway;
+
 function computeBranchTraffic() {
   const cd = window.WP_CUSTOMERS || {};
   const ds = window.WP_DEADSTOCK || {};
-  const td = window.WP_TODAY || {};
   const race = cd.race || {};
   const byBranch = race.by_branch || {};
   const months = Array.isArray(race.months) ? race.months : [];
   const lastIdx = months.length ? months.length - 1 : -1;
   // 5 active branches (canonical order)
   const active = ['W01','W02','W03','W05','W07'];
+  const readNum = (v) => {
+    if (Array.isArray(v)) return lastIdx >= 0 ? (+v[lastIdx] || 0) : 0;
+    return +v || 0;
+  };
   const rows = active.map(code => {
     const b = byBranch[code] || {};
-    const walkin   = lastIdx >= 0 && b.walkin   ? (+b.walkin[lastIdx]   || 0) : 0;
-    const purchase = lastIdx >= 0 && b.purchase ? (+b.purchase[lastIdx] || 0) : 0;
-    const amount   = lastIdx >= 0 && b.amount   ? (+b.amount[lastIdx]   || 0) : 0;
-    const aov      = purchase > 0 ? amount / purchase : 0;
-    const cr       = walkin > 0 ? purchase / walkin : 0;
-    // Anomalies = inventory problem % flag + low-CR flag
+    const walkin   = readNum(b.walkin);
+    const purchase = readNum(b.purchase);
+    const amount   = readNum(b.amount);
+    const basket   = readNum(b.basket);
+    const crLive   = readNum(b.cr);
+    // Prefer pre-computed basket (AOV) and cr from the API; fall back to
+    // computing from amount/purchase/walkin if missing.
+    const aov = basket > 0 ? basket : (purchase > 0 ? amount / purchase : 0);
+    const cr  = crLive > 0 ? crLive : (walkin > 0 ? purchase / walkin : 0);
+    // Anomalies — count of: deadstock problem ≥ 30%, CR < 50%, AOV < RM 200.
     const dsByBr = (ds.by_branch || {})[code] || {};
     const probPct = dsByBr.problem_pct || 0;
     let anomalies = 0;
-    if (probPct >= 30) anomalies++;
-    if (walkin > 0 && cr < 0.5) anomalies++;
-    if (walkin > 0 && aov < 200) anomalies++;
+    if (probPct >= 30)            anomalies++;
+    if (walkin > 0 && cr < 0.5)   anomalies++;
+    if (walkin > 0 && aov < 200)  anomalies++;
     return { code, name: dsByBr.name || code, walkin, aov, cr, anomalies };
   });
   return rows;
@@ -5432,16 +5486,22 @@ function renderToday() {
     else if (overall.tone === 'bad')  { headlineKey = 'td-status-bad';  headlineCls = 'danger'; }
     const headline = t(headlineKey).replace('{bad}', String(Math.max(overall.bad, overall.warn)));
 
-    let runwayValue, runwayCls = '';
+    let runwayValue, runwayCls = '', runwaySub = t('td-runway-sub');
     if (runway.status === 'na') {
-      runwayValue = t('td-runway-na');
+      // Honest placeholder when FMM cash data hasn't loaded — never invent.
+      runwayValue = t('td-runway-pending');
       runwayCls   = '';
-    } else if (runway.burning) {
-      runwayValue = t('td-runway-burn').replace('{n}', Math.abs(runway.months).toFixed(1));
-      runwayCls   = 'danger';
+      runwaySub   = t('td-runway-sub-pending');
+    } else if (runway.basis === 'profitable') {
+      // Business is profitable on average → cash is buffer, not runway.
+      runwayValue = t('td-runway-buffer').replace('{n}', runway.months.toFixed(1));
+      runwayCls   = runway.status === 'ok' ? 'ok' : runway.status === 'warn' ? 'warn' : 'danger';
+      runwaySub   = t('td-runway-sub-profitable').replace('{cash}', fmtMoney(runway.cash));
     } else {
+      // Burning — show months until cash runs out.
       runwayValue = t('td-runway-months').replace('{n}', runway.months.toFixed(1));
       runwayCls   = runway.status === 'ok' ? 'ok' : runway.status === 'warn' ? 'warn' : 'danger';
+      runwaySub   = t('td-runway-sub-burning').replace('{cash}', fmtMoney(runway.cash));
     }
     statusEl.innerHTML =
       '<div class="tst-light" id="todayStatusLight" data-tone="' + overall.tone + '">' + overall.light + '</div>' +
@@ -5456,7 +5516,7 @@ function renderToday() {
       '<div class="tst-runway">' +
         '<div class="tst-r-label">' + t('td-runway-label') + '</div>' +
         '<div class="tst-r-value ' + runwayCls + '" id="todayRunway">' + runwayValue + '</div>' +
-        '<div class="tst-r-sub">' + t('td-runway-sub') + '</div>' +
+        '<div class="tst-r-sub">' + runwaySub + '</div>' +
       '</div>';
   }
 

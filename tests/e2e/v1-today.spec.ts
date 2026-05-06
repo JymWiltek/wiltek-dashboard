@@ -1360,43 +1360,79 @@ test.describe('Round 9 — V1 第三刀: Raw sale source + month-switch cache', 
                from real data d) status light real-computed (FMM)
    ════════════════════════════════════════════════════════════════════ */
 test.describe('Round 10 — V1 第三刀: Today landing (4 layers)', () => {
-  test('Layer 1: status light + Cash Runway render from real FMM data (acceptance d)', async ({ page }) => {
+  test('Layer 1: Cash Runway shows "数据待补" when FMM live cash not loaded (honest placeholder)', async ({ page }) => {
+    // V1 第三刀 验收 fix: when /api/proxy?type=financial returns no liability.raw,
+    // computeCashRunway returns status='na' and the UI shows "数据待补" /
+    // "Data pending" — never invents a number.
     await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
     await page.route('**/api/sales*',     route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
     await page.route('**/api/customers*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
     await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
     await loginOwner(page);
-    // FMM data is baked into assets/financial-data.js (loaded statically) so
-    // status light + runway compute even when all live channels fail.
     await page.waitForSelector('#todayStatusLight', { timeout: 5000 });
     const lightTone = await page.locator('#todayStatusLight').getAttribute('data-tone');
     expect(['ok','warn','bad','na']).toContain(lightTone);
     const lightChar = await page.locator('#todayStatusLight').textContent();
     expect(['🟢','🟡','🔴','⚪']).toContain((lightChar || '').trim());
-    // Runway must render — either a months value or "—" (na).
+    // Runway must show "Data pending" / "数据待补" — never the bogus 0.1 month.
     const runwayText = (await page.locator('#todayRunway').textContent() || '').trim();
-    expect(runwayText.length).toBeGreaterThan(0);
-    // Verify computeCashRunway uses FMM directly: hand-compute and compare.
-    const expected = await page.evaluate(() => {
-      const fd = (window as any).WP_FINANCIAL || {};
-      const sc = fd.sales_coll_series || [];
-      const cats = fd.categories || [];
-      let cumNet = 0, sumExp = 0;
-      for (let m = 0; m < sc.length; m++) {
-        let exp = 0;
-        for (const c of cats) exp += +(c.series || [])[m] || 0;
-        cumNet += (+sc[m] || 0) - exp;
-        sumExp += exp;
+    expect(runwayText).toMatch(/数据待补|Data pending/);
+    expect(runwayText).not.toMatch(/0\.1|0\.0/);
+  });
+
+  test('Layer 1: Cash Runway computes from FMM liability.raw bank balances (real formula)', async ({ page }) => {
+    // V1 第三刀 验收 fix: feed /api/proxy?type=financial a payload whose
+    // liability.raw mimics the real FMM shape (CASH IN BANK section + 4
+    // bank rows summing to RM 54,202). Assert the runway uses this cash
+    // figure, not invented numbers.
+    const finPayload = {
+      ok: true, type: 'financial',
+      data: {
+        liability: {
+          raw: [
+            { label: 'BUILDING',                     value: 2500000 },
+            { label: 'STOCK - MARCH\'2026',          value: 1167280 },
+            { label: 'CASH IN BANK - 06th Mar26',    value: 0 },
+            { label: 'MBI Ampang - Saving',          value: 30385.50 },
+            { label: 'MBI Ampang',                   value: 0 },
+            { label: 'PBB Thambi Dollah',            value: 23204.51 },
+            { label: 'PBI Taman Muda',               value: 612 },
+            { label: 'SUB - TOTAL',                  value: 3721482.01 },
+            { label: 'TERM LOAN',                    value: 0 },
+            { label: 'MBI : (LOAN)',                 value: 3100000 },
+          ],
+          assets: { stock: 1167280, building: 2500000 },
+          liabilities: { total: 0 },
+        },
+      },
+    };
+    await page.route('**/api/proxy*', route => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('type') === 'financial') {
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(finPayload) });
+      } else {
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) });
       }
-      const avgExp = sumExp / sc.length;
-      return { months: cumNet / avgExp, status: avgExp > 0 ? (cumNet / avgExp >= 3 ? 'ok' : cumNet / avgExp >= 1 ? 'warn' : 'bad') : 'na' };
     });
-    if (expected.status !== 'na') {
-      const expStr = expected.months < 0
-        ? Math.abs(expected.months).toFixed(1)
-        : expected.months.toFixed(1);
-      expect(runwayText).toContain(expStr);
-    }
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/customers*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await loginOwner(page);
+    // Wait for __wpLive.financial to land, then re-render Today
+    await page.waitForFunction(() => !!((window as any).__wpLive && (window as any).__wpLive.financial && (window as any).__wpLive.financial.liability), { timeout: 8000 });
+    await page.evaluate(() => (window as any).renderToday && (window as any).renderToday());
+    // Verify computeCashRunway returns the right cash figure
+    const got = await page.evaluate(() => {
+      const fn = (window as any).computeCashRunway;
+      return fn ? fn() : null;
+    });
+    expect(got).not.toBeNull();
+    expect(got!.cash).toBeCloseTo(54202.01, 1);
+    expect(['burning','profitable']).toContain(got!.basis);
+    expect(got!.months).toBeGreaterThan(0);
+    // UI shows the cash figure in the sub-line
+    const subText = (await page.locator('.tst-r-sub').textContent() || '').trim();
+    expect(subText).toMatch(/54,202|54,201/);
   });
 
   test('Layer 2: Mark-as-done dismisses card + Restore brings it back (acceptance c)', async ({ page }) => {
@@ -1446,17 +1482,21 @@ test.describe('Round 10 — V1 第三刀: Today landing (4 layers)', () => {
     }
   });
 
-  test('Layer 3: 5-store row uses live floatation by_branch when available', async ({ page }) => {
+  test('Layer 3: 5-store walk-in / AOV / CR populate from /api/floatation scalar by_branch (Bug 2 fix)', async ({ page }) => {
+    // V1 第三刀 验收 fix: /api/floatation returns scalar (not array) values
+    // per branch — { W01: { walkin: 577, purchase: 403, amount: 130736,
+    // basket: 324.41, cr: 0.6984 }, ... }. Earlier code did b.walkin[lastIdx]
+    // on a Number → undefined → "—". This test guards the scalar path.
     const liveFlo = {
       ok: true, fetched_at: '2026-05-06T08:00:00.000Z',
       year: 2026, months: ['2026-03','2026-04','2026-05'], month_idx: [3,4,5],
       races: [], totals: { walkin:[0,0,0], purchase:[0,0,0], amount:[0,0,0], basket:[0,0,0], cr:[0,0,0] },
       by_branch: {
-        W01: { walkin: 100, purchase: 60, amount: 18000, basket: 300, cr: 0.6 },
-        W02: { walkin: 200, purchase: 120, amount: 36000, basket: 300, cr: 0.6 },
-        W03: { walkin: 150, purchase: 90, amount: 27000, basket: 300, cr: 0.6 },
-        W05: { walkin: 250, purchase: 175, amount: 50000, basket: 285.71, cr: 0.7 },
-        W07: { walkin: 50,  purchase: 40,  amount: 12000, basket: 300, cr: 0.8 },
+        W01: { walkin: 577, purchase: 403, amount: 130736,    basket: 324.41, cr: 0.6984 },
+        W02: { walkin: 784, purchase: 532, amount: 190764,    basket: 358.58, cr: 0.6786 },
+        W03: { walkin: 561, purchase: 411, amount: 167990,    basket: 408.73, cr: 0.7326 },
+        W05: { walkin: 418, purchase: 334, amount: 132071,    basket: 395.42, cr: 0.7990 },
+        W07: { walkin: 481, purchase: 419, amount: 145309.71, basket: 346.80, cr: 0.8711 },
       },
       source: 'live:test',
     };
@@ -1466,16 +1506,21 @@ test.describe('Round 10 — V1 第三刀: Today landing (4 layers)', () => {
     await loginOwner(page);
     await page.waitForFunction(() => (window as any).WP_CUSTOMERS?.race?._live === true, { timeout: 5000 });
     await page.evaluate(() => (window as any).renderToday && (window as any).renderToday());
-    // W05 (last index) has visits=250 — we read the LAST month so by_branch
-    // single-value lookup applies; computeBranchTraffic uses race.months[lastIdx].
-    // Our by_branch values are scalars (legacy shape) — so walkin should
-    // either be 250 for W05 OR 0 if shape is per-month-array. Either way the
-    // test asserts "ts-num" cells exist with non-empty content.
-    const visitCells = await page.evaluate(() =>
+    // Read all 5 rows × 4 numeric columns (visits, AOV, CR, anomalies)
+    const cells = await page.evaluate(() =>
       Array.from(document.querySelectorAll('#todayStores .ts-row:not(.head)'))
-        .map(r => (r.querySelectorAll(':scope > div')[2]?.textContent || '').trim()));
-    expect(visitCells).toHaveLength(5);
-    for (const v of visitCells) expect(v.length).toBeGreaterThan(0);
+        .map(r => Array.from(r.querySelectorAll(':scope > div')).map(c => (c.textContent || '').trim())));
+    expect(cells).toHaveLength(5);
+    // Walkin column (index 2) must be NUMERIC, not "—"
+    for (const row of cells) {
+      expect(row[2]).not.toBe('—');
+      expect(row[2]).toMatch(/^\d[\d,]*$/);
+    }
+    // W01 specifically: walk-in 577, AOV 324, CR 69.8%
+    const w01 = cells.find(r => r[0] === 'W01')!;
+    expect(w01[2]).toBe('577');
+    expect(w01[3]).toBe('324');                    // AOV (basket) RM
+    expect(w01[4]).toMatch(/69\.8%/);              // CR
   });
 
   test('Layer 4: domain grid click jumps to that domain', async ({ page }) => {
