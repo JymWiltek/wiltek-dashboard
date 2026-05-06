@@ -4232,8 +4232,11 @@ function computeSlowMoverDrain(abcd) {
   return { ok: true, n_skus: skuSet.size, amount: amt, rows: drainRows };
 }
 
-/* Customer-type mix at the snapshot window. Reads cross_by_window[period]
-   keyed by ['Walk-in', 'Contractor', 'Interior Designer', 'Other']. */
+/* Customer-type mix at the snapshot window. cross_by_window[period][type]
+   has TWO possible shapes:
+     a) flat: { n, amt }                                     (older payload)
+     b) nested by age-bucket: { '<1y': { n, amt }, '1-5y': … } (current API)
+   We sum across age buckets to get the per-type total either way. */
 function computeCustTypeMix(periodKey) {
   const cd = window.WP_CUSTOMERS || {};
   const cross = (cd.cross_by_window || {})[periodKey || '1m'] || {};
@@ -4241,9 +4244,20 @@ function computeCustTypeMix(periodKey) {
   const out = {};
   let totalN = 0, totalAmt = 0;
   for (const t of types) {
-    const c = cross[t] || {};
-    const n = c.n || c.total || 0;
-    const a = c.amt || c.amt_total || 0;
+    const c = cross[t];
+    if (!c) { out[t] = { n: 0, amt: 0 }; continue; }
+    let n = 0, a = 0;
+    if (typeof c.n === 'number' || typeof c.amt === 'number') {
+      // flat shape
+      n = +c.n || 0; a = +c.amt || +c.amt_total || 0;
+    } else {
+      // nested-by-age-bucket shape — sum across buckets
+      for (const k of Object.keys(c)) {
+        const v = c[k] || {};
+        n += +v.n || 0;
+        a += +v.amt || +v.amt_total || 0;
+      }
+    }
     out[t] = { n, amt: a };
     totalN += n; totalAmt += a;
   }
