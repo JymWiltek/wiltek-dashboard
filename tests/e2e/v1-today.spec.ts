@@ -320,3 +320,159 @@ test.describe('Round 4 — V1 第6刀: 6-domain architecture + sanity', () => {
     expect(ok).toBe(true);
   });
 });
+
+/* ────────────────────────────────────────────────────────────────────
+   Round 5 — V1 第7刀: Refresh button + Branch Manager view
+   - 3-way view-as switcher (Owner / Branch Manager / Warehouse)
+   - branch picker (W01-W07) + URL ?role=branch&branch=W0X persist
+   - Branch view scopes Sales/Inventory/Customers/Products to the branch
+   - Branch view hides Finance + HR menu items
+   - 🔄 Refresh button calls /api/proxy live and overlays + toast
+   ──────────────────────────────────────────────────────────────────── */
+test.describe('Round 5 — V1 第7刀: Refresh + Branch Manager view', () => {
+  test('header has Refresh button and 3 view-as buttons', async ({ page }) => {
+    await loginOwner(page);
+    await expect(page.locator('#refreshBtn')).toBeVisible();
+    await expect(page.locator('#viewAsOwner')).toBeVisible();
+    await expect(page.locator('#viewAsBranch')).toBeVisible();
+    await expect(page.locator('#viewAsWarehouse')).toBeVisible();
+  });
+
+  test('switching to Branch Manager shows picker + banner', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => (window as any).setViewAs('branch'));
+    await expect(page.locator('#branchPicker')).toBeVisible();
+    await expect(page.locator('#branchBanner.on')).toBeVisible();
+    const txt = await page.locator('#branchBanner').innerText();
+    // Default first branch is W01
+    expect(txt).toContain('W01');
+  });
+
+  test('selecting W05 in picker scopes inventory dashboard to W05', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => {
+      (window as any).setViewAs('branch');
+      (window as any).setBranch('W05');
+      (window as any).setView('inventory');
+    });
+    await page.waitForSelector('#view-inventory.on');
+    const result = await page.evaluate(() => {
+      const ds = (window as any).WP_DEADSTOCK || {};
+      const allRows = (ds.rows || []).filter((r: any) => r.branch === 'W05').length;
+      const html = document.querySelector('#view-inventory')?.innerHTML || '';
+      return { allRows, hasW05: html.indexOf('W05') >= 0, branch: (window as any).BRANCH_VIEW };
+    });
+    expect(result.branch).toBe('W05');
+    expect(result.hasW05).toBe(true);
+    expect(result.allRows).toBeGreaterThan(0);
+  });
+
+  test('branch view hides Finance + HR menu items', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => (window as any).setViewAs('branch'));
+    await expect(page.locator('#navFinance.hidden')).toHaveCount(1);
+    await expect(page.locator('#navHr.hidden')).toHaveCount(1);
+    // Owner-mode shouldn't have those hidden
+    await page.evaluate(() => (window as any).setViewAs('owner'));
+    await expect(page.locator('#navFinance.hidden')).toHaveCount(0);
+    await expect(page.locator('#navHr.hidden')).toHaveCount(0);
+  });
+
+  test('URL persists ?role=branch&branch=W03 across reload', async ({ page }) => {
+    await loginOwner(page);
+    await page.evaluate(() => {
+      (window as any).setViewAs('branch');
+      (window as any).setBranch('W03');
+    });
+    const url1 = page.url();
+    expect(url1).toContain('role=branch');
+    expect(url1).toContain('branch=W03');
+    await page.reload();
+    await page.waitForSelector('#app.ready');
+    const state = await page.evaluate(() => ({
+      viewAs: (window as any).VIEW_AS,
+      branch: (window as any).BRANCH_VIEW,
+    }));
+    expect(state.viewAs).toBe('branch');
+    expect(state.branch).toBe('W03');
+  });
+
+  test('customers dashboard scopes member count to branch', async ({ page }) => {
+    await loginOwner(page);
+    const baseline = await page.evaluate(() => {
+      (window as any).setView('customers');
+      const html = document.querySelector('#view-customers')?.innerHTML || '';
+      const m = html.match(/Total members[\s\S]*?<div class="value">([\d,]+)/);
+      return m ? parseInt(m[1].replace(/,/g,''),10) : -1;
+    });
+    const w01 = await page.evaluate(() => {
+      (window as any).setViewAs('branch');
+      (window as any).setBranch('W01');
+      (window as any).setView('customers');
+      const html = document.querySelector('#view-customers')?.innerHTML || '';
+      const m = html.match(/<div class="value">([\d,]+)/);
+      return m ? parseInt(m[1].replace(/,/g,''),10) : -1;
+    });
+    expect(baseline).toBeGreaterThan(0);
+    expect(w01).toBeGreaterThan(0);
+    expect(w01).toBeLessThan(baseline);
+  });
+
+  test('Refresh button toggles loading class then succeeds or fails honestly', async ({ page }) => {
+    await loginOwner(page);
+    // Mock /api/proxy to return ok payloads instantly so we don't depend on prod
+    await page.route('**/api/proxy*', route => {
+      const url = new URL(route.request().url());
+      const type = url.searchParams.get('type') || 'all';
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, type, data: { _stub: true, ts: Date.now() } }),
+      });
+    });
+    const before = await page.evaluate(() => localStorage.getItem('wp_last_refresh_v1'));
+    await page.click('#refreshBtn');
+    // Wait for toast to appear
+    await page.waitForSelector('#wpToast.show', { timeout: 5000 });
+    const toast = await page.locator('#wpToast').innerText();
+    expect(toast.toLowerCase()).toMatch(/data updated|数据已更新/);
+    const after = await page.evaluate(() => localStorage.getItem('wp_last_refresh_v1'));
+    expect(after).not.toBe(before);
+    expect(parseInt(after || '0', 10)).toBeGreaterThan(0);
+  });
+
+  test('Refresh fails gracefully when proxy returns error', async ({ page }) => {
+    await loginOwner(page);
+    await page.route('**/api/proxy*', route => route.fulfill({
+      status: 500, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'down' })
+    }));
+    await page.click('#refreshBtn');
+    await page.waitForSelector('#wpToast.show.fail', { timeout: 5000 });
+    const toast = await page.locator('#wpToast').innerText();
+    expect(toast.toLowerCase()).toMatch(/unreachable|未响应/);
+  });
+
+  test('header data-date shows last refresh HH:MM after refresh', async ({ page }) => {
+    await loginOwner(page);
+    await page.route('**/api/proxy*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, type: 'sales', data: {} }),
+    }));
+    await page.click('#refreshBtn');
+    await page.waitForSelector('#wpToast.show', { timeout: 5000 });
+    const dataDate = await page.locator('#dataDate').innerText();
+    expect(dataDate).toMatch(/last refresh \d{2}:\d{2}|上次刷新 \d{2}:\d{2}/);
+  });
+
+  test('owner view (no role param) leaves dashboards company-wide', async ({ page }) => {
+    await loginOwner(page);
+    const state = await page.evaluate(() => ({
+      viewAs: (window as any).VIEW_AS,
+      branch: (window as any).BRANCH_VIEW,
+      bannerOn: !!document.querySelector('#branchBanner.on'),
+    }));
+    expect(state.viewAs).toBe('owner');
+    expect(state.branch).toBeNull();
+    expect(state.bannerOn).toBe(false);
+  });
+});

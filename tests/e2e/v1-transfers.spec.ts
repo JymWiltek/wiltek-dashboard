@@ -241,8 +241,10 @@ test.describe('Round 2 — Functional', () => {
     await expect(page.locator('#view-warehouse.on')).toBeVisible();
     // Transfer suggestions menu hidden in warehouse mode
     await expect(page.locator('#navTransfers')).toBeHidden();
+    // V1 第7刀: switching back to owner lands on 'sales' (the V1 第5刀 default
+    // owner home), not transfers. Verify nav surfaces transfers again.
     await page.click('#viewAsOwner');
-    await expect(page.locator('#view-transfers.on')).toBeVisible();
+    await expect(page.locator('#view-sales.on')).toBeVisible();
     await expect(page.locator('#navTransfers')).toBeVisible();
   });
 

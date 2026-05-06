@@ -393,6 +393,58 @@ header.app-header .view-as button {
 header.app-header .view-as button.on { background: var(--brand); color: #fff; }
 header.app-header .view-as.locked button { cursor: not-allowed; opacity: 0.6; }
 
+/* ── V1 第7刀: branch picker (visible only when view-as = branch) ── */
+header.app-header .branch-picker {
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+  font-size: 12px; background: var(--bg); color: var(--text-primary);
+}
+header.app-header .refresh-btn {
+  border: 1px solid var(--border); background: var(--bg); border-radius: 6px;
+  padding: 4px 10px; font-size: 12px; color: var(--text-primary); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+header.app-header .refresh-btn:hover { border-color: var(--brand); color: var(--brand); }
+header.app-header .refresh-btn.loading { opacity: 0.6; cursor: wait; }
+header.app-header .refresh-btn.loading::before {
+  content: ''; display: inline-block; width: 10px; height: 10px;
+  border: 2px solid var(--brand); border-top-color: transparent;
+  border-radius: 50%; animation: refreshSpin 0.8s linear infinite;
+  margin-right: 4px;
+}
+@keyframes refreshSpin { to { transform: rotate(360deg); } }
+
+/* V1 第7刀: light forest-green banner under header when in Branch Manager view */
+.branch-banner {
+  display: none;
+  background: #E8F2EC;
+  border-bottom: 1px solid #BFD7C9;
+  color: #1F5F4A;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.branch-banner.on { display: block; }
+.branch-banner strong { font-weight: 700; }
+.branch-banner .badge {
+  display: inline-block; background: #1F5F4A; color: #fff;
+  padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.05em; margin-left: 8px;
+}
+
+/* V1 第7刀: floating toast for refresh result */
+.wp-toast {
+  position: fixed; top: 76px; left: 50%; transform: translateX(-50%);
+  background: #1F5F4A; color: #fff; padding: 10px 18px; border-radius: 6px;
+  font-size: 13px; font-weight: 500; z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  opacity: 0; transition: opacity 0.25s ease;
+  pointer-events: none;
+  max-width: 90vw;
+}
+.wp-toast.show { opacity: 1; }
+.wp-toast.fail { background: #C04D3F; }
+.wp-toast.warn { background: #D8A23B; color: #2A2A2A; }
+
 /* ── View containers ────────────────────────────────────────────── */
 .view { display: none; }
 .view.on { display: block; }
@@ -897,10 +949,22 @@ footer.app-footer {
     <div class="header-right">
       <div class="role-chip"><strong id="userName">—</strong> · <span id="userRole">—</span></div>
       <div class="data-date" id="dataDate">—</div>
+      <!-- V1 第7刀: 3-way view-as switcher (Owner / Branch Manager / Warehouse).
+           Owner is full company; Branch Manager scopes every dashboard to a single
+           store via the W0X picker; Warehouse is the existing warehouse-only view.
+           Switching is a "view" not a permission — Jym uses this to QA per-store data. -->
       <div class="view-as" id="viewAsSwitcher" role="tablist" title="View as (test)" style="display:none">
         <button id="viewAsOwner" type="button" onclick="setViewAs('owner')" data-i18n="viewas-owner">Owner</button>
+        <button id="viewAsBranch" type="button" onclick="setViewAs('branch')" data-i18n="viewas-branch">Branch Manager</button>
         <button id="viewAsWarehouse" type="button" onclick="setViewAs('warehouse')" data-i18n="viewas-warehouse">Warehouse</button>
       </div>
+      <select id="branchPicker" class="branch-picker" onchange="setBranch(this.value)" style="display:none" title="Pick branch to scope all dashboards">
+        <option value="W01">W01 · Pandan Indah</option>
+        <option value="W02">W02 · Ampang Waterfront</option>
+        <option value="W03">W03 · Wangsa Maju</option>
+        <option value="W05">W05 · Bangi Seksyen 7</option>
+        <option value="W07">W07 · Pandan Jaya</option>
+      </select>
       <!-- Global period selector — drives every page that has a time window -->
       <div class="period-toggle" id="periodToggle" role="tablist" title="Period (1m / 3m / 6m / 12m)">
         <button type="button" data-period="1m"  data-i18n="period-1m">1m</button>
@@ -912,11 +976,22 @@ footer.app-footer {
         <button id="langEN" class="on" type="button" onclick="setLang('en')">EN</button>
         <button id="langZH" type="button" onclick="setLang('zh')">中</button>
       </div>
+      <!-- V1 第7刀: manual data refresh. Hits the live Apps Script endpoints
+           (financial / sales / stock / customers) via /api/proxy and overlays
+           the freshest values on top of the static baked dashboards. -->
+      <button id="refreshBtn" class="refresh-btn" type="button" onclick="doRefresh()" title="Refresh live data from Google Sheet" aria-label="Refresh data">🔄 <span data-i18n="btn-refresh">Refresh</span></button>
       <!-- V1 第6刀: data integrity status light. 🟢 all checks pass · 🟡 some warnings · 🔴 contradictions -->
       <button id="dataSanityLight" class="sanity-light" type="button" title="Data sanity status — click for details" onclick="setView('admin/sanity')" aria-label="Data sanity status">🟢</button>
       <button class="logout-btn" type="button" onclick="doLogout()" id="logoutBtn">Sign out</button>
     </div>
   </header>
+
+  <!-- V1 第7刀: branch banner — appears only in Branch Manager view, light forest green
+       so the store manager doesn't mistake their scoped view for the company-wide owner view. -->
+  <div id="branchBanner" class="branch-banner" aria-live="polite"></div>
+
+  <!-- V1 第7刀: refresh toast container -->
+  <div id="wpToast" class="wp-toast" role="status" aria-live="polite"></div>
 
   <main class="app-main">
     <nav class="menu" id="menu">
@@ -1591,7 +1666,9 @@ const STR = {
     "wh-status-cancel": "Skipped",
 
     "viewas-owner": "Owner",
+    "viewas-branch": "Branch Manager",
     "viewas-warehouse": "Warehouse",
+    "btn-refresh": "Refresh",
 
     "nav-section-cust": "Customers",
     "nav-cust-churn": "Lapsed Customers",
@@ -1948,7 +2025,9 @@ const STR = {
     "wh-status-cancel": "已跳过",
 
     "viewas-owner": "Owner",
+    "viewas-branch": "店长",
     "viewas-warehouse": "仓库",
+    "btn-refresh": "刷新",
 
     "nav-section-cust": "顾客",
     "nav-cust-churn": "老客流失清单",
@@ -2172,12 +2251,17 @@ function enterApp() {
   document.getElementById('userName').textContent = s.name || s.userId;
   document.getElementById('userRole').textContent = ROLE_LABEL[s.role] || s.role;
   const meta = (window.WP_DEADSTOCK || {}).meta || {};
-  document.getElementById('dataDate').textContent = meta.snapshot ? ('Snapshot ' + meta.snapshot) : '';
   document.getElementById('footerSnapshot').textContent = meta.snapshot || '';
 
   // Initial view-as = real role
   VIEW_AS = (s.role === 'warehouse') ? 'warehouse' : 'owner';
+  BRANCH_VIEW = null;
+  // V1 第7刀: if URL has ?role=branch&branch=W0X, restore that view (owner only)
+  try { if (typeof applyRoleFromUrl === 'function') applyRoleFromUrl(); } catch(_){}
+  try { if (typeof publishRoleState === 'function') publishRoleState(); } catch(_){}
   setupViewAsSwitcher(s.role);
+  updateBranchBanner();
+  updateDataDateLabel();
   applyMenuVisibility();
 
   // Honor ?status= from URL (drives the dead stock 6-tab default selection)
@@ -2219,6 +2303,9 @@ function setLang(l) {
   document.getElementById('langEN').classList.toggle('on', l === 'en');
   document.getElementById('langZH').classList.toggle('on', l === 'zh');
   applyLang();
+  // V1 第7刀: language-sensitive header bits
+  try { updateBranchBanner(); } catch(_){}
+  try { updateDataDateLabel(); } catch(_){}
   renderHero();
   renderTabs();
   renderBranchCards();
@@ -2519,8 +2606,36 @@ function exportCSV() {
    ──────────────────────────────────────────────────────────────── */
 
 let CUR_VIEW = 'deadstock';
-let VIEW_AS = 'owner';            // owner | warehouse — view-mode (not real role)
+let VIEW_AS = 'owner';            // owner | branch | warehouse — view-mode (not real role)
+let BRANCH_VIEW = null;           // V1 第7刀: when VIEW_AS === 'branch', the W0X code being scoped to
 const STATE_KEY = 'wp_transfers_v1';
+const REFRESH_KEY = 'wp_last_refresh_v1';
+
+/* ── V1 第7刀: branch-view filter helpers ───────────────────────────
+   When BRANCH_VIEW is set (e.g. "W05"), every dashboard's row-level data
+   should be filtered to that branch only. These helpers make that explicit
+   and one-line at every render site. */
+function isBranchScoped() { return VIEW_AS === 'branch' && !!BRANCH_VIEW; }
+function activeBranches() {
+  return isBranchScoped() ? [BRANCH_VIEW] : ['W01','W02','W03','W05','W07'];
+}
+function filterRowsByBranch(rows) {
+  if (!isBranchScoped()) return rows || [];
+  const code = BRANCH_VIEW;
+  return (rows || []).filter(r => r && r.branch === code);
+}
+function branchManagerName(code) {
+  const u = (window.WP_USERS || []).find(x => x.branch === code);
+  return u ? u.name : code;
+}
+/* Expose for tests + reload-state inspection. We re-publish from inside
+   setViewAs/setBranch/applyRoleFromUrl so the window mirror always tracks. */
+function publishRoleState() {
+  try {
+    window.VIEW_AS = VIEW_AS;
+    window.BRANCH_VIEW = BRANCH_VIEW;
+  } catch(_) {}
+}
 
 /* ── State persistence (per-suggestion lifecycle) ───────────────── */
 function loadState() {
@@ -2756,14 +2871,23 @@ function leafToParentDomain(leaf) {
 function applyMenuVisibility() {
   // Warehouse role/view only sees warehouse + deadstock; transfers is Owner-only
   const isWarehouse = (VIEW_AS === 'warehouse');
+  const isBranch    = (VIEW_AS === 'branch');
   const navTransfers = document.getElementById('navTransfers');
   const navWarehouse = document.getElementById('navWarehouse');
   if (navTransfers) navTransfers.classList.toggle('hidden', isWarehouse);
   // Warehouse sub-item is always visible (Owner can preview it via view-as switcher)
   if (navWarehouse) navWarehouse.classList.remove('hidden');
+
+  /* V1 第7刀: in Branch Manager view, hide Finance + HR (company-only data
+     a store manager shouldn't see). Inventory / Sales / Customers / Products
+     stay because they have per-branch data. */
+  const navFinance = document.getElementById('navFinance');
+  const navHr      = document.getElementById('navHr');
+  if (navFinance) navFinance.classList.toggle('hidden', isBranch);
+  if (navHr)      navHr.classList.toggle('hidden', isBranch);
 }
 
-/* ── Header view-as switcher ────────────────────────────────────── */
+/* ── Header view-as switcher (V1 第7刀: 3-way Owner / Branch / Warehouse) ── */
 function setupViewAsSwitcher(realRole) {
   const sw = document.getElementById('viewAsSwitcher');
   if (!sw) return;
@@ -2775,17 +2899,79 @@ function setupViewAsSwitcher(realRole) {
     sw.style.display = 'none';
   }
   document.getElementById('viewAsOwner').classList.toggle('on', VIEW_AS === 'owner');
+  document.getElementById('viewAsBranch').classList.toggle('on', VIEW_AS === 'branch');
   document.getElementById('viewAsWarehouse').classList.toggle('on', VIEW_AS === 'warehouse');
+  // Branch picker visibility tracks the toggle
+  const picker = document.getElementById('branchPicker');
+  if (picker) picker.style.display = (VIEW_AS === 'branch' && realRole === 'owner') ? 'inline-block' : 'none';
 }
 function setViewAs(mode) {
   const s = window.WP_SESSION.get(); if (!s) return;
   if (s.role !== 'owner') return;  // only owner can preview
   VIEW_AS = mode;
   document.getElementById('viewAsOwner').classList.toggle('on', mode === 'owner');
+  document.getElementById('viewAsBranch').classList.toggle('on', mode === 'branch');
   document.getElementById('viewAsWarehouse').classList.toggle('on', mode === 'warehouse');
+  const picker = document.getElementById('branchPicker');
+  if (mode === 'branch') {
+    if (picker) picker.style.display = 'inline-block';
+    if (!BRANCH_VIEW) BRANCH_VIEW = (picker && picker.value) || 'W01';
+    if (picker) picker.value = BRANCH_VIEW;
+  } else {
+    if (picker) picker.style.display = 'none';
+    BRANCH_VIEW = null;
+  }
+  updateBranchBanner();
   applyMenuVisibility();
+  syncRoleUrl();
+  publishRoleState();
   // Jump to that role's default page
-  setView(mode === 'warehouse' ? 'warehouse' : 'transfers');
+  if (mode === 'warehouse') setView('warehouse');
+  else if (mode === 'branch') setView('sales');
+  else setView('sales');
+}
+function setBranch(code) {
+  if (!code) return;
+  BRANCH_VIEW = code;
+  const picker = document.getElementById('branchPicker');
+  if (picker) picker.value = code;
+  updateBranchBanner();
+  syncRoleUrl();
+  publishRoleState();
+  rerenderActiveView();
+}
+function updateBranchBanner() {
+  const banner = document.getElementById('branchBanner');
+  if (!banner) return;
+  if (isBranchScoped()) {
+    const code = BRANCH_VIEW;
+    const name = branchManagerName(code);
+    const labelStore = LANG === 'zh' ? '分行视角' : 'Branch view';
+    const labelMode  = LANG === 'zh' ? '所有数据已锁定到该分行' : 'all dashboards scoped to this branch';
+    banner.classList.add('on');
+    banner.innerHTML = '<strong>' + escapeHtml(name) + '</strong>' +
+      '<span class="badge">' + escapeHtml(code) + '</span>' +
+      ' · ' + labelStore + ' · <span style="color:#5C7B6A">' + labelMode + '</span>';
+  } else {
+    banner.classList.remove('on');
+    banner.innerHTML = '';
+  }
+}
+function syncRoleUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (VIEW_AS === 'branch' && BRANCH_VIEW) {
+      url.searchParams.set('role', 'branch');
+      url.searchParams.set('branch', BRANCH_VIEW);
+    } else if (VIEW_AS === 'warehouse') {
+      url.searchParams.set('role', 'warehouse');
+      url.searchParams.delete('branch');
+    } else {
+      url.searchParams.delete('role');
+      url.searchParams.delete('branch');
+    }
+    history.replaceState(null, '', url.toString());
+  } catch(_) {}
 }
 
 /* ── Owner kanban renderer ──────────────────────────────────────── */
@@ -3270,7 +3456,11 @@ function renderSalesDashboard() {
   // window and call out per-branch performance + drop% as the actionable
   // signal. When intraday data lands, the today_sales card switches to
   // a real "today" number — the structure here doesn't change.
-  const trend = td.branch_sales_trend || {};
+  const trendAll = td.branch_sales_trend || {};
+  // V1 第7刀: branch-scope filter — when in Branch Manager view, only show that branch
+  const trend = isBranchScoped()
+    ? (trendAll[BRANCH_VIEW] ? { [BRANCH_VIEW]: trendAll[BRANCH_VIEW] } : {})
+    : trendAll;
   const branches = Object.keys(trend).sort();
   const periodLabelStr = periodLabel(window.PERIOD || '6m');
 
@@ -3473,11 +3663,33 @@ function renderCustomersDashboard() {
   const cd = window.WP_CUSTOMERS || {};
   const churn = (window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.summary) || {};
   const win = window.PERIOD || '6m';
-  // Buckets schema: [{ key: '<1y'|'1-5y'|'5-8y'|'8y+', n, amt, ... }]
-  const buckets = (cd.buckets_by_window && cd.buckets_by_window[win]) || [];
-  const winSum = (cd.summary_by_window && cd.summary_by_window[win]) || cd.summary || {};
-  const totalMembers = (cd.summary && cd.summary.total_members) || winSum.total_members || 0;
-  const activeInWin = winSum.n_active || 0;
+  // V1 第7刀: in Branch Manager view, recompute everything from cd.all filtered to branch
+  let buckets, winSum, totalMembers, activeInWin;
+  if (isBranchScoped()) {
+    const branchAll = filterRowsByBranch(cd.all || []);
+    totalMembers = branchAll.length;
+    // Active = had any sale in window
+    const winKey = ({ '1m':'m1', '3m':'m3', '6m':'m6', '12m':'ltm' })[win] || 'm6';
+    const amtField = winKey + '_amt';
+    activeInWin = branchAll.filter(c => (c[amtField] || 0) > 0).length;
+    // Bucket recompute by age_bucket
+    const bucketAgg = {};
+    branchAll.forEach(c => {
+      const key = c.age_bucket || '—';
+      if (!bucketAgg[key]) bucketAgg[key] = { n: 0, amt: 0 };
+      bucketAgg[key].n += 1;
+      bucketAgg[key].amt += (c.lifetime_amt || 0);
+    });
+    buckets = Object.entries(bucketAgg).map(([key, v]) => ({ key, n: v.n, amt: v.amt }))
+      .sort((a, b) => (a.key < b.key ? -1 : 1));
+    winSum = { total_members: totalMembers, n_active: activeInWin };
+  } else {
+    // Buckets schema: [{ key: '<1y'|'1-5y'|'5-8y'|'8y+', n, amt, ... }]
+    buckets = (cd.buckets_by_window && cd.buckets_by_window[win]) || [];
+    winSum = (cd.summary_by_window && cd.summary_by_window[win]) || cd.summary || {};
+    totalMembers = (cd.summary && cd.summary.total_members) || winSum.total_members || 0;
+    activeInWin = winSum.n_active || 0;
+  }
 
   // 5y+ veteran share — sum members where the key starts with a digit ≥ 5
   let vetShare = 0, totBucketMembers = 0;
@@ -3489,13 +3701,23 @@ function renderCustomersDashboard() {
   });
   const vetPct = totBucketMembers ? (vetShare / totBucketMembers * 100) : (winSum.pct_5plus_n || 0);
 
+  // V1 第7刀: scope churn ("lapsed members") to branch when in Branch Manager view
+  let lapsedN, lapsedRm;
+  if (isBranchScoped()) {
+    const churnRows = filterRowsByBranch((window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.rows) || []);
+    lapsedN  = churnRows.length;
+    lapsedRm = churnRows.reduce((a, r) => a + (r.amount || 0), 0);
+  } else {
+    lapsedN  = churn.n_high_value || 0;
+    lapsedRm = churn.lifetime_rm  || 0;
+  }
   document.getElementById('dsCustCards').innerHTML =
     dsCard(t('ds-cust-members'), fmt(totalMembers), '') +
     dsCard(t('ds-cust-active'),  fmt(activeInWin), periodLabel(win)) +
     dsCard(t('ds-cust-old'),     fmtPct(vetPct), fmt(vetShare) + (LANG === 'zh' ? ' 会员' : ' members')) +
-    dsCard(t('ds-cust-lapsed'),  fmt(churn.n_high_value || 0),
-           'RM ' + fmtMoney(churn.lifetime_rm || 0) + ' lifetime',
-           (churn.n_high_value || 0) > 1000 ? 'warn' : '');
+    dsCard(t('ds-cust-lapsed'),  fmt(lapsedN),
+           'RM ' + fmtMoney(lapsedRm) + ' lifetime',
+           lapsedN > 1000 ? 'warn' : '');
 
   // Chart: age tier members bar
   const labels = buckets.map(b => b.key || '—');
@@ -3514,9 +3736,9 @@ function renderCustomersDashboard() {
 
   // 👉 action: lapsed count + vet share
   let zh, en;
-  if ((churn.n_high_value || 0) > 1000) {  // threshold: >1k lapsed → first-call
-    zh = `${fmt(churn.n_high_value)} 高值会员 6 个月+ 没回 — 老客流失清单是优先电话名单。`;
-    en = `${fmt(churn.n_high_value)} high-value members idle 6+ months — lapsed list is the priority call sheet.`;
+  if (lapsedN > (isBranchScoped() ? 100 : 1000)) {  // threshold: lapsed → first-call
+    zh = `${fmt(lapsedN)} 高值会员 6 个月+ 没回 — 老客流失清单是优先电话名单。`;
+    en = `${fmt(lapsedN)} high-value members idle 6+ months — lapsed list is the priority call sheet.`;
   } else if (vetPct < 30) {
     zh = `5 年+ 老客只占 ${vetPct.toFixed(0)}%,品牌资产单薄,需投资留客。`;
     en = `5y+ veterans are only ${vetPct.toFixed(0)}% of base — brand equity is thin, invest in retention.`;
@@ -3537,9 +3759,12 @@ function renderProductsDashboard() {
   const ds = window.WP_DEADSTOCK || {};
   const brands = fd.brands || [];
   const totals = ds.totals || {};
-  const allRows = ds.rows || [];
+  // V1 第7刀: in Branch Manager view, SKU set = SKUs that have stock in this branch
+  const allRows = isBranchScoped() ? filterRowsByBranch(ds.rows || []) : (ds.rows || []);
   const skuSet = new Set(allRows.map(r => r.code));
-  const activeSkus = (totals.ACTIVE && totals.ACTIVE.rows) || 0;
+  const activeSkus = isBranchScoped()
+    ? allRows.filter(r => r.cls === 'ACTIVE').length
+    : ((totals.ACTIVE && totals.ACTIVE.rows) || 0);
   const avgGp = brands.length ? (brands.reduce((a, b) => a + (b.gp_pct || 0), 0) / brands.length) : 0;
 
   document.getElementById('dsProdCards').innerHTML =
@@ -3686,21 +3911,40 @@ function renderHrDashboard() {
 function renderInventoryDashboard() {
   const ds  = window.WP_DEADSTOCK || {};
   const m   = ds.meta   || {};
-  const totals = ds.totals || {};
+  const totalsAll = ds.totals || {};
   const td  = window.WP_TODAY || {};
   const po  = td.po_exceptions || {};
   const sum = po.summary || {};
   const overdueRows = po.overdue || [];
   const delayedRows = po.delayed || [];
 
-  const companyTotal = m.company_total_stock || m.total_stock || 0;
+  // V1 第7刀: in Branch Manager view, recompute totals from per-branch row filter
+  let totals = totalsAll;
+  let companyTotal, fivStoreTotal;
+  if (isBranchScoped()) {
+    const branchRows = filterRowsByBranch(ds.rows || []);
+    const recomputed = { ACTIVE:{amount:0,rows:0}, SLOW:{amount:0,rows:0}, DEAD:{amount:0,rows:0}, MISPLACED:{amount:0,rows:0}, COMPANY_DEAD:{amount:0,rows:0} };
+    branchRows.forEach(r => {
+      const cls = r.cls || 'ACTIVE';
+      if (!recomputed[cls]) recomputed[cls] = { amount: 0, rows: 0 };
+      recomputed[cls].amount += r.amount || 0;
+      recomputed[cls].rows += 1;
+    });
+    totals = recomputed;
+    const branchTotal = (ds.by_branch && ds.by_branch[BRANCH_VIEW]) || {};
+    companyTotal  = branchTotal.total_stock || branchRows.reduce((a, r) => a + (r.amount || 0), 0);
+    fivStoreTotal = companyTotal || 1;
+  } else {
+    companyTotal  = m.company_total_stock || m.total_stock || 0;
+    fivStoreTotal = m.total_stock || 1;
+  }
+
   const overdueAmt   = overdueRows.reduce((a, r) => a + (r.amount || 0), 0);
   const inTransitN   = sum.n_overdue || overdueRows.length;
 
   // F-N-S health = (DEAD + COMPANY_DEAD) / total stock
   const deadAmt = ((totals.DEAD && totals.DEAD.amount) || 0) +
                   ((totals.COMPANY_DEAD && totals.COMPANY_DEAD.amount) || 0);
-  const fivStoreTotal = m.total_stock || 1;
   const fnsDeadPct = fivStoreTotal ? (deadAmt / fivStoreTotal * 100) : 0;
 
   // Lead time avg from delayed PO `days` field (closed POs that arrived late)
@@ -3710,10 +3954,16 @@ function renderInventoryDashboard() {
     leadAvg = sumDays / delayedRows.length;
   }
 
+  const scopeLabel = isBranchScoped()
+    ? (BRANCH_VIEW + ' · ' + (LANG === 'zh' ? '该分行' : 'this branch'))
+    : (LANG === 'zh' ? '公司全部' : 'company-wide');
+  const scopeRows = isBranchScoped()
+    ? filterRowsByBranch(ds.rows || []).length
+    : (m.company_rows_total || 0);
   document.getElementById('dsInvCards').innerHTML =
     dsCard(LANG === 'zh' ? '总库存值' : 'Total inventory value',
            'RM ' + fmtMoney(companyTotal),
-           (LANG === 'zh' ? '公司全部 · ' : 'company-wide · ') + fmt(m.company_rows_total || 0) + ' rows') +
+           scopeLabel + ' · ' + fmt(scopeRows) + ' rows') +
     dsCard(LANG === 'zh' ? '在途 PO' : 'In-transit POs',
            fmt(inTransitN),
            'RM ' + fmtMoney(overdueAmt) + (LANG === 'zh' ? ' 未到货' : ' open'),
@@ -4140,6 +4390,128 @@ function renderAdminSanity() {
     '</tr>').join('');
 }
 window.renderAdminSanity = renderAdminSanity;
+
+/* ──────────────────────────────────────────────────────────────────
+   V1 第 7 刀  ·  Manual Refresh + Branch Manager view
+   ──────────────────────────────────────────────────────────────────
+   Architecture truth (recon notes):
+   - Portal currently loads STATIC `assets/*-data.js` baked at build time
+     by `tools/build-*.py` (which read xlsx + Apps Script live JSON).
+   - Apps Script proxy supports LIVE types: financial, customers, sales, stock.
+     (other types — all/today/po/etc — time out, don't exist on the script.)
+   - Apps Script reads Sheet on every request (no observable cache);
+     no time-driven trigger needed.
+   - For full ingestion of fresh xlsx, build pipeline must run + push to Vercel;
+     for live KPI overlays, Refresh button calls /api/proxy?type=...&t={ts}.
+   ────────────────────────────────────────────────────────────────── */
+
+/* Show a transient toast at top-of-page. kind: 'ok' | 'fail' | 'warn'. */
+function showToast(msg, kind) {
+  const t = document.getElementById('wpToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'wp-toast show' + (kind === 'fail' ? ' fail' : kind === 'warn' ? ' warn' : '');
+  setTimeout(() => { t.classList.remove('show'); }, 4500);
+}
+window.showToast = showToast;
+
+/* Format HH:MM from Date or epoch */
+function fmtHHMM(d) {
+  const dt = (d instanceof Date) ? d : new Date(d || Date.now());
+  return String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+}
+
+/* Persist + read last-refresh timestamp */
+function getLastRefresh() {
+  try { const v = localStorage.getItem(REFRESH_KEY); return v ? parseInt(v, 10) : 0; }
+  catch(_) { return 0; }
+}
+function setLastRefresh(ms) {
+  try { localStorage.setItem(REFRESH_KEY, String(ms)); } catch(_) {}
+}
+
+/* Update the "Snapshot YYYY-MM · last refresh HH:MM" string in header */
+function updateDataDateLabel() {
+  const meta = (window.WP_DEADSTOCK || {}).meta || {};
+  const snap = meta.snapshot || '';
+  const lastMs = getLastRefresh();
+  const refreshStr = lastMs
+    ? ((LANG === 'zh' ? ' · 上次刷新 ' : ' · last refresh ') + fmtHHMM(lastMs))
+    : '';
+  const el = document.getElementById('dataDate');
+  if (el) el.textContent = (snap ? ('Snapshot ' + snap) : '') + refreshStr;
+}
+window.updateDataDateLabel = updateDataDateLabel;
+
+/* Fetch all live endpoints in parallel; merge into window.__wpLive overlay.
+   On success: bump last-refresh, show toast, repaint active view + light. */
+async function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn && btn.classList.contains('loading')) return;  // de-dupe rapid clicks
+  if (btn) btn.classList.add('loading');
+
+  const ts = Date.now();
+  const types = ['financial', 'sales', 'stock', 'customers'];
+  const results = await Promise.allSettled(types.map(type =>
+    fetch('/api/proxy?type=' + type + '&t=' + ts, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(j => (j && j.ok) ? { type, data: j.data } : Promise.reject(new Error((j && j.error) || 'bad payload')))
+  ));
+
+  const live = window.__wpLive || (window.__wpLive = {});
+  let okCount = 0, failTypes = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) { live[types[i]] = r.value.data; okCount++; }
+    else { failTypes.push(types[i]); }
+  });
+
+  if (btn) btn.classList.remove('loading');
+
+  if (okCount === 0) {
+    showToast(LANG === 'zh' ? '数据源未响应,请稍后再试' : 'Data source unreachable — try again later', 'fail');
+    return false;
+  }
+
+  setLastRefresh(ts);
+  updateDataDateLabel();
+
+  const partialMsg = failTypes.length
+    ? (LANG === 'zh' ? ' (部分: ' : ' (partial: ') + failTypes.join(',') + ')'
+    : '';
+  showToast(
+    (LANG === 'zh' ? '数据已更新 · ' : 'Data updated · ') + fmtHHMM(ts) + partialMsg,
+    failTypes.length ? 'warn' : 'ok'
+  );
+
+  // Repaint active view so any KPI cards using live overlay refresh
+  try { rerenderActiveView(); } catch(_) {}
+  try { updateSanityLight(); } catch(_) {}
+  return true;
+}
+window.doRefresh = doRefresh;
+
+/* Parse ?role=branch&branch=W05 from URL on app entry */
+function applyRoleFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const role = u.searchParams.get('role');
+    const br   = u.searchParams.get('branch');
+    if (role === 'branch' && br && /^W\d{2}$/.test(br)) {
+      const s = window.WP_SESSION.get();
+      if (s && s.role === 'owner') {
+        VIEW_AS = 'branch';
+        BRANCH_VIEW = br;
+        const picker = document.getElementById('branchPicker');
+        if (picker) { picker.value = br; picker.style.display = 'inline-block'; }
+      }
+    } else if (role === 'warehouse') {
+      const s = window.WP_SESSION.get();
+      if (s && s.role === 'owner') VIEW_AS = 'warehouse';
+    }
+  } catch(_) {}
+  publishRoleState();
+}
+window.applyRoleFromUrl = applyRoleFromUrl;
 
 /* ── Candidate generation: collect signals across 4 dimensions ─── */
 function collectTodayCandidates() {
