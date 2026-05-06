@@ -965,8 +965,16 @@ footer.app-footer {
         <option value="W05">W05 · Bangi Seksyen 7</option>
         <option value="W07">W07 · Pandan Jaya</option>
       </select>
-      <!-- Global period selector — drives every page that has a time window -->
-      <div class="period-toggle" id="periodToggle" role="tablist" title="Period (1m / 3m / 6m / 12m)">
+      <!-- V1 第二刀 (2026-05-06): Month picker — locks the snapshot to a specific YYYY-MM.
+           Affects /api/customers (recomputes 1m/3m/6m/12m windows from this snapshot) and
+           the dynamic "Snapshot YYYY-MM" header label. Default: latest month with data. -->
+      <select id="monthPicker" class="branch-picker" onchange="setSnapshot(this.value)" title="Snapshot month — every dashboard scopes to this month">
+        <option value="">—</option>
+      </select>
+      <!-- Global period selector — drives every page that has a time window.
+           Window is interpreted RELATIVE to the picked Snapshot month above:
+           e.g. snapshot=2026-04 + period=3m  →  Feb 2026 .. Apr 2026 inclusive. -->
+      <div class="period-toggle" id="periodToggle" role="tablist" title="Period window (relative to Snapshot month)">
         <button type="button" data-period="1m"  data-i18n="period-1m">1m</button>
         <button type="button" data-period="3m"  data-i18n="period-3m">3m</button>
         <button type="button" data-period="6m"  class="on" data-i18n="period-6m">6m</button>
@@ -2250,8 +2258,10 @@ function enterApp() {
 
   document.getElementById('userName').textContent = s.name || s.userId;
   document.getElementById('userRole').textContent = ROLE_LABEL[s.role] || s.role;
-  const meta = (window.WP_DEADSTOCK || {}).meta || {};
-  document.getElementById('footerSnapshot').textContent = meta.snapshot || '';
+  // V1 第二刀: footer Snapshot is now driven by window.SNAPSHOT (month picker).
+  // First paint may show the build-time fallback; updateFooterSnapshot is called
+  // again after the live /api/customers reply populates the picker.
+  try { updateFooterSnapshot(); } catch(_) {}
 
   // Initial view-as = real role
   VIEW_AS = (s.role === 'warehouse') ? 'warehouse' : 'owner';
@@ -2292,10 +2302,14 @@ function enterApp() {
   // V1 第6刀: run sanity checks once at app entry, paint the status light
   try { if (typeof updateSanityLight === 'function') updateSanityLight(); } catch(_){}
 
-  // V1 第8刀: kick off live floatation fetch in background — Refresh-without-clicking-Refresh
-  // for the very first page load. ~1-2s after login the walk-in chart shows live numbers.
+  // V1 第二刀: kick off live fetches for ALL channels (floatation + sales + customers)
+  // in background — Refresh-without-clicking-Refresh for the first page load. The
+  // refreshLiveData orchestrator handles loading state + change detection + toast.
+  // Silent on entry (no toast) to avoid surprising the user immediately after login.
   try {
-    if (typeof fetchFloatationLive === 'function') {
+    if (typeof refreshLiveData === 'function') {
+      refreshLiveData({ silent: true });
+    } else if (typeof fetchFloatationLive === 'function') {
       fetchFloatationLive(Date.now()).then(r => {
         if (r && r.ok) {
           setLastRefresh(Date.now());
@@ -3371,6 +3385,94 @@ window.PERIOD = periodFromUrl()
   || (function(){ try { const v = localStorage.getItem('wp_period'); return PERIOD_VALID.indexOf(v) !== -1 ? v : null; } catch(_){ return null; } })()
   || '6m';
 
+/* ── Global SNAPSHOT state (YYYY-MM) — V1 第二刀 ─────────────────
+   The "as-of" month every dashboard scopes to. Default = latest month
+   with data (resolved from /api/customers months_seen on first fetch).
+   URL: ?month=YYYY-MM. localStorage: wp_snapshot.
+
+   Source of truth flow:
+     - On boot, read URL > localStorage > <empty>.
+     - On first /api/customers response, if SNAPSHOT empty, set to
+       latest_month and re-render. (Picker auto-populated from months_seen.)
+     - User picks via #monthPicker → setSnapshot() → re-fetch live endpoints
+       with ?month=YYYY-MM → mutate WP_TODAY/WP_CUSTOMERS → re-render.
+     - "Snapshot YYYY-MM" footer label and #dataDate header read from this. */
+const SNAPSHOT_RX = /^\d{4}-(0[1-9]|1[0-2])$/;
+function snapshotFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const v = u.searchParams.get('month');
+    if (v && SNAPSHOT_RX.test(v)) return v;
+  } catch(_) {}
+  return null;
+}
+function persistSnapshotToUrl() {
+  try {
+    const u = new URL(window.location.href);
+    if (window.SNAPSHOT) u.searchParams.set('month', window.SNAPSHOT);
+    else u.searchParams.delete('month');
+    history.replaceState(null, '', u.toString());
+  } catch(_) {}
+}
+function setSnapshot(ym, opts) {
+  if (!ym) return;
+  if (!SNAPSHOT_RX.test(ym)) return;
+  if (window.SNAPSHOT === ym) return;
+  window.SNAPSHOT = ym;
+  try { localStorage.setItem('wp_snapshot', ym); } catch(_) {}
+  persistSnapshotToUrl();
+  // Reflect in picker
+  const sel = document.getElementById('monthPicker');
+  if (sel) sel.value = ym;
+  // Update dynamic Snapshot label immediately (refresh will repaint with live data)
+  try { updateDataDateLabel(); } catch(_) {}
+  try { updateFooterSnapshot(); } catch(_) {}
+  // Re-fetch live endpoints scoped to picked month, then repaint.
+  if (!(opts && opts.skipRefresh)) {
+    if (typeof refreshLiveData === 'function') refreshLiveData({ silent: true });
+  }
+}
+window.setSnapshot = setSnapshot;
+// Bootstrap default: URL > localStorage > <empty until first /api/customers reply>
+window.SNAPSHOT = snapshotFromUrl()
+  || (function(){ try { const v = localStorage.getItem('wp_snapshot'); return v && SNAPSHOT_RX.test(v) ? v : null; } catch(_){ return null; } })()
+  || null;
+
+/* Build & populate the month-picker <select> from a sorted list of YYYY-MM strings.
+   Always preserves the current SNAPSHOT selection. */
+function populateMonthPicker(months) {
+  const sel = document.getElementById('monthPicker');
+  if (!sel || !Array.isArray(months) || !months.length) return;
+  // Sort ascending then render newest-first in dropdown
+  const sorted = [...months].filter(m => SNAPSHOT_RX.test(m)).sort();
+  if (!sorted.length) return;
+  const newest = sorted[sorted.length - 1];
+  if (!window.SNAPSHOT) window.SNAPSHOT = newest;
+  sel.innerHTML = '';
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const m = sorted[i];
+    const o = document.createElement('option');
+    o.value = m; o.textContent = m;
+    if (m === window.SNAPSHOT) o.selected = true;
+    sel.appendChild(o);
+  }
+  // Sync URL + label after picker is populated
+  try { persistSnapshotToUrl(); } catch(_) {}
+  try { updateDataDateLabel(); } catch(_) {}
+  try { updateFooterSnapshot(); } catch(_) {}
+}
+window.populateMonthPicker = populateMonthPicker;
+
+/* Footer "Snapshot YYYY-MM" — was hardcoded from WP_DEADSTOCK.meta.snapshot;
+   now driven by window.SNAPSHOT (with WP_DEADSTOCK as fallback). */
+function updateFooterSnapshot() {
+  const el = document.getElementById('footerSnapshot');
+  if (!el) return;
+  const snap = window.SNAPSHOT || ((window.WP_DEADSTOCK || {}).meta || {}).snapshot || '';
+  el.textContent = snap;
+}
+window.updateFooterSnapshot = updateFooterSnapshot;
+
 /* ── ?status= sync for dead stock view ──────────────────────────── */
 const STATUS_VALID = ['all','ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'];
 function persistStatusToUrl(s) {
@@ -4444,25 +4546,27 @@ function setLastRefresh(ms) {
   try { localStorage.setItem(REFRESH_KEY, String(ms)); } catch(_) {}
 }
 
-/* Update the "Snapshot YYYY-MM · last refresh HH:MM" string in header */
+/* Update the "Snapshot YYYY-MM · last refresh HH:MM" string in header.
+   V1 第二刀: snapshot now comes from window.SNAPSHOT (driven by month picker)
+   instead of the static WP_DEADSTOCK build-time meta. Falls back to WP_DEADSTOCK
+   only on first paint before the picker has resolved a default. */
 function updateDataDateLabel() {
-  const meta = (window.WP_DEADSTOCK || {}).meta || {};
-  const snap = meta.snapshot || '';
+  const snap = window.SNAPSHOT || ((window.WP_DEADSTOCK || {}).meta || {}).snapshot || '';
   const lastMs = getLastRefresh();
   const refreshStr = lastMs
     ? ((LANG === 'zh' ? ' · 上次刷新 ' : ' · last refresh ') + fmtHHMM(lastMs))
     : '';
   const el = document.getElementById('dataDate');
   if (el) el.textContent = (snap ? ('Snapshot ' + snap) : '') + refreshStr;
+  // Mirror to footer snapshot (was hardcoded from build meta)
+  try { updateFooterSnapshot(); } catch(_) {}
 }
 window.updateDataDateLabel = updateDataDateLabel;
 
 /* V1 第8刀 — Live floatation (Walk-in) fetcher.
    Hits /api/floatation, server reads 5 W0X public Sheets and parses to RACE_DATA shape.
    On success → mutate window.WP_CUSTOMERS.race in-place so renderCustInsights picks up
-   live data on next paint. (Note: WP_CUSTOMERS, not WP_TODAY — that's where build-today.py
-   used to bake the legacy `race` key. The existing renderer reads ci.race from WP_CUSTOMERS.)
-   Fire-and-forget; no exception escapes. */
+   live data on next paint. */
 async function fetchFloatationLive(ts) {
   const url = '/api/floatation?t=' + (ts || Date.now());
   try {
@@ -4482,63 +4586,228 @@ async function fetchFloatationLive(ts) {
     };
     if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
     window.WP_CUSTOMERS.race = race;
-    return { ok: true, fetched_at: j.fetched_at, months: j.months };
+    return { ok: true, fetched_at: j.fetched_at, months: j.months, payload: j };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 }
 window.fetchFloatationLive = fetchFloatationLive;
 
-/* Fetch all live endpoints in parallel; merge into window.__wpLive overlay.
-   On success: bump last-refresh, show toast, repaint active view + light. */
-async function doRefresh() {
-  const btn = document.getElementById('refreshBtn');
-  if (btn && btn.classList.contains('loading')) return;  // de-dupe rapid clicks
-  if (btn) btn.classList.add('loading');
+/* V1 第二刀 — Live sales (PO/GRN by month × main group).
+   Hits /api/sales (public Sheet). Stores raw payload at window.WP_SALES_LIVE
+   for downstream renderers to pivot. Does NOT overwrite WP_FINANCIAL (those
+   are different cuts — financial = cash, sales = unit movement). */
+async function fetchSalesLive(ts) {
+  const url = '/api/sales?t=' + (ts || Date.now());
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    const j = await r.json();
+    if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
+    j._live = true;
+    j._fetched_at = j.fetched_at;
+    window.WP_SALES_LIVE = j;
+    return { ok: true, fetched_at: j.fetched_at, months: j.months, payload: j };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+window.fetchSalesLive = fetchSalesLive;
 
+/* V1 第二刀 — Live customers (RFM + churn + buckets, snapshot-scoped).
+   Hits /api/customers?month=YYYY-MM (uses window.SNAPSHOT or falls back to latest).
+   On success → mutate window.WP_CUSTOMERS.* and window.WP_TODAY.churn in place,
+   so every dashboard that reads those globals gets fresh numbers on next render.
+   Also feeds the month picker on first reply (months_seen → populateMonthPicker). */
+async function fetchCustomersLive(ts) {
+  const month = window.SNAPSHOT;
+  const qs = month ? ('&month=' + encodeURIComponent(month)) : '';
+  const url = '/api/customers?t=' + (ts || Date.now()) + qs;
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    const j = await r.json();
+    if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
+
+    // Populate / re-populate the month picker from months_seen (newest months may
+    // appear over time; picker stays in sync). Preserves current SNAPSHOT.
+    if (Array.isArray(j.months_seen) && j.months_seen.length) {
+      try { populateMonthPicker(j.months_seen); } catch(_) {}
+    }
+    // If snapshot was empty, server default = latest month with data → adopt it.
+    if (!window.SNAPSHOT && j.snapshot && SNAPSHOT_RX.test(j.snapshot)) {
+      window.SNAPSHOT = j.snapshot;
+      try { localStorage.setItem('wp_snapshot', j.snapshot); } catch(_) {}
+      try { persistSnapshotToUrl(); } catch(_) {}
+    }
+
+    // Mutate WP_CUSTOMERS in place (preserve race overlay set by fetchFloatationLive)
+    if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
+    const race = window.WP_CUSTOMERS.race;
+    Object.assign(window.WP_CUSTOMERS, {
+      meta: { ...(window.WP_CUSTOMERS.meta||{}), generated: j.fetched_at, snapshot: j.snapshot, _live: true },
+      summary: j.summary,
+      summary_by_window: j.summary_by_window,
+      buckets_by_window: j.buckets_by_window,
+      cross_by_window: j.cross_by_window,
+      top100: j.top100,
+      windows: j.windows,
+      types: j.types,
+      _live: true,
+      _fetched_at: j.fetched_at,
+    });
+    if (race) window.WP_CUSTOMERS.race = race;
+
+    // Mirror churn into WP_TODAY.churn so renderChurn() / renderToday() pick up
+    // fresh data without a frontend rewrite.
+    if (!window.WP_TODAY) window.WP_TODAY = {};
+    window.WP_TODAY.churn = j.churn;
+    window.WP_TODAY.meta = { ...(window.WP_TODAY.meta||{}), snapshot: j.snapshot };
+
+    return { ok: true, fetched_at: j.fetched_at, snapshot: j.snapshot, payload: j };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+window.fetchCustomersLive = fetchCustomersLive;
+
+/* Lightweight stable hash of an object (sub-payload key-set hash, fast).
+   Used for change detection between consecutive Refresh clicks: same hash →
+   "已是最新", different hash → "已更新". Not cryptographic; collisions OK. */
+function quickHash(obj) {
+  try {
+    const s = JSON.stringify(obj);
+    if (!s) return '0';
+    let h = 0;
+    for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return String(h) + ':' + s.length;
+  } catch(_) { return '0'; }
+}
+window.__wpLastHash = window.__wpLastHash || null;
+
+/* Compute a fingerprint over the things Refresh actually mutates, so we can
+   tell the user "已是最新" vs "已更新". */
+function fingerprintLiveState() {
+  return quickHash({
+    flo: window.WP_CUSTOMERS && window.WP_CUSTOMERS.race && {
+      months: window.WP_CUSTOMERS.race.months,
+      totals: window.WP_CUSTOMERS.race.totals,
+    },
+    cust: window.WP_CUSTOMERS && {
+      snap: window.WP_CUSTOMERS.meta && window.WP_CUSTOMERS.meta.snapshot,
+      sum:  window.WP_CUSTOMERS.summary && window.WP_CUSTOMERS.summary.amt_total,
+      n:    window.WP_CUSTOMERS.summary && window.WP_CUSTOMERS.summary.total_members,
+      churn:window.WP_TODAY && window.WP_TODAY.churn && window.WP_TODAY.churn.summary,
+    },
+    sales: window.WP_SALES_LIVE && {
+      latest: window.WP_SALES_LIVE.latest_month,
+      n_months: (window.WP_SALES_LIVE.months || []).length,
+      mar26: window.WP_SALES_LIVE.by_month && window.WP_SALES_LIVE.by_month[window.SNAPSHOT],
+    },
+  });
+}
+window.fingerprintLiveState = fingerprintLiveState;
+
+/* Core orchestrator — fetches all 5 live channels in parallel.
+   Per V1 第二刀 spec: "One Refresh refreshes all 5 sources."
+     1. /api/sales       — public Sales Sheet (PO + GRN by month × main group)
+     2. /api/customers   — public CustomerBuy Sheet (RFM + churn + buckets)
+     3. /api/floatation  — 5 W0X public Sheets (walk-in by race)
+     4. /api/proxy?type=financial  — Apps Script (P&L + cash)
+     5. /api/proxy?type=stock      — Apps Script (live inventory)
+
+   `silent: true` skips the toast (used internally by setSnapshot so the user
+   doesn't get a toast on every dropdown change, and on page-load auto-fetch). */
+async function refreshLiveData(opts) {
+  const silent = !!(opts && opts.silent);
+  const btn = document.getElementById('refreshBtn');
+  if (btn && btn.classList.contains('loading')) return { ok: false, error: 'in-flight' };
+  if (btn) { btn.classList.add('loading'); btn.setAttribute('aria-busy', 'true'); btn.disabled = true; }
+
+  const beforeHash = fingerprintLiveState();
   const ts = Date.now();
-  const types = ['financial', 'sales', 'stock', 'customers'];
-  const proxyP = Promise.allSettled(types.map(type =>
+
+  // Apps Script proxy channels (financial + stock — Sales/customers are now direct)
+  const proxyTypes = ['financial', 'stock'];
+  const proxyP = Promise.allSettled(proxyTypes.map(type =>
     fetch('/api/proxy?type=' + type + '&t=' + ts, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
       .then(j => (j && j.ok) ? { type, data: j.data } : Promise.reject(new Error((j && j.error) || 'bad payload')))
   ));
-  const flotP = fetchFloatationLive(ts);
 
-  const [results, flo] = await Promise.all([proxyP, flotP]);
+  const [salesR, custR, floR, proxyResults] = await Promise.all([
+    Promise.resolve().then(() => fetchSalesLive(ts)).catch(e => ({ ok: false, error: e.message })),
+    Promise.resolve().then(() => fetchCustomersLive(ts)).catch(e => ({ ok: false, error: e.message })),
+    Promise.resolve().then(() => fetchFloatationLive(ts)).catch(e => ({ ok: false, error: e.message })),
+    proxyP,
+  ]);
 
+  const sales = salesR, cust = custR, flo = floR;
+
+  // Merge proxy results into __wpLive overlay (preserves the V1 第7刀 contract)
   const live = window.__wpLive || (window.__wpLive = {});
-  let okCount = 0, failTypes = [];
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value) { live[types[i]] = r.value.data; okCount++; }
-    else { failTypes.push(types[i]); }
+  const proxyOk = []; const proxyFail = [];
+  proxyResults.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) { live[proxyTypes[i]] = r.value.data; proxyOk.push(proxyTypes[i]); }
+    else {
+      const msg = (r.reason && r.reason.message) || 'fail';
+      proxyFail.push(proxyTypes[i] + ':' + msg);
+    }
   });
-  // Floatation success counts as one more channel; failure adds to failTypes
-  if (flo && flo.ok) { okCount++; live.floatation = flo; }
-  else { failTypes.push('floatation'); }
 
-  if (btn) btn.classList.remove('loading');
+  if (btn) { btn.classList.remove('loading'); btn.removeAttribute('aria-busy'); btn.disabled = false; }
+
+  const okCount = (sales.ok ? 1 : 0) + (cust.ok ? 1 : 0) + (flo.ok ? 1 : 0) + proxyOk.length;
+  const failed = [];
+  if (!sales.ok) failed.push('sales:' + (sales.error || 'fail'));
+  if (!cust.ok)  failed.push('customers:' + (cust.error || 'fail'));
+  if (!flo.ok)   failed.push('floatation:' + (flo.error || 'fail'));
+  failed.push(...proxyFail);
 
   if (okCount === 0) {
-    showToast(LANG === 'zh' ? '数据源未响应,请稍后再试' : 'Data source unreachable — try again later', 'fail');
-    return false;
+    if (!silent) showToast(
+      (LANG === 'zh' ? '刷新失败 · ' : 'Refresh failed · ') + failed.join(' · '),
+      'fail'
+    );
+    return { ok: false, error: failed.join(' · ') };
   }
 
   setLastRefresh(ts);
   updateDataDateLabel();
 
-  const partialMsg = failTypes.length
-    ? (LANG === 'zh' ? ' (部分: ' : ' (partial: ') + failTypes.join(',') + ')'
-    : '';
-  showToast(
-    (LANG === 'zh' ? '数据已更新 · ' : 'Data updated · ') + fmtHHMM(ts) + partialMsg,
-    failTypes.length ? 'warn' : 'ok'
-  );
-
-  // Repaint active view so any KPI cards using live overlay + race chart refresh
+  // Repaint
   try { rerenderActiveView(); } catch(_) {}
   try { updateSanityLight(); } catch(_) {}
-  return true;
+
+  const afterHash = fingerprintLiveState();
+  const changed = (beforeHash !== afterHash);
+  if (!silent) {
+    if (failed.length && okCount > 0) {
+      showToast(
+        (LANG === 'zh' ? '数据已更新 (部分) · ' : 'Data updated (partial) · ') + fmtHHMM(ts) +
+        ' · ' + failed.join(' · '),
+        'warn'
+      );
+    } else if (!changed) {
+      showToast(
+        (LANG === 'zh' ? '已是最新 · ' : 'Already up to date · ') + fmtHHMM(ts),
+        'ok'
+      );
+    } else {
+      showToast(
+        (LANG === 'zh' ? '数据已更新 · ' : 'Data updated · ') + fmtHHMM(ts),
+        'ok'
+      );
+    }
+  }
+  window.__wpLastHash = afterHash;
+  return { ok: true, changed, failed, ts };
+}
+window.refreshLiveData = refreshLiveData;
+
+/* Public Refresh-button handler (kept name `doRefresh` for the inline onclick). */
+async function doRefresh() {
+  return refreshLiveData({ silent: false });
 }
 window.doRefresh = doRefresh;
 

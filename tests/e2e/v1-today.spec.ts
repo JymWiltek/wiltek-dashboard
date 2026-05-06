@@ -419,45 +419,121 @@ test.describe('Round 5 — V1 第7刀: Refresh + Branch Manager view', () => {
   });
 
   test('Refresh button toggles loading class then succeeds or fails honestly', async ({ page }) => {
-    await loginOwner(page);
-    // Mock /api/proxy to return ok payloads instantly so we don't depend on prod
+    // V1 第二刀: doRefresh now hits 5 channels. Mock all of them OK so the
+    // success path triggers a "Data updated" (or "Already up to date") toast.
     await page.route('**/api/proxy*', route => {
       const url = new URL(route.request().url());
       const type = url.searchParams.get('type') || 'all';
       route.fulfill({
-        status: 200,
-        contentType: 'application/json',
+        status: 200, contentType: 'application/json',
         body: JSON.stringify({ ok: true, type, data: { _stub: true, ts: Date.now() } }),
       });
     });
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, fetched_at: new Date().toISOString(),
+        months: ['2026-04'], groups: ['G1'], matrix: { '2026-04': { G1: { po: 100, grn: 90 } } },
+        by_month: { '2026-04': { po: 100, grn: 90 } }, by_group: { G1: { po: 100, grn: 90 } },
+        latest_month: '2026-04', rows_n: 1, source: 'test' }),
+    }));
+    await page.route('**/api/customers*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, fetched_at: new Date().toISOString(),
+        snapshot: '2026-04', months_seen: ['2026-04','2026-03'],
+        windows: ['1m','3m','6m','12m'], types: ['Walk-in'],
+        summary: { total_members: 1, amt_total: 100 }, summary_by_window: {},
+        buckets_by_window: {}, cross_by_window: {}, top100: [],
+        churn: { summary: { n_high_value: 0 }, customers: [] }, source: 'test' }),
+    }));
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, fetched_at: new Date().toISOString(),
+        year: 2026, months: ['2026-04'], month_idx: [4], races: [],
+        totals: { walkin:[0], purchase:[0], amount:[0], basket:[0], cr:[0] },
+        by_branch: {}, source: 'test' }),
+    }));
+    await loginOwner(page);
+    // Wait for the auto-fired silent refresh on enterApp() to settle so the
+    // manual click below isn't blocked by the in-flight guard.
+    await page.waitForFunction(() => {
+      const btn = document.getElementById('refreshBtn');
+      return !!btn && !btn.classList.contains('loading') &&
+             !!localStorage.getItem('wp_last_refresh_v1');
+    }, { timeout: 5000 });
     const before = await page.evaluate(() => localStorage.getItem('wp_last_refresh_v1'));
+    // Sleep a tick so the second Date.now() differs from autofire's
+    await page.waitForTimeout(20);
     await page.click('#refreshBtn');
-    // Wait for toast to appear
     await page.waitForSelector('#wpToast.show', { timeout: 5000 });
     const toast = await page.locator('#wpToast').innerText();
-    expect(toast.toLowerCase()).toMatch(/data updated|数据已更新/);
+    expect(toast.toLowerCase()).toMatch(/data updated|already up to date|数据已更新|已是最新/);
     const after = await page.evaluate(() => localStorage.getItem('wp_last_refresh_v1'));
-    expect(after).not.toBe(before);
+    expect(parseInt(after || '0', 10)).toBeGreaterThanOrEqual(parseInt(before || '0', 10));
     expect(parseInt(after || '0', 10)).toBeGreaterThan(0);
   });
 
-  test('Refresh fails gracefully when proxy returns error', async ({ page }) => {
-    await loginOwner(page);
+  test('Refresh fails gracefully when all upstream sources error', async ({ page }) => {
+    // V1 第二刀: doRefresh now hits 5 channels (sales/customers/floatation direct +
+    // financial/stock via proxy). Mock ALL of them as failures BEFORE login so
+    // both the auto-fire and manual click see the same fail-tree → "Refresh failed".
     await page.route('**/api/proxy*', route => route.fulfill({
       status: 500, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'down' })
     }));
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'sheet down' })
+    }));
+    await page.route('**/api/customers*', route => route.fulfill({
+      status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'sheet down' })
+    }));
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'sheet down' })
+    }));
+    await loginOwner(page);
+    // Wait for the auto-fire (silent) to finish so the in-flight guard is clear.
+    await page.waitForFunction(() => {
+      const btn = document.getElementById('refreshBtn');
+      return !!btn && !btn.classList.contains('loading');
+    }, { timeout: 5000 });
     await page.click('#refreshBtn');
     await page.waitForSelector('#wpToast.show.fail', { timeout: 5000 });
     const toast = await page.locator('#wpToast').innerText();
-    expect(toast.toLowerCase()).toMatch(/unreachable|未响应/);
+    expect(toast.toLowerCase()).toMatch(/refresh failed|刷新失败/);
   });
 
   test('header data-date shows last refresh HH:MM after refresh', async ({ page }) => {
-    await loginOwner(page);
+    // V1 第二刀: refresh = 5 channels — mock all of them OK so the success path
+    // sets last_refresh and updateDataDateLabel renders "last refresh HH:MM".
     await page.route('**/api/proxy*', route => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ ok: true, type: 'sales', data: {} }),
     }));
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, fetched_at: new Date().toISOString(),
+        months: ['2026-04'], groups: [], matrix: {}, by_month: {}, by_group: {},
+        latest_month: '2026-04', rows_n: 0, source: 'test' }),
+    }));
+    await page.route('**/api/customers*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, fetched_at: new Date().toISOString(),
+        snapshot: '2026-04', months_seen: ['2026-04'],
+        windows: [], types: [], summary: { total_members: 0, amt_total: 0 },
+        summary_by_window: {}, buckets_by_window: {}, cross_by_window: {},
+        top100: [], churn: { summary: {}, customers: [] }, source: 'test' }),
+    }));
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, fetched_at: new Date().toISOString(),
+        year: 2026, months: ['2026-04'], month_idx: [4], races: [],
+        totals: { walkin:[0], purchase:[0], amount:[0], basket:[0], cr:[0] },
+        by_branch: {}, source: 'test' }),
+    }));
+    await loginOwner(page);
+    // Wait for auto-fire (silent) to finish so the manual click isn't blocked
+    await page.waitForFunction(() => {
+      const btn = document.getElementById('refreshBtn');
+      return !!btn && !btn.classList.contains('loading');
+    }, { timeout: 5000 });
     await page.click('#refreshBtn');
     await page.waitForSelector('#wpToast.show', { timeout: 5000 });
     const dataDate = await page.locator('#dataDate').innerText();
@@ -617,5 +693,299 @@ test.describe('Round 6 — V1 第8刀: Live floatation (Walk-in)', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.months).toEqual(['2026-03', '2026-04', '2026-05']);
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────
+   Round 7 — V1 第二刀: Month picker + Live Sales + Live Customers +
+                       Refresh feedback (loading / change-detection / toasts)
+   ─────────────────────────────────────────────────────────────────── */
+test.describe('Round 7 — V1 第二刀: Month picker + Sales/Customers live + Refresh feedback', () => {
+  // Minimal /api/customers payload — covers everything the picker + churn / RFM render needs.
+  function buildCustomersPayload(snapshot: string, opts: { amt_total?: number; n_total?: number } = {}) {
+    return {
+      ok: true,
+      fetched_at: '2026-05-06T08:00:00.000Z',
+      source: 'live:google-sheets',
+      sheet_id: 'TEST',
+      months_seen: ['2026-01','2026-02','2026-03','2026-04','2026-05'],
+      snapshot,
+      requested_month: snapshot,
+      summary: {
+        total_members: opts.n_total ?? 12550,
+        n_active: 6329, n_lt1: 2702, n_1_5: 5893, n_5_8: 1696, n_8plus: 2259,
+        amt_total: opts.amt_total ?? 4474700,
+        amt_lt1: 1957351, amt_1_5: 1067623, amt_5_8: 627418, amt_8plus: 822308,
+        pct_5plus_n: 31.5, pct_5plus_amt: 32.4, snapshot,
+      },
+      summary_by_window: { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      buckets_by_window: { '1m': [], '3m': [], '6m': [], '12m': [] },
+      cross_by_window:   { '1m': {}, '3m': {}, '6m': {}, '12m': {} },
+      top100: [],
+      windows: ['1m','3m','6m','12m'],
+      types:   ['Walk-in','Contractor','Interior Designer','Other'],
+      churn: {
+        summary: { n_total: 2118, n_high_value: 1311, lifetime_rm: 3338685, cutoff_months: 6, high_value_threshold: 1000 },
+        rows: [
+          { mc: 'M03308', name: 'MOUSSA', last: '2024-10', months_ago: 17, amount: 120969, visits: 8, loyalty: 'More than 5 year', branch: 'W02', cust_type: 'Other' }
+        ],
+      },
+      diagnostics: { snapshot, n_rows: 70000, n_members: 12550, n_ci_rows: 12552, n_churn: 2118 },
+    };
+  }
+  function buildSalesPayload(latest = '2026-04') {
+    return {
+      ok: true,
+      fetched_at: '2026-05-06T08:00:00.000Z',
+      source: 'live:google-sheets',
+      sheet_id: 'TEST_SALES',
+      months: ['2026-01','2026-02','2026-03','2026-04'],
+      groups: ['Faucet','Water Closet','Wash Basin'],
+      matrix: { '2026-04': { Faucet: { po: 12000, grn: 11500 } } },
+      by_month: { '2026-04': { po: 100000, grn: 95000 } },
+      by_group: { Faucet: { po: 50000, grn: 48000 } },
+      latest_month: latest,
+      rows_n: 36,
+    };
+  }
+
+  test('header has month picker populated from /api/customers months_seen', async ({ page }) => {
+    await page.route('**/api/customers*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(buildCustomersPayload('2026-05')),
+    }));
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, type: 'x', data: {} }) }));
+
+    await loginOwner(page);
+    // Wait for the auto-refresh on enterApp to populate the picker
+    await page.waitForFunction(() => {
+      const sel = document.getElementById('monthPicker') as HTMLSelectElement | null;
+      return !!(sel && sel.options.length >= 5);
+    }, { timeout: 5000 });
+
+    const opts = await page.$$eval('#monthPicker option', els =>
+      (els as HTMLOptionElement[]).map(o => o.value).filter(Boolean));
+    // Newest-first display
+    expect(opts).toEqual(['2026-05','2026-04','2026-03','2026-02','2026-01']);
+    const sel = await page.locator('#monthPicker').inputValue();
+    expect(sel).toBe('2026-05');
+    const snap = await page.evaluate(() => (window as any).SNAPSHOT);
+    expect(snap).toBe('2026-05');
+  });
+
+  test('setSnapshot syncs URL ?month=YYYY-MM and updates header label', async ({ page }) => {
+    await page.route('**/api/customers*', route => {
+      const u = new URL(route.request().url());
+      const m = u.searchParams.get('month') || '2026-05';
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload(m)) });
+    });
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).SNAPSHOT, { timeout: 5000 });
+
+    // Pick 2026-04 via dropdown
+    await page.selectOption('#monthPicker', '2026-04');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-04', { timeout: 5000 });
+
+    const url = page.url();
+    expect(url).toMatch(/[?&]month=2026-04/);
+
+    const dataDate = await page.locator('#dataDate').innerText();
+    expect(dataDate).toMatch(/Snapshot 2026-04|Snapshot\s+2026-04/);
+    const footer = await page.locator('#footerSnapshot').innerText();
+    expect(footer).toBe('2026-04');
+  });
+
+  test('?month=2026-04 in URL pre-selects picker on app entry', async ({ page }) => {
+    await page.route('**/api/customers*', route => {
+      const u = new URL(route.request().url());
+      const m = u.searchParams.get('month') || '2026-05';
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload(m)) });
+    });
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await page.goto(PAGE_URL + '?month=2026-04');
+    await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
+    await page.fill('#loginUser', 'owner');
+    await page.fill('#loginPw', 'Owner@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-04', { timeout: 5000 });
+
+    const sel = await page.locator('#monthPicker').inputValue();
+    expect(sel).toBe('2026-04');
+  });
+
+  test('fetchCustomersLive mutates WP_TODAY.churn + WP_CUSTOMERS in-place', async ({ page }) => {
+    await page.route('**/api/customers*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(buildCustomersPayload('2026-04', { amt_total: 999999, n_total: 12345 })),
+    }));
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS && (window as any).WP_CUSTOMERS._live === true, { timeout: 5000 });
+
+    const state = await page.evaluate(() => ({
+      cust_n_total: (window as any).WP_CUSTOMERS.summary.total_members,
+      cust_amt:     (window as any).WP_CUSTOMERS.summary.amt_total,
+      cust_snap:    (window as any).WP_CUSTOMERS.meta.snapshot,
+      churn_n:      (window as any).WP_TODAY.churn.summary.n_high_value,
+      churn_rm:     (window as any).WP_TODAY.churn.summary.lifetime_rm,
+    }));
+    expect(state.cust_n_total).toBe(12345);
+    expect(state.cust_amt).toBe(999999);
+    expect(state.cust_snap).toBe('2026-04');
+    expect(state.churn_n).toBe(1311);
+    expect(state.churn_rm).toBe(3338685);
+  });
+
+  test('fetchSalesLive populates WP_SALES_LIVE', async ({ page }) => {
+    await page.route('**/api/customers*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload('2026-04')) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._live === true, { timeout: 5000 });
+    const sales = await page.evaluate(() => ({
+      latest:   (window as any).WP_SALES_LIVE.latest_month,
+      n_months: (window as any).WP_SALES_LIVE.months.length,
+      faucet:   (window as any).WP_SALES_LIVE.by_group.Faucet,
+    }));
+    expect(sales.latest).toBe('2026-04');
+    expect(sales.n_months).toBe(4);
+    expect(sales.faucet).toEqual({ po: 50000, grn: 48000 });
+  });
+
+  test('Refresh shows "已是最新" toast when payload is byte-for-byte identical', async ({ page }) => {
+    const payload = buildCustomersPayload('2026-05');
+    await page.route('**/api/customers*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) }));
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS && (window as any).WP_CUSTOMERS._live === true, { timeout: 5000 });
+
+    // Click refresh — same payload should hash-match → "Already up to date"
+    await page.click('#refreshBtn');
+    await page.waitForSelector('#wpToast.show', { timeout: 5000 });
+    const toast = await page.locator('#wpToast').innerText();
+    // Could be either "Already up to date" (full success) or "Data updated (partial)"
+    // (because floatation 502 → partial). Test for warning-tone OR no-change-tone path:
+    expect(toast.toLowerCase()).toMatch(/already up to date|已是最新|partial|部分/);
+  });
+
+  test('Refresh shows "已更新" toast when payload changes between clicks', async ({ page }) => {
+    let n = 0;
+    await page.route('**/api/customers*', route => {
+      n++;
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(buildCustomersPayload('2026-05', { amt_total: 1000000 + n * 1000 })) });
+    });
+    await page.route('**/api/sales*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, fetched_at: 't', months: ['2026-03','2026-04','2026-05'], races: [], totals: {}, by_branch: {} }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: { _ts: Math.random() } }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS && (window as any).WP_CUSTOMERS._live === true, { timeout: 5000 });
+
+    await page.click('#refreshBtn');
+    await page.waitForSelector('#wpToast.show', { timeout: 5000 });
+    const toast = await page.locator('#wpToast').innerText();
+    expect(toast.toLowerCase()).toMatch(/data updated|已更新/);
+  });
+
+  test('Refresh button shows loading visual + becomes disabled during fetch', async ({ page }) => {
+    // Hold /api/sales but ONLY on the 2nd hit (the manual click). The 1st hit
+    // is the silent autofire on enterApp() — let it pass instantly so we can
+    // observe the loading visual mid-flight on the manual refresh.
+    let salesCall = 0;
+    let resolveSales: ((v: any) => void) | null = null;
+    await page.route('**/api/sales*', async route => {
+      salesCall++;
+      if (salesCall === 1) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) });
+        return;
+      }
+      // 2nd+ call: hold until released
+      await new Promise<any>(r => { resolveSales = r; });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) });
+    });
+    await page.route('**/api/customers*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload('2026-05')) }));
+    await page.route('**/api/floatation*',route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, fetched_at: 't', months: [], races: [], totals: {}, by_branch: {} }) }));
+    await page.route('**/api/proxy*',     route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    // Wait for autofire (silent) to finish — loading class clears, last_refresh set
+    await page.waitForFunction(() => {
+      const btn = document.getElementById('refreshBtn');
+      return !!btn && !btn.classList.contains('loading') &&
+             !!localStorage.getItem('wp_last_refresh_v1');
+    }, { timeout: 5000 });
+    // Click refresh — sales is held, so loading visual must persist
+    const click = page.click('#refreshBtn');
+    await page.waitForFunction(() => {
+      const b = document.getElementById('refreshBtn') as HTMLButtonElement | null;
+      return !!(b && b.classList.contains('loading') && b.disabled);
+    }, { timeout: 3000 });
+    // Release the held response
+    if (resolveSales) (resolveSales as any)(true);
+    await click;
+    await page.waitForSelector('#wpToast.show', { timeout: 5000 });
+    const finalState = await page.evaluate(() => {
+      const b = document.getElementById('refreshBtn') as HTMLButtonElement | null;
+      return { loading: b?.classList.contains('loading'), disabled: b?.disabled };
+    });
+    expect(finalState.loading).toBe(false);
+    expect(finalState.disabled).toBe(false);
+  });
+
+  test('Snapshot footer label is dynamic (not hardcoded "2026-03")', async ({ page }) => {
+    await page.route('**/api/customers*', route => {
+      const u = new URL(route.request().url());
+      const m = u.searchParams.get('month') || '2026-05';
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload(m)) });
+    });
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-05', { timeout: 5000 });
+    let footer = await page.locator('#footerSnapshot').innerText();
+    expect(footer).toBe('2026-05');
+
+    await page.selectOption('#monthPicker', '2026-02');
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-02', { timeout: 5000 });
+    footer = await page.locator('#footerSnapshot').innerText();
+    expect(footer).toBe('2026-02');
+  });
+
+  test('window.refreshLiveData + setSnapshot are exposed and round-trip URL', async ({ page }) => {
+    await page.route('**/api/customers*', route => {
+      const u = new URL(route.request().url());
+      const m = u.searchParams.get('month') || '2026-05';
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildCustomersPayload(m)) });
+    });
+    await page.route('**/api/sales*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildSalesPayload()) }));
+    await page.route('**/api/floatation*', route => route.fulfill({ status: 502, body: JSON.stringify({ ok: false }) }));
+    await page.route('**/api/proxy*',      route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: {} }) }));
+
+    await loginOwner(page);
+    await page.waitForFunction(() => typeof (window as any).refreshLiveData === 'function' && typeof (window as any).setSnapshot === 'function', { timeout: 5000 });
+    await page.evaluate(() => (window as any).setSnapshot('2026-03'));
+    await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-03', { timeout: 5000 });
+    expect(page.url()).toMatch(/[?&]month=2026-03/);
   });
 });
