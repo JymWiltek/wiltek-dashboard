@@ -476,3 +476,146 @@ test.describe('Round 5 — V1 第7刀: Refresh + Branch Manager view', () => {
     expect(state.bannerOn).toBe(false);
   });
 });
+
+/* ───────────────────────────────────────────────────────────────────
+   Round 6 — V1 第8刀: Live floatation (Walk-in) from 5 W0X Sheets
+   ─────────────────────────────────────────────────────────────────── */
+test.describe('Round 6 — V1 第8刀: Live floatation (Walk-in)', () => {
+  // Sample payload mirroring api/floatation.js buildResponse() shape
+  const liveFloatation = {
+    ok: true,
+    fetched_at: '2026-05-06T08:00:00.000Z',
+    year: 2026,
+    months: ['2026-03', '2026-04', '2026-05'],
+    month_idx: [3, 4, 5],
+    races: [
+      { key: 'chinese', label_en: 'Chinese', label_zh: '华族',
+        walkin: [482, 461, 61], purchase: [333, 318, 44],
+        amount: [104791.6, 93737.7, 13186],
+        basket: [314.69, 294.77, 299.68], cr: [0.6909, 0.6898, 0.7213] },
+      { key: 'malay', label_en: 'Malay', label_zh: '马来族',
+        walkin: [700, 720, 80], purchase: [510, 540, 55],
+        amount: [180000, 195000, 20000],
+        basket: [352.94, 361.11, 363.64], cr: [0.7286, 0.75, 0.6875] },
+      { key: 'indian', label_en: 'Indian', label_zh: '印度族',
+        walkin: [55, 50, 8], purchase: [45, 40, 6],
+        amount: [12500, 11000, 1800],
+        basket: [277.78, 275, 300], cr: [0.8182, 0.8, 0.75] },
+      { key: 'others', label_en: 'Others', label_zh: '其他',
+        walkin: [25, 26, 4], purchase: [22, 23, 3],
+        amount: [6500, 7000, 900],
+        basket: [295.45, 304.35, 300], cr: [0.88, 0.8846, 0.75] },
+    ],
+    totals: {
+      walkin:   [1262, 1257, 153],
+      purchase: [910, 921, 108],
+      amount:   [303791.6, 306737.7, 35886],
+      basket:   [333.84, 333.05, 332.28],
+      cr:       [0.7211, 0.7327, 0.7059],
+    },
+    by_branch: {
+      W01: { walkin: 577, purchase: 403, amount: 130736, basket: 324.41, cr: 0.6984 },
+      W02: { walkin: 784, purchase: 532, amount: 190764, basket: 358.58, cr: 0.6786 },
+      W03: { walkin: 600, purchase: 420, amount: 145000, basket: 345,    cr: 0.7    },
+      W05: { walkin: 460, purchase: 360, amount: 138000, basket: 383.33, cr: 0.7826 },
+      W07: { walkin: 251, purchase: 224, amount: 75000,  basket: 334.82, cr: 0.8924 },
+    },
+    note_en: 'Live walk-in (2026-03 to 2026-05) — pulled from 5 W0X Customer Floatation Sheets at fetched_at.',
+    note_zh: '实时进店数据(2026-03 至 2026-05)— 来自 5 家分店 Customer Floatation Sheet。',
+    source: 'live:google-sheets',
+  };
+
+  test('GET /api/floatation contract — frontend mutates WP_TODAY.race', async ({ page }) => {
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(liveFloatation),
+    }));
+    await loginOwner(page);
+    // Wait for the auto-fired floatation fetch on enterApp() to settle
+    await page.waitForFunction(() => {
+      const r = (window as any).WP_CUSTOMERS?.race;
+      return !!(r && r._live === true);
+    }, { timeout: 5000 });
+    const race = await page.evaluate(() => (window as any).WP_CUSTOMERS?.race);
+    expect(race.months).toEqual(['2026-03', '2026-04', '2026-05']);
+    expect(race.races).toHaveLength(4);
+    expect(race.races[0].key).toBe('chinese');
+    expect(race.races[0].walkin).toEqual([482, 461, 61]);
+    expect(race.totals.walkin).toEqual([1262, 1257, 153]);
+    expect(race.by_branch.W01.walkin).toBe(577);
+  });
+
+  test('Customer Insights walk-in chart renders LIVE numbers, not hardcoded', async ({ page }) => {
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(liveFloatation),
+    }));
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS?.race?._live === true, { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView && (window as any).setView('cust-insights'));
+    await page.waitForSelector('#ciRaceTable tbody tr', { timeout: 5000 });
+    const tableHtml = await page.locator('#ciRaceTable').innerHTML();
+    // Live total walk-in across 3-month window = 1262 + 1257 + 153 = 2672 (rendered "2,672")
+    expect(tableHtml).toMatch(/2,672/);
+    // Hardcoded triplet 683,468,565 (Chinese walk-in Jan/Feb/Mar) must NOT survive
+    expect(tableHtml).not.toMatch(/683.*468.*565/);
+  });
+
+  test('Refresh button refetches floatation + bumps WP_TODAY.race fetched_at', async ({ page }) => {
+    let callCount = 0;
+    await page.route('**/api/floatation*', route => {
+      callCount++;
+      const payload = { ...liveFloatation, fetched_at: new Date(Date.now() + callCount * 1000).toISOString() };
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+    });
+    await page.route('**/api/proxy*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ok: true, type: 'x', data: {} }),
+    }));
+    await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_CUSTOMERS?.race?._live === true, { timeout: 5000 });
+    const ts1 = await page.evaluate(() => (window as any).WP_CUSTOMERS.race._fetched_at);
+    await page.click('#refreshBtn');
+    await page.waitForSelector('#wpToast.show', { timeout: 5000 });
+    const ts2 = await page.evaluate(() => (window as any).WP_CUSTOMERS.race._fetched_at);
+    expect(ts2).not.toBe(ts1);
+    expect(callCount).toBeGreaterThanOrEqual(2);
+  });
+
+  test('Floatation failure degrades gracefully — app keeps loading', async ({ page }) => {
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 502, contentType: 'application/json',
+      body: JSON.stringify({ ok: false, error: 'all 5 sheets unreachable' }),
+    }));
+    await loginOwner(page);
+    await page.waitForTimeout(800);
+    // loginOwner navigates to 'today' view; that's where it lands.
+    await expect(page.locator('#view-today.on')).toBeVisible();
+    const live = await page.evaluate(() => (window as any).WP_CUSTOMERS?.race?._live);
+    expect(live).toBeUndefined();
+  });
+
+  test('hardcoded RACE_DATA literal is purged from baked customers-data.js', async ({ request }) => {
+    const r = await request.get('/assets/customers-data.js');
+    const txt = await r.text();
+    expect(txt).not.toMatch(/"race":\{/);
+    expect(txt).not.toMatch(/683,468,565/);
+    expect(txt).not.toMatch(/walkin":\[683/);
+  });
+
+  test('window.fetchFloatationLive is exposed and returns ok shape', async ({ page }) => {
+    await page.route('**/api/floatation*', route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(liveFloatation),
+    }));
+    await loginOwner(page);
+    const result = await page.evaluate(async () => {
+      const fn = (window as any).fetchFloatationLive;
+      if (typeof fn !== 'function') return { ok: false, why: 'not exposed' };
+      const r = await fn();
+      return { ok: r.ok, months: r.months };
+    });
+    expect(result.ok).toBe(true);
+    expect(result.months).toEqual(['2026-03', '2026-04', '2026-05']);
+  });
+});

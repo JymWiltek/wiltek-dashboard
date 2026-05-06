@@ -2292,6 +2292,20 @@ function enterApp() {
   // V1 第6刀: run sanity checks once at app entry, paint the status light
   try { if (typeof updateSanityLight === 'function') updateSanityLight(); } catch(_){}
 
+  // V1 第8刀: kick off live floatation fetch in background — Refresh-without-clicking-Refresh
+  // for the very first page load. ~1-2s after login the walk-in chart shows live numbers.
+  try {
+    if (typeof fetchFloatationLive === 'function') {
+      fetchFloatationLive(Date.now()).then(r => {
+        if (r && r.ok) {
+          setLastRefresh(Date.now());
+          try { updateDataDateLabel(); } catch(_){}
+          try { rerenderActiveView(); } catch(_){}
+        }
+      });
+    }
+  } catch(_){}
+
   try { window.AuditLog && window.AuditLog.log('login_success', s.userId, 'role=' + s.role); } catch(_){}
 }
 
@@ -4443,6 +4457,38 @@ function updateDataDateLabel() {
 }
 window.updateDataDateLabel = updateDataDateLabel;
 
+/* V1 第8刀 — Live floatation (Walk-in) fetcher.
+   Hits /api/floatation, server reads 5 W0X public Sheets and parses to RACE_DATA shape.
+   On success → mutate window.WP_CUSTOMERS.race in-place so renderCustInsights picks up
+   live data on next paint. (Note: WP_CUSTOMERS, not WP_TODAY — that's where build-today.py
+   used to bake the legacy `race` key. The existing renderer reads ci.race from WP_CUSTOMERS.)
+   Fire-and-forget; no exception escapes. */
+async function fetchFloatationLive(ts) {
+  const url = '/api/floatation?t=' + (ts || Date.now());
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    const j = await r.json();
+    if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
+    const race = {
+      months:    j.months,
+      races:     j.races,
+      totals:    j.totals,
+      by_branch: j.by_branch,
+      note_en:   j.note_en,
+      note_zh:   j.note_zh,
+      _live:     true,
+      _fetched_at: j.fetched_at,
+    };
+    if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
+    window.WP_CUSTOMERS.race = race;
+    return { ok: true, fetched_at: j.fetched_at, months: j.months };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+window.fetchFloatationLive = fetchFloatationLive;
+
 /* Fetch all live endpoints in parallel; merge into window.__wpLive overlay.
    On success: bump last-refresh, show toast, repaint active view + light. */
 async function doRefresh() {
@@ -4452,11 +4498,14 @@ async function doRefresh() {
 
   const ts = Date.now();
   const types = ['financial', 'sales', 'stock', 'customers'];
-  const results = await Promise.allSettled(types.map(type =>
+  const proxyP = Promise.allSettled(types.map(type =>
     fetch('/api/proxy?type=' + type + '&t=' + ts, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
       .then(j => (j && j.ok) ? { type, data: j.data } : Promise.reject(new Error((j && j.error) || 'bad payload')))
   ));
+  const flotP = fetchFloatationLive(ts);
+
+  const [results, flo] = await Promise.all([proxyP, flotP]);
 
   const live = window.__wpLive || (window.__wpLive = {});
   let okCount = 0, failTypes = [];
@@ -4464,6 +4513,9 @@ async function doRefresh() {
     if (r.status === 'fulfilled' && r.value) { live[types[i]] = r.value.data; okCount++; }
     else { failTypes.push(types[i]); }
   });
+  // Floatation success counts as one more channel; failure adds to failTypes
+  if (flo && flo.ok) { okCount++; live.floatation = flo; }
+  else { failTypes.push('floatation'); }
 
   if (btn) btn.classList.remove('loading');
 
@@ -4483,7 +4535,7 @@ async function doRefresh() {
     failTypes.length ? 'warn' : 'ok'
   );
 
-  // Repaint active view so any KPI cards using live overlay refresh
+  // Repaint active view so any KPI cards using live overlay + race chart refresh
   try { rerenderActiveView(); } catch(_) {}
   try { updateSanityLight(); } catch(_) {}
   return true;

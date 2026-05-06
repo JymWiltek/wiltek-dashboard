@@ -25,10 +25,16 @@ M1_CUTOFF  = datetime(2026, 3, 1)   # last 1 month
 
 ACTIVE_BRANCHES = {"W01", "W02", "W03", "W05", "W07"}
 
-# Race / walk-in data — from legacy /Users/jymchee/Desktop/Claude use/Wiltek_MASTER.html
-# (CUST26 dataset, Jan–Mar 2026 — manual count, not in Sheet27).
-# Walk-in = total foot traffic (incl. non-buyers); CR = closing rate; basket = avg ticket.
-RACE_DATA = {
+# V1 第8刀 (2026-05-06) — Walk-in by race is now read LIVE from 5 W0X
+# Customer Floatation Sheets via /api/floatation. The hardcoded literal that
+# used to live below has been removed; the build no longer emits a `race` key
+# into customers-data.js. Front-end fetches the live shape on page load
+# (and on every Refresh click) and mutates window.WP_TODAY.race in place.
+#
+# Kept the variable name + signature as a no-op stub so anyone reading old
+# diffs sees the deletion explicitly rather than a silent vanish.
+RACE_DATA = None  # live now — see api/floatation.js
+_DELETED_RACE_DATA = {
     "months": ["2026-01", "2026-02", "2026-03"],
     "races": [
         {"key": "chinese",  "label_en": "Chinese",  "label_zh": "华族",
@@ -442,7 +448,7 @@ payload_cust = {
     "types": TYPES,
     "top100": ci_rows_top,
     "all": ci_rows,           # for filter computations in browser
-    "race": RACE_DATA,        # walk-in by ethnicity (Jan-Mar 2026, manual count)
+    # "race": removed in V1 第8刀 — now live via /api/floatation, not baked.
 }
 
 with open(OUT_CUST, "w", encoding="utf-8") as f:
