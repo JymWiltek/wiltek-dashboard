@@ -2094,8 +2094,8 @@ const STR = {
     "ds-inv-alert-dead-clear-title":"Dead-stock Top 20 clearance (snapshot)",
     "ds-inv-alert-po-a-title":      "PO exceptions hitting A-grade SKUs (snapshot)",
 
-    "ds-cust-kpi-mix":        "Customer type mix",
-    "ds-cust-kpi-repeat":     "Repeat-rate health (top 100)",
+    "ds-cust-kpi-mix":        "Active members this month",
+    "ds-cust-kpi-repeat":     "Member sales RM this month",
     "ds-cust-kpi-race":       "Race walk-in CR (best)",
     "ds-cust-mix-pending":    "cross_by_window not yet loaded",
     "ds-cust-repeat-pending": "top100 not yet loaded",
@@ -2540,8 +2540,8 @@ const STR = {
     "ds-inv-alert-dead-clear-title":"OEM 死货 Top 20 清仓(快照)",
     "ds-inv-alert-po-a-title":      "采购异常命中 A 级 SKU(快照)",
 
-    "ds-cust-kpi-mix":        "客户类型健康度",
-    "ds-cust-kpi-repeat":     "老客回购健康度(Top 100)",
+    "ds-cust-kpi-mix":        "该月活跃会员",
+    "ds-cust-kpi-repeat":     "该月会员销售 RM",
     "ds-cust-kpi-race":       "种族 walk-in 转化(最高)",
     "ds-cust-mix-pending":    "cross_by_window 数据加载中",
     "ds-cust-repeat-pending": "top100 数据加载中",
@@ -4788,53 +4788,11 @@ function renderCustomersDashboard() {
   const sleeping = computeSleepingTop();
   const churnAlert = computeChurnAlerts();
 
-  // 1) Customer type mix — pick dominant type + share, flag if Walk-in > 70% (over-reliance)
-  let kpi1Val = '—', kpi1Sub = t('ds-cust-mix-pending'), kpi1Cls = '';
-  if (mix.ok) {
-    const sorted = Object.entries(mix.byType).sort((a, b) => b[1].n - a[1].n);
-    const [topType, topInfo] = sorted[0];
-    const pct = mix.totalN ? 100 * topInfo.n / mix.totalN : 0;
-    kpi1Val = (LANG === 'zh' && topType === 'Walk-in') ? '散客' :
-              (LANG === 'zh' && topType === 'Contractor') ? '承包商' :
-              (LANG === 'zh' && topType === 'Interior Designer') ? '设计师' :
-              (LANG === 'zh' && topType === 'Other') ? '其他' : topType;
-    kpi1Sub = (LANG === 'zh'
-      ? `${pct.toFixed(0)}% 占比 · ${fmt(topInfo.n)} 人 · ${fmt(mix.totalN)} 总活跃`
-      : `${pct.toFixed(0)}% share · ${fmt(topInfo.n)} of ${fmt(mix.totalN)} active`);
-    if (topType === 'Walk-in' && pct > 70) kpi1Cls = 'warn';
-  }
-
-  // 2) Repeat rate — top100 with m1_visits ≥ 2. Threshold: ≥30% ok, 15-30% warn, <15% bad.
-  let kpi2Val = '—', kpi2Sub = t('ds-cust-repeat-pending'), kpi2Cls = '';
-  if (repeat.ok) {
-    kpi2Val = repeat.pct.toFixed(1) + '%';
-    if (repeat.pct < 15)      kpi2Cls = 'danger';
-    else if (repeat.pct < 30) kpi2Cls = 'warn';
-    if (newOld.ok) {
-      kpi2Sub = (LANG === 'zh'
-        ? `老客 AOV RM ${fmtMoney(newOld.aov_old)} · 新客 RM ${fmtMoney(newOld.aov_new)}`
-        : `Old AOV RM ${fmtMoney(newOld.aov_old)} · New RM ${fmtMoney(newOld.aov_new)}`);
-    } else {
-      kpi2Sub = `${fmt(repeat.repeat)} of ${fmt(repeat.total)} ` + (LANG === 'zh' ? '老客回头' : 'high-tier repeat');
-    }
-  }
-
-  // 3) Race walk-in CR — best vs worst race
-  let kpi3Val = '—', kpi3Sub = t('ds-cust-race-pending'), kpi3Cls = '';
-  if (race.ok) {
-    const best = race.best;
-    const bestLabel = LANG === 'zh' ? (best.label_zh || best.key) : (best.label_en || best.key);
-    kpi3Val = (best.cr * 100).toFixed(1) + '%';
-    kpi3Sub = (LANG === 'zh'
-      ? `${bestLabel} CR 最高 · 客单价待 race × Customer Buy 接通`
-      : `${bestLabel} highest CR · AOV requires race × Customer Buy join`);
-    if (best.cr < 0.5) kpi3Cls = 'warn';
-  }
-
-  // V1 第四刀 返工: build per-month series for compare lines.
-  // Active-members and amt_total are already exposed per month via summary_by_month.
+  // V1.5: Customers top 3 KPIs are TRULY month-shifting. They read
+  // summary_by_month[snap] (n_active, amt_total) which is per-month, not
+  // window-relative. Race CR comes from /api/floatation latest-month scalar.
   const cd_local = window.WP_CUSTOMERS || {};
-  const sbmonth = cd_local.summary_by_month || {};
+  const sbmonth  = cd_local.summary_by_month || {};
   const snapForCmp = snapMonth();
   const activeSeries = {}, amtSeries = {};
   for (const ym of Object.keys(sbmonth)) {
@@ -4844,10 +4802,32 @@ function renderCustomersDashboard() {
   const cmpActive = buildMonthlyCompare(activeSeries, snapForCmp);
   const cmpAmt    = buildMonthlyCompare(amtSeries, snapForCmp);
 
+  // KPI 1 — 该月活跃会员数 (real per-month from summary_by_month)
+  const kpi1Val = cmpActive.single ? fmt(cmpActive.single) + (LANG === 'zh' ? ' 人' : '') : '—';
+  const kpi1Sub = LANG === 'zh' ? `${snapForCmp || '—'} · 该月活跃会员` : `${snapForCmp || '—'} · active members`;
+  const kpi1Cls = '';
+
+  // KPI 2 — 该月会员销售 RM (real per-month from summary_by_month.amt_total)
+  const kpi2Val = cmpAmt.single ? 'RM ' + fmtMoney(cmpAmt.single) : '—';
+  const kpi2Sub = LANG === 'zh' ? `${snapForCmp || '—'} · 该月会员销售` : `${snapForCmp || '—'} · member sales`;
+  const kpi2Cls = '';
+
+  // KPI 3 — Race walk-in CR (latest /api/floatation month — labelled accordingly)
+  let kpi3Val = '—', kpi3Sub = t('ds-cust-race-pending'), kpi3Cls = '';
+  if (race.ok) {
+    const best = race.best;
+    const bestLabel = LANG === 'zh' ? (best.label_zh || best.key) : (best.label_en || best.key);
+    kpi3Val = (best.cr * 100).toFixed(1) + '%';
+    kpi3Sub = (LANG === 'zh'
+      ? `${bestLabel} CR 最高 · race feed 最新月窗口`
+      : `${bestLabel} highest CR · race feed latest month`);
+    if (best.cr < 0.5) kpi3Cls = 'warn';
+  }
+
   document.getElementById('dsCustCards').innerHTML =
     dsCardCompare(t('ds-cust-kpi-mix'),  kpi1Val, cmpActive,
                   { sub: kpi1Sub, valueClass: kpi1Cls,
-                    fmtVal: (n) => fmt(Math.round(n)) + (LANG === 'zh' ? ' 活跃' : ' active') }) +
+                    fmtVal: (n) => fmt(Math.round(n)) + (LANG === 'zh' ? ' 人' : '') }) +
     dsCardCompare(t('ds-cust-kpi-repeat'), kpi2Val, cmpAmt,
                   { sub: kpi2Sub, valueClass: kpi2Cls,
                     fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
@@ -5039,11 +5019,16 @@ function renderProductsDashboard() {
   const skuAmtByMonth = sl.sku_amt_by_month || {};
   const totalAmtByMonth = sl.total_amt_by_month || {};
 
-  // KPI 1 — 该月销售总额 (RM) + 3-line compare. Falls back to summing
-  // sales_by_branch_month if total_amt_by_month not yet exposed.
-  let totalSeries = totalAmtByMonth;
-  if (!Object.keys(totalSeries).length && sl.sales_by_branch_month) {
-    totalSeries = {};
+  // KPI 1 — 该月销售总额 (RM) + 3-line compare. V1.5: branch-scoped when
+  // logged in as a store manager — sums ONLY their branch's monthly sales
+  // from sales_by_branch_month[BRANCH_VIEW]. Owner sees all-5-store sum.
+  let totalSeries = {};
+  if (isBranchScoped() && sl.sales_by_branch_month && sl.sales_by_branch_month[BRANCH_VIEW]) {
+    const m = sl.sales_by_branch_month[BRANCH_VIEW];
+    for (const ym of Object.keys(m)) totalSeries[ym] = (+m[ym] || 0);
+  } else if (Object.keys(totalAmtByMonth).length) {
+    totalSeries = totalAmtByMonth;
+  } else if (sl.sales_by_branch_month) {
     for (const br of Object.keys(sl.sales_by_branch_month)) {
       const m = sl.sales_by_branch_month[br] || {};
       for (const ym of Object.keys(m)) totalSeries[ym] = (totalSeries[ym] || 0) + (+m[ym] || 0);
@@ -5051,25 +5036,28 @@ function renderProductsDashboard() {
   }
   const cmpTotal = buildMonthlyCompare(totalSeries, snap);
   const k1Val = cmpTotal.single ? 'RM ' + fmtMoney(cmpTotal.single) : '—';
-  const k1Sub = LANG === 'zh' ? `${snap || '—'} · 全分行总销售` : `${snap || '—'} · all-branch total`;
+  const k1ScopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全分行' : 'all-branch');
+  const k1Sub = LANG === 'zh' ? `${snap || '—'} · ${k1ScopeLbl}总销售` : `${snap || '—'} · ${k1ScopeLbl} total`;
   const k1Cls = cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -10 ? 'danger'
                : cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -5 ? 'warn' : '';
 
   // KPI 2 — 该月活跃 SKU 数 (unique SKUs that sold that month) + compare on count.
+  // V1.5: per-SKU per-branch monthly data isn't exposed yet — when branch-scoped,
+  // honestly note "(全公司参考)" so the store manager knows this is company-wide.
   const skuCountSeries = {};
   for (const ym of Object.keys(skuAmtByMonth)) {
     skuCountSeries[ym] = Object.keys(skuAmtByMonth[ym] || {}).length;
   }
   const cmpCount = buildMonthlyCompare(skuCountSeries, snap);
   const k2Val = cmpCount.single ? fmt(cmpCount.single) + (LANG === 'zh' ? ' 颗' : ' SKUs') : '—';
-  const k2Sub = LANG === 'zh' ? `${snap || '—'} · 该月有销售的 SKU 数` : `${snap || '—'} · SKUs with sales`;
+  const k2ScopeNote = isBranchScoped() ? (LANG === 'zh' ? ' · (全公司参考)' : ' · (company-wide ref)') : '';
+  const k2Sub = (LANG === 'zh' ? `${snap || '—'} · 该月有销售的 SKU 数` : `${snap || '—'} · SKUs with sales`) + k2ScopeNote;
 
   // KPI 3 — 该月 Top SKU (best-seller this month).
   const skuMonth = skuAmtByMonth[snap] || {};
   const topThisMonth = Object.entries(skuMonth).sort((a, b) => b[1] - a[1])[0];
   const k3Val = topThisMonth ? topThisMonth[0] : '—';
-  // For compare we use the top-1 SKU's series value across months
-  let k3Sub = LANG === 'zh' ? '该月销售冠军 SKU' : 'best-seller this month';
+  let k3Sub = (LANG === 'zh' ? '该月销售冠军 SKU' : 'best-seller this month') + k2ScopeNote;
   let cmpTop3 = null;
   if (topThisMonth) {
     const code = topThisMonth[0];
@@ -5733,6 +5721,9 @@ function renderInventoryDashboard() {
     ? `${scopeLabel} · 呆滞 ${fnsDeadPct.toFixed(1)}% · 截止 ${stockSnapLabel} 数据`
     : `${scopeLabel} · ${fnsDeadPct.toFixed(1)}% dead · as of ${stockSnapLabel}`);
 
+  // V1.5: KPIs 2 + 4 use sl.matrix (per-category per-month) which has NO
+  // per-branch dimension — when a store manager is logged in we honestly
+  // append "(全公司参考)" to the sub so they don't misread it as own-store.
   // KPI 2 — 该月 PO 总额 + 3-line compare (sl.matrix[ym][grp] = { po, grn })
   const poByMonth = {};
   const grnByMonth = {};
@@ -5749,8 +5740,9 @@ function renderInventoryDashboard() {
     grnByMonth[ym] = grn;
   }
   const cmpPo = buildMonthlyCompare(poByMonth, snap);
+  const invScopeNote = isBranchScoped() ? (LANG === 'zh' ? ' · (全公司参考)' : ' · (company-wide ref)') : '';
   const k2Val = cmpPo.single ? 'RM ' + fmtMoney(cmpPo.single) : '—';
-  const k2Sub = LANG === 'zh' ? `${snap || '—'} · 该月 PO 总额` : `${snap || '—'} · this month's PO total`;
+  const k2Sub = (LANG === 'zh' ? `${snap || '—'} · 该月 PO 总额` : `${snap || '—'} · this month's PO total`) + invScopeNote;
 
   // KPI 3 — 断货 SKU 预警 (snapshot-derived, not month-shifting)
   const k3Val = stockout.ok ? fmt(stockout.critical_n) + (LANG === 'zh' ? ' 颗' : '') : '—';
@@ -5769,9 +5761,9 @@ function renderInventoryDashboard() {
     snap
   );
   const k4Val = cmpGap.single !== 0 ? 'RM ' + fmtMoney(cmpGap.single) : (cmpPo.single || totalAmtByMonth[snap] ? 'RM 0' : '—');
-  const k4Sub = LANG === 'zh'
+  const k4Sub = (LANG === 'zh'
     ? `${snap || '—'} · 销售消耗 - PO 入货 (正=库存下降)`
-    : `${snap || '—'} · sales − PO (positive = depleting)`;
+    : `${snap || '—'} · sales − PO (positive = depleting)`) + invScopeNote;
 
   document.getElementById('dsInvCards').innerHTML =
     dsCard(t('ds-inv-kpi-health'),         k1Val, k1Sub, k1Cls) +
