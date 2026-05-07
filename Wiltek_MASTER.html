@@ -1318,6 +1318,88 @@ footer.app-footer {
 .v17-seg-Mid      { background: rgba(212,168,69,0.18); color: #8B6F1F; }
 .v17-seg-Veteran  { background: rgba(31,95,74,0.18);   color: var(--brand); }
 
+/* V1.7 phase 3 — empty-state card (Strategic Push placeholder) */
+.v17-empty-state {
+  background: var(--bg-card); border: 1px dashed var(--brand); border-radius: 8px;
+  padding: 18px; display: flex; gap: 14px; align-items: flex-start; margin-top: 8px;
+}
+.v17-empty-state .v17-empty-icon { font-size: 32px; flex: 0 0 auto; }
+.v17-empty-state .v17-empty-body { flex: 1; min-width: 0; }
+.v17-empty-state .v17-empty-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; color: var(--text-primary); }
+.v17-empty-state .v17-empty-detail { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 8px; }
+.v17-empty-state .v17-empty-howto { font-size: 12px; color: var(--text-secondary); }
+.v17-empty-state .v17-empty-howto code {
+  background: rgba(31,95,74,0.06); padding: 1px 6px; border-radius: 4px;
+  font-family: ui-monospace, monospace;
+}
+
+/* Strategic-push table */
+.v17-strategic-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.v17-strategic-table th, .v17-strategic-table td {
+  padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: left;
+}
+.v17-strategic-table thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+}
+.v17-strategic-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.v17-strategic-table .kpi-ok   { color: var(--ok);   font-weight: 600; }
+.v17-strategic-table .kpi-warn { color: var(--warn); font-weight: 600; }
+.v17-strategic-table .kpi-bad  { color: var(--danger); font-weight: 600; }
+.v17-strategic-table .kpi-na   { color: var(--text-tertiary); }
+
+/* Data-gap chip in category tables */
+.v17-gap-chip {
+  cursor: pointer; color: var(--warn); border-bottom: 1px dashed var(--warn);
+  background: rgba(212,168,69,0.10);
+  padding: 1px 6px; border-radius: 4px; font-size: 12px;
+}
+.v17-gap-chip:hover { background: rgba(212,168,69,0.22); }
+
+/* Modal */
+.v17-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(7,9,15,0.55); z-index: 9000;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.v17-modal {
+  background: var(--bg-card); border-radius: 10px; max-width: 900px;
+  width: 100%; max-height: 90vh; display: flex; flex-direction: column;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+}
+.v17-modal-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--border-soft);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.v17-modal-head .v17-modal-title { font-weight: 600; font-size: 15px; color: var(--text-primary); }
+.v17-modal-head .v17-modal-close {
+  background: none; border: 0; cursor: pointer; font-size: 22px; line-height: 1; color: var(--text-secondary);
+}
+.v17-modal-body { padding: 14px 18px; overflow: auto; flex: 1; }
+.v17-modal-foot {
+  padding: 12px 18px; border-top: 1px solid var(--border-soft);
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.v17-modal-foot .v17-csv-btn {
+  background: var(--brand); color: #fff; border: 0; padding: 8px 14px;
+  border-radius: 6px; cursor: pointer; font-weight: 600;
+}
+.v17-modal-foot .v17-csv-btn:hover { background: #19503e; }
+.v17-modal-list-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.v17-modal-list-table th, .v17-modal-list-table td {
+  padding: 6px 8px; border-bottom: 1px solid var(--border-soft); text-align: left;
+}
+.v17-modal-list-table thead th {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+  position: sticky; top: 0;
+}
+.v17-modal-list-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+
 /* V1.7 — Products page action plan + tables */
 .v17-prod-action-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -2013,6 +2095,11 @@ const STR = {
     "col-amt": "Amount RM",
     "col-last": "Last sale",
     "col-others": "Others sold",
+    "col-idx":         "#",
+    "col-sales-90d":   "90d sales",
+    "col-cover-days":  "Cover (days)",
+    "col-others-sell": "Other branches selling (90d)",
+    "col-months-ago":  "Months since last sale",
     "expand-title": "This SKU's distribution across 5 active stores",
     "no-results": "No rows match.",
     "footer": "Wiltek Portal V1 cut 0 · Snapshot",
@@ -2459,6 +2546,11 @@ const STR = {
     "col-amt": "金额 RM",
     "col-last": "最后卖出",
     "col-others": "别店有卖",
+    "col-idx":         "#",
+    "col-sales-90d":   "90 天销量",
+    "col-cover-days":  "覆盖天数",
+    "col-others-sell": "其他店在卖 (90 天)",
+    "col-months-ago":  "距今几个月没卖",
     "expand-title": "该 SKU 在 5 家活跃店的分布",
     "no-results": "没有匹配的记录。",
     "footer": "Wiltek Portal V1 第 0 刀 · 数据快照",
@@ -3122,10 +3214,14 @@ function renderHero() {
 function renderTabs() {
   const ds = window.WP_DEADSTOCK;
   // V1.7 hotfix: branch-scope tab counts/amounts so the manager only sees
-  // their store's totals (not the 5-store roll-up).
+  // their store's totals (not the 5-store roll-up). Phase 3: rows are
+  // also reclassified per V1.6 (clsV16) so tab counts match Today /
+  // Inventory exactly. Old DEAD-only-this-branch rows fold into either
+  // MISPLACED (other branches sold) or COMPANY_DEAD (nobody sold).
   let totals = ds.totals;
   if (typeof isBranchScoped === 'function' && isBranchScoped()) {
     const branchRows = filterRowsByBranch(ds.rows || []);
+    v17EnrichRowsForManager(branchRows, ds, window.BRANCH_VIEW);
     const recomputed = { ACTIVE:{rows:0,amount:0}, SLOW:{rows:0,amount:0}, DEAD:{rows:0,amount:0}, MISPLACED:{rows:0,amount:0}, COMPANY_DEAD:{rows:0,amount:0} };
     branchRows.forEach(r => {
       const cls = r.cls || 'ACTIVE';
@@ -3134,6 +3230,8 @@ function renderTabs() {
       recomputed[cls].amount += r.amount || 0;
     });
     totals = recomputed;
+  } else {
+    v17RestoreOriginalCls(ds.rows || []);
   }
   const total_rows = CLS_ORDER.reduce((s,k)=> s + ((totals[k] && totals[k].rows) || 0), 0);
   const total_amt  = CLS_ORDER.reduce((s,k)=> s + ((totals[k] && totals[k].amount) || 0), 0);
@@ -3239,6 +3337,77 @@ const COLS = [
   { key:'others_qty',label:'col-others',  sortable:true,  type:'num',  opt:true }
 ];
 
+// V1.7 phase 3 — store-manager column set for the deadstock list. Adds
+// 90-day sales qty, stock cover days, and a per-state extra column
+// ("which other branches are selling" for Misplaced, "months since last
+// sale" for Dead). Also drops the branch column (single-branch view).
+const COLS_MANAGER_V17 = [
+  { key:'idx',           label:'col-idx',         sortable:false, type:'idx'  },
+  { key:'cls',           label:'col-cls',         sortable:true,  type:'cls'  },
+  { key:'code',          label:'col-code',        sortable:true,  type:'text' },
+  { key:'desc',          label:'col-desc',        sortable:false, type:'text' },
+  { key:'qty',           label:'col-qty',         sortable:true,  type:'num'  },
+  { key:'amount',        label:'col-amt',         sortable:true,  type:'num'  },
+  { key:'sales_90d',     label:'col-sales-90d',   sortable:true,  type:'num'  },
+  { key:'cover_days',    label:'col-cover-days',  sortable:true,  type:'num'  },
+  { key:'last_sale',     label:'col-last',        sortable:true,  type:'text' },
+  { key:'others_selling',label:'col-others-sell', sortable:false, type:'text' },
+];
+
+function colsForView() {
+  return (typeof isBranchScoped === 'function' && isBranchScoped())
+    ? COLS_MANAGER_V17 : COLS;
+}
+
+/* Enrich each row with manager-relevant computed fields. Mutates r in
+   place to keep sort/CSV simple. Cheap to run on every render — the
+   row count is already branch-filtered (~800 rows).
+   V1.7 phase 3: ALSO overwrites r.cls with the V1.6 4-state
+   reclassification (mapped back to legacy codes ACTIVE/SLOW/MISPLACED/
+   COMPANY_DEAD) so the manager's deadstock list matches the Today
+   and Inventory pages exactly. r._cls_orig stores the original. */
+function v17EnrichRowsForManager(rows, ds, branch) {
+  const sbs = ds.sku_branch_sales_3m || {};
+  // Map V1.6 4-state names back to the legacy codes the tab system uses.
+  const v16ToLegacy = { Active: 'ACTIVE', Slow: 'SLOW', Misplaced: 'MISPLACED', Dead: 'COMPANY_DEAD' };
+  rows.forEach(r => {
+    if (r._cls_orig === undefined) r._cls_orig = r.cls;
+    const v16 = clsV16(r, ds);
+    r.cls = v16ToLegacy[v16] || r._cls_orig;
+    const branchSales = sbs[r.code] || {};
+    const ownSold90 = +(branchSales[branch] || 0);
+    r.sales_90d = ownSold90;
+    // Cover days = stock qty / (90d sales qty / 90 days). If 0 sales, mark 999.
+    if (ownSold90 > 0) {
+      r.cover_days = Math.round((+r.qty || 0) * 90 / ownSold90);
+    } else {
+      r.cover_days = 999;   // sentinel: "no recent sales"
+    }
+    // Other branches selling this SKU (last 90d), sorted by qty desc.
+    const others = Object.entries(branchSales)
+      .filter(([b, q]) => b !== branch && (+q || 0) > 0)
+      .sort((a, b) => (+b[1]||0) - (+a[1]||0))
+      .map(([b, q]) => `${b}(${q})`);
+    r.others_selling = others.length ? others.join(' / ') : '—';
+    // Months since last sale (if last_sale is YYYY-MM).
+    if (r.last_sale && /^\d{4}-\d{2}/.test(r.last_sale)) {
+      const [ly, lm] = r.last_sale.slice(0, 7).split('-').map(Number);
+      const snap = (typeof snapMonth === 'function' ? snapMonth() : '') || `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth()+1).padStart(2,'0')}`;
+      const [sy, sm] = snap.split('-').map(Number);
+      r.months_ago = (sy - ly) * 12 + (sm - lm);
+    } else {
+      r.months_ago = null;
+    }
+  });
+}
+
+/* Restore original (backend) classification on rows. Called when an
+   owner returns to a deadstock view that a manager session previously
+   reclassified. */
+function v17RestoreOriginalCls(rows) {
+  (rows || []).forEach(r => { if (r._cls_orig !== undefined) r.cls = r._cls_orig; });
+}
+
 function buildCategoryFilter() {
   const ds = window.WP_DEADSTOCK; if (!ds) return;
   const cats = Array.from(new Set(ds.rows.map(r => r.category).filter(Boolean))).sort();
@@ -3268,9 +3437,13 @@ function visibleRows() {
   const q = SEARCH.toLowerCase();
   let rows = ds.rows;
   // V1.7 hotfix: branch-scope the dead-stock list so managers see only
-  // their own store's SKU rows.
+  // their own store's SKU rows. Phase 3: also enrich + reclassify so
+  // r.cls reflects V1.6 4-state (matches Today / Inventory).
   if (typeof isBranchScoped === 'function' && isBranchScoped()) {
     rows = filterRowsByBranch(rows);
+    v17EnrichRowsForManager(rows, ds, window.BRANCH_VIEW);
+  } else {
+    v17RestoreOriginalCls(ds.rows || []);
   }
   if (CUR_TAB !== 'all') rows = rows.filter(r => r.cls === CUR_TAB);
   else rows = rows.filter(r => CLASS_SET.has(r.cls));
@@ -3285,8 +3458,9 @@ function visibleRows() {
 }
 
 function renderTable() {
+  const cols = colsForView();
   const head = document.getElementById('detailHead');
-  head.innerHTML = COLS.map(c => {
+  head.innerHTML = cols.map(c => {
     const cls = (c.type === 'num' ? 'num ' : '') + (c.sortable ? 'sortable ' : '') + (c.opt ? 'opt' : '');
     const ind = (SORT_KEY === c.key) ? ' <span class="sort-ind">' + (SORT_DIR === 'asc' ? '▲' : '▼') + '</span>' : '';
     return '<th class="' + cls + '" data-key="' + c.key + '">' + t(c.label) + ind + '</th>';
@@ -3295,27 +3469,47 @@ function renderTable() {
     th.addEventListener('click', () => {
       const k = th.getAttribute('data-key');
       if (SORT_KEY === k) SORT_DIR = (SORT_DIR === 'asc' ? 'desc' : 'asc');
-      else { SORT_KEY = k; SORT_DIR = (COLS.find(c=>c.key===k).type === 'num' ? 'desc' : 'asc'); }
+      else {
+        SORT_KEY = k;
+        const cd = cols.find(c => c.key === k);
+        SORT_DIR = (cd && cd.type === 'num' ? 'desc' : 'asc');
+      }
       renderTable();
     });
   });
 
-  const rows = visibleRows();
+  let rows = visibleRows();   // already enriched + reclassified for managers
   const body = document.getElementById('detailBody');
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="' + COLS.length + '" class="empty-state">' + t('no-results') + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="' + cols.length + '" class="empty-state">' + t('no-results') + '</td></tr>';
     return;
   }
   const RENDER_CAP = 1500;
   const slice = rows.slice(0, RENDER_CAP);
   const out = [];
   slice.forEach((r, idx) => {
-    const cells = COLS.map(c => {
+    const cells = cols.map(c => {
       let v = r[c.key];
       let cls = c.type === 'num' ? 'num-col' : '';
       if (c.opt) cls += ' opt';
+      if (c.key === 'idx') {
+        return '<td class="' + cls + '">' + (idx + 1) + '</td>';
+      }
       if (c.key === 'cls') {
         return '<td class="' + cls + '"><span class="cls-chip cls-' + r.cls + '">' + t('tab-' + r.cls) + '</span></td>';
+      }
+      if (c.key === 'cover_days') {
+        // 999 sentinel = no recent sales.
+        if (v === 999 || v == null) return '<td class="' + cls + '">—</td>';
+        const tone = v < 14 ? 'cmp-down' : v > 90 ? 'cmp-up' : '';
+        return '<td class="' + cls + ' ' + tone + '">' + fmt(v) + (LANG === 'zh' ? ' 天' : 'd') + '</td>';
+      }
+      if (c.key === 'sales_90d') {
+        return '<td class="' + cls + '">' + (v ? fmt(v) : '0') + '</td>';
+      }
+      if (c.key === 'last_sale' && r.cls === 'COMPANY_DEAD' && r.months_ago != null) {
+        return '<td class="' + cls + '">' + (v || '—') + '<br><small style="color:var(--text-tertiary)">' +
+          r.months_ago + (LANG === 'zh' ? ' 月前' : 'mo ago') + '</small></td>';
       }
       if (c.type === 'num') {
         if (c.key === 'amount') v = 'RM ' + fmtMoney(v);
@@ -3328,11 +3522,11 @@ function renderTable() {
     }).join('');
     out.push('<tr class="row-main" data-i="' + idx + '">' + cells + '</tr>');
     if (EXPANDED_ROW === idx) {
-      out.push('<tr class="row-expand"><td colspan="' + COLS.length + '">' + expandedHtml(r) + '</td></tr>');
+      out.push('<tr class="row-expand"><td colspan="' + cols.length + '">' + expandedHtml(r) + '</td></tr>');
     }
   });
   if (rows.length > RENDER_CAP) {
-    out.push('<tr><td colspan="' + COLS.length + '" class="empty-state">' +
+    out.push('<tr><td colspan="' + cols.length + '" class="empty-state">' +
       (LANG==='zh' ? '只显示前 ' + RENDER_CAP + ' 行,共 ' + fmt(rows.length) + ' 行 — 用搜索或筛选缩小范围。' :
         'Showing first ' + RENDER_CAP + ' of ' + fmt(rows.length) + ' rows — use search or filter to narrow.') +
       '</td></tr>');
@@ -3361,9 +3555,16 @@ function expandedHtml(r) {
 
 /* ── CSV export ────────────────────────────────────────────────── */
 function exportCSV() {
-  const rows = visibleRows();
-  const cols = ['cls','branch','code','desc','category','qty','unit_cost','amount','last_sale','others_qty'];
-  const colLabel = {cls:'cls',branch:'branch',code:'code',desc:'desc',category:'cat',qty:'qty',unit_cost:'unit',amount:'amt',last_sale:'last',others_qty:'others'};
+  let rows = visibleRows();
+  // V1.7 phase 3: when a manager exports, enrich rows with the V1.7
+  // columns (90d sales / cover days / others-selling / months ago) and
+  // emit those extras alongside the canonical columns.
+  const isMgr = typeof isBranchScoped === 'function' && isBranchScoped();
+  if (isMgr) v17EnrichRowsForManager(rows, window.WP_DEADSTOCK || {}, window.BRANCH_VIEW);
+  const cols = isMgr
+    ? ['cls','branch','code','desc','category','qty','unit_cost','amount','sales_90d','cover_days','last_sale','months_ago','others_selling']
+    : ['cls','branch','code','desc','category','qty','unit_cost','amount','last_sale','others_qty'];
+  const colLabel = {cls:'cls',branch:'branch',code:'code',desc:'desc',category:'cat',qty:'qty',unit_cost:'unit',amount:'amt',last_sale:'last',others_qty:'others',sales_90d:'sales-90d',cover_days:'cover-days',months_ago:'months-ago',others_selling:'others-sell'};
   const head = cols.map(k => t('col-' + colLabel[k]));
   const lines = [head.join(',')];
   rows.forEach(r => {
@@ -6912,7 +7113,7 @@ function renderSalesManager() {
     '<th class="num">' + (LANG === 'zh' ? 'vs 6M 均值' : 'vs 6M avg') + '</th>' +
     '</tr></thead><tbody>' +
     catRows.map(r => '<tr>' +
-      '<td>' + escapeHtml(r.cat) + '</td>' +
+      v17CatCell(r.cat, r.skus, branch) +
       '<td class="num">' + fmt(r.skus) + '</td>' +
       '<td class="num">RM ' + fmtMoney(Math.round(r.amt)) + '</td>' +
       '<td class="num">' + r.share.toFixed(1) + '%</td>' +
@@ -7295,7 +7496,7 @@ function renderProductsManagerV17() {
     '<th class="num">' + (LANG === 'zh' ? 'vs 6M 均值' : 'vs 6M avg') + '</th>' +
     '</tr></thead><tbody>' +
     catRows.map(r => '<tr>' +
-      '<td>' + escapeHtml(r.cat) + '</td>' +
+      v17CatCell(r.cat, r.skus, branch) +
       '<td class="num">' + fmt(r.skus) + '</td>' +
       '<td class="num">RM ' + fmtMoney(Math.round(r.amt)) + '</td>' +
       '<td class="num">' + r.share.toFixed(1) + '%</td>' +
@@ -7351,8 +7552,332 @@ function renderProductsManagerV17() {
 
   // ── Action Plan (3-5 dynamic cards) ──
   v17ProductsActionPlan({ branch, snap, lmKey, lyKey, codeToCat, codeToCls, codeToRow, skuABM, skuQBM, ds, top20, catRows, m6Range });
+
+  // ── V1.7 phase 3: Strategic Push tracking ──
+  v17StrategicPushTracking({ branch, snap, lmKey, codeToRow, skuABM, sbm });
 }
 window.renderProductsManagerV17 = renderProductsManagerV17;
+
+/* V1.7 phase 3 — Strategic Push tracking. Reads `r.strategic_push` (any
+   truthy value treated as YES) from ds.rows. If no SKU is flagged at
+   all, render an empty-state card pointing the Owner to Item Master.
+
+   Owner workflow:
+     1. Open Item Master Sheet
+     2. For each SKU you want to track, fill STRATEGIC_PUSH = YES
+     3. Refresh — this section will auto-populate
+
+   Once data is present, table shows per-SKU monthly performance for the
+   manager's branch, with red/yellow/green status. */
+function v17StrategicPushTracking(ctx) {
+  const view = document.getElementById('view-products');
+  if (!view) return;
+  let el = document.getElementById('dsProdV17StrategicPush');
+  if (!el) {
+    el = document.createElement('section');
+    el.id = 'dsProdV17StrategicPush';
+    el.className = 'ds-section v17-mgr-section';
+    const ap = document.getElementById('dsProdV17ActionPlan');
+    if (ap && ap.parentNode) ap.parentNode.insertBefore(el, ap.nextSibling);
+    else {
+      const cards = document.getElementById('dsProdCards');
+      if (cards && cards.parentNode) cards.parentNode.insertBefore(el, cards);
+    }
+  }
+  el.style.display = '';
+
+  const ds = window.WP_DEADSTOCK || {};
+  const flagged = (ds.rows || []).filter(r =>
+    r.strategic_push === true ||
+    r.strategic_push === 'YES' ||
+    r.strategic_push === 'yes' ||
+    r.strategic_push === 'Y' ||
+    r.strategic_push === 1 ||
+    r.strategic_push === '1'
+  );
+  // Deduplicate by code (rows are per-branch).
+  const flaggedCodesSet = new Set(flagged.map(r => r.code));
+
+  if (flaggedCodesSet.size === 0) {
+    el.innerHTML =
+      '<h2 class="v16-mgr-section-title">' + (LANG === 'zh' ? '⭐ 主推产品本月表现' : '⭐ Strategic Push tracking') + '</h2>' +
+      '<div class="v17-empty-state">' +
+        '<div class="v17-empty-icon">📋</div>' +
+        '<div class="v17-empty-body">' +
+          '<div class="v17-empty-title">' + (LANG === 'zh'
+            ? 'Owner 尚未标记主推产品'
+            : 'No SKUs flagged as Strategic Push yet') + '</div>' +
+          '<div class="v17-empty-detail">' + (LANG === 'zh'
+            ? '到 Item Master Sheet,在 STRATEGIC_PUSH 字段填 "YES" 标记你想跟踪的 SKU。下次刷新此区块会自动列出该 SKU 在本店的本月表现 vs 全公司。'
+            : 'Open the Item Master Sheet and set STRATEGIC_PUSH = YES on the SKUs you want tracked. After refresh this section will list each flagged SKU\'s this-month performance at this branch vs company-wide.') + '</div>' +
+          '<div class="v17-empty-howto">' +
+            '<strong>' + (LANG === 'zh' ? '字段位置:' : 'Field location: ') + '</strong>' +
+            '<code>Item Master Sheet → STRATEGIC_PUSH</code> ' +
+            (LANG === 'zh' ? '(YES / NO)' : '(YES / NO)') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+
+  // Render the per-SKU performance table.
+  const branch = ctx.branch;
+  const snap = ctx.snap;
+  const skuABM = ctx.skuABM;
+  const sbm = ctx.sbm;
+
+  // This-store this-month total sales (denominator for branch share).
+  const branchTotalThis = +(sbm?.[branch]?.[snap]) || 0;
+  // Company-wide this-month total sales (denominator for company share).
+  let companyTotalThis = 0;
+  for (const br of Object.keys(sbm || {})) companyTotalThis += +(sbm[br]?.[snap]) || 0;
+
+  const rowsOut = Array.from(flaggedCodesSet).map(code => {
+    const branchM = (skuABM[snap] || {})[branch] || {};
+    const branchAmt = +branchM[code] || 0;
+    let companyAmt = 0;
+    for (const br of Object.keys(skuABM[snap] || {})) {
+      companyAmt += +((skuABM[snap] || {})[br] || {})[code] || 0;
+    }
+    const branchShare = branchTotalThis ? branchAmt / branchTotalThis * 100 : 0;
+    const companyShare = companyTotalThis ? companyAmt / companyTotalThis * 100 : 0;
+    // Index = branchShare / companyShare. >110% green, 90-110% yellow, <90% red.
+    const indexPct = companyShare > 0 ? branchShare / companyShare * 100 : null;
+    let tone = '';
+    if (indexPct == null) tone = 'kpi-na';
+    else if (indexPct >= 110) tone = 'kpi-ok';
+    else if (indexPct >= 90)  tone = 'kpi-warn';
+    else                      tone = 'kpi-bad';
+    const desc = (ctx.codeToRow[code] || {}).desc || '';
+    return { code, desc, branchAmt, companyAmt, branchShare, companyShare, indexPct, tone };
+  }).sort((a, b) => b.branchAmt - a.branchAmt);
+
+  const tbl = '<table class="v17-strategic-table"><thead><tr>' +
+    '<th>SKU</th>' +
+    '<th>' + (LANG === 'zh' ? '描述' : 'Description') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '本店本月 RM' : 'This-store this-month RM') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '全公司本月 RM' : 'Company this-month RM') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '本店占比' : 'Branch share %') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '全公司占比' : 'Company share %') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '指数' : 'Index') + '</th>' +
+    '</tr></thead><tbody>' +
+    rowsOut.map(r =>
+      '<tr>' +
+        '<td>' + escapeHtml(r.code) + '</td>' +
+        '<td>' + escapeHtml((r.desc || '—').slice(0, 50)) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(Math.round(r.branchAmt)) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(Math.round(r.companyAmt)) + '</td>' +
+        '<td class="num">' + r.branchShare.toFixed(2) + '%</td>' +
+        '<td class="num">' + r.companyShare.toFixed(2) + '%</td>' +
+        '<td class="num ' + r.tone + '">' + (r.indexPct == null ? '—' : r.indexPct.toFixed(0) + '%') + '</td>' +
+      '</tr>'
+    ).join('') +
+    '</tbody></table>';
+
+  el.innerHTML =
+    '<h2 class="v16-mgr-section-title">⭐ ' + (LANG === 'zh'
+      ? `主推产品本月表现 · ${branch} · ${snap || '—'}`
+      : `Strategic Push tracking · ${branch} · ${snap || '—'}`) + '</h2>' +
+    '<p class="v16-mgr-section-sub">' + (LANG === 'zh'
+      ? '指数 = 本店占比 ÷ 全公司占比。绿 ≥110% / 黄 90-110% / 红 <90%。'
+      : 'Index = branch share ÷ company share. Green ≥110% / Yellow 90-110% / Red <90%.') + '</p>' +
+    '<div class="ci-table-wrap">' + tbl + '</div>';
+}
+window.v17StrategicPushTracking = v17StrategicPushTracking;
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.7 phase 3 — Data-gap reveal modal
+   Design principle (per Jym):
+     Whenever the dashboard cannot show complete information because of
+     a data-source problem (missing Category / Brand / Race / etc.), do
+     three things — never just hide:
+       1. Tell the user the gap exists (badge instead of silent)
+       2. Show the exact records affected (clickable list)
+       3. Provide a one-click CSV so the Owner can fill the gap once
+          in Item Master / Customer Buy Sheet.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Show a modal listing the SKUs (or any record set) that have a missing
+   field. items = [{ code, desc, qty, amount, sales_90d, advice, ... }]
+   columns = same keys (in display order). */
+function v17ShowGapModal(opts) {
+  // Remove any existing modal first.
+  document.querySelectorAll('.v17-modal-backdrop').forEach(el => el.remove());
+  const items = opts.items || [];
+  const columns = opts.columns || [];
+  const titleHtml = opts.title || 'Data gap';
+  const subHtml   = opts.sub   || '';
+  const filename  = opts.filename || 'wiltek_gap.csv';
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'v17-modal-backdrop';
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
+
+  const modal = document.createElement('div');
+  modal.className = 'v17-modal';
+  const headHtml =
+    '<div class="v17-modal-head">' +
+      '<div><div class="v17-modal-title">' + titleHtml + '</div>' +
+      (subHtml ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">' + subHtml + '</div>' : '') +
+      '</div>' +
+      '<button class="v17-modal-close" aria-label="Close">×</button>' +
+    '</div>';
+  let bodyHtml;
+  if (!items.length) {
+    bodyHtml = '<div class="v17-modal-body"><p style="color:var(--text-secondary);">' + (LANG === 'zh' ? '没有缺失字段的记录。' : 'No records have missing fields.') + '</p></div>';
+  } else {
+    bodyHtml =
+      '<div class="v17-modal-body">' +
+        '<table class="v17-modal-list-table"><thead><tr>' +
+          columns.map(c => '<th class="' + (c.num ? 'num' : '') + '">' + c.label + '</th>').join('') +
+        '</tr></thead><tbody>' +
+          items.map(item => '<tr>' +
+            columns.map(c => {
+              const v = item[c.key];
+              const cls = c.num ? 'num' : '';
+              const display = c.format ? c.format(v, item) : (v == null || v === '' ? '—' : escapeHtml(String(v)));
+              return '<td class="' + cls + '">' + display + '</td>';
+            }).join('') +
+          '</tr>').join('') +
+        '</tbody></table>' +
+      '</div>';
+  }
+  const footHtml =
+    '<div class="v17-modal-foot">' +
+      '<div style="font-size:12px;color:var(--text-secondary)">' + (LANG === 'zh' ? '共 ' : '') + items.length + (LANG === 'zh' ? ' 条记录' : ' records') + '</div>' +
+      '<button class="v17-csv-btn">⬇ ' + (LANG === 'zh' ? '下载 CSV' : 'Download CSV') + '</button>' +
+    '</div>';
+
+  modal.innerHTML = headHtml + bodyHtml + footHtml;
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+
+  modal.querySelector('.v17-modal-close').addEventListener('click', () => backdrop.remove());
+  modal.querySelector('.v17-csv-btn').addEventListener('click', () => {
+    const head = columns.map(c => '"' + (c.label || c.key).replace(/"/g, '""') + '"').join(',');
+    const lines = items.map(it => columns.map(c => {
+      let v = it[c.key];
+      if (v == null) v = '';
+      const s = String(v).replace(/"/g, '""');
+      return '"' + s + '"';
+    }).join(','));
+    const csv = '﻿' + [head, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+}
+window.v17ShowGapModal = v17ShowGapModal;
+
+/* Open the "Uncategorised SKUs" modal — used by category tables in
+   Sales / Products manager pages when a row has no Category.
+   Includes BOTH gap sources:
+     (a) ds.rows entries at this branch with empty / "Uncategorised"
+         category (SKUs in stock but unmapped in Item Master)
+     (b) SKUs that sold this month at this branch but have no row in
+         ds.rows at all (sold-out at snapshot or never warehoused) so
+         codeToCat falls back to Uncategorised. */
+function v17OpenUncategorisedModal(branch) {
+  const ds = window.WP_DEADSTOCK || {};
+  const sl = window.WP_SALES_LIVE || {};
+  const skuABM = sl.sku_amt_by_month_branch || {};
+  const skuQBM = sl.sku_qty_by_month_branch || {};
+  const sbs = ds.sku_branch_sales_3m || {};
+  const snap = (typeof snapMonth === 'function' ? snapMonth() : '') || '';
+
+  // Build a code → row map for THIS branch.
+  const branchRowByCode = {};
+  (ds.rows || []).forEach(r => { if (r.branch === branch) branchRowByCode[r.code] = r; });
+  // Build a code → ANY-branch row map for fallback description lookup.
+  const anyRowByCode = {};
+  (ds.rows || []).forEach(r => { if (r && r.code && !anyRowByCode[r.code]) anyRowByCode[r.code] = r; });
+  // Build canonical category lookup (any branch row that has it).
+  const codeToCat = {};
+  (ds.rows || []).forEach(r => {
+    if (r && r.code && r.category && !/^uncategor/i.test(String(r.category)) && !codeToCat[r.code]) {
+      codeToCat[r.code] = r.category;
+    }
+  });
+
+  // Source (a): rows in ds.rows at this branch with no/empty category.
+  const aCodes = new Set();
+  Object.keys(branchRowByCode).forEach(code => {
+    const cat = codeToCat[code];
+    if (!cat) aCodes.add(code);
+  });
+  // Source (b): SKUs sold this month at this branch with no category mapping.
+  const bCodes = new Set();
+  const monthAm = (skuABM[snap] || {})[branch] || {};
+  Object.keys(monthAm).forEach(code => {
+    if (+monthAm[code] > 0 && !codeToCat[code]) bCodes.add(code);
+  });
+  const allCodes = new Set([...aCodes, ...bCodes]);
+
+  const items = Array.from(allCodes).map(code => {
+    const r = branchRowByCode[code] || anyRowByCode[code] || {};
+    const monthAmt = +(((skuABM[snap] || {})[branch] || {})[code] || 0);
+    const own90 = +((sbs[code] || {})[branch] || 0);
+    const stockQty = branchRowByCode[code] ? (branchRowByCode[code].qty || 0) : 0;
+    const stockAmt = branchRowByCode[code] ? (branchRowByCode[code].amount || 0) : 0;
+    const cover = own90 > 0 ? Math.round((+stockQty || 0) * 90 / own90) : null;
+    const source = aCodes.has(code) && bCodes.has(code) ? 'in-stock + sold'
+                 : aCodes.has(code) ? 'in-stock' : 'sold this month';
+    return {
+      code,
+      desc: r.desc || '',
+      source,
+      qty: stockQty,
+      amount: Math.round(stockAmt),
+      sales_90d: own90,
+      cover_days: cover,
+      this_month_rm: Math.round(monthAmt),
+      advice: (LANG === 'zh' ? '在 Item Master 填 Main Group + Sub Group' : 'Fill Main Group + Sub Group in Item Master'),
+    };
+  }).sort((a, b) => (b.amount + b.this_month_rm) - (a.amount + a.this_month_rm));
+
+  v17ShowGapModal({
+    title: (LANG === 'zh' ? `未分类 SKU(待补 Category)· ${branch}` : `Uncategorised SKUs (Category pending) · ${branch}`),
+    sub: (LANG === 'zh'
+      ? '这些 SKU 在 Item Master Sheet 缺少 Main Group。下载 CSV → 一次性补完。'
+      : 'These SKUs have no Main Group in the Item Master Sheet. Download CSV → fill in one pass.'),
+    items,
+    columns: [
+      { key: 'code',         label: 'SKU' },
+      { key: 'desc',         label: LANG === 'zh' ? '描述' : 'Description' },
+      { key: 'source',       label: LANG === 'zh' ? '来源' : 'Source' },
+      { key: 'qty',          label: LANG === 'zh' ? '库存' : 'Stock qty', num: true },
+      { key: 'amount',       label: LANG === 'zh' ? '库存值 RM' : 'Stock RM', num: true,
+        format: v => v ? 'RM ' + fmtMoney(v) : '—' },
+      { key: 'sales_90d',    label: LANG === 'zh' ? '90 天销量' : '90d sales', num: true },
+      { key: 'cover_days',   label: LANG === 'zh' ? '覆盖天数' : 'Cover (days)', num: true,
+        format: v => v == null ? '—' : v + (LANG === 'zh' ? ' 天' : 'd') },
+      { key: 'this_month_rm',label: LANG === 'zh' ? '本月销售 RM' : 'This month RM', num: true,
+        format: v => v ? 'RM ' + fmtMoney(v) : '—' },
+      { key: 'advice',       label: LANG === 'zh' ? '操作建议' : 'Advice' },
+    ],
+    filename: `wiltek_uncategorised_${branch}_${snap}.csv`,
+  });
+}
+window.v17OpenUncategorisedModal = v17OpenUncategorisedModal;
+
+/* Render a category-table cell. If the cat name is missing or
+   "Uncategorised", emit a clickable chip that opens the gap modal. */
+function v17CatCell(catName, skuCount, branch) {
+  if (!catName || /^uncategor/i.test(String(catName))) {
+    const label = LANG === 'zh'
+      ? `未分类 (待补 Category) · ${skuCount} SKU`
+      : `Uncategorised (Category pending) · ${skuCount} SKU`;
+    return '<td><span class="v17-gap-chip" onclick="v17OpenUncategorisedModal(\'' + branch + '\')" title="' +
+      (LANG === 'zh' ? '点击查看 SKU 清单 + 下载 CSV' : 'Click to see SKUs + download CSV') + '">' +
+      label + '</span></td>';
+  }
+  return '<td>' + escapeHtml(catName) + '</td>';
+}
+window.v17CatCell = v17CatCell;
 
 /* V1.7 — Products Action Plan: 3-5 dynamically-generated cards based on
    real numbers vs history. Inserted at the top of the Products view. */
