@@ -4640,12 +4640,14 @@ function renderStockDashboard() {
            problemTotal > 0 ? 'warn' : '') +
     dsCard(t('ds-stock-dead'),    'RM ' + fmtMoney(deadAmt),
            (totals.DEAD ? totals.DEAD.rows : 0) + ' DEAD · ' +
-           (totals.COMPANY_DEAD ? totals.COMPANY_DEAD.rows : 0) + ' Co-DEAD',
+           (totals.COMPANY_DEAD ? totals.COMPANY_DEAD.rows : 0) + ' Dead',
            deadAmt > 0 ? 'danger' : '');
 
-  // Chart: F-N-S split (donut)
+  // Chart: F-N-S split (donut) — V1.6 labels
   const labels = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k =>
-    LANG === 'zh' ? ({ACTIVE:'活跃',SLOW:'慢销',DEAD:'呆滞',MISPLACED:'错位',COMPANY_DEAD:'全公司无销'}[k]) : k);
+    LANG === 'zh'
+      ? ({ACTIVE:'活跃 Active',SLOW:'慢销 Slow',DEAD:'死货 — 仅本店',MISPLACED:'错位 Misplaced',COMPANY_DEAD:'呆死 Dead'}[k])
+      : ({ACTIVE:'Active',SLOW:'Slow',DEAD:'Dead — branch only',MISPLACED:'Misplaced',COMPANY_DEAD:'Dead'}[k]));
   const data   = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k => (totals[k] && totals[k].amount) || 0);
   const colors = [BRAND_GREEN, BRAND_AMBER, BRAND_DANGER, '#7C8FA6', '#5C6770'];
   document.getElementById('dsStockChartTitle').textContent =
@@ -5934,6 +5936,17 @@ window.renderGtd = renderGtd;
 
 /* ── Inventory dashboard (V1 第6刀: merges Stock + Purchasing) ── */
 function renderInventoryDashboard() {
+  // V1.6 hotfix: reset inline styles on dsInvCards in case the V1.6 manager
+  // overlay was previously injected (which sets display:block + no grid).
+  // For branch-scoped managers we'll re-inject those at the end; for owner
+  // mode we want the .ds-cards grid styling restored.
+  const _resetCards = document.getElementById('dsInvCards');
+  if (_resetCards) {
+    if (typeof isBranchScoped !== 'function' || !isBranchScoped()) {
+      _resetCards.style.display = '';
+      _resetCards.style.gridTemplateColumns = '';
+    }
+  }
   const ds  = window.WP_DEADSTOCK || {};
   const m   = ds.meta   || {};
   const totalsAll = ds.totals || {};
@@ -6052,7 +6065,7 @@ function renderInventoryDashboard() {
     const branchDeadAmt = +(branchEntry.DEAD || 0) + +(branchEntry.COMPANY_DEAD || 0);
     const branchProblemAmt = +(branchEntry.problem || 0);
     cmpK4 = null; // snapshot — no compare
-    k4Label = (LANG === 'zh' ? `自家店死货 + 全公司无销(${BRANCH_VIEW})` : `Dead + COMPANY_DEAD (${BRANCH_VIEW})`);
+    k4Label = (LANG === 'zh' ? `自家店呆死货(${BRANCH_VIEW})` : `Dead (${BRANCH_VIEW})`);
     k4Val   = branchDeadAmt ? 'RM ' + fmtMoney(branchDeadAmt) : 'RM 0';
     k4Sub   = LANG === 'zh'
       ? `${BRANCH_VIEW} · 截止 ${stockSnapLabel} 快照 · 问题库存 RM ${fmtMoney(branchProblemAmt)}`
@@ -6147,9 +6160,11 @@ function renderInventoryDashboard() {
   }
   document.getElementById('dsInvAlerts').innerHTML = alerts.join('');
 
-  // F-N-S donut chart
+  // F-N-S donut chart (V1.6: COMPANY_DEAD label → "Dead", legacy DEAD → "Dead — branch only")
   const labels = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k =>
-    LANG === 'zh' ? ({ACTIVE:'活跃',SLOW:'慢销',DEAD:'呆滞',MISPLACED:'错位',COMPANY_DEAD:'全公司无销'}[k]) : k);
+    LANG === 'zh'
+      ? ({ACTIVE:'活跃 Active',SLOW:'慢销 Slow',DEAD:'死货 — 仅本店',MISPLACED:'错位 Misplaced',COMPANY_DEAD:'呆死 Dead'}[k])
+      : ({ACTIVE:'Active',SLOW:'Slow',DEAD:'Dead — branch only',MISPLACED:'Misplaced',COMPANY_DEAD:'Dead'}[k]));
   const data   = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k => (totals[k] && totals[k].amount) || 0);
   const colors = [BRAND_GREEN, BRAND_AMBER, BRAND_DANGER, '#7C8FA6', '#5C6770'];
   document.getElementById('dsInvChartTitle').textContent =
@@ -6209,6 +6224,77 @@ function renderInventoryDashboard() {
     drillTile('inventory/transfer',  'drill-transfers', 'drill-transfers-sub', '🔁') +
     drillTile('inventory/warehouse', 'drill-warehouse', 'drill-warehouse-sub', '🏪') +
     drillTile('inventory/po',        'drill-po-exc',    'drill-po-exc-sub',    '🛒');
+
+  // V1.6 hotfix: for store managers, replace the 4 KPI cards at the top of
+  // the Inventory page with the V1.6 4-state distribution (matches the
+  // Today page exactly so managers see one consistent picture). Owner mode
+  // keeps the original 4 KPI cards untouched.
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    try { v16OverlayInventoryCards(); } catch (e) { console.warn('v16OverlayInventoryCards failed:', e); }
+  }
+}
+
+/* V1.6 — replace dsInvCards with the per-branch 4-state distribution. Each
+   row is clickable and routes to the dead-stock list pre-filtered. */
+function v16OverlayInventoryCards() {
+  const cardsEl = document.getElementById('dsInvCards');
+  if (!cardsEl) return;
+  const branch = window.BRANCH_VIEW;
+  const ds = window.WP_DEADSTOCK || {};
+  const meta = ds.meta || {};
+  const dist = branchInventoryDistV16(branch, ds);
+  const snapAsOf = meta.snapshot || snapMonth() || '—';
+  const distOrder = ['Active','Slow','Misplaced','Dead'];
+  const head =
+    '<thead><tr>' +
+      '<th>' + (LANG === 'zh' ? '状态' : 'Status') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '金额 (RM)' : 'Amount (RM)') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+      '<th class="num">SKU</th>' +
+      '<th class="num"></th>' +
+    '</tr></thead>';
+  const body = distOrder.map(c => {
+    const r = dist[c] || { amt: 0, n: 0 };
+    const sharePct = dist.total ? (r.amt / dist.total * 100) : 0;
+    return '<tr data-v16-state="' + c + '">' +
+      '<td class="v16-name v16-' + c + '">' + v16ClassLabel(c) + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(r.amt)) + '</td>' +
+      '<td class="num">' + sharePct.toFixed(1) + '%</td>' +
+      '<td class="num">' + fmt(r.n) + '</td>' +
+      '<td class="num v16-arrow">→</td>' +
+    '</tr>';
+  }).join('');
+  const foot =
+    '<tfoot><tr>' +
+      '<td>' + (LANG === 'zh' ? '总计' : 'Total') + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(dist.total)) + '</td>' +
+      '<td class="num">100.0%</td>' +
+      '<td class="num">' + fmt(distOrder.reduce((a, c) => a + ((dist[c] || {}).n || 0), 0)) + '</td>' +
+      '<td></td>' +
+    '</tr></tfoot>';
+  cardsEl.innerHTML =
+    '<div class="v16-mgr-headline">' +
+      '<div class="v16-headline-title">' + (LANG === 'zh'
+        ? `本店 Inventory 状态 · ${branch}` : `This-store Inventory state · ${branch}`) + '</div>' +
+      '<div class="v16-headline-meta">' + (LANG === 'zh'
+        ? `总值 RM ${fmtMoney(Math.round(dist.total))} · 快照 截止 ${snapAsOf}`
+        : `Total RM ${fmtMoney(Math.round(dist.total))} · snapshot as of ${snapAsOf}`) + '</div>' +
+    '</div>' +
+    '<table class="v16-inv-dist">' + head + '<tbody>' + body + '</tbody>' + foot + '</table>';
+  cardsEl.style.gridTemplateColumns = 'unset';
+  cardsEl.style.display = 'block';
+  cardsEl.querySelectorAll('tbody tr[data-v16-state]').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const v16 = tr.getAttribute('data-v16-state');
+      const mapping = { Active:'ACTIVE', Slow:'SLOW', Misplaced:'MISPLACED', Dead:'COMPANY_DEAD' };
+      const targetCls = mapping[v16] || 'all';
+      try {
+        if (typeof CUR_TAB !== 'undefined') CUR_TAB = targetCls;
+        if (typeof persistStatusToUrl === 'function') persistStatusToUrl(targetCls);
+        setView('deadstock');
+      } catch(_) {}
+    });
+  });
 }
 
 /* ── Sales depth: 品类 / 80-20 / Top 20 / 价格带 / 四象限 ──────── */
@@ -6941,14 +7027,19 @@ async function fetchFloatationLive(ts) {
     const j = await r.json();
     if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
     const race = {
-      months:    j.months,
-      races:     j.races,
-      totals:    j.totals,
-      by_branch: j.by_branch,
-      note_en:   j.note_en,
-      note_zh:   j.note_zh,
-      _live:     true,
-      _fetched_at: j.fetched_at,
+      months:        j.months,
+      races:         j.races,
+      totals:        j.totals,
+      by_branch:     j.by_branch,
+      // V1.6 hotfix: branches_full carries the per-branch 12-month detail
+      // (walkin/purchase/amount/basket/cr per Jan..Dec). Without this the
+      // store-manager Today KPI table cannot pull per-month per-branch
+      // Walk-in / AOV / Closing Rate actuals.
+      branches_full: j.branches_full,
+      note_en:       j.note_en,
+      note_zh:       j.note_zh,
+      _live:         true,
+      _fetched_at:   j.fetched_at,
     };
     if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
     window.WP_CUSTOMERS.race = race;
