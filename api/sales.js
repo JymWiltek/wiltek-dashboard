@@ -139,6 +139,11 @@ function buildRawSaleAggregates(text) {
   const recent14 = new Set(allMonthsSorted.slice(-14));
 
   // Second pass: build per-SKU per-month for recent 14 months only.
+  // V1.5 bonus: ALSO build per-branch per-SKU per-month aggregates so the
+  // store-manager Products dashboard can show 自家店该月活跃 SKU + 销售冠军.
+  // Schema: sku_amt_by_month_branch[ym][branch][code] = amount
+  const skuAmtByMonthBranch = {};
+  const skuQtyByMonthBranch = {};
   if (I_CODE >= 0) {
     for (let i = 1; i < grid.length; i++) {
       const r = grid[i];
@@ -147,12 +152,23 @@ function buildRawSaleAggregates(text) {
       if (!ym || !recent14.has(ym)) continue;
       const code = String(r[I_CODE]||'').trim();
       if (!code) continue;
+      const br = String(r[I_BRANCH]||'').trim();
       const amt = parseNum(r[I_AMT]);
       const qty = I_QTY >= 0 ? parseNum(r[I_QTY]) : 0;
+      // Company-wide per-month
       if (!skuAmtByMonth[ym]) skuAmtByMonth[ym] = {};
       if (!skuQtyByMonth[ym]) skuQtyByMonth[ym] = {};
       skuAmtByMonth[ym][code] = (skuAmtByMonth[ym][code] || 0) + amt;
       skuQtyByMonth[ym][code] = (skuQtyByMonth[ym][code] || 0) + qty;
+      // Per-branch per-month
+      if (br) {
+        if (!skuAmtByMonthBranch[ym]) skuAmtByMonthBranch[ym] = {};
+        if (!skuAmtByMonthBranch[ym][br]) skuAmtByMonthBranch[ym][br] = {};
+        skuAmtByMonthBranch[ym][br][code] = (skuAmtByMonthBranch[ym][br][code] || 0) + amt;
+        if (!skuQtyByMonthBranch[ym]) skuQtyByMonthBranch[ym] = {};
+        if (!skuQtyByMonthBranch[ym][br]) skuQtyByMonthBranch[ym][br] = {};
+        skuQtyByMonthBranch[ym][br][code] = (skuQtyByMonthBranch[ym][br][code] || 0) + qty;
+      }
     }
   }
 
@@ -168,11 +184,20 @@ function buildRawSaleAggregates(text) {
       skuAmtByMonth[ym][c] = Math.round(skuAmtByMonth[ym][c]);
     }
   }
+  for (const ym of Object.keys(skuAmtByMonthBranch)) {
+    for (const br of Object.keys(skuAmtByMonthBranch[ym])) {
+      for (const c of Object.keys(skuAmtByMonthBranch[ym][br])) {
+        skuAmtByMonthBranch[ym][br][c] = Math.round(skuAmtByMonthBranch[ym][br][c]);
+      }
+    }
+  }
 
   return {
     sales_by_branch_month: sbm,
     sku_amt_by_month: skuAmtByMonth,
     sku_qty_by_month: skuQtyByMonth,
+    sku_amt_by_month_branch: skuAmtByMonthBranch,
+    sku_qty_by_month_branch: skuQtyByMonthBranch,
     total_amt_by_month: totalAmtByMonth,
     months_seen: allMonthsSorted,
     branches_seen: [...branchesSet].sort(),

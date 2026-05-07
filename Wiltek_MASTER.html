@@ -4187,16 +4187,20 @@ function rankingToggleHtml(key) {
   '</div>';
 }
 
-/* Resolve a SKU amount for a given mode, given sku_amt_by_month + snap. */
+/* Resolve a SKU amount for a given mode, given sku_amt_by_month + snap.
+   V1.5: when isBranchScoped(), uses sku_amt_by_month_branch[ym][BRANCH_VIEW]. */
 function skuAmtForMode(skuAmtByMonth, snap, mode) {
+  const sl = window.WP_SALES_LIVE || {};
+  const branched = (typeof isBranchScoped === 'function' && isBranchScoped())
+    ? (sl.sku_amt_by_month_branch || null) : null;
+  const pickMonth = (ym) => branched ? ((branched[ym] || {})[BRANCH_VIEW] || {}) : ((skuAmtByMonth || {})[ym] || {});
   const out = {};
   if (mode === 'single') {
-    const m = (skuAmtByMonth || {})[snap] || {};
-    return Object.assign({}, m);
+    return Object.assign({}, pickMonth(snap));
   }
   const months = mode === 'm6' ? ymsRange(snap, 6) : ymsRange(snap, 12);
   for (const ym of months) {
-    const m = (skuAmtByMonth || {})[ym] || {};
+    const m = pickMonth(ym);
     for (const code of Object.keys(m)) {
       out[code] = (out[code] || 0) + (+m[code] || 0);
     }
@@ -4697,16 +4701,22 @@ function computeRaceConversion() {
   const races = Array.isArray(race.races) ? race.races : [];
   const months = race.months || [];
   if (!races.length || !months.length) return { ok: false };
-  const idx = months.length - 1;
+  // V1.5: pick the month matching SNAPSHOT if it's in the floatation feed.
+  // Floatation Sheet only has the most recent few months — when the user
+  // selects a month outside the feed, we fall back to '—' (NOT the latest
+  // month value, which would be misleading per Jym's R4).
+  const snap = (typeof snapMonth === 'function') ? snapMonth() : (window.SNAPSHOT || '');
+  const idxFromSnap = months.indexOf(snap);
+  const idx = idxFromSnap >= 0 ? idxFromSnap : -1;   // -1 = no data for this snap
+  const monthLabel = idx >= 0 ? months[idx] : (snap || '—');
   const out = races.map(r => ({
     key: r.key,
     label_en: r.label_en, label_zh: r.label_zh,
-    walkin: Array.isArray(r.walkin) ? (+r.walkin[idx] || 0) : (+r.walkin || 0),
-    cr:     Array.isArray(r.cr)     ? (+r.cr[idx]     || 0) : (+r.cr     || 0),
+    walkin: idx >= 0 ? (Array.isArray(r.walkin) ? (+r.walkin[idx] || 0) : (+r.walkin || 0)) : 0,
+    cr:     idx >= 0 ? (Array.isArray(r.cr)     ? (+r.cr[idx]     || 0) : (+r.cr     || 0)) : 0,
   }));
-  // Best / worst CR
   const sorted = out.slice().sort((a, b) => b.cr - a.cr);
-  return { ok: true, races: out, best: sorted[0], worst: sorted[sorted.length - 1] };
+  return { ok: true, hasMonth: idx >= 0, monthsAvail: months, monthLabel, races: out, best: sorted[0], worst: sorted[sorted.length - 1] };
 }
 
 /* Sleeping high-value customers — top100 with m3_visits = 0 (didn't shop in
@@ -4812,16 +4822,25 @@ function renderCustomersDashboard() {
   const kpi2Sub = LANG === 'zh' ? `${snapForCmp || '—'} · 该月会员销售` : `${snapForCmp || '—'} · member sales`;
   const kpi2Cls = '';
 
-  // KPI 3 — Race walk-in CR (latest /api/floatation month — labelled accordingly)
+  // KPI 3 — Race walk-in CR. V1.5 fix: per-month from /api/floatation.
+  // If snap is OUTSIDE the floatation feed range (Sheet only has recent
+  // months), show '—' rather than misleading latest-month value.
   let kpi3Val = '—', kpi3Sub = t('ds-cust-race-pending'), kpi3Cls = '';
-  if (race.ok) {
+  if (race.ok && race.hasMonth) {
     const best = race.best;
     const bestLabel = LANG === 'zh' ? (best.label_zh || best.key) : (best.label_en || best.key);
     kpi3Val = (best.cr * 100).toFixed(1) + '%';
     kpi3Sub = (LANG === 'zh'
-      ? `${bestLabel} CR 最高 · race feed 最新月窗口`
-      : `${bestLabel} highest CR · race feed latest month`);
+      ? `${bestLabel} CR 最高 · ${race.monthLabel}`
+      : `${bestLabel} highest CR · ${race.monthLabel}`);
     if (best.cr < 0.5) kpi3Cls = 'warn';
+  } else if (race.ok && !race.hasMonth) {
+    // Snap month not in race feed — honest empty state with what IS available
+    kpi3Val = '—';
+    const avail = (race.monthsAvail || []).slice(-3).join(', ');
+    kpi3Sub = LANG === 'zh'
+      ? `${snapForCmp || '—'} · race feed 仅有 ${avail || '—'}`
+      : `${snapForCmp || '—'} · race feed only has ${avail || '—'}`;
   }
 
   document.getElementById('dsCustCards').innerHTML =
@@ -5041,33 +5060,41 @@ function renderProductsDashboard() {
   const k1Cls = cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -10 ? 'danger'
                : cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -5 ? 'warn' : '';
 
-  // KPI 2 — 该月活跃 SKU 数 (unique SKUs that sold that month) + compare on count.
-  // V1.5: per-SKU per-branch monthly data isn't exposed yet — when branch-scoped,
-  // honestly note "(全公司参考)" so the store manager knows this is company-wide.
+  // V1.5 fix: KPI 2 + 3 are now BRANCH-SCOPED via sku_amt_by_month_branch.
+  // When isBranchScoped(), pick that branch's per-SKU per-month aggregate.
+  // Owner mode: company-wide (sum across all branches' per-month dictionaries).
+  const skuAmtByMonthBranch = sl.sku_amt_by_month_branch || {};
+  const skuAmtForView = (ym) => {
+    if (isBranchScoped()) {
+      return (skuAmtByMonthBranch[ym] && skuAmtByMonthBranch[ym][BRANCH_VIEW]) || {};
+    }
+    return skuAmtByMonth[ym] || {};
+  };
+
+  // KPI 2 — 该月活跃 SKU 数 (per-branch when scoped, company-wide otherwise)
   const skuCountSeries = {};
   for (const ym of Object.keys(skuAmtByMonth)) {
-    skuCountSeries[ym] = Object.keys(skuAmtByMonth[ym] || {}).length;
+    skuCountSeries[ym] = Object.keys(skuAmtForView(ym)).length;
   }
   const cmpCount = buildMonthlyCompare(skuCountSeries, snap);
   const k2Val = cmpCount.single ? fmt(cmpCount.single) + (LANG === 'zh' ? ' 颗' : ' SKUs') : '—';
-  const k2ScopeNote = isBranchScoped() ? (LANG === 'zh' ? ' · (全公司参考)' : ' · (company-wide ref)') : '';
-  const k2Sub = (LANG === 'zh' ? `${snap || '—'} · 该月有销售的 SKU 数` : `${snap || '—'} · SKUs with sales`) + k2ScopeNote;
+  const prodScopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全分行' : 'all-branch');
+  const k2Sub = (LANG === 'zh' ? `${snap || '—'} · ${prodScopeLbl} 该月有销售的 SKU 数` : `${snap || '—'} · ${prodScopeLbl} SKUs with sales`);
 
-  // KPI 3 — 该月 Top SKU (best-seller this month).
-  const skuMonth = skuAmtByMonth[snap] || {};
+  // KPI 3 — 该月 Top SKU (best-seller this month, branch-scoped if applicable)
+  const skuMonth = skuAmtForView(snap);
   const topThisMonth = Object.entries(skuMonth).sort((a, b) => b[1] - a[1])[0];
   const k3Val = topThisMonth ? topThisMonth[0] : '—';
-  let k3Sub = (LANG === 'zh' ? '该月销售冠军 SKU' : 'best-seller this month') + k2ScopeNote;
+  let k3Sub = (LANG === 'zh' ? `${prodScopeLbl} 该月销售冠军 SKU` : `${prodScopeLbl} best-seller this month`);
   let cmpTop3 = null;
   if (topThisMonth) {
     const code = topThisMonth[0];
     const topSeries = {};
     for (const ym of Object.keys(skuAmtByMonth)) {
-      topSeries[ym] = +(skuAmtByMonth[ym] || {})[code] || 0;
+      topSeries[ym] = +(skuAmtForView(ym) || {})[code] || 0;
     }
     cmpTop3 = buildMonthlyCompare(topSeries, snap);
-    k3Sub = (LANG === 'zh' ? `${code} · RM ${fmtMoney(topThisMonth[1])}`
-                           : `${code} · RM ${fmtMoney(topThisMonth[1])}`);
+    k3Sub = `${code} · RM ${fmtMoney(topThisMonth[1])} · ${prodScopeLbl}`;
   }
 
   document.getElementById('dsProdCards').innerHTML =
@@ -5520,10 +5547,42 @@ function gtdKpiStatus(actual, target, kpiId) {
   return 'bad';
 }
 
+/* V1.5: hydrate GTD store from /api/gtd (Gist) on each view-enter so cross-
+   device data is loaded fresh. We merge server data into localStorage so
+   offline edits + server source of truth coexist. */
+async function gtdHydrateFromServer() {
+  if (window.__gtd_hydrated_at && Date.now() - window.__gtd_hydrated_at < 30000) return;
+  try {
+    const r = await fetch('/api/gtd?t=' + Date.now(), { cache: 'no-store' });
+    const j = await r.json();
+    if (j && j.ok) {
+      // Merge server store INTO localStorage. Server is source of truth for
+      // any key that exists on both sides; local-only keys (offline edits)
+      // are preserved until next save.
+      const local = gtdLoadStore();
+      const merged = Object.assign({}, local, j.store || {});
+      gtdSaveStore(merged);
+      window.__gtd_hydrated_at = Date.now();
+      // Re-render if currently on GTD view
+      if (CUR_VIEW === 'gtd') {
+        try { renderGtd(); } catch(_){}
+      }
+      const status = document.getElementById('gtdSaveStatus');
+      if (status && CUR_VIEW === 'gtd') {
+        const reason = j.reason ? ` (${j.reason})` : '';
+        status.textContent = (LANG === 'zh' ? '已从 Sheet 加载最新数据' : 'Loaded latest from Sheet') + reason;
+      }
+    }
+  } catch(_){}
+}
+
 function renderGtd() {
   const branch = gtdActiveBranch();
   const isOwnerRole = (window.WP_SESSION?.get()?.role === 'owner');
   const store = gtdLoadStore();
+  // Kick off async hydrate (non-blocking — UI renders from localStorage first,
+  // then re-renders when server reply arrives).
+  gtdHydrateFromServer();
 
   const scopeEl = document.getElementById('gtdScope');
   if (scopeEl) {
@@ -5617,26 +5676,29 @@ window.renderGtd = renderGtd;
     const btn = e.target.closest('#gtdSaveBtn');
     if (!btn) return;
     const status = document.getElementById('gtdSaveStatus');
-    if (status) status.textContent = (LANG === 'zh' ? '已保存到本地。' : 'Saved locally.');
-    // Best-effort Sheet write-back via /api/proxy
+    if (status) status.textContent = (LANG === 'zh' ? '保存中...' : 'Saving...');
     const branch = gtdActiveBranch();
     const store = gtdLoadStore();
-    fetch('/api/proxy?type=gtd_save&branch=' + encodeURIComponent(branch), {
+    // V1.5: real cross-device persistence via /api/gtd (Gist-backed).
+    fetch('/api/gtd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ branch, store }),
     }).then(r => r.json()).then(j => {
       if (j && j.ok) {
-        if (status) status.textContent = (LANG === 'zh' ? '✓ 已保存到本地 + Sheet。' : '✓ Saved locally + Sheet.');
+        // Server merged successfully — adopt the merged store as source of truth
+        if (j.store) gtdSaveStore(j.store);
+        window.__gtd_hydrated_at = Date.now();
+        if (status) status.textContent = (LANG === 'zh' ? '✓ 已保存到 Sheet · 跨设备同步' : '✓ Saved to Sheet · cross-device synced');
       } else {
         if (status) status.textContent = (LANG === 'zh'
-          ? '⚠ 已保存到本地。Sheet 写回端点未接通(下一刀)。'
-          : '⚠ Saved locally. Sheet write-back endpoint not yet wired (next cut).');
+          ? `⚠ 已保存到本地。Sheet 写回失败:${j?.reason || 'unknown'}(env GH_GIST_ID/GH_GIST_TOKEN 未配置时为正常)`
+          : `⚠ Saved locally. Sheet save failed: ${j?.reason || 'unknown'} (expected if GH_GIST_ID/GH_GIST_TOKEN env not set)`);
       }
-    }).catch(() => {
+    }).catch(err => {
       if (status) status.textContent = (LANG === 'zh'
-        ? '⚠ 已保存到本地。Sheet 写回端点未接通(下一刀)。'
-        : '⚠ Saved locally. Sheet write-back endpoint not yet wired (next cut).');
+        ? '⚠ 已保存到本地。/api/gtd 不可达。'
+        : '⚠ Saved locally. /api/gtd unreachable.');
     });
   });
 })();
@@ -5721,57 +5783,97 @@ function renderInventoryDashboard() {
     ? `${scopeLabel} · 呆滞 ${fnsDeadPct.toFixed(1)}% · 截止 ${stockSnapLabel} 数据`
     : `${scopeLabel} · ${fnsDeadPct.toFixed(1)}% dead · as of ${stockSnapLabel}`);
 
-  // V1.5: KPIs 2 + 4 use sl.matrix (per-category per-month) which has NO
-  // per-branch dimension — when a store manager is logged in we honestly
-  // append "(全公司参考)" to the sub so they don't misread it as own-store.
-  // KPI 2 — 该月 PO 总额 + 3-line compare (sl.matrix[ym][grp] = { po, grn })
-  const poByMonth = {};
-  const grnByMonth = {};
+  // V1.5 fix: when isBranchScoped(), KPI 2 + 4 are REPLACED with branch-
+  // specific metrics that ARE per-branch (PO data has no per-branch dim
+  // upstream so we don't fake it). For owner mode, keep the company-wide
+  // PO/Gap KPIs which ARE useful at company level.
   const matrix = sl.matrix || {};
+  const poByMonth = {};
   for (const ym of Object.keys(matrix)) {
-    let po = 0, grn = 0;
+    let po = 0;
     for (const grp of Object.keys(matrix[ym] || {})) {
       const c = matrix[ym][grp];
       if (!c) continue;
-      po  += +c.po  || 0;
-      grn += +c.grn || 0;
+      po += +c.po || 0;
     }
-    poByMonth[ym]  = po;
-    grnByMonth[ym] = grn;
+    poByMonth[ym] = po;
   }
-  const cmpPo = buildMonthlyCompare(poByMonth, snap);
-  const invScopeNote = isBranchScoped() ? (LANG === 'zh' ? ' · (全公司参考)' : ' · (company-wide ref)') : '';
-  const k2Val = cmpPo.single ? 'RM ' + fmtMoney(cmpPo.single) : '—';
-  const k2Sub = (LANG === 'zh' ? `${snap || '—'} · 该月 PO 总额` : `${snap || '—'} · this month's PO total`) + invScopeNote;
-
-  // KPI 3 — 断货 SKU 预警 (snapshot-derived, not month-shifting)
-  const k3Val = stockout.ok ? fmt(stockout.critical_n) + (LANG === 'zh' ? ' 颗' : '') : '—';
-  const k3Sub = stockout.ok
-    ? (LANG === 'zh' ? `< 14 天库存 · 截止 ${stockSnapLabel} 快照` : `<14d stock · as of ${stockSnapLabel}`)
-    : (LANG === 'zh' ? '3m 销售数据待载' : '3m sales data missing');
-  const k3Cls = stockout.ok ? (stockout.critical_n > 5 ? 'danger' : stockout.critical_n > 0 ? 'warn' : '') : '';
-
-  // KPI 4 — 该月销售 vs 该月 PO 缺口 (gap = sales - PO; positive = depleting stock)
-  // Need monthly sales total. Use total_amt_by_month from Raw sale tab.
   const totalAmtByMonth = sl.total_amt_by_month || {};
-  const cmpGap = buildMonthlyCompare(
-    Object.fromEntries(Object.keys({ ...poByMonth, ...totalAmtByMonth }).map(ym =>
-      [ym, (+totalAmtByMonth[ym] || 0) - (+poByMonth[ym] || 0)]
-    )),
-    snap
-  );
-  const k4Val = cmpGap.single !== 0 ? 'RM ' + fmtMoney(cmpGap.single) : (cmpPo.single || totalAmtByMonth[snap] ? 'RM 0' : '—');
-  const k4Sub = (LANG === 'zh'
-    ? `${snap || '—'} · 销售消耗 - PO 入货 (正=库存下降)`
-    : `${snap || '—'} · sales − PO (positive = depleting)`) + invScopeNote;
+
+  let k2Label, k2Val, k2Sub, cmpK2;
+  let k4Label, k4Val, k4Sub, cmpK4;
+
+  if (isBranchScoped()) {
+    // Branch-scoped Inventory: KPI 2 = 该月销售消耗 (own store);
+    // KPI 4 = 自家店死货金额 (snapshot, branch-specific from WP_DEADSTOCK)
+    const sbm = sl.sales_by_branch_month || {};
+    const branchSalesByMonth = {};
+    if (sbm[BRANCH_VIEW]) {
+      for (const ym of Object.keys(sbm[BRANCH_VIEW])) {
+        branchSalesByMonth[ym] = +sbm[BRANCH_VIEW][ym] || 0;
+      }
+    }
+    cmpK2 = buildMonthlyCompare(branchSalesByMonth, snap);
+    k2Label = (LANG === 'zh' ? `该月销售消耗(${BRANCH_VIEW})` : `Sales consumption (${BRANCH_VIEW})`);
+    k2Val   = cmpK2.single ? 'RM ' + fmtMoney(cmpK2.single) : '—';
+    k2Sub   = LANG === 'zh' ? `${snap || '—'} · ${BRANCH_VIEW} 自家店该月销售` : `${snap || '—'} · ${BRANCH_VIEW} own-store sales`;
+
+    // KPI 4: branch dead-stock amount (snapshot)
+    const branchEntry = (ds.by_branch || {})[BRANCH_VIEW] || {};
+    const branchDeadAmt = +(branchEntry.DEAD || 0) + +(branchEntry.COMPANY_DEAD || 0);
+    const branchProblemAmt = +(branchEntry.problem || 0);
+    cmpK4 = null; // snapshot — no compare
+    k4Label = (LANG === 'zh' ? `自家店死货 + 全公司无销(${BRANCH_VIEW})` : `Dead + COMPANY_DEAD (${BRANCH_VIEW})`);
+    k4Val   = branchDeadAmt ? 'RM ' + fmtMoney(branchDeadAmt) : 'RM 0';
+    k4Sub   = LANG === 'zh'
+      ? `${BRANCH_VIEW} · 截止 ${stockSnapLabel} 快照 · 问题库存 RM ${fmtMoney(branchProblemAmt)}`
+      : `${BRANCH_VIEW} · as of ${stockSnapLabel} · problem stock RM ${fmtMoney(branchProblemAmt)}`;
+  } else {
+    // Owner / company-wide: keep the original PO + Gap KPIs.
+    cmpK2 = buildMonthlyCompare(poByMonth, snap);
+    k2Label = t('ds-inv-kpi-po');
+    k2Val   = cmpK2.single ? 'RM ' + fmtMoney(cmpK2.single) : '—';
+    k2Sub   = LANG === 'zh' ? `${snap || '—'} · 该月 PO 总额 · 全公司` : `${snap || '—'} · this month's PO total · company`;
+
+    cmpK4 = buildMonthlyCompare(
+      Object.fromEntries(Object.keys({ ...poByMonth, ...totalAmtByMonth }).map(ym =>
+        [ym, (+totalAmtByMonth[ym] || 0) - (+poByMonth[ym] || 0)]
+      )),
+      snap
+    );
+    k4Label = t('ds-inv-kpi-gap');
+    k4Val   = cmpK4.single !== 0 ? 'RM ' + fmtMoney(cmpK4.single) : (cmpK2.single || totalAmtByMonth[snap] ? 'RM 0' : '—');
+    k4Sub   = LANG === 'zh'
+      ? `${snap || '—'} · 销售消耗 - PO 入货 (正=库存下降) · 全公司`
+      : `${snap || '—'} · sales − PO (positive = depleting) · company`;
+  }
+
+  // KPI 3 — 断货 SKU 预警 (snapshot-derived). For branch view, scope to that branch's stockouts.
+  let stockoutValForBranch = stockout.critical_n;
+  if (isBranchScoped() && stockout.ok) {
+    // Filter stockout list to SKUs that have stock in this branch
+    const skuBranchStock = ds.sku_branch_stock || {};
+    stockoutValForBranch = stockout.list.filter(x => {
+      const branchHasStock = (skuBranchStock[x.code] || {})[BRANCH_VIEW] > 0;
+      return x.critical && branchHasStock;
+    }).length;
+  }
+  const k3Val = stockout.ok ? fmt(stockoutValForBranch) + (LANG === 'zh' ? ' 颗' : '') : '—';
+  const k3ScopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全公司' : 'company');
+  const k3Sub = stockout.ok
+    ? (LANG === 'zh' ? `< 14 天库存(${k3ScopeLbl})· 截止 ${stockSnapLabel} 快照` : `<14d stock (${k3ScopeLbl}) · as of ${stockSnapLabel}`)
+    : (LANG === 'zh' ? '3m 销售数据待载' : '3m sales data missing');
+  const k3Cls = stockout.ok ? (stockoutValForBranch > 5 ? 'danger' : stockoutValForBranch > 0 ? 'warn' : '') : '';
 
   document.getElementById('dsInvCards').innerHTML =
-    dsCard(t('ds-inv-kpi-health'),         k1Val, k1Sub, k1Cls) +
-    dsCardCompare(t('ds-inv-kpi-po'),      k2Val, cmpPo,
-                  { sub: k2Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
-    dsCard(t('ds-inv-kpi-stockout'),       k3Val, k3Sub, k3Cls) +
-    dsCardCompare(t('ds-inv-kpi-gap'),     k4Val, cmpGap,
-                  { sub: k4Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+    dsCard(t('ds-inv-kpi-health'), k1Val, k1Sub, k1Cls) +
+    (cmpK2 ? dsCardCompare(k2Label, k2Val, cmpK2,
+                  { sub: k2Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) })
+           : dsCard(k2Label, k2Val, k2Sub)) +
+    dsCard(t('ds-inv-kpi-stockout'), k3Val, k3Sub, k3Cls) +
+    (cmpK4 ? dsCardCompare(k4Label, k4Val, cmpK4,
+                  { sub: k4Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) })
+           : dsCard(k4Label, k4Val, k4Sub));
 
   // ── 4 alert cards ─────────────────────────────────────────────────
   const alerts = [];
