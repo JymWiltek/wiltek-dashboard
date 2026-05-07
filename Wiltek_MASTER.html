@@ -1766,8 +1766,8 @@ const STR = {
     "ds-sales-price-sub":    "SKU count + LTM revenue across 5 unit-cost bands (RM).",
     "ds-sales-quad-title":   "四象限 — Volume × Margin matrix",
     "ds-sales-quad-sub":     "Brand GP% (Y-axis) × LTM sales (X-axis). Stars / Cash cows / Question marks / Dogs.",
-    "ds-prod-brand-title":   "品牌结构 — Brand portfolio",
-    "ds-prod-brand-sub":     "All brands ranked by LTM sales — the long tail of the catalog.",
+    "ds-prod-brand-title":   "品牌结构 — Brand portfolio (12M reference)",
+    "ds-prod-brand-sub":     "All brands ranked by trailing 12-month sales · structural reference, not month-shifting.",
     /* Domain dashboard titles + sub-headlines */
     "ds-sales-title":  "Sales",
     "ds-sales-sub":    "5 active stores · today + period sales · drill-down to per-store hubs.",
@@ -2000,9 +2000,9 @@ const STR = {
     "ds-inv-kpi-po":          "This month PO total",
     "ds-inv-alert-oem-cal-title":   "OEM (China) PO calendar",
     "ds-inv-alert-oem-cal-pending": "Per-SKU PO history + Country field needed — pending",
-    "ds-inv-alert-transfer-title":  "Transfer opportunities (misplaced)",
-    "ds-inv-alert-dead-clear-title":"Dead-stock Top 20 clearance",
-    "ds-inv-alert-po-a-title":      "PO exceptions hitting A-grade SKUs",
+    "ds-inv-alert-transfer-title":  "Transfer opportunities · misplaced (snapshot)",
+    "ds-inv-alert-dead-clear-title":"Dead-stock Top 20 clearance (snapshot)",
+    "ds-inv-alert-po-a-title":      "PO exceptions hitting A-grade SKUs (snapshot)",
 
     "ds-cust-kpi-mix":        "Customer type mix",
     "ds-cust-kpi-repeat":     "Repeat-rate health (top 100)",
@@ -2010,11 +2010,11 @@ const STR = {
     "ds-cust-mix-pending":    "cross_by_window not yet loaded",
     "ds-cust-repeat-pending": "top100 not yet loaded",
     "ds-cust-race-pending":   "race feed not yet loaded",
-    "ds-cust-alert-sleep-title":   "Sleeping high-value (Top 100)",
+    "ds-cust-alert-sleep-title":   "Sleeping high-value · Top 100 (snapshot · 3m window)",
     "ds-cust-alert-sleep-pending": "top100 + 3m visits data missing",
-    "ds-cust-alert-pro-title":     "Designer / Contractor / Builders",
+    "ds-cust-alert-pro-title":     "Designer / Contractor / Builders (1m window)",
     "ds-cust-alert-pro-pending":   "cross_by_window cust-type data missing",
-    "ds-cust-alert-churn-title":   "High-value churn alert",
+    "ds-cust-alert-churn-title":   "High-value churn · m6 active → m1 silent",
     "ds-cust-alert-churn-pending": "top100 m1/m6 split not yet loaded",
     "ds-cust-alert-race-cross-title":   "Race × purchase preference",
     "ds-cust-alert-race-cross-pending": "Customer Buy has no race tag — race × category needs join from Floatation Sheet",
@@ -2201,8 +2201,8 @@ const STR = {
     "ds-sales-price-sub":    "5 个单价区间的 SKU 数 + LTM 销售。",
     "ds-sales-quad-title":   "四象限 — 销量 × 毛利",
     "ds-sales-quad-sub":     "品牌 GP% × LTM 销售 — Stars / Cash cows / Question marks / Dogs。",
-    "ds-prod-brand-title":   "品牌结构 — 品牌组合",
-    "ds-prod-brand-sub":     "全部品牌按 LTM 销售排名 — 长尾结构。",
+    "ds-prod-brand-title":   "品牌结构 — 品牌组合(12M 参考)",
+    "ds-prod-brand-sub":     "全部品牌按近 12 月销售排名 · 结构参考,非单月数据。",
     /* Domain dashboard titles + sub-headlines */
     "ds-sales-title":  "销售",
     "ds-sales-sub":    "5 家活跃门市 · 今日 + 期间销售 · 下钻到分行枢纽。",
@@ -2435,9 +2435,9 @@ const STR = {
     "ds-inv-kpi-po":          "该月 PO 总额",
     "ds-inv-alert-oem-cal-title":   "OEM (中国) PO 周期日历",
     "ds-inv-alert-oem-cal-pending": "需逐 SKU PO 历史 + Country 字段,待补",
-    "ds-inv-alert-transfer-title":  "调拨机会(错位)",
-    "ds-inv-alert-dead-clear-title":"OEM 死货 Top 20 清仓",
-    "ds-inv-alert-po-a-title":      "采购异常命中 A 级 SKU",
+    "ds-inv-alert-transfer-title":  "调拨机会 · 错位(快照)",
+    "ds-inv-alert-dead-clear-title":"OEM 死货 Top 20 清仓(快照)",
+    "ds-inv-alert-po-a-title":      "采购异常命中 A 级 SKU(快照)",
 
     "ds-cust-kpi-mix":        "客户类型健康度",
     "ds-cust-kpi-repeat":     "老客回购健康度(Top 100)",
@@ -2445,11 +2445,11 @@ const STR = {
     "ds-cust-mix-pending":    "cross_by_window 数据加载中",
     "ds-cust-repeat-pending": "top100 数据加载中",
     "ds-cust-race-pending":   "race 数据加载中",
-    "ds-cust-alert-sleep-title":   "沉睡高价值客户(Top 100)",
+    "ds-cust-alert-sleep-title":   "沉睡高价值客户 · Top 100(快照 · 近 3 月窗口)",
     "ds-cust-alert-sleep-pending": "top100 + 近 3 月数据加载中",
-    "ds-cust-alert-pro-title":     "Designer/Contractor/Builders",
+    "ds-cust-alert-pro-title":     "Designer/Contractor/Builders(近 1 月窗口)",
     "ds-cust-alert-pro-pending":   "cust-type 数据加载中",
-    "ds-cust-alert-churn-title":   "高价值客户流失预警",
+    "ds-cust-alert-churn-title":   "高价值客户流失预警 · 近 6 月有买,本月 0 单",
     "ds-cust-alert-churn-pending": "top100 m1/m6 数据加载中",
     "ds-cust-alert-race-cross-title":   "种族购买偏好 cross-tab",
     "ds-cust-alert-race-cross-pending": "Customer Buy 没种族字段,需 Floatation Sheet × 品类联表,待补",
@@ -4979,12 +4979,14 @@ function renderProductsDashboard() {
     : ((totals.ACTIVE && totals.ACTIVE.rows) || 0);
   const avgGp = brands.length ? (brands.reduce((a, b) => a + (b.gp_pct || 0), 0) / brands.length) : 0;
 
-  // Chart: top 10 brands by GP
+  // Chart: top 10 brands by GP — V1 第四刀返工: explicitly labelled as
+  // 12M reference (NOT single-month) so user doesn't mistake it for a
+  // month-shifting metric. The trend chart is for historical context only.
   const top = brands.slice(0, 10);
   const labels = top.map(b => b.brand || '—');
   const data   = top.map(b => b.gp_pct || 0);
   document.getElementById('dsProdChartTitle').textContent =
-    LANG === 'zh' ? '品牌毛利率排行 (Top 10)' : 'Brand GP% — Top 10';
+    LANG === 'zh' ? '品牌毛利率排行 Top 10 · 近 12 月趋势(参考)' : 'Brand GP% — Top 10 · 12M trend (ref)';
   drawChart('dsProdChart', {
     type: 'bar',
     data: { labels, datasets: [{ data, backgroundColor: BRAND_GREEN }] },
@@ -5446,7 +5448,9 @@ function renderInventoryDashboard() {
   const data   = ['ACTIVE','SLOW','DEAD','MISPLACED','COMPANY_DEAD'].map(k => (totals[k] && totals[k].amount) || 0);
   const colors = [BRAND_GREEN, BRAND_AMBER, BRAND_DANGER, '#7C8FA6', '#5C6770'];
   document.getElementById('dsInvChartTitle').textContent =
-    LANG === 'zh' ? 'F-N-S 速度分布 (5 家活跃门市)' : 'F-N-S movement split (5 active stores)';
+    LANG === 'zh'
+      ? `F-N-S 速度分布 · 5 家活跃门市(快照 · 截止 ${stockSnapLabel})`
+      : `F-N-S movement split · 5 active stores (snapshot · as of ${stockSnapLabel})`;
   drawChart('dsInvChart', {
     type: 'doughnut',
     data: { labels, datasets: [{ data, backgroundColor: colors }] },
@@ -5465,7 +5469,9 @@ function renderInventoryDashboard() {
     else ltBuckets[4]++;
   });
   document.getElementById('dsInvLeadTitle').textContent =
-    LANG === 'zh' ? 'Lead time 分布 (延迟 PO · 天)' : 'Lead-time distribution (delayed POs · days)';
+    LANG === 'zh'
+      ? `Lead time 分布 · 延迟 PO 天数(快照 · 当前异常)`
+      : `Lead-time distribution · delayed POs days (snapshot · current exceptions)`;
   drawChart('dsInvLeadChart', {
     type: 'bar',
     data: { labels: ['0-30','31-60','61-90','91-180','180+'],
@@ -6424,32 +6430,38 @@ function computeDomainHealth() {
   const cd  = window.WP_CUSTOMERS || {};
   const sl  = window.WP_SALES_LIVE || {};
   const td  = window.WP_TODAY || {};
+  const snap = snapMonth();
   const out = [];
 
-  // Sales — month-over-month change of latest 2 ALL-branch totals from raw sale.
+  // Sales — selected-month total RM with vs-last-month %. Uses
+  // total_amt_by_month if exposed (V1 第四刀返工 backend), else falls back
+  // to per-branch sum. Honors current SNAPSHOT, NOT just "latest two".
   let salesStatus = 'na', salesText = '—';
-  const sbm = (sl._raw_ok && sl.sales_by_branch_month) || sl.sales_by_branch_month || {};
-  const months = Array.isArray(sl.months_seen) ? sl.months_seen.slice() : (Array.isArray(sl.months) ? sl.months.slice() : []);
-  months.sort();
-  if (months.length >= 2) {
-    const cur = months[months.length - 1], prev = months[months.length - 2];
-    let curTotal = 0, prevTotal = 0;
-    for (const b of Object.keys(sbm)) {
-      curTotal  += (sbm[b] && sbm[b][cur])  || 0;
-      prevTotal += (sbm[b] && sbm[b][prev]) || 0;
+  let totalSeries = sl.total_amt_by_month || {};
+  if (!Object.keys(totalSeries).length && sl.sales_by_branch_month) {
+    totalSeries = {};
+    for (const br of Object.keys(sl.sales_by_branch_month)) {
+      const m = sl.sales_by_branch_month[br] || {};
+      for (const ym of Object.keys(m)) totalSeries[ym] = (totalSeries[ym] || 0) + (+m[ym] || 0);
     }
-    if (prevTotal > 0) {
-      const mom = (curTotal - prevTotal) / prevTotal;
-      const pct = (mom * 100);
-      if      (mom >= -0.05) salesStatus = 'ok';
-      else if (mom >= -0.15) salesStatus = 'warn';
-      else                   salesStatus = 'bad';
-      salesText = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '% MoM';
-    } else if (curTotal > 0) { salesStatus = 'ok'; salesText = 'RM ' + fmtMoney(curTotal); }
+  }
+  const cmpSales = buildMonthlyCompare(totalSeries, snap);
+  if (cmpSales.single > 0) {
+    if (cmpSales.vs.lm.has) {
+      const pct = cmpSales.vs.lm.pct;
+      if      (pct >= -5)   salesStatus = 'ok';
+      else if (pct >= -15)  salesStatus = 'warn';
+      else                  salesStatus = 'bad';
+      salesText = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '% ' + (LANG === 'zh' ? '环比 · ' : 'MoM · ') + (snap || '—');
+    } else {
+      salesStatus = 'ok';
+      salesText = 'RM ' + fmtMoney(cmpSales.single) + ' · ' + (snap || '—');
+    }
   }
   out.push({ key: 'sales', icon: '💰', name: t('td-dom-sales'), status: salesStatus, statusText: salesText, jump: 'sales' });
 
-  // Inventory — problem stock %.
+  // Inventory — problem stock %. Snapshot, NOT month-shifting. Always
+  // labelled "(快照)" so user knows it's a point-in-time figure.
   let invStatus = 'na', invText = '—';
   const dsm = ds.meta || {};
   if (typeof dsm.problem_pct === 'number') {
@@ -6457,11 +6469,11 @@ function computeDomainHealth() {
     if      (p < 25) invStatus = 'ok';
     else if (p < 40) invStatus = 'warn';
     else             invStatus = 'bad';
-    invText = fmtPct(p) + ' problem';
+    invText = fmtPct(p) + (LANG === 'zh' ? ' 问题(快照 · ' : ' problem (snapshot · ') + (dsm.snapshot || '—') + ')';
   }
   out.push({ key: 'inventory', icon: '📦', name: t('td-dom-inventory'), status: invStatus, statusText: invText, jump: 'inventory' });
 
-  // Customers — high-value churn count.
+  // Customers — high-value churn count. Snapshot.
   let custStatus = 'na', custText = '—';
   const churnSum = (td.churn && td.churn.summary) || {};
   if (typeof churnSum.n_high_value === 'number') {
@@ -6469,11 +6481,11 @@ function computeDomainHealth() {
     if      (n < 50)  custStatus = 'ok';
     else if (n < 200) custStatus = 'warn';
     else              custStatus = 'bad';
-    custText = fmt(n) + ' lapsed';
+    custText = fmt(n) + (LANG === 'zh' ? ' 流失(快照)' : ' lapsed (snapshot)');
   }
   out.push({ key: 'customers', icon: '👥', name: t('td-dom-customers'), status: custStatus, statusText: custText, jump: 'customers' });
 
-  // Products — average brand GP%.
+  // Products — average brand GP%. 12M reference (FMM headline). Labelled.
   let prodStatus = 'na', prodText = '—';
   const brands = Array.isArray(fd.brands) ? fd.brands : [];
   if (brands.length) {
@@ -6481,11 +6493,11 @@ function computeDomainHealth() {
     if      (avgGp >= 25) prodStatus = 'ok';
     else if (avgGp >= 20) prodStatus = 'warn';
     else                  prodStatus = 'bad';
-    prodText = avgGp.toFixed(1) + '% avg GP';
+    prodText = avgGp.toFixed(1) + '% ' + (LANG === 'zh' ? '平均毛利(12M 参考)' : 'avg GP (12M ref)');
   }
   out.push({ key: 'products', icon: '🏷️', name: t('td-dom-products'), status: prodStatus, statusText: prodText, jump: 'products' });
 
-  // Finance — net%.
+  // Finance — net%. 12M reference label.
   let finStatus = 'na', finText = '—';
   const h = fd.headline || {};
   if (typeof h.net_pct === 'number') {
@@ -6493,18 +6505,18 @@ function computeDomainHealth() {
     if      (n >= 5) finStatus = 'ok';
     else if (n >= 0) finStatus = 'warn';
     else             finStatus = 'bad';
-    finText = (n >= 0 ? '+' : '') + n.toFixed(1) + '% net';
+    finText = (n >= 0 ? '+' : '') + n.toFixed(1) + '% ' + (LANG === 'zh' ? '净利率(12M 参考)' : 'net (12M ref)');
   }
   out.push({ key: 'finance', icon: '📈', name: t('td-dom-finance'), status: finStatus, statusText: finText, jump: 'finance' });
 
-  // HR — payroll % of sales (target 28%).
+  // HR — payroll % of sales (target 28%). 12M reference label.
   let hrStatus = 'na', hrText = '—';
   if (typeof h.hr_pct_sales === 'number') {
     const p = h.hr_pct_sales;
     if      (p <= 28) hrStatus = 'ok';
     else if (p <= 32) hrStatus = 'warn';
     else              hrStatus = 'bad';
-    hrText = p.toFixed(0) + '% of sales';
+    hrText = p.toFixed(0) + '% ' + (LANG === 'zh' ? '占销售(12M 参考)' : 'of sales (12M ref)');
   }
   out.push({ key: 'hr', icon: '👤', name: t('td-dom-hr'), status: hrStatus, statusText: hrText, jump: 'hr' });
 
@@ -6589,6 +6601,11 @@ function renderToday() {
     const headline = t(headlineKey).replace('{bad}', String(Math.max(overall.bad, overall.warn)));
 
     let runwayValue, runwayCls = '', runwaySub = t('td-runway-sub');
+    // V1 第四刀返工: Cash Runway is a SNAPSHOT (point-in-time) — never
+    // shifts with month picker. Always labelled "快照 · 截止 X" so user
+    // doesn't expect month-over-month behavior here.
+    const fmmAsOf = (window.WP_FINANCIAL?.meta?.generated || '').slice(0, 10) || '—';
+    const snapShortLabel = (LANG === 'zh' ? '快照 · 截止 ' : 'snapshot · as of ') + fmmAsOf;
     if (runway.status === 'na') {
       // Honest placeholder when FMM cash data hasn't loaded — never invent.
       runwayValue = t('td-runway-pending');
@@ -6598,12 +6615,12 @@ function renderToday() {
       // Business is profitable on average → cash is buffer, not runway.
       runwayValue = t('td-runway-buffer').replace('{n}', runway.months.toFixed(1));
       runwayCls   = runway.status === 'ok' ? 'ok' : runway.status === 'warn' ? 'warn' : 'danger';
-      runwaySub   = t('td-runway-sub-profitable').replace('{cash}', fmtMoney(runway.cash));
+      runwaySub   = snapShortLabel + ' · ' + t('td-runway-sub-profitable').replace('{cash}', fmtMoney(runway.cash));
     } else {
       // Burning — show months until cash runs out.
       runwayValue = t('td-runway-months').replace('{n}', runway.months.toFixed(1));
       runwayCls   = runway.status === 'ok' ? 'ok' : runway.status === 'warn' ? 'warn' : 'danger';
-      runwaySub   = t('td-runway-sub-burning').replace('{cash}', fmtMoney(runway.cash));
+      runwaySub   = snapShortLabel + ' · ' + t('td-runway-sub-burning').replace('{cash}', fmtMoney(runway.cash));
     }
     statusEl.innerHTML =
       '<div class="tst-light" id="todayStatusLight" data-tone="' + overall.tone + '">' + overall.light + '</div>' +
