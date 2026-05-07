@@ -3077,19 +3077,64 @@ function renderHero() {
   const ds = window.WP_DEADSTOCK; if (!ds) return;
   const m = ds.meta;
   const el = document.getElementById('hero');
+  // V1.7 hotfix: branch-scope the Dead Stock List hero numbers when a
+  // store manager is logged in. Owner mode keeps the company-wide totals.
+  let totalStock, problemTotal, problemPct, scopeLabel = '';
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    const branch = window.BRANCH_VIEW;
+    const branchRows = filterRowsByBranch(ds.rows || []);
+    totalStock = branchRows.reduce((a, r) => a + (r.amount || 0), 0);
+    // problem = SLOW + DEAD + MISPLACED + COMPANY_DEAD
+    problemTotal = branchRows.filter(r => r.cls && r.cls !== 'ACTIVE').reduce((a, r) => a + (r.amount || 0), 0);
+    problemPct = totalStock ? (problemTotal / totalStock * 100) : 0;
+    scopeLabel = branch + ' only';
+    // Update page title + subtitle to reflect branch scope.
+    const titleEl = document.querySelector('#view-deadstock .page-title');
+    if (titleEl) titleEl.textContent = (LANG === 'zh' ? '呆滞库存清单 · ' : 'Dead Stock List · ') + branch;
+    const subEl = document.querySelector('#view-deadstock .page-sub');
+    if (subEl) subEl.textContent = (LANG === 'zh'
+      ? branch + ' · 按 4 状态分类(本店视角)'
+      : branch + ' only · classified by 4-state movement (this branch).');
+  } else {
+    totalStock = m.total_stock;
+    problemTotal = m.problem_total;
+    problemPct = m.problem_pct;
+    // Restore owner title/subtitle.
+    const titleEl = document.querySelector('#view-deadstock .page-title');
+    if (titleEl) titleEl.textContent = LANG === 'zh' ? '呆滞库存清单' : 'Dead Stock List';
+    const subEl = document.querySelector('#view-deadstock .page-sub');
+    if (subEl) subEl.textContent = LANG === 'zh'
+      ? '5 家活跃门市 · 按移动速度分类,释放可变现资金。'
+      : '5 active stores · classified by movement to surface releasable cash.';
+  }
   el.innerHTML =
-    '<div class="hero-line">' + t('hero-line') + '</div>' +
-    '<div class="hero-big"><span class="num accent">RM ' + fmtMoney(m.total_stock) + '</span></div>' +
+    '<div class="hero-line">' + (scopeLabel
+      ? (LANG === 'zh' ? '本店库存合计(' + scopeLabel + ')' : 'Branch inventory total (' + scopeLabel + ')')
+      : t('hero-line')) + '</div>' +
+    '<div class="hero-big"><span class="num accent">RM ' + fmtMoney(totalStock) + '</span></div>' +
     '<div class="hero-detail">' +
-      t('hero-of-which') + ' <span class="danger num">RM ' + fmtMoney(m.problem_total) + '</span>' +
-      ' (<span class="num">' + fmtPct(m.problem_pct) + '</span>) ' + t('hero-problem') +
+      t('hero-of-which') + ' <span class="danger num">RM ' + fmtMoney(problemTotal) + '</span>' +
+      ' (<span class="num">' + fmtPct(problemPct) + '</span>) ' + t('hero-problem') +
     '</div>';
 }
 
 /* ── Block 2: Tabs ────────────────────────────────────────────── */
 function renderTabs() {
   const ds = window.WP_DEADSTOCK;
-  const totals = ds.totals;
+  // V1.7 hotfix: branch-scope tab counts/amounts so the manager only sees
+  // their store's totals (not the 5-store roll-up).
+  let totals = ds.totals;
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    const branchRows = filterRowsByBranch(ds.rows || []);
+    const recomputed = { ACTIVE:{rows:0,amount:0}, SLOW:{rows:0,amount:0}, DEAD:{rows:0,amount:0}, MISPLACED:{rows:0,amount:0}, COMPANY_DEAD:{rows:0,amount:0} };
+    branchRows.forEach(r => {
+      const cls = r.cls || 'ACTIVE';
+      if (!recomputed[cls]) recomputed[cls] = { rows: 0, amount: 0 };
+      recomputed[cls].rows += 1;
+      recomputed[cls].amount += r.amount || 0;
+    });
+    totals = recomputed;
+  }
   const total_rows = CLS_ORDER.reduce((s,k)=> s + ((totals[k] && totals[k].rows) || 0), 0);
   const total_amt  = CLS_ORDER.reduce((s,k)=> s + ((totals[k] && totals[k].amount) || 0), 0);
   const tabs = [
@@ -3140,6 +3185,18 @@ function renderTabs() {
 /* ── Block 3: Branch cards ───────────────────────────────────── */
 function renderBranchCards() {
   const ds = window.WP_DEADSTOCK;
+  // V1.7 hotfix: in store-manager mode, hide the per-branch grid + the
+  // section title above it (manager only has one branch — the grid is noise).
+  const _grid = document.getElementById('branchGrid');
+  const _gridTitle = _grid && _grid.previousElementSibling;
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    if (_grid) { _grid.style.display = 'none'; _grid.innerHTML = ''; }
+    if (_gridTitle && _gridTitle.classList && _gridTitle.classList.contains('section-title')) _gridTitle.style.display = 'none';
+    return;
+  } else {
+    if (_grid) _grid.style.display = '';
+    if (_gridTitle && _gridTitle.classList && _gridTitle.classList.contains('section-title')) _gridTitle.style.display = '';
+  }
   const branches = Object.entries(ds.by_branch)
     .sort((a,b) => b[1].problem_pct - a[1].problem_pct);
   const html = branches.map(pair => {
@@ -3210,6 +3267,11 @@ function visibleRows() {
   const ds = window.WP_DEADSTOCK;
   const q = SEARCH.toLowerCase();
   let rows = ds.rows;
+  // V1.7 hotfix: branch-scope the dead-stock list so managers see only
+  // their own store's SKU rows.
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    rows = filterRowsByBranch(rows);
+  }
   if (CUR_TAB !== 'all') rows = rows.filter(r => r.cls === CUR_TAB);
   else rows = rows.filter(r => CLASS_SET.has(r.cls));
   if (CAT) rows = rows.filter(r => r.category === CAT);
@@ -4447,6 +4509,39 @@ function kpiPctColor(actual, target) {
 function v16ClassLabel(c) {
   return LANG === 'zh' ? ({Active:'活跃 Active', Slow:'慢销 Slow', Misplaced:'错位 Misplaced', Dead:'呆死 Dead'}[c] || c) : c;
 }
+
+/* V1.7 hotfix audit helper — pick one real SKU per V1.6 class for a branch
+   and return a verifiable example (expose at window.v17ClassifierAudit). */
+function v17ClassifierAudit(branch) {
+  const ds = window.WP_DEADSTOCK || {};
+  const sbs = ds.sku_branch_sales_3m || {};
+  const out = { branch, samples: { Active: null, Slow: null, Misplaced: null, Dead: null } };
+  for (const r of (ds.rows || [])) {
+    if (r.branch !== branch) continue;
+    const cls = clsV16(r, ds);
+    if (out.samples[cls]) continue;
+    const branchSales = sbs[r.code] || {};
+    const ownSold = +(branchSales[branch] || 0);
+    let companySold = 0;
+    for (const b of Object.keys(branchSales)) companySold += +branchSales[b] || 0;
+    out.samples[cls] = {
+      sku: r.code,
+      branch, classification: cls,
+      stock_qty: r.qty,
+      stock_amt_rm: Math.round(r.amount || 0),
+      own_branch_90d_sales_qty: ownSold,
+      company_90d_sales_qty: companySold,
+      reason:
+        cls === 'Dead'      ? `company 90-day sales = 0 → Dead`
+      : cls === 'Misplaced' ? `own branch 90d sales = 0 but company sold ${companySold} → Misplaced`
+      : cls === 'Slow'      ? `stock_qty ${r.qty} >= own 90d sales qty ${ownSold} → Slow`
+      :                       `stock_qty ${r.qty} <  own 90d sales qty ${ownSold} → Active`,
+    };
+    if (Object.values(out.samples).every(v => v != null)) break;
+  }
+  return out;
+}
+window.v17ClassifierAudit = v17ClassifierAudit;
 
 /* Render the 3 compare lines as inline HTML inside a sub container. */
 function renderCompareLines(compare, fmtVal) {
@@ -6338,6 +6433,29 @@ function renderInventoryDashboard() {
   // keeps the original 4 KPI cards untouched.
   if (typeof isBranchScoped === 'function' && isBranchScoped()) {
     try { v16OverlayInventoryCards(); } catch (e) { console.warn('v16OverlayInventoryCards failed:', e); }
+    // V1.7 hotfix: hide owner-strategic clutter (4 alerts, F-N-S donut,
+    // Lead time chart, drill tiles to Transfer Suggestions / Warehouse /
+    // PO exceptions) so managers see one consistent picture.
+    const _hideIds = ['dsInvAlerts', 'dsInvAction', 'dsInvDrills'];
+    _hideIds.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    const _invView = document.getElementById('view-inventory');
+    if (_invView) {
+      // Hide ALL .ds-section blocks (Lead time chart) for managers.
+      _invView.querySelectorAll('section.ds-section').forEach(s => { s.style.display = 'none'; });
+      // Hide F-N-S donut chart-wrap (sibling of dsInvAlerts + dsInvAction).
+      _invView.querySelectorAll('.chart-wrap').forEach(cw => { cw.style.display = 'none'; });
+    }
+  } else {
+    // Owner: restore anything the V1.7 hotfix may have hidden in a prior
+    // manager render.
+    ['dsInvAlerts', 'dsInvAction', 'dsInvDrills'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = '';
+    });
+    const _invView = document.getElementById('view-inventory');
+    if (_invView) {
+      _invView.querySelectorAll('section.ds-section').forEach(s => { s.style.display = ''; });
+      _invView.querySelectorAll('.chart-wrap').forEach(cw => { cw.style.display = ''; });
+    }
   }
 }
 
