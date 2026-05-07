@@ -1258,6 +1258,98 @@ footer.app-footer {
   font-size: 14px; font-weight: 600; color: var(--text-primary);
   margin: 0 0 10px; padding-left: 4px; border-left: 4px solid var(--brand);
 }
+
+/* V1.7 — manager Customer + Products page styles */
+.v17-mgr-section { margin-top: 22px; }
+.v17-race-grid {
+  display: grid; grid-template-columns: 1fr 1.4fr; gap: 18px;
+  align-items: start;
+}
+.v17-loyalty-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;
+  align-items: start; margin-top: 12px;
+}
+.v17-race-table, .v17-trend-table, .v17-sample-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.v17-race-table th, .v17-race-table td,
+.v17-trend-table th, .v17-trend-table td,
+.v17-sample-table th, .v17-sample-table td {
+  padding: 6px 8px; border-bottom: 1px solid var(--border-soft); text-align: left;
+}
+.v17-race-table th, .v17-trend-table th, .v17-sample-table th {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+}
+.v17-race-table .num, .v17-trend-table .num, .v17-sample-table .num {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.v17-cust-card-list {
+  margin-top: 10px; font-size: 12px;
+}
+.v17-cust-card-list summary {
+  cursor: pointer; color: var(--brand); font-weight: 600;
+}
+.v17-cust-card-list[open] summary { margin-bottom: 8px; }
+.v17-list-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 4px 0; border-bottom: 1px dashed var(--border-soft);
+  font-size: 12px;
+}
+.v17-list-row:last-child { border-bottom: 0; }
+.v17-list-name { font-weight: 500; }
+.v17-list-meta { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.v17-list-empty { color: var(--text-tertiary); font-style: italic; padding: 8px 0; }
+
+.v17-sample-customer-wrap { margin-top: 16px; }
+.v17-sample-customer {
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 12px 14px;
+}
+.v17-sample-customer summary { cursor: pointer; }
+.v17-sample-note {
+  margin: 8px 0 0; font-size: 12px; color: var(--text-secondary); font-style: italic;
+}
+.v17-seg-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.v17-seg-New      { background: rgba(166,207,183,0.4); color: #2d6b4e; }
+.v17-seg-Mid      { background: rgba(212,168,69,0.18); color: #8B6F1F; }
+.v17-seg-Veteran  { background: rgba(31,95,74,0.18);   color: var(--brand); }
+
+/* V1.7 — Products page action plan + tables */
+.v17-prod-action-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px; margin-bottom: 18px;
+}
+.v17-prod-action-card {
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 14px; display: flex; gap: 12px; align-items: flex-start;
+  border-left-width: 4px;
+}
+.v17-prod-action-card.urg-high { border-left-color: var(--danger); }
+.v17-prod-action-card.urg-mid  { border-left-color: var(--warn); }
+.v17-prod-action-card.urg-low  { border-left-color: var(--brand); }
+.v17-prod-action-card .v17-icon { font-size: 24px; flex: 0 0 auto; }
+.v17-prod-action-card .v17-body { min-width: 0; flex: 1; }
+.v17-prod-action-card .v17-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.v17-prod-action-card .v17-detail { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.v17-prod-action-card .v17-trigger { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; font-style: italic; }
+
+.v17-status-light {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-right: 4px; vertical-align: middle;
+}
+.v17-status-light.Active    { background: var(--ok); }
+.v17-status-light.Slow      { background: var(--warn); }
+.v17-status-light.Misplaced { background: var(--brand); }
+.v17-status-light.Dead      { background: var(--danger); }
+
+@media (max-width: 1100px) {
+  .v17-loyalty-grid { grid-template-columns: 1fr; }
+  .v17-race-grid    { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -5010,6 +5102,12 @@ function dsAlert(title, value, sub, tone, pendingNote) {
 
 /* ── Customers dashboard (V1 第四刀: 3 KPIs + 4 alerts) ───────── */
 function renderCustomersDashboard() {
+  // V1.7 — store-manager Customer view replaces the Owner one entirely
+  // (4 KPIs + 3 Action Plan cards + Race section + Loyalty 3-segment trio).
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    try { renderCustomersManagerV17(); } catch (e) { console.warn('renderCustomersManagerV17 failed:', e); }
+    return;
+  }
   // V1.6: Action Plan (3 cards) moved to Customers top for store managers.
   try { renderV16CustomerActionPlan(); } catch(_){}
   // V1 第四刀: top 3 KPIs are now (1) cust type mix (2) repeat rate +
@@ -5244,6 +5342,15 @@ function renderCustomersDashboard() {
 
 /* ── Products dashboard (V1 第四刀: 3 KPIs + 4 alerts) ─────────── */
 function renderProductsDashboard() {
+  // V1.7 — store-manager Products view replaces the Owner one entirely.
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    try { renderProductsManagerV17(); } catch (e) { console.warn('renderProductsManagerV17 failed:', e); }
+    return;
+  }
+  // Owner: restore any sections we may have hidden in a previous manager render.
+  const _restoreView = document.getElementById('view-products');
+  if (_restoreView) _restoreView.querySelectorAll('section.ds-section').forEach(s => { s.style.display = ''; });
+
   const fd = window.WP_FINANCIAL || {};
   const ds = window.WP_DEADSTOCK || {};
   const sl = window.WP_SALES_LIVE || {};
@@ -6787,6 +6894,778 @@ function renderV16CustomerActionPlan() {
     '<div class="today-cards">' + cards + '</div>';
 }
 window.renderV16CustomerActionPlan = renderV16CustomerActionPlan;
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.7 — Customers dashboard for store managers.
+   Sections (in order):
+     1. Action Plan (3 cards: lapsed / churn / new-customer trend)
+     2. KPIs (Walk-in / Purchase / Avg Basket / Revenue) per-branch per-month
+        with aligned 3-line compare strip
+     3. Race section (pie + 3-month per-race table)
+     4. Loyalty 3-segment trio (Revenue line / New Members bar / Buying Intent)
+   Owner view untouched.
+   ════════════════════════════════════════════════════════════════════ */
+function renderCustomersManagerV17() {
+  const cd     = window.WP_CUSTOMERS || {};
+  const race   = cd.race || {};
+  const branch = window.BRANCH_VIEW;
+  const snap   = snapMonth();
+  const lmKey  = ymPrev(snap, 1);
+  const lyKey  = ymPrev(snap, 12);
+
+  // Hide owner-mode containers we won't use; ensure manager-mode
+  // containers visible.
+  const hideIds = ['dsCustAlerts'];
+  hideIds.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  // Hide owner chart wrap + action + drills.
+  const view = document.getElementById('view-customers');
+  if (view) {
+    const oldChart = view.querySelector('.chart-wrap');
+    if (oldChart) oldChart.style.display = 'none';
+    const oldAction = document.getElementById('dsCustAction');
+    if (oldAction) oldAction.style.display = 'none';
+    const oldDrills = document.getElementById('dsCustDrills');
+    if (oldDrills) oldDrills.style.display = 'none';
+  }
+
+  // ── Section 1: Action Plan 3 cards ──
+  v17CustActionPlan(branch, snap);
+
+  // ── Section 2: KPI cards (Walk-in / Purchase / Avg Basket / Revenue) ──
+  const kpiSpec = [
+    { id: 'walkin',   labelEn: 'Walk-in Customers',   labelZh: '客流',          fmt: n => fmt(Math.round(n)) },
+    { id: 'purchase', labelEn: 'Purchase (bills)',    labelZh: '成交单数',       fmt: n => fmt(Math.round(n)) },
+    { id: 'basket',   labelEn: 'Avg Basket (RM)',     labelZh: '客单价 (RM)',   fmt: n => 'RM ' + fmtMoney(Math.round(n)) },
+    { id: 'amount',   labelEn: 'Revenue (RM)',        labelZh: '销售额 (RM)',    fmt: n => 'RM ' + fmtMoney(Math.round(n)) },
+  ];
+
+  function buildSeries(branch, kpiId) {
+    const bf = (race.branches_full || {})[branch];
+    if (!bf || !bf.races || !bf.races.all) return {};
+    const out = {};
+    const arr = bf.races.all[kpiId];
+    if (!arr) return {};
+    const year = race.year || (snap ? +snap.slice(0,4) : new Date().getFullYear());
+    for (let i = 0; i < arr.length; i++) {
+      const ym = `${year}-${String(i + 1).padStart(2,'0')}`;
+      if (arr[i] != null) out[ym] = +arr[i] || 0;
+    }
+    return out;
+  }
+
+  const cardsEl = document.getElementById('dsCustCards');
+  if (cardsEl) {
+    cardsEl.innerHTML = kpiSpec.map(k => {
+      const series = buildSeries(branch, k.id);
+      const cmp = buildMonthlyCompare(series, snap);
+      const val = cmp.single ? k.fmt(cmp.single) : '—';
+      const sub = (snap || '—') + ' · ' + branch;
+      return v17ManagerCard(LANG === 'zh' ? k.labelZh : k.labelEn, val, sub, cmp, k.fmt);
+    }).join('');
+  }
+
+  // ── Sections 3 + 4: race + loyalty — inject as new container ──
+  let v17Container = document.getElementById('dsCustV17Sections');
+  if (!v17Container) {
+    v17Container = document.createElement('div');
+    v17Container.id = 'dsCustV17Sections';
+    if (cardsEl && cardsEl.parentNode) cardsEl.parentNode.insertBefore(v17Container, cardsEl.nextSibling);
+  }
+  v17Container.style.display = '';
+
+  v17Container.innerHTML =
+    // Race section
+    '<section class="ds-section v17-mgr-section">' +
+      '<h2 class="v16-mgr-section-title">' + (LANG === 'zh' ? '种族数据 · 本月' : 'Race breakdown · this month') + '</h2>' +
+      '<div class="v17-race-grid">' +
+        '<div class="chart-wrap"><div class="chart-title">' + (LANG === 'zh' ? '客流种族占比' : 'Walk-in by race') + '</div>' +
+          '<canvas id="v17RacePie" height="180"></canvas></div>' +
+        '<div><div class="chart-title">' + (LANG === 'zh' ? '近 3 月对比 (Walk-in / CR / Avg Basket)' : 'Last 3 months (Walk-in / CR / Avg Basket)') + '</div>' +
+          '<div id="v17RaceTable"></div></div>' +
+      '</div>' +
+    '</section>' +
+    // Loyalty section
+    '<section class="ds-section v17-mgr-section">' +
+      '<h2 class="v16-mgr-section-title">' + (LANG === 'zh' ? 'Loyalty 段位 · 12 月' : 'Loyalty segments · 12 months') + '</h2>' +
+      '<p class="v16-mgr-section-sub">' + (LANG === 'zh'
+        ? '段位按"该次购买月份 - 入会月份"动态算: 新客 < 12 月 / 中客 12-60 月 / 老客 > 60 月。'
+        : 'Segments assigned at the time of each purchase: New &lt; 12 mo / Mid 12-60 mo / Veteran &gt; 60 mo.') + '</p>' +
+      '<div class="v17-loyalty-grid">' +
+        '<div class="chart-wrap"><div class="chart-title">' + (LANG === 'zh' ? 'Revenue by Segment (12 月)' : 'Revenue by Segment (12 months)') + '</div>' +
+          '<canvas id="v17LoyaltyRev" height="180"></canvas></div>' +
+        '<div class="chart-wrap"><div class="chart-title">' + (LANG === 'zh' ? '每月新会员数' : 'New members / month') + '</div>' +
+          '<canvas id="v17LoyaltyNew" height="180"></canvas></div>' +
+        '<div class="chart-wrap"><div class="chart-title">' + (LANG === 'zh' ? '段位品类偏好(12 月汇总)' : 'Buying intent by segment (12-month total)') + '</div>' +
+          '<canvas id="v17LoyaltyIntent" height="220"></canvas></div>' +
+      '</div>' +
+      '<div class="v17-sample-customer-wrap" id="v17SampleAudit"></div>' +
+    '</section>';
+
+  v17RaceCharts(branch, snap);
+  v17LoyaltyCharts(branch);
+}
+window.renderCustomersManagerV17 = renderCustomersManagerV17;
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.7 — Products dashboard for store managers.
+     1. Action Plan (3-5 dynamic cards: surge/drop/stockout/price-drift/slow)
+     2. 3 KPIs (Month Sales / Active SKU / Top SKU) per-branch with compare
+     3. Category table per-branch per-month with compare cols
+     4. Top 20 SKU per-branch per-month (slim cols + status light)
+     Hide Pareto / Price-band / Quadrant for managers.
+   ════════════════════════════════════════════════════════════════════ */
+function renderProductsManagerV17() {
+  const ds       = window.WP_DEADSTOCK || {};
+  const sl       = window.WP_SALES_LIVE || {};
+  const branch   = window.BRANCH_VIEW;
+  const snap     = snapMonth();
+  const lmKey    = ymPrev(snap, 1);
+  const lyKey    = ymPrev(snap, 12);
+  const skuABM   = sl.sku_amt_by_month_branch || {};
+  const skuQBM   = sl.sku_qty_by_month_branch || {};
+  const sbm      = sl.sales_by_branch_month || {};
+
+  // Cache: SKU code → category, classification (V1.6).
+  const codeToCat = {};
+  const codeToCls = {};
+  const codeToRow = {};
+  (ds.rows || []).forEach(r => {
+    if (!r || !r.code) return;
+    if (r.branch === branch) {
+      codeToCat[r.code] = (r.category || 'Uncategorised') || 'Uncategorised';
+      codeToCls[r.code] = clsV16(r, ds);
+      codeToRow[r.code] = r;
+    } else if (!codeToCat[r.code]) {
+      // Fallback: category lookup from any branch row.
+      codeToCat[r.code] = (r.category || 'Uncategorised') || 'Uncategorised';
+    }
+  });
+
+  // ── Hide owner-only sections (Pareto + Price-band + Quadrant + Brand) ──
+  const view = document.getElementById('view-products');
+  if (view) {
+    view.querySelectorAll('section.ds-section').forEach((sec, i) => {
+      // Section order in #view-products: 0=Price band, 1=Categories, 2=Top20, 3+=Brand
+      // We want managers to see Categories + Top20 only. Hide Price band + later sections.
+      const id = sec.id || '';
+      // Keep dsProdCatSection + dsProdTop20Section visible; hide rest.
+      if (id === 'dsProdCatSection' || id === 'dsProdTop20Section') sec.style.display = '';
+      else sec.style.display = 'none';
+    });
+    // Hide alerts, action, drills, brand table, chart-wrap below alerts.
+    ['dsProdAlerts','dsProdAction','dsProdDrills','dsProdBrandTable'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    const cw = view.querySelector('.chart-wrap'); if (cw) cw.style.display = 'none';
+  }
+
+  // ── Per-month per-branch helpers ──
+  function totalSalesForMonth(ym) {
+    const m = (skuABM[ym] || {})[branch] || {};
+    let total = 0; for (const c of Object.keys(m)) total += +m[c] || 0;
+    return total;
+  }
+  function activeSkusForMonth(ym) {
+    const m = (skuABM[ym] || {})[branch] || {};
+    return Object.values(m).filter(v => +v > 0).length;
+  }
+  function topSkuForMonth(ym) {
+    const m = (skuABM[ym] || {})[branch] || {};
+    let bestC = null, bestV = 0;
+    for (const c of Object.keys(m)) { const v = +m[c] || 0; if (v > bestV) { bestV = v; bestC = c; } }
+    return { code: bestC, amt: bestV };
+  }
+
+  // KPI series (12 months per branch).
+  const totalSeries = {};
+  const activeSeries = {};
+  Object.keys(skuABM).forEach(ym => {
+    totalSeries[ym] = totalSalesForMonth(ym);
+    activeSeries[ym] = activeSkusForMonth(ym);
+  });
+  const cmpTotal = buildMonthlyCompare(totalSeries, snap);
+  const cmpActive = buildMonthlyCompare(activeSeries, snap);
+  const topSku = topSkuForMonth(snap);
+  const topSkuLm = topSku.code && lmKey ? +(skuABM[lmKey]?.[branch]?.[topSku.code] || 0) : 0;
+  const topSkuLy = topSku.code && lyKey ? +(skuABM[lyKey]?.[branch]?.[topSku.code] || 0) : 0;
+  const topSkuTrend = (topSkuLm && topSku.amt) ? ((topSku.amt - topSkuLm) / topSkuLm * 100).toFixed(1) + '%' : '—';
+
+  // ── KPI cards ──
+  const cardsEl = document.getElementById('dsProdCards');
+  if (cardsEl) {
+    cardsEl.innerHTML =
+      v17ManagerCard(LANG === 'zh' ? '该月销售 (RM)' : 'Month sales (RM)',
+        cmpTotal.single ? 'RM ' + fmtMoney(cmpTotal.single) : '—',
+        (snap || '—') + ' · ' + branch, cmpTotal, n => 'RM ' + fmtMoney(n)) +
+      v17ManagerCard(LANG === 'zh' ? '活跃 SKU 数' : 'Active SKUs',
+        cmpActive.single ? fmt(Math.round(cmpActive.single)) : '—',
+        (snap || '—') + ' · ' + branch, cmpActive, n => fmt(Math.round(n))) +
+      v17ManagerCard(LANG === 'zh' ? '销售冠军 SKU' : 'Top SKU',
+        topSku.code ? escapeHtml(topSku.code) : '—',
+        (snap || '—') + ' · RM ' + fmtMoney(Math.round(topSku.amt)),
+        // Custom mini-compare for top SKU using just its own amounts.
+        {
+          single: topSku.amt,
+          lastMonth: topSkuLm, lastYearMonth: topSkuLy, sixMonthAvg: 0,
+          vs: {
+            lm: { has: !!topSkuLm, pct: topSkuLm ? (topSku.amt - topSkuLm) / topSkuLm * 100 : 0, dir: !topSkuLm ? 'flat' : (topSku.amt > topSkuLm ? 'up' : 'down') },
+            lyr: { has: !!topSkuLy, pct: topSkuLy ? (topSku.amt - topSkuLy) / topSkuLy * 100 : 0, dir: !topSkuLy ? 'flat' : (topSku.amt > topSkuLy ? 'up' : 'down') },
+            m6: { has: false, pct: 0, dir: 'flat' },
+          },
+        }, n => 'RM ' + fmtMoney(Math.round(n || 0)));
+  }
+
+  // ── Category table per-branch per-month with compare cols ──
+  function catTotalsForMonth(ym) {
+    const out = {};
+    const m = (skuABM[ym] || {})[branch] || {};
+    for (const code of Object.keys(m)) {
+      const cat = codeToCat[code] || 'Uncategorised';
+      if (!out[cat]) out[cat] = { amt: 0, qty: 0, codes: new Set() };
+      out[cat].amt += +m[code] || 0;
+      out[cat].codes.add(code);
+    }
+    const qm = (skuQBM[ym] || {})[branch] || {};
+    for (const code of Object.keys(qm)) {
+      const cat = codeToCat[code] || 'Uncategorised';
+      if (!out[cat]) out[cat] = { amt: 0, qty: 0, codes: new Set() };
+      out[cat].qty += +qm[code] || 0;
+      out[cat].codes.add(code);
+    }
+    return out;
+  }
+  const catThis = catTotalsForMonth(snap);
+  const catLm   = lmKey ? catTotalsForMonth(lmKey) : {};
+  const catLy   = lyKey ? catTotalsForMonth(lyKey) : {};
+  const m6Range = ymsRange(ymPrev(snap, 1), 6);
+  const cat6M = {};
+  m6Range.forEach(ym => {
+    const t = catTotalsForMonth(ym);
+    for (const c of Object.keys(t)) {
+      if (!cat6M[c]) cat6M[c] = { sum: 0, count: 0 };
+      cat6M[c].sum += t[c].amt;
+      cat6M[c].count += 1;
+    }
+  });
+  const totalThisAmt = Object.values(catThis).reduce((a, v) => a + v.amt, 0) || 1;
+  const catRows = Object.entries(catThis)
+    .map(([cat, v]) => {
+      const lm = (catLm[cat] || {}).amt || 0;
+      const ly = (catLy[cat] || {}).amt || 0;
+      const m6 = cat6M[cat] ? cat6M[cat].sum / Math.max(1, cat6M[cat].count) : 0;
+      return { cat, amt: v.amt, qty: v.qty, skus: v.codes.size, share: v.amt / totalThisAmt * 100, lm, ly, m6 };
+    })
+    .sort((a, b) => b.amt - a.amt);
+
+  function diffCell(cur, prior) {
+    if (!prior) return '<td class="num">—</td>';
+    const diff = cur - prior;
+    const pct = prior !== 0 ? (cur - prior) / prior * 100 : 0;
+    const cls = pct > 0.5 ? 'cmp-up' : pct < -0.5 ? 'cmp-down' : 'cmp-flat';
+    const sign = pct >= 0 ? '+' : '';
+    return '<td class="num ' + cls + '">RM ' + fmtMoney(Math.round(diff)) + ' (' + sign + pct.toFixed(1) + '%)</td>';
+  }
+
+  // Replace Category table content with V1.7 layout.
+  const catTblHtml = '<table class="v16-sales-cat-table"><thead><tr>' +
+    '<th>' + (LANG === 'zh' ? '品类' : 'Category') + '</th>' +
+    '<th class="num">SKU</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '该月 RM' : 'This month RM') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 上月' : 'vs Last Month') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 去年同月' : 'vs Last Year') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 6M 均值' : 'vs 6M avg') + '</th>' +
+    '</tr></thead><tbody>' +
+    catRows.map(r => '<tr>' +
+      '<td>' + escapeHtml(r.cat) + '</td>' +
+      '<td class="num">' + fmt(r.skus) + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(r.amt)) + '</td>' +
+      '<td class="num">' + r.share.toFixed(1) + '%</td>' +
+      diffCell(r.amt, r.lm) + diffCell(r.amt, r.ly) + diffCell(r.amt, r.m6) +
+    '</tr>').join('') +
+    '</tbody></table>';
+  const catEl = document.getElementById('dsProdCatTable');
+  if (catEl) catEl.innerHTML = '<div class="ci-table-wrap">' + catTblHtml + '</div>';
+  // Hide rank-mode toggle for managers (single-month default is what they want).
+  const catToggle = document.getElementById('dsProdCatToggle'); if (catToggle) catToggle.innerHTML = '';
+
+  // ── Top 20 SKU table (per-branch per-month, slim, status light) ──
+  const skuThis = (skuABM[snap] || {})[branch] || {};
+  const skuLm   = lmKey ? (skuABM[lmKey] || {})[branch] || {} : {};
+  const skuLy   = lyKey ? (skuABM[lyKey] || {})[branch] || {} : {};
+  const skuM6   = {};
+  m6Range.forEach(ym => {
+    const m = (skuABM[ym] || {})[branch] || {};
+    for (const c of Object.keys(m)) skuM6[c] = (skuM6[c] || 0) + (+m[c] || 0);
+  });
+  for (const c of Object.keys(skuM6)) skuM6[c] = skuM6[c] / m6Range.length;
+
+  const top20 = Object.entries(skuThis)
+    .map(([code, amt]) => ({ code, amt: +amt || 0 }))
+    .sort((a, b) => b.amt - a.amt)
+    .slice(0, 20);
+
+  const top20Tbl = '<table class="v16-sales-top20-table"><thead><tr>' +
+    '<th>#</th>' +
+    '<th>SKU</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '该月 RM' : 'This month RM') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 上月' : 'vs Last Month') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 去年同月' : 'vs Last Year') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 6M 均值' : 'vs 6M avg') + '</th>' +
+    '<th>' + (LANG === 'zh' ? '状态' : 'Status') + '</th>' +
+    '</tr></thead><tbody>' +
+    top20.map((s, i) => {
+      const cls = codeToCls[s.code] || 'Active';
+      return '<tr>' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td>' + escapeHtml(s.code) + '</td>' +
+        '<td class="num">RM ' + fmtMoney(Math.round(s.amt)) + '</td>' +
+        diffCell(s.amt, +(skuLm[s.code] || 0)) +
+        diffCell(s.amt, +(skuLy[s.code] || 0)) +
+        diffCell(s.amt, +(skuM6[s.code] || 0)) +
+        '<td><span class="v17-status-light ' + cls + '"></span>' + cls + '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>';
+  const top20El = document.getElementById('dsProdTop20Table');
+  if (top20El) top20El.innerHTML = '<div class="ci-table-wrap">' + top20Tbl + '</div>';
+  const top20Toggle = document.getElementById('dsProdTop20Toggle'); if (top20Toggle) top20Toggle.innerHTML = '';
+
+  // ── Action Plan (3-5 dynamic cards) ──
+  v17ProductsActionPlan({ branch, snap, lmKey, lyKey, codeToCat, codeToCls, codeToRow, skuABM, skuQBM, ds, top20, catRows, m6Range });
+}
+window.renderProductsManagerV17 = renderProductsManagerV17;
+
+/* V1.7 — Products Action Plan: 3-5 dynamically-generated cards based on
+   real numbers vs history. Inserted at the top of the Products view. */
+function v17ProductsActionPlan(ctx) {
+  const view = document.getElementById('view-products');
+  if (!view) return;
+  let el = document.getElementById('dsProdV17ActionPlan');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'dsProdV17ActionPlan';
+    el.className = 'v17-mgr-section';
+    const cards = document.getElementById('dsProdCards');
+    if (cards && cards.parentNode) cards.parentNode.insertBefore(el, cards);
+  }
+  el.style.display = '';
+
+  const cards = [];
+  // Card type 1 + 2: surge / drop categories (>+20% / <-20% MoM).
+  for (const r of ctx.catRows.slice(0, 10)) {
+    if (!r.lm || !r.amt) continue;
+    const mom = (r.amt - r.lm) / r.lm * 100;
+    if (mom >= 20) {
+      cards.push({
+        urg: 'low', icon: '🔥',
+        title: (LANG === 'zh' ? '急涨品类: ' : 'Surging category: ') + escapeHtml(r.cat),
+        detail: (LANG === 'zh' ? '本月 RM ' : 'This month RM ') + fmtMoney(Math.round(r.amt)) +
+                ' · ' + (LANG === 'zh' ? '上月 RM ' : 'last month RM ') + fmtMoney(Math.round(r.lm)) +
+                ' (' + (LANG === 'zh' ? '环比 ' : 'MoM ') + '+' + mom.toFixed(1) + '%)',
+        trigger: LANG === 'zh' ? '触发: 品类销售环比 > +20% — 顺势推销' : 'Trigger: category MoM > +20% — push while it lasts',
+        score: mom,
+      });
+    } else if (mom <= -20) {
+      cards.push({
+        urg: 'high', icon: '🔴',
+        title: (LANG === 'zh' ? '急跌品类: ' : 'Plunging category: ') + escapeHtml(r.cat),
+        detail: (LANG === 'zh' ? '本月 RM ' : 'This month RM ') + fmtMoney(Math.round(r.amt)) +
+                ' · ' + (LANG === 'zh' ? '上月 RM ' : 'last month RM ') + fmtMoney(Math.round(r.lm)) +
+                ' (' + (LANG === 'zh' ? '环比 ' : 'MoM ') + mom.toFixed(1) + '%)' +
+                ' — ' + (LANG === 'zh' ? '建议查询客户 / 看子品类' : 'follow up with customers / drill sub-cat'),
+        trigger: LANG === 'zh' ? '触发: 品类销售环比 < -20%' : 'Trigger: category MoM < -20%',
+        score: -mom,
+      });
+    }
+  }
+
+  // Card type 3: top SKU stockout warning. Top 10 this month → 14-day cover from 90d sales qty.
+  const sbs3 = ctx.ds.sku_branch_sales_3m || {};
+  const skuStock = ctx.ds.sku_branch_stock || {};
+  for (const s of ctx.top20.slice(0, 10)) {
+    const sales90 = +(((sbs3[s.code] || {})[ctx.branch]) || 0);
+    const stockQty = +(((skuStock[s.code] || {})[ctx.branch]) || 0);
+    if (!sales90) continue;
+    const dailyVel = sales90 / 90;
+    const coverDays = dailyVel > 0 ? stockQty / dailyVel : 999;
+    if (coverDays < 14) {
+      cards.push({
+        urg: coverDays < 7 ? 'high' : 'mid',
+        icon: '⚠️',
+        title: (LANG === 'zh' ? '销冠 SKU 即将断货: ' : 'Top SKU near stockout: ') + escapeHtml(s.code),
+        detail: (LANG === 'zh' ? '近 90 天卖 ' : 'last 90d sold ') + fmt(Math.round(sales90)) +
+                ' · ' + (LANG === 'zh' ? '本店库存 ' : 'branch stock ') + fmt(stockQty) +
+                ' · ' + (LANG === 'zh' ? '约 ' : 'approx ') + coverDays.toFixed(1) + ' ' + (LANG === 'zh' ? '天可卖' : 'days cover'),
+        trigger: LANG === 'zh' ? '触发: Top 10 本月销冠 + 库存 < 14 天销量' : 'Trigger: top-10 SKU + stock < 14d cover',
+        score: 100 - coverDays,
+      });
+    }
+  }
+
+  // Card type 4: price drift. For each category, this-month avg unit price vs 12M avg.
+  // Avg price = sum amt / sum qty. Need 12M data.
+  for (const r of ctx.catRows.slice(0, 10)) {
+    if (!r.qty) continue;
+    const thisAvg = r.amt / r.qty;
+    // 12M avg from full skuABM/skuQBM aggregated to this category.
+    let amt12 = 0, qty12 = 0;
+    const months12 = ymsRange(ctx.snap, 12);
+    months12.forEach(ym => {
+      const am = (ctx.skuABM[ym] || {})[ctx.branch] || {};
+      const qm = (ctx.skuQBM[ym] || {})[ctx.branch] || {};
+      for (const code of Object.keys(am)) {
+        if ((ctx.codeToCat[code] || 'Uncategorised') !== r.cat) continue;
+        amt12 += +am[code] || 0;
+      }
+      for (const code of Object.keys(qm)) {
+        if ((ctx.codeToCat[code] || 'Uncategorised') !== r.cat) continue;
+        qty12 += +qm[code] || 0;
+      }
+    });
+    if (!qty12) continue;
+    const avg12 = amt12 / qty12;
+    if (!avg12) continue;
+    const drift = (thisAvg - avg12) / avg12 * 100;
+    if (drift <= -10) {
+      cards.push({
+        urg: drift <= -20 ? 'high' : 'mid', icon: '🟡',
+        title: (LANG === 'zh' ? '价格漂移警示: ' : 'Price drift warning: ') + escapeHtml(r.cat),
+        detail: (LANG === 'zh' ? '12M 均价 RM ' : '12M avg price RM ') + fmtMoney(avg12.toFixed(2)) +
+                ' · ' + (LANG === 'zh' ? '本月均价 RM ' : 'this month RM ') + fmtMoney(thisAvg.toFixed(2)) +
+                ' (' + drift.toFixed(1) + '%) — ' + (LANG === 'zh' ? '审核员工折扣' : 'audit staff discounts'),
+        trigger: LANG === 'zh' ? '触发: 品类均价 vs 12M 均价 < -10%' : 'Trigger: category avg price vs 12M < -10%',
+        score: -drift,
+      });
+    }
+  }
+
+  // Card type 5: Slow SKU clearance candidates. Top SKUs marked Slow per clsV16
+  // with 3-consecutive-month decline.
+  const slowCandidates = [];
+  const lm2Key = ymPrev(ctx.snap, 2);
+  for (const s of ctx.top20) {
+    const cls = ctx.codeToCls[s.code];
+    if (cls !== 'Slow') continue;
+    const lm  = +(((ctx.skuABM[ctx.lmKey] || {})[ctx.branch] || {})[s.code] || 0);
+    const lm2 = +(((ctx.skuABM[lm2Key]   || {})[ctx.branch] || {})[s.code] || 0);
+    if (s.amt < lm && lm < lm2 && lm2 > 0) slowCandidates.push({ code: s.code, amt: s.amt, lm, lm2 });
+  }
+  if (slowCandidates.length) {
+    cards.push({
+      urg: 'mid', icon: '🔴',
+      title: (LANG === 'zh' ? '慢销 SKU 清仓建议' : 'Slow SKU clearance candidates') + ' (' + slowCandidates.length + ')',
+      detail: slowCandidates.slice(0, 5).map(s => escapeHtml(s.code) + ' (RM ' + fmtMoney(Math.round(s.amt)) + ')').join(' · '),
+      trigger: LANG === 'zh' ? '触发: Top 20 本月销冠 + 标 Slow 状态 + 连续 3 月跌' : 'Trigger: top-20 SKU + Slow class + 3 consecutive monthly drops',
+      score: 50,
+    });
+  }
+
+  // Sort cards by severity then truncate to 5.
+  cards.sort((a, b) => {
+    const order = { high: 3, mid: 2, low: 1 };
+    if (order[b.urg] !== order[a.urg]) return order[b.urg] - order[a.urg];
+    return (b.score || 0) - (a.score || 0);
+  });
+  const top = cards.slice(0, 5);
+
+  if (!top.length) {
+    el.innerHTML =
+      '<h2 class="v16-mgr-section-title">' + (LANG === 'zh' ? '🎯 Action Plan · 本月暂无需关注的异常' : '🎯 Action Plan · No alerts this month') + '</h2>' +
+      '<p class="v16-mgr-section-sub">' + (LANG === 'zh' ? '本月无急涨/急跌/断货/价格漂移/慢销异常。' : 'No surge / drop / stockout / price-drift / slow-mover anomalies this month.') + '</p>';
+    return;
+  }
+
+  el.innerHTML =
+    '<h2 class="v16-mgr-section-title">' + (LANG === 'zh' ? '🎯 Action Plan · ' : '🎯 Action Plan · ') + ctx.branch + ' · ' + (ctx.snap || '—') + '</h2>' +
+    '<p class="v16-mgr-section-sub">' + (LANG === 'zh' ? '基于本月数据动态生成,按严重度排序。' : 'Dynamically generated from this-month data, sorted by severity.') + '</p>' +
+    '<div class="v17-prod-action-grid">' +
+    top.map(c =>
+      '<div class="v17-prod-action-card urg-' + c.urg + '">' +
+        '<div class="v17-icon">' + c.icon + '</div>' +
+        '<div class="v17-body">' +
+          '<div class="v17-title">' + c.title + '</div>' +
+          '<div class="v17-detail">' + c.detail + '</div>' +
+          '<div class="v17-trigger">' + c.trigger + '</div>' +
+        '</div>' +
+      '</div>'
+    ).join('') +
+    '</div>';
+}
+window.v17ProductsActionPlan = v17ProductsActionPlan;
+
+/* Aligned KPI card with 3-line compare (used by V1.7 Customers + Sales). */
+function v17ManagerCard(label, val, sub, cmp, fmtVal) {
+  function lines(c, f) {
+    const arrow = (d) => d === 'up' ? '↑' : d === 'down' ? '↓' : '→';
+    const cls = (d) => d === 'up' ? 'cmp-up' : d === 'down' ? 'cmp-down' : 'cmp-flat';
+    const pctStr = (v) => v.has ? (v.pct >= 0 ? '+' : '') + v.pct.toFixed(1) + '%' : '—';
+    const lLm = LANG === 'zh' ? '上月       ' : 'Last month  ';
+    const lLyr = LANG === 'zh' ? '去年同月   ' : 'vs Last Year';
+    const lM6 = LANG === 'zh' ? '6 月均值   ' : '6m avg      ';
+    const ln = (v, prior, label) =>
+      '<div class="cmp-line ' + cls(v.dir) + '">' +
+        '<span class="v16-l">' + label + '</span>' +
+        '<span class="v16-v">: ' + f(prior) + '</span>' +
+        '<span class="v16-p">(' + pctStr(v) + ')</span>' +
+      '</div>';
+    return '<div class="cmp-lines v16-aligned">' +
+      ln(c.vs.lm,  c.lastMonth,     lLm) +
+      ln(c.vs.lyr, c.lastYearMonth, lLyr) +
+      ln(c.vs.m6,  c.sixMonthAvg,   lM6) +
+    '</div>';
+  }
+  return '<div class="ds-card">' +
+    '<div class="label">' + label + '</div>' +
+    '<div class="value">' + val + '</div>' +
+    '<div class="sub">' + sub + '</div>' +
+    lines(cmp, fmtVal) +
+  '</div>';
+}
+
+/* V1.7 Customer Action Plan (3 cards). */
+function v17CustActionPlan(branch, snap) {
+  const el = document.getElementById('dsCustActionPlan');
+  if (!el) return;
+  el.style.display = '';
+
+  // Card 1: Lapsed >5y
+  const churnTd = window.WP_TODAY || {};
+  const churnRows = (churnTd.churn && churnTd.churn.rows) || [];
+  // Filter to this branch + months_ago > 60
+  const lapsedLong = churnRows.filter(r => r.branch === branch && (r.months_ago || 0) > 60);
+  lapsedLong.sort((a,b) => (b.amount||0) - (a.amount||0));
+  const lapsedSum = lapsedLong.reduce((a,r) => a + (r.amount||0), 0);
+  const lapsedTop = lapsedLong[0];
+  const lapsedMax = lapsedLong.reduce((m, r) => Math.max(m, r.amount||0), 0);
+
+  // Card 2: m6 active but m1 silent (computeChurnAlerts uses global; we filter to branch)
+  const cd = window.WP_CUSTOMERS || {};
+  const allCustomers = (cd.top100 || []);   // top100 already pre-filtered to active branches
+  const churnAlertList = (typeof computeChurnAlerts === 'function')
+    ? (computeChurnAlerts() || {}).list || []
+    : [];
+  const churnBranch = churnAlertList.filter(c => c.branch === branch);
+  const churnTop = churnBranch[0];
+
+  // Card 3: New-customer trend anomaly. Use loyalty_v17_by_branch.new_members_by_month.
+  const lv = (cd.loyalty_v17_by_branch || {})[branch];
+  const nmm = (lv && lv.new_members_by_month) || {};
+  const nmmKeys = Object.keys(nmm).sort();
+  const recent = nmmKeys.slice(-12);
+  const recentVals = recent.map(k => nmm[k] || 0);
+  const recentSum = recentVals.reduce((a,v) => a+v, 0);
+  const recentAvg = recent.length ? recentSum / recent.length : 0;
+  const lastMonthCount = recent.length ? recentVals[recent.length - 1] : 0;
+  const peakIdx = recentVals.reduce((bestI, v, i, arr) => v > arr[bestI] ? i : bestI, 0);
+  const peakVal = recentVals[peakIdx] || 0;
+  const peakYm = recent[peakIdx] || '—';
+  const trough = recentVals.length && peakVal > 0 ? (lastMonthCount - peakVal) / peakVal * 100 : 0;
+
+  const card = (cls, icon, title, value, body, list) =>
+    '<div class="today-card urg-' + cls + '">' +
+      '<div class="td-icon">' + icon + '</div>' +
+      '<div class="td-body">' +
+        '<div class="td-title">' + title + '</div>' +
+        '<div class="td-interp">' + value + '</div>' +
+        '<div class="td-action-label">' + (LANG === 'zh' ? '清单' : 'List') + '</div>' +
+        '<div class="td-action">' + body + '</div>' +
+        (list ? '<details class="v17-cust-card-list"><summary>' + (LANG === 'zh' ? '展开 Top 20' : 'Open Top 20') + '</summary>' + list + '</details>' : '') +
+      '</div>' +
+    '</div>';
+
+  const c1 = card('high', '🔴',
+    LANG === 'zh' ? `5 年+ 流失老客 (${branch})` : `Lapsed 5y+ members (${branch})`,
+    fmt(lapsedLong.length) + (LANG === 'zh' ? ' 位 · 终身 RM ' : ' members · lifetime RM ') + fmtMoney(lapsedSum),
+    LANG === 'zh'
+      ? `最大单笔 RM ${fmtMoney(lapsedMax)} · ` + (lapsedTop ? `头号: ${escapeHtml(lapsedTop.name||'—')}` : '')
+      : `Max single RM ${fmtMoney(lapsedMax)} · ` + (lapsedTop ? `top: ${escapeHtml(lapsedTop.name||'—')}` : ''),
+    lapsedLong.slice(0,20).map(r =>
+      '<div class="v17-list-row">' +
+        '<span class="v17-list-name">' + escapeHtml(r.name||r.mc||'—') + '</span>' +
+        '<span class="v17-list-meta">RM ' + fmtMoney(r.amount||0) + ' · ' + (r.months_ago||0) + (LANG === 'zh' ? ' 月前' : 'm ago') + ' · ' + (r.cust_type || '—') + '</span>' +
+      '</div>'
+    ).join('') || '<div class="v17-list-empty">—</div>'
+  );
+
+  const c2 = card(churnBranch.length > 5 ? 'high' : 'mid', '🟠',
+    LANG === 'zh' ? `高价值客户流失预警 (${branch})` : `High-value churn alert (${branch})`,
+    fmt(churnBranch.length) + (LANG === 'zh' ? ' 位本月 0 单' : ' members silent this month'),
+    LANG === 'zh'
+      ? `近 6 月有买,本月 0 单${churnTop ? ' · 头号: ' + escapeHtml(churnTop.name||'—') : ''}`
+      : `Active in 6m, silent this month${churnTop ? ' · top: ' + escapeHtml(churnTop.name||'—') : ''}`,
+    churnBranch.slice(0,20).map(r =>
+      '<div class="v17-list-row">' +
+        '<span class="v17-list-name">' + escapeHtml(r.name||r.mc||'—') + '</span>' +
+        '<span class="v17-list-meta">6m RM ' + fmtMoney(r.m6_amt||0) + ' · ' + (r.cust_type||'—') + '</span>' +
+      '</div>'
+    ).join('') || '<div class="v17-list-empty">—</div>'
+  );
+
+  const trendBody = LANG === 'zh'
+    ? `近 12 月新增会员 ${fmt(recentSum)} · 月均 ${recentAvg.toFixed(1)} · 本月 ${fmt(lastMonthCount)} · 最高峰 ${peakYm} (${fmt(peakVal)})`
+    : `12m new members ${fmt(recentSum)} · monthly avg ${recentAvg.toFixed(1)} · this month ${fmt(lastMonthCount)} · peak ${peakYm} (${fmt(peakVal)})`;
+  const c3 = card(trough < -30 ? 'high' : trough < -10 ? 'mid' : 'low', '📊',
+    LANG === 'zh' ? `新客增长趋势 (${branch})` : `New customer trend (${branch})`,
+    trough < 0 ? `${trough.toFixed(0)}% ` + (LANG === 'zh' ? 'vs 峰值' : 'vs peak') : (LANG === 'zh' ? '稳定' : 'stable'),
+    trendBody,
+    '<table class="v17-trend-table"><thead><tr>' +
+      '<th>' + (LANG === 'zh' ? '月份' : 'Month') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '新会员' : 'New members') + '</th>' +
+    '</tr></thead><tbody>' +
+    recent.map((ym, i) => '<tr><td>' + ym + '</td><td class="num">' + fmt(recentVals[i]) + '</td></tr>').join('') +
+    '</tbody></table>'
+  );
+
+  el.innerHTML =
+    '<div class="v16-cap-title">' + (LANG === 'zh' ? '🎯 Action Plan' : '🎯 Action Plan') + '</div>' +
+    '<div class="today-cards">' + c1 + c2 + c3 + '</div>';
+}
+
+/* V1.7 Race section: pie + 3-month per-race table. */
+function v17RaceCharts(branch, snap) {
+  const cd = window.WP_CUSTOMERS || {};
+  const race = cd.race || {};
+  const bf = (race.branches_full || {})[branch];
+  if (!bf || !bf.races) return;
+  const monthIdx = ymToMonthIdx(snap);
+  const races = ['chinese','malay','indian','others'];
+  const labelMap = { chinese: LANG==='zh'?'华人':'Chinese', malay: LANG==='zh'?'马来':'Malay', indian: LANG==='zh'?'印度':'Indian', others: LANG==='zh'?'其他':'Others' };
+  // Pie data — current month walk-in by race
+  const pieData = races.map(k => {
+    const arr = bf.races[k]?.walkin || [];
+    return monthIdx >= 0 ? (+arr[monthIdx] || 0) : 0;
+  });
+  drawChart('v17RacePie', {
+    type: 'pie',
+    data: { labels: races.map(k => labelMap[k]), datasets: [{ data: pieData, backgroundColor: [BRAND_GREEN, BRAND_AMBER, '#7C8FA6', '#5C6770'] }] },
+    options: { maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } },
+  });
+  // Race × 3 months × Walk-in / CR / Basket
+  const window3 = [ymPrev(snap, 2), ymPrev(snap, 1), snap].filter(Boolean);
+  const window3Idx = window3.map(ymToMonthIdx);
+  let html = '<table class="v17-race-table"><thead><tr><th>' + (LANG === 'zh' ? '种族' : 'Race') + '</th>';
+  for (const ym of window3) html += '<th class="num">' + ym + '<br><small>Walk-in</small></th>';
+  for (const ym of window3) html += '<th class="num">' + ym + '<br><small>CR %</small></th>';
+  for (const ym of window3) html += '<th class="num">' + ym + '<br><small>Basket</small></th>';
+  html += '</tr></thead><tbody>';
+  for (const k of races) {
+    const r = bf.races[k] || {};
+    html += '<tr><td>' + labelMap[k] + '</td>';
+    for (const i of window3Idx) {
+      const v = i >= 0 ? (+(r.walkin||[])[i]||0) : 0;
+      html += '<td class="num">' + (v ? fmt(v) : '—') + '</td>';
+    }
+    for (const i of window3Idx) {
+      const v = i >= 0 ? (+(r.cr||[])[i]||0) : 0;
+      html += '<td class="num">' + (v ? (v*100).toFixed(1) + '%' : '—') + '</td>';
+    }
+    for (const i of window3Idx) {
+      const v = i >= 0 ? (+(r.basket||[])[i]||0) : 0;
+      html += '<td class="num">' + (v ? 'RM ' + fmtMoney(Math.round(v)) : '—') + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('v17RaceTable').innerHTML = html;
+}
+
+/* V1.7 Loyalty 3-segment trio. */
+function v17LoyaltyCharts(branch) {
+  const cd = window.WP_CUSTOMERS || {};
+  const lv = (cd.loyalty_v17_by_branch || {})[branch];
+  const auditEl = document.getElementById('v17SampleAudit');
+  if (!lv) {
+    if (auditEl) auditEl.innerHTML = '<div class="v17-list-empty">' + (LANG === 'zh' ? 'Loyalty 数据待加载' : 'Loyalty data pending') + '</div>';
+    return;
+  }
+  const months = lv._months || Object.keys(lv.revenue_by_segment_by_month || {}).sort();
+  const segs = ['New', 'Mid', 'Veteran'];
+  const segLabels = LANG === 'zh' ? { New:'新客 (<12 月)', Mid:'中客 (12-60 月)', Veteran:'老客 (>60 月)' } : { New:'New (<12mo)', Mid:'Mid (12-60mo)', Veteran:'Veteran (>60mo)' };
+  const colors = { New: BRAND_GREEN_SOFT || '#A6CFB7', Mid: BRAND_AMBER, Veteran: BRAND_GREEN };
+
+  // Chart 1: Revenue by Segment (line, 3 lines)
+  drawChart('v17LoyaltyRev', {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: segs.map(s => ({
+        label: segLabels[s],
+        data: months.map(m => (lv.revenue_by_segment_by_month[m] || {})[s] || 0),
+        borderColor: colors[s], backgroundColor: colors[s], fill: false, tension: 0.2, pointRadius: 3,
+      })),
+    },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } } },
+    },
+  });
+
+  // Chart 2: New members per month (bar)
+  drawChart('v17LoyaltyNew', {
+    type: 'bar',
+    data: { labels: months, datasets: [{ data: months.map(m => lv.new_members_by_month[m] || 0), backgroundColor: BRAND_GREEN }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+
+  // Chart 3: Buying intent by segment — group bar by top 5 categories.
+  const allCats = new Set();
+  for (const s of segs) {
+    for (const c of Object.keys(lv.buying_intent_by_segment[s] || {})) allCats.add(c);
+  }
+  // Rank by total amt across all segments, top 5.
+  const catTotals = {};
+  for (const c of allCats) {
+    catTotals[c] = segs.reduce((acc, s) => acc + ((lv.buying_intent_by_segment[s]||{})[c] || 0), 0);
+  }
+  const top5 = Object.entries(catTotals).sort((a,b) => b[1]-a[1]).slice(0, 5).map(x => x[0]);
+  drawChart('v17LoyaltyIntent', {
+    type: 'bar',
+    data: {
+      labels: top5,
+      datasets: segs.map(s => ({
+        label: segLabels[s],
+        data: top5.map(c => (lv.buying_intent_by_segment[s] || {})[c] || 0),
+        backgroundColor: colors[s],
+      })),
+    },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } } },
+    },
+  });
+
+  // Sample customer audit panel
+  const sample = lv.sample_customer;
+  if (auditEl) {
+    if (!sample) {
+      auditEl.innerHTML = '<div class="v17-sample-customer"><strong>' + (LANG === 'zh' ? '段位演示样本' : 'Segment audit sample') + '</strong><br>' + (LANG === 'zh' ? '该分行无跨段位历史样本' : 'No multi-segment history available for this branch') + '</div>';
+    } else {
+      auditEl.innerHTML =
+        '<details class="v17-sample-customer"><summary><strong>' + (LANG === 'zh' ? '段位动态计算演示样本' : 'Dynamic segmentation audit') + '</strong> — ' + (LANG === 'zh' ? '一名真实顾客 ' : 'one real customer ') + escapeHtml(String(sample.mc)) + (LANG === 'zh' ? ' 的购买历史 (入会 ' : ' (enrolled ') + sample.enrol + ')</summary>' +
+        '<table class="v17-sample-table"><thead><tr>' +
+          '<th>' + (LANG === 'zh' ? '购买月份' : 'Purchase YM') + '</th>' +
+          '<th class="num">' + (LANG === 'zh' ? '金额 (RM)' : 'Amount (RM)') + '</th>' +
+          '<th class="num">' + (LANG === 'zh' ? '入会跨度 (月)' : 'Span (months)') + '</th>' +
+          '<th>' + (LANG === 'zh' ? '段位' : 'Segment') + '</th>' +
+        '</tr></thead><tbody>' +
+        sample.purchases.map(p =>
+          '<tr><td>' + p.ym + '</td><td class="num">' + fmtMoney(p.amt) + '</td><td class="num">' + p.span_months + '</td><td><span class="v17-seg-chip v17-seg-' + p.segment + '">' + p.segment + '</span></td></tr>'
+        ).join('') +
+        '</tbody></table>' +
+        '<p class="v17-sample-note">' + (LANG === 'zh'
+          ? '同一顾客在不同购买月份归到不同段位 — 证明段位是按"购买当时距入会的月数"动态计算,不是按今天的固定段位回贴历史。'
+          : 'Same customer falls into different segments across purchases — proves segments are computed at the time of each purchase, not by applying today\'s tier to historical data.') + '</p>' +
+        '</details>';
+    }
+  }
+}
 
 /* ── Products depth: 品牌结构 (full brand portfolio) ──────────── */
 function renderProductsDepth() {
