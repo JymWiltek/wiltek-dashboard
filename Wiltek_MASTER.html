@@ -777,10 +777,15 @@ header.app-header .refresh-btn.loading::before {
 }
 .td-restore-bar button:hover { color: var(--text-primary); border-color: var(--brand); }
 
-/* Layer 3 — 5-store traffic snapshot (override stock grid) */
+/* Layer 3 — 5-store traffic snapshot (override stock grid). V1 第四刀返工 v2:
+   7 cols (id / name / 该月销售 RM / 环比 % / 客流 / 成交率 / 异常) */
 .today-stores.traffic .ts-row {
-  grid-template-columns: 70px 1fr 90px 100px 80px 90px;
+  grid-template-columns: 60px 1fr 110px 80px 80px 70px 80px;
 }
+.today-stores.traffic .ts-row.head { padding-top: 16px; padding-bottom: 16px; }
+.today-stores.traffic .ts-row.head .ts-num { line-height: 1.25; }
+.today-stores.traffic .ts-row .ts-num.cmp-up    { color: var(--ok, #1F5F4A); font-weight: 600; }
+.today-stores.traffic .ts-row .ts-num.cmp-down  { color: var(--danger, #C04848); font-weight: 600; }
 .today-stores.traffic .ts-row .ts-anom.high { color: var(--danger); font-weight: 600; }
 .today-stores.traffic .ts-row .ts-anom.mid  { color: var(--warn); font-weight: 600; }
 .today-stores.traffic .ts-row .ts-anom.low  { color: var(--ok); font-weight: 500; }
@@ -6548,13 +6553,25 @@ function computeOverallStatus(domains) {
 window.computeCashRunway = computeCashRunway;
 
 function computeBranchTraffic() {
+  // V1 第四刀返工 v2: per-branch per-month SALES is the primary metric — it
+  // shifts with the SNAPSHOT month picker. Walk-in / AOV / CR come from the
+  // /api/floatation feed, which exposes ONLY a 3-month-period scalar per
+  // branch (not per-month series). To stay honest per Jym's rules:
+  //   • 该月销售 RM      — month-shifts via sales_by_branch_month
+  //   • 上月销售 RM      — explicit MoM compare per branch
+  //   • 环比 %           — per-branch
+  //   • 客流 (近 3 月)   — scalar, labelled in column header
+  //   • 异常             — derived from snapshot (deadstock + traffic)
+  const sl = window.WP_SALES_LIVE || {};
   const cd = window.WP_CUSTOMERS || {};
   const ds = window.WP_DEADSTOCK || {};
   const race = cd.race || {};
   const byBranch = race.by_branch || {};
   const months = Array.isArray(race.months) ? race.months : [];
   const lastIdx = months.length ? months.length - 1 : -1;
-  // 5 active branches (canonical order)
+  const snap = snapMonth();
+  const lmKey = ymPrev(snap, 1);
+  const sbm = sl.sales_by_branch_month || {};
   const active = ['W01','W02','W03','W05','W07'];
   const readNum = (v) => {
     if (Array.isArray(v)) return lastIdx >= 0 ? (+v[lastIdx] || 0) : 0;
@@ -6567,18 +6584,20 @@ function computeBranchTraffic() {
     const amount   = readNum(b.amount);
     const basket   = readNum(b.basket);
     const crLive   = readNum(b.cr);
-    // Prefer pre-computed basket (AOV) and cr from the API; fall back to
-    // computing from amount/purchase/walkin if missing.
     const aov = basket > 0 ? basket : (purchase > 0 ? amount / purchase : 0);
     const cr  = crLive > 0 ? crLive : (walkin > 0 ? purchase / walkin : 0);
-    // Anomalies — count of: deadstock problem ≥ 30%, CR < 50%, AOV < RM 200.
+    // V1 第四刀返工 v2: month-shifting per-branch sales.
+    const monthSales = +(sbm[code]?.[snap]) || 0;
+    const lmSales    = lmKey ? +(sbm[code]?.[lmKey]) || 0 : 0;
+    const momPct     = lmSales > 0 ? (monthSales - lmSales) / lmSales * 100 : null;
+    // Anomalies (snapshot-based)
     const dsByBr = (ds.by_branch || {})[code] || {};
     const probPct = dsByBr.problem_pct || 0;
     let anomalies = 0;
     if (probPct >= 30)            anomalies++;
     if (walkin > 0 && cr < 0.5)   anomalies++;
     if (walkin > 0 && aov < 200)  anomalies++;
-    return { code, name: dsByBr.name || code, walkin, aov, cr, anomalies };
+    return { code, name: dsByBr.name || code, monthSales, lmSales, momPct, walkin, aov, cr, anomalies };
   });
   return rows;
 }
@@ -6697,25 +6716,34 @@ function renderToday() {
     }
   }
 
-  // Layer 3 — 5-store traffic snapshot
+  // Layer 3 — 5-store snapshot. V1 第四刀返工 v2: column header lays out
+  // exactly which numbers shift with snapshot vs which are 3-month period
+  // scalars from /api/floatation. Sales RM is per-branch per-month and
+  // shifts with the picker; walk-in / AOV / CR are 3M-window scalars.
   const storesEl = document.getElementById('todayStores');
   if (storesEl) {
     const traffic = computeBranchTraffic();
+    const snapMo = snapMonth();
     const head = '<div class="ts-row head">' +
       '<div>' + t('td-store-id') + '</div>' +
       '<div>' + t('td-store-name') + '</div>' +
-      '<div class="ts-num">' + t('td-store-visits') + '</div>' +
-      '<div class="ts-num">' + t('td-store-aov') + '</div>' +
-      '<div class="ts-num">' + t('td-store-cr') + '</div>' +
+      '<div class="ts-num">' + (LANG === 'zh' ? '该月销售 RM' : 'Sales RM') + '<br><span style="font-weight:400;text-transform:none">(' + (snapMo || '—') + ')</span></div>' +
+      '<div class="ts-num">' + (LANG === 'zh' ? '环比 %' : 'MoM %') + '</div>' +
+      '<div class="ts-num">' + (LANG === 'zh' ? '客流' : 'Visits') + '<br><span style="font-weight:400;text-transform:none">(' + (LANG === 'zh' ? '近 3 月汇总' : '3M total') + ')</span></div>' +
+      '<div class="ts-num">' + (LANG === 'zh' ? '成交率 %' : 'CR %') + '</div>' +
       '<div class="ts-num">' + t('td-store-anom') + '</div>' +
     '</div>';
     const rows = traffic.map(b => {
       const anomCls = b.anomalies >= 2 ? 'high' : b.anomalies === 1 ? 'mid' : 'low';
+      const momCls = b.momPct == null ? '' : b.momPct >= 0 ? 'cmp-up' : 'cmp-down';
+      const momStr = b.momPct == null ? '—' :
+        (b.momPct >= 0 ? '+' : '') + b.momPct.toFixed(1) + '%';
       return '<div class="ts-row">' +
         '<div class="ts-id">' + b.code + '</div>' +
         '<div class="ts-name">' + escapeHtml(b.name || b.code) + '</div>' +
+        '<div class="ts-num">' + (b.monthSales ? 'RM ' + fmtMoney(b.monthSales) : '—') + '</div>' +
+        '<div class="ts-num ' + momCls + '">' + momStr + '</div>' +
         '<div class="ts-num">' + (b.walkin ? fmt(b.walkin) : '—') + '</div>' +
-        '<div class="ts-num">' + (b.aov ? fmtMoney(b.aov) : '—') + '</div>' +
         '<div class="ts-num">' + (b.cr ? (b.cr * 100).toFixed(1) + '%' : '—') + '</div>' +
         '<div class="ts-num ts-anom ' + anomCls + '">' + (b.anomalies > 0 ? ('⚠ ' + b.anomalies) : '✓ 0') + '</div>' +
       '</div>';

@@ -1491,45 +1491,59 @@ test.describe('Round 10 — V1 第三刀: Today landing (4 layers)', () => {
     }
   });
 
-  test('Layer 3: 5-store walk-in / AOV / CR populate from /api/floatation scalar by_branch (Bug 2 fix)', async ({ page }) => {
-    // V1 第三刀 验收 fix: /api/floatation returns scalar (not array) values
-    // per branch — { W01: { walkin: 577, purchase: 403, amount: 130736,
-    // basket: 324.41, cr: 0.6984 }, ... }. Earlier code did b.walkin[lastIdx]
-    // on a Number → undefined → "—". This test guards the scalar path.
+  test('Layer 3: 5-store row month-shifts (该月销售 RM / 环比 / 客流 / 成交率 / 异常)', async ({ page }) => {
+    // V1 第四刀返工 v2: 5-store row now leads with PER-BRANCH PER-MONTH sales
+    // (which shifts with snapshot) + MoM%, then the 3-month-period scalars
+    // from /api/floatation (walk-in / CR). Columns:
+    //   0:id  1:name  2:该月销售RM  3:环比%  4:客流  5:成交率  6:异常
     const liveFlo = {
       ok: true, fetched_at: '2026-05-06T08:00:00.000Z',
       year: 2026, months: ['2026-03','2026-04','2026-05'], month_idx: [3,4,5],
       races: [], totals: { walkin:[0,0,0], purchase:[0,0,0], amount:[0,0,0], basket:[0,0,0], cr:[0,0,0] },
       by_branch: {
-        W01: { walkin: 577, purchase: 403, amount: 130736,    basket: 324.41, cr: 0.6984 },
-        W02: { walkin: 784, purchase: 532, amount: 190764,    basket: 358.58, cr: 0.6786 },
-        W03: { walkin: 561, purchase: 411, amount: 167990,    basket: 408.73, cr: 0.7326 },
-        W05: { walkin: 418, purchase: 334, amount: 132071,    basket: 395.42, cr: 0.7990 },
-        W07: { walkin: 481, purchase: 419, amount: 145309.71, basket: 346.80, cr: 0.8711 },
+        W01: { walkin: 577, purchase: 403, amount: 130736, basket: 324.41, cr: 0.6984 },
+        W02: { walkin: 784, purchase: 532, amount: 190764, basket: 358.58, cr: 0.6786 },
+        W03: { walkin: 561, purchase: 411, amount: 167990, basket: 408.73, cr: 0.7326 },
+        W05: { walkin: 418, purchase: 334, amount: 132071, basket: 395.42, cr: 0.7990 },
+        W07: { walkin: 481, purchase: 419, amount: 145310, basket: 346.80, cr: 0.8711 },
       },
       source: 'live:test',
+    };
+    const salesPayload = {
+      ok: true, source: 'test', sheet_id: 'TEST',
+      months: ['2026-03','2026-04'], groups: [],
+      matrix: {}, by_month: {}, by_group: {}, latest_month: '2026-04', rows_n: 0,
+      sales_by_branch_month: {
+        W01: { '2026-03': 50000, '2026-04': 60000 },
+        W02: { '2026-03': 100000, '2026-04': 110000 },
+        W03: { '2026-03': 75000, '2026-04': 80000 },
+        W05: { '2026-03': 40000, '2026-04': 45000 },
+        W07: { '2026-03': 60000, '2026-04': 65000 },
+      },
+      total_amt_by_month: {}, sku_amt_by_month: {}, sku_qty_by_month: {},
+      months_seen: ['2026-03','2026-04'], _raw_ok: true,
     };
     await page.route('**/api/floatation*', route => route.fulfill({
       status: 200, contentType: 'application/json', body: JSON.stringify(liveFlo)
     }));
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(salesPayload)
+    }));
     await loginOwner(page);
     await page.waitForFunction(() => (window as any).WP_CUSTOMERS?.race?._live === true, { timeout: 5000 });
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE?._raw_ok === true, { timeout: 5000 });
+    // Set snap to 2026-04 and re-render
+    await page.evaluate(() => (window as any).setSnapshot('2026-04'));
     await page.evaluate(() => (window as any).renderToday && (window as any).renderToday());
-    // Read all 5 rows × 4 numeric columns (visits, AOV, CR, anomalies)
     const cells = await page.evaluate(() =>
       Array.from(document.querySelectorAll('#todayStores .ts-row:not(.head)'))
         .map(r => Array.from(r.querySelectorAll(':scope > div')).map(c => (c.textContent || '').trim())));
     expect(cells).toHaveLength(5);
-    // Walkin column (index 2) must be NUMERIC, not "—"
-    for (const row of cells) {
-      expect(row[2]).not.toBe('—');
-      expect(row[2]).toMatch(/^\d[\d,]*$/);
-    }
-    // W01 specifically: walk-in 577, AOV 324, CR 69.8%
     const w01 = cells.find(r => r[0] === 'W01')!;
-    expect(w01[2]).toBe('577');
-    expect(w01[3]).toBe('324');                    // AOV (basket) RM
-    expect(w01[4]).toMatch(/69\.8%/);              // CR
+    expect(w01[2]).toMatch(/RM\s*60,?000/);   // 该月销售 RM (2026-04)
+    expect(w01[3]).toMatch(/\+20\.0%/);        // 环比 (60k vs 50k = +20%)
+    expect(w01[4]).toBe('577');                // 客流 (3M total scalar)
+    expect(w01[5]).toMatch(/69\.8%/);          // 成交率
   });
 
   test('Layer 4: domain grid click jumps to that domain', async ({ page }) => {
