@@ -109,9 +109,9 @@ test.describe('Round 1 — Today data accuracy', () => {
       Array.from(document.querySelectorAll('#todayStores .ts-row:not(.head) .ts-id'))
         .map(e => (e.textContent || '').trim()));
     expect(ids).toEqual(['W01','W02','W03','W05','W07']);
-    // Each row has 6 cells now (id + name + visits + aov + cr + anomalies)
+    // V1.5: 7 cells (id + name + 该月销售RM + 环比% + 客流 + 成交率 + 异常)
     const cellCount = await page.locator('#todayStores .ts-row:not(.head)').first().locator('> div').count();
-    expect(cellCount).toBe(6);
+    expect(cellCount).toBe(7);
     // Anomalies column has either ✓ or ⚠ — never empty
     const anomalies = await page.evaluate(() =>
       Array.from(document.querySelectorAll('#todayStores .ts-row:not(.head) .ts-anom'))
@@ -253,14 +253,21 @@ test.describe('Round 3 — Today responsive', () => {
 });
 
 test.describe('Round 4 — V1 第6刀: 6-domain architecture + sanity', () => {
-  test('menu shows Today + 6 domains, no Stock/Purchasing top-level', async ({ page }) => {
-    // V1 第三刀: 🏠 Today is the new first visible nav item, ahead of the
-    // 6 domains. Stock/Purchasing legacy aliases stay in .legacy-nav.
+  test('menu shows Today + 6 domains + GTD, with Finance/HR hidden in V1.5', async ({ page }) => {
+    // V1 第三刀: 🏠 Today is the first nav. V1.5: GTD added as last nav,
+    // Finance + HR hidden per scope (deferred).
     await loginOwner(page);
     const visibleNavs = await page.evaluate(() =>
       Array.from(document.querySelectorAll('nav.menu > .group:not(.legacy-nav) .sub-item[data-view]'))
+        .filter(el => !(el as HTMLElement).classList.contains('hidden'))
         .map(el => el.getAttribute('data-view')));
-    expect(visibleNavs).toEqual(['today','sales','inventory','customers','products','finance','hr']);
+    expect(visibleNavs).toEqual(['today','sales','inventory','customers','products','gtd']);
+    // Finance + HR exist as DOM elements (kept for back-compat) but are .hidden
+    const allNavs = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('nav.menu > .group:not(.legacy-nav) .sub-item[data-view]'))
+        .map(el => el.getAttribute('data-view')));
+    expect(allNavs).toContain('finance');
+    expect(allNavs).toContain('hr');
   });
 
   test('inventory dashboard renders required strings (总库存值/在途 PO/F-N-S/lead time)', async ({ page }) => {
@@ -378,15 +385,20 @@ test.describe('Round 5 — V1 第7刀: Refresh + Branch Manager view', () => {
     expect(result.allRows).toBeGreaterThan(0);
   });
 
-  test('branch view hides Finance + HR menu items', async ({ page }) => {
+  test('Finance + HR menu items hidden globally in V1.5', async ({ page }) => {
+    // V1.5: Finance + HR are deferred for the store-manager meeting cut.
+    // They're hidden globally (owner + branch + warehouse), regardless of
+    // view-as mode. Spec line: "Finance dashboard 隐藏 / HR dashboard 不做".
     await loginOwner(page);
+    await expect(page.locator('#navFinance.hidden')).toHaveCount(1);
+    await expect(page.locator('#navHr.hidden')).toHaveCount(1);
+    // Switching view-as mode does NOT make them visible (still hidden)
     await page.evaluate(() => (window as any).setViewAs('branch'));
     await expect(page.locator('#navFinance.hidden')).toHaveCount(1);
     await expect(page.locator('#navHr.hidden')).toHaveCount(1);
-    // Owner-mode shouldn't have those hidden
     await page.evaluate(() => (window as any).setViewAs('owner'));
-    await expect(page.locator('#navFinance.hidden')).toHaveCount(0);
-    await expect(page.locator('#navHr.hidden')).toHaveCount(0);
+    await expect(page.locator('#navFinance.hidden')).toHaveCount(1);
+    await expect(page.locator('#navHr.hidden')).toHaveCount(1);
   });
 
   test('URL persists ?role=branch&branch=W03 across reload', async ({ page }) => {
@@ -1281,16 +1293,17 @@ test.describe('Round 9 — V1 第三刀: Raw sale source + month-switch cache', 
     await page.evaluate(() => (window as any).setView('sales'));
     await page.waitForSelector('#dsSalesCards', { timeout: 5000 });
 
-    // Mar-26 ALL-branch total: 55491+100038+75727+43487+68158+29655+52 = 372,608
+    // V1.5: Sales dashboard top KPI sums the 5 ACTIVE stores (W01/02/03/05/07),
+    // not all branches. Mar-26 5-store sum: 55491+100038+75727+43487+68158 = 342,901.
+    // (Today's Cash Runway / status row continues to show ALL-branch total.)
     await page.selectOption('#monthPicker', '2026-03');
     await page.waitForFunction(() => (window as any).SNAPSHOT === '2026-03', { timeout: 5000 });
-    // Wait for repaint
     await page.waitForFunction(() => {
       const t = document.getElementById('dsSalesChartTitle');
       return !!t && (t.textContent || '').includes('2026-03');
     }, { timeout: 5000 });
     const monthSalesValue = await page.locator('#dsSalesCards .ds-card').first().locator('.value').innerText();
-    expect(monthSalesValue.replace(/\s/g,'')).toContain('372,608');
+    expect(monthSalesValue.replace(/\s/g,'')).toContain('342,901');
   });
 
   test('switching month does NOT re-fetch /api/customers or /api/sales (cache hit)', async ({ page }) => {
@@ -1353,8 +1366,8 @@ test.describe('Round 9 — V1 第三刀: Raw sale source + month-switch cache', 
     const html = await page.locator('#dsSalesCards').innerHTML();
     expect(html).not.toContain('9,999,999');
     expect(html).not.toContain('49,999,995');  // 5x poison
-    // WP_SALES_LIVE Mar-26 W01 + ... + WCO = 425,109 ALL-branch for 2026-04
-    expect(html.replace(/\s/g,'')).toContain('425,109');
+    // V1.5: 5-store sum for 2026-04: 65408+109822+82060+82149+63630 = 403,069
+    expect(html.replace(/\s/g,'')).toContain('403,069');
   });
 });
 
@@ -1872,5 +1885,122 @@ test.describe('Round 11 — V1 第四刀: Products / Inventory / Customers', () 
     // Latest month index = 2 ⇒ chinese 0.7213, malay 0.6897 — chinese wins.
     const k3 = await page.locator('#dsCustCards .ds-card .value').nth(2).innerText();
     expect(k3).toMatch(/72\.1%|72%/);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+   Round 12 — V1.5: Store-manager login + branch lock + GTD dashboard
+   ════════════════════════════════════════════════════════════════════ */
+test.describe('Round 12 — V1.5: Store-manager login + GTD', () => {
+  test('w05_mgr login auto-locks BRANCH_VIEW=W05 and hides Finance/HR navs', async ({ page }) => {
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS && !!(window as any).WP_DEADSTOCK && !!(window as any).WP_TODAY);
+    await page.fill('#loginUser', 'w05_mgr');
+    await page.fill('#loginPw', 'W05@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    const state = await page.evaluate(() => ({
+      viewAs: (window as any).VIEW_AS,
+      branch: (window as any).BRANCH_VIEW,
+      activeView: Array.from(document.querySelectorAll('.view.on')).map(v => v.id),
+    }));
+    expect(state.viewAs).toBe('branch');
+    expect(state.branch).toBe('W05');
+    // Default landing for store managers = sales (their store)
+    expect(state.activeView).toEqual(['view-sales']);
+    // Finance + HR navs hidden
+    await expect(page.locator('#navFinance')).toHaveClass(/hidden/);
+    await expect(page.locator('#navHr')).toHaveClass(/hidden/);
+    // GTD nav visible
+    await expect(page.locator('#navGtd')).toBeVisible();
+  });
+
+  test('owner login: Finance + HR navs hidden (V1.5 scope), GTD visible', async ({ page }) => {
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS);
+    await page.fill('#loginUser', 'owner');
+    await page.fill('#loginPw', 'Owner@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await expect(page.locator('#navFinance')).toHaveClass(/hidden/);
+    await expect(page.locator('#navHr')).toHaveClass(/hidden/);
+    await expect(page.locator('#navGtd')).toBeVisible();
+  });
+
+  test('GTD dashboard renders Tasks table (10 rows) + KPI table (6 rows)', async ({ page }) => {
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS);
+    await page.fill('#loginUser', 'w05_mgr');
+    await page.fill('#loginPw', 'W05@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView('gtd'));
+    await page.waitForSelector('#view-gtd.on', { timeout: 5000 });
+    await page.waitForSelector('#gtdTasksTable tbody tr', { timeout: 5000 });
+    const taskRows = await page.locator('#gtdTasksTable tbody tr').count();
+    expect(taskRows).toBe(10);
+    const kpiRows = await page.locator('#gtdKpiTable tbody tr').count();
+    expect(kpiRows).toBe(6);
+    // Each task row: 1 task name + 12 month dropdowns + 1 note = 14 cells
+    const firstTaskCells = await page.locator('#gtdTasksTable tbody tr').first().locator('td').count();
+    expect(firstTaskCells).toBe(14);
+    // Branch scope label shows W05
+    const scope = await page.locator('#gtdScope').innerText();
+    expect(scope).toContain('W05');
+  });
+
+  test('GTD task dropdown: change → localStorage persists → reload restores', async ({ page }) => {
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS);
+    await page.fill('#loginUser', 'w05_mgr');
+    await page.fill('#loginPw', 'W05@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView('gtd'));
+    await page.waitForSelector('#gtdTasksTable tbody tr', { timeout: 5000 });
+    // Pick the first row's January cell (data-row="bunting" data-month="0")
+    await page.selectOption('#gtdTasksTable select[data-row="bunting"][data-month="0"]', 'Done');
+    await page.waitForTimeout(150);
+    // localStorage should now contain the cell
+    const stored = await page.evaluate(() => {
+      const raw = localStorage.getItem('wp_gtd_v1') || '{}';
+      return JSON.parse(raw);
+    });
+    expect(stored['W05::task::bunting::0']).toBe('Done');
+    // Reload — value should restore
+    await page.reload();
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView('gtd'));
+    await page.waitForSelector('#gtdTasksTable tbody tr', { timeout: 5000 });
+    const restored = await page.locator('#gtdTasksTable select[data-row="bunting"][data-month="0"]').inputValue();
+    expect(restored).toBe('Done');
+  });
+
+  test('GTD KPI: store manager sees Target as locked (read-only); Owner can edit', async ({ page }) => {
+    // Store manager: Target should be a locked text cell (no input).
+    await page.goto(PAGE_URL);
+    await page.waitForFunction(() => !!(window as any).WP_USERS);
+    await page.fill('#loginUser', 'w05_mgr');
+    await page.fill('#loginPw', 'W05@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView('gtd'));
+    await page.waitForSelector('#gtdKpiTable tbody tr', { timeout: 5000 });
+    // First KPI row's Target cell
+    const firstTargetText = await page.locator('#gtdKpiTable tbody tr').first().locator('td.target-cell').innerText();
+    expect(firstTargetText).toMatch(/🔒/);
+    // No editable target input for store manager
+    expect(await page.locator('#gtdKpiTable input[data-gtd="target"]').count()).toBe(0);
+
+    // Owner: target should be editable input
+    await page.evaluate(() => (window as any).WP_SESSION.end());
+    await page.reload();
+    await page.fill('#loginUser', 'owner');
+    await page.fill('#loginPw', 'Owner@2026');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#app.ready', { timeout: 5000 });
+    await page.evaluate(() => (window as any).setView('gtd'));
+    await page.waitForSelector('#gtdKpiTable tbody tr', { timeout: 5000 });
+    expect(await page.locator('#gtdKpiTable input[data-gtd="target"]').count()).toBe(6);
   });
 });

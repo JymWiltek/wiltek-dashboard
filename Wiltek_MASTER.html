@@ -980,6 +980,54 @@ footer.app-footer {
 .ds-section-title { font-size: 16px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
 .ds-section-sub { font-size: 12px; color: var(--text-meta); margin: 0 0 12px; line-height: 1.5; }
 
+/* V1.5: GTD dashboard (store manager monthly task + KPI tracker) */
+.gtd-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  margin: 12px 0 18px;
+}
+.gtd-toolbar .gtd-scope {
+  font-size: 13px; color: var(--text-meta);
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px;
+}
+.gtd-toolbar .gtd-save-btn {
+  background: var(--brand, #1F5F4A); color: #fff; border: 0; border-radius: 6px;
+  padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.gtd-toolbar .gtd-save-btn:hover { background: #19503e; }
+.gtd-toolbar .gtd-save-status { font-size: 12px; color: var(--text-meta); font-style: italic; }
+.gtd-table-wrap { overflow-x: auto; margin-bottom: 8px; }
+.gtd-table {
+  width: 100%; border-collapse: collapse; min-width: 1100px;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px;
+}
+.gtd-table th, .gtd-table td {
+  padding: 8px 10px; border-bottom: 1px solid var(--line);
+  font-size: 12px; text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.gtd-table th {
+  background: var(--surface, #F5F1EA);
+  font-weight: 600; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px;
+}
+.gtd-table th.month, .gtd-table td.month { text-align: center; min-width: 70px; }
+.gtd-table td.task-name, .gtd-table td.kpi-name { font-weight: 500; min-width: 220px; }
+.gtd-table td.note { font-size: 11px; color: var(--text-meta); max-width: 260px; }
+.gtd-table select, .gtd-table input[type="number"] {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px;
+  font-size: 12px; font-family: inherit; box-sizing: border-box;
+  font-variant-numeric: tabular-nums; text-align: center;
+}
+.gtd-table select.gtd-status-Done     { background: #DEF2E5; color: #1F5F4A; font-weight: 600; }
+.gtd-table select.gtd-status-Updated  { background: #FCEDD0; color: #8A6310; font-weight: 600; }
+.gtd-table select.gtd-status-Undone   { background: #FBE2E2; color: #8A2424; font-weight: 600; }
+.gtd-table .gtd-status-cell.kpi-ok    { background: #DEF2E5; color: #1F5F4A; font-weight: 700; text-align: center; }
+.gtd-table .gtd-status-cell.kpi-near  { background: #FCEDD0; color: #8A6310; font-weight: 700; text-align: center; }
+.gtd-table .gtd-status-cell.kpi-bad   { background: #FBE2E2; color: #8A2424; font-weight: 700; text-align: center; }
+.gtd-table td.target-cell { font-weight: 600; min-width: 80px; }
+.gtd-table td.target-locked { color: var(--text-meta); font-size: 11px; }
+.gtd-table .gtd-row-hint { color: var(--text-meta); font-size: 11px; }
+
 /* V1 第四刀 返工: 3-line monthly comparison block under each KPI value */
 .ds-card .cmp-lines { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
 .ds-card .cmp-line {
@@ -1219,6 +1267,11 @@ footer.app-footer {
         <div class="sub-item" data-view="hr" id="navHr" onclick="setView('hr')" style="padding-left:12px">
           <span class="icon">👷</span><span data-i18n="nav-hr">HR</span>
         </div>
+        <!-- V1.5: GTD dashboard — store-manager monthly task tracker + KPI tracker.
+             Visible to Owner + all 5 store managers. Branch-scoped automatically. -->
+        <div class="sub-item" data-view="gtd" id="navGtd" onclick="setView('gtd')" style="padding-left:12px">
+          <span class="icon">✅</span><span data-i18n="nav-gtd">GTD Tracker</span>
+        </div>
       </div>
       <!-- Hidden legacy menu anchors — visually clipped off-screen so they
            don't show up in the UI, but still in the layout box so existing
@@ -1410,6 +1463,27 @@ footer.app-footer {
         </div>
         <div id="dsHrAction"></div>
         <div class="drill-links" id="dsHrDrills"></div>
+      </div>
+
+      <!-- ── View: GTD (V1.5: store manager task + KPI tracker) ── -->
+      <div class="view" id="view-gtd">
+        <h1 class="page-title" data-i18n="ds-gtd-title">GTD Tracker</h1>
+        <p class="page-sub" data-i18n="ds-gtd-sub">每月任务勾选 + KPI 数字记录 · 店长自己填,Owner 监督。</p>
+        <div class="gtd-toolbar">
+          <span class="gtd-scope" id="gtdScope"></span>
+          <button id="gtdSaveBtn" class="gtd-save-btn" type="button" data-i18n="gtd-save">💾 Save</button>
+          <span class="gtd-save-status" id="gtdSaveStatus"></span>
+        </div>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="gtd-tasks-title">📋 Monthly Task Schedule (Done / Updated / Undone)</h2>
+          <p class="ds-section-sub" data-i18n="gtd-tasks-sub">每个任务对应每月一格 · 下拉选状态 · 点 Save 永久存档(本地暂存,Sheet 写回下一刀接通)。</p>
+          <div class="gtd-table-wrap"><table class="gtd-table" id="gtdTasksTable"></table></div>
+        </section>
+        <section class="ds-section">
+          <h2 class="ds-section-title" data-i18n="gtd-kpi-title">📊 Manual KPI Tracking</h2>
+          <p class="ds-section-sub" data-i18n="gtd-kpi-sub">填实际数字 · Status 自动算颜色(绿=达标 / 黄=接近 / 红=不达标)· Target 仅 Owner 可编辑。</p>
+          <div class="gtd-table-wrap"><table class="gtd-table" id="gtdKpiTable"></table></div>
+        </section>
       </div>
 
       <!-- ── View: Dead Stock List ─────────────────────────────── -->
@@ -1790,6 +1864,8 @@ const STR = {
     "ds-hr-sub":       "Headcount · revenue per head · branch-level staffing — detailed drill-downs coming next cut.",
     /* Card labels — Sales (V1 第二刀: single-month isolation, no rolling) */
     "ds-sales-month":   "Month sales",
+    "ds-sales-units":   "Units sold this month",
+    "ds-sales-aov":     "AOV (sales ÷ units)",
     "ds-sales-today":   "Today's sales",   /* legacy — unused after 第二刀 */
     "ds-sales-period":  "Period sales",    /* legacy — unused after 第二刀 */
     "ds-sales-best":    "Top branch",
@@ -1975,6 +2051,15 @@ const STR = {
     "td-store-aov":     "AOV RM",
     "td-store-cr":      "CR %",
     "td-store-anom":    "Anomalies",
+
+    "nav-gtd":          "GTD Tracker",
+    "ds-gtd-title":     "GTD Tracker — Monthly Tasks + KPIs",
+    "ds-gtd-sub":       "Store-manager monthly checklist + KPI tracking. Branch-scoped.",
+    "gtd-save":         "💾 Save",
+    "gtd-tasks-title":  "📋 Monthly Task Schedule",
+    "gtd-tasks-sub":    "Per-task status (Done / Updated / Undone) per month. Click Save to persist.",
+    "gtd-kpi-title":    "📊 Manual KPI Tracking",
+    "gtd-kpi-sub":      "Fill actual numbers; status auto-colours (green/yellow/red vs target).",
 
     "ds-prod-kpi-velocity":   "SKU Velocity Index",
     "ds-prod-kpi-stockout":   "Top SKU stockout alerts",
@@ -2225,6 +2310,8 @@ const STR = {
     "ds-hr-sub":       "总员工数 · 人均产值 · 各分行人手 — 下钻待补。",
     /* Card labels — Sales (V1 第二刀: 仅显示选中月份,不滚动) */
     "ds-sales-month":   "该月销售总额",
+    "ds-sales-units":   "该月销售件数",
+    "ds-sales-aov":     "该月客单价",
     "ds-sales-today":   "今日销售",     /* legacy — 第二刀后已弃用 */
     "ds-sales-period":  "期间销售",     /* legacy — 第二刀后已弃用 */
     "ds-sales-best":    "销冠门市",
@@ -2410,6 +2497,15 @@ const STR = {
     "td-store-aov":     "客单价 RM",
     "td-store-cr":      "成交率",
     "td-store-anom":    "异常",
+
+    "nav-gtd":          "GTD 跟踪表",
+    "ds-gtd-title":     "GTD 跟踪表 — 每月任务 + KPI",
+    "ds-gtd-sub":       "店长每月任务勾选 + KPI 数字记录。自动锁定自家分行。",
+    "gtd-save":         "💾 保存",
+    "gtd-tasks-title":  "📋 每月任务表",
+    "gtd-tasks-sub":    "每个任务每月一格(Done/Updated/Undone)· 点 Save 永久存档。",
+    "gtd-kpi-title":    "📊 KPI 数字跟踪",
+    "gtd-kpi-sub":      "填实际数字 · Status 自动算颜色(绿/黄/红 vs Target)· Target 仅 Owner 可改。",
 
     "ds-prod-kpi-velocity":   "SKU 周转健康度",
     "ds-prod-kpi-stockout":   "Top SKU 异常告警",
@@ -2643,9 +2739,14 @@ function enterApp() {
   // again after the live /api/customers reply populates the picker.
   try { updateFooterSnapshot(); } catch(_) {}
 
-  // Initial view-as = real role
-  VIEW_AS = (s.role === 'warehouse') ? 'warehouse' : 'owner';
-  BRANCH_VIEW = null;
+  // V1.5: store-manager roles (w01_mgr / w02_mgr / w03_mgr / w05_mgr / w07_mgr)
+  // auto-lock to their assigned branch. Branch picker hidden via
+  // applyMenuVisibility(). Owner stays on company-wide; warehouse → warehouse list.
+  const userRec = (window.WP_USERS || []).find(u => u.id === s.userId) || {};
+  const isStoreMgr = /^w\d{2}_mgr$/.test(s.role || '');
+  if (s.role === 'warehouse')      { VIEW_AS = 'warehouse'; BRANCH_VIEW = null; }
+  else if (isStoreMgr && userRec.branch) { VIEW_AS = 'branch'; BRANCH_VIEW = userRec.branch; }
+  else                              { VIEW_AS = 'owner';     BRANCH_VIEW = null; }
   // V1 第7刀: if URL has ?role=branch&branch=W0X, restore that view (owner only)
   try { if (typeof applyRoleFromUrl === 'function') applyRoleFromUrl(); } catch(_){}
   try { if (typeof publishRoleState === 'function') publishRoleState(); } catch(_){}
@@ -2674,6 +2775,11 @@ function enterApp() {
   let initialView;
   if (VIEW_AS === 'warehouse') {
     initialView = 'warehouse';
+  } else if (VIEW_AS === 'branch') {
+    // V1.5: store managers default-land on Sales (single-month, own store).
+    // Today's owner-focused 6-domain grid isn't useful for branch staff.
+    const url = viewFromUrl();
+    initialView = url && VIEW_ROUTES[url] ? url : 'sales';
   } else {
     const url = viewFromUrl();
     initialView = url && VIEW_ROUTES[url] ? url : 'today';
@@ -2734,6 +2840,7 @@ function setLang(l) {
   else if (CUR_VIEW === 'products')   renderProductsDashboard();
   else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
   else if (CUR_VIEW === 'hr')         renderHrDashboard();
+  else if (CUR_VIEW === 'gtd')        renderGtd();
 }
 function applyLang() {
   document.documentElement.setAttribute('lang', LANG);
@@ -3160,6 +3267,7 @@ const VIEW_ROUTES = {
   'products':        'products',
   'finance':         'finance',
   'hr':              'hr',
+  'gtd':             'gtd',
   // Legacy aliases — old top-level keys now resolve to Inventory
   'stock':           'inventory',
   'purchasing':      'inventory',
@@ -3248,6 +3356,7 @@ function setView(v) {
   else if (leaf === 'products')   renderProductsDashboard();
   else if (leaf === 'finance')    renderFinanceDashboard();
   else if (leaf === 'hr')         renderHrDashboard();
+  else if (leaf === 'gtd')        renderGtd();
   else if (leaf === 'admin-sanity') renderAdminSanity();
   else if (leaf === 'transfers')  renderTransfers();
   else if (leaf === 'warehouse')  renderWarehouse();
@@ -3287,13 +3396,13 @@ function applyMenuVisibility() {
   // Warehouse sub-item is always visible (Owner can preview it via view-as switcher)
   if (navWarehouse) navWarehouse.classList.remove('hidden');
 
-  /* V1 第7刀: in Branch Manager view, hide Finance + HR (company-only data
-     a store manager shouldn't see). Inventory / Sales / Customers / Products
-     stay because they have per-branch data. */
+  /* V1.5: Finance + HR navs hidden for EVERYONE (deferred to next cut, per
+     tomorrow's store-manager meeting scope). Branch managers also have the
+     branch-picker / view-as switcher hidden — they only see their store. */
   const navFinance = document.getElementById('navFinance');
   const navHr      = document.getElementById('navHr');
-  if (navFinance) navFinance.classList.toggle('hidden', isBranch);
-  if (navHr)      navHr.classList.toggle('hidden', isBranch);
+  if (navFinance) navFinance.classList.add('hidden');
+  if (navHr)      navHr.classList.add('hidden');
 }
 
 /* ── Header view-as switcher (V1 第7刀: 3-way Owner / Branch / Warehouse) ── */
@@ -4137,54 +4246,108 @@ function drillTile(viewKey, labelKey, subKey, icon, disabled) {
    Chart: 5 active retail branches only.
    No rolling logic. */
 function renderSalesDashboard() {
-  // Primary: Raw sale aggregate (all transactions). Fallback: CustomerBuy.
+  // V1.5 Sales dashboard: top 3 KPIs (单月销售 / 单月件数 / 单月客单价),
+  // each with 3-line compare. Branch-scoped when VIEW_AS='branch' (store
+  // manager's auto-locked view).
   const sl = window.WP_SALES_LIVE || {};
   const cd = window.WP_CUSTOMERS || {};
   const sbm = (sl._raw_ok && sl.sales_by_branch_month)
     || sl.sales_by_branch_month
     || cd.sales_by_branch_month
     || {};
-  const snap = window.SNAPSHOT || (cd.meta && cd.meta.snapshot) || '';
+  const snap = snapMonth();
   const ACTIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
-  // V1 第7刀: branch-scope filter — when in Branch Manager view, only that branch.
-  const chartBranches = (isBranchScoped()
+  const branchSet = isBranchScoped()
     ? (ACTIVE.includes(BRANCH_VIEW) ? [BRANCH_VIEW] : [])
-    : ACTIVE
-  ).filter(b => sbm[b]);
+    : ACTIVE;
+  const chartBranches = branchSet.filter(b => sbm[b]);
+  const scopeKey = isBranchScoped() ? BRANCH_VIEW : 'all';
 
-  // Per-branch sale for the SELECTED snapshot month
-  const monthSales = {};
-  chartBranches.forEach(b => { monthSales[b] = (sbm[b] && sbm[b][snap]) || 0; });
-
-  // ALL-branch total for the "Month sales" card (Jym verifies against Sheet
-  // status bar which sums every branch). When branch-scoped, scope to that.
-  let monthTotalAll = 0;
+  // ── KPI 1: 该月销售总额 (single-month, branch-scoped) — series across months
+  // for the compare lines.
+  const salesByMonth = {};
   if (isBranchScoped()) {
-    monthTotalAll = (sbm[BRANCH_VIEW] && sbm[BRANCH_VIEW][snap]) || 0;
+    Object.keys(sbm[BRANCH_VIEW] || {}).forEach(ym => {
+      salesByMonth[ym] = +sbm[BRANCH_VIEW][ym] || 0;
+    });
   } else {
-    for (const b of Object.keys(sbm)) {
-      monthTotalAll += (sbm[b] && sbm[b][snap]) || 0;
+    // Sum across active branches (5 stores) per month
+    for (const b of ACTIVE) {
+      const m = sbm[b] || {};
+      for (const ym of Object.keys(m)) salesByMonth[ym] = (salesByMonth[ym] || 0) + (+m[ym] || 0);
     }
   }
+  const cmpSales = buildMonthlyCompare(salesByMonth, snap);
 
-  // Top/Lowest within active retail set
+  // ── KPI 2: 该月销售件数 (qty units sold this month, scoped). Use
+  // sku_qty_by_month — it's the per-SKU per-month qty from Raw sale tab.
+  // For branch-scoped, we don't have per-branch per-SKU per-month qty — use
+  // the per-branch sales-RM / company AOV proxy. Honest fallback: '—'.
+  const skuQtyByMonth = sl.sku_qty_by_month || {};
+  const qtyByMonth = {};
+  if (isBranchScoped()) {
+    // No per-branch per-SKU monthly qty available — fall back to scaling
+    // the company-wide qty by this branch's share of company sales.
+    const sharePerMonth = {};
+    Object.keys(sbm[BRANCH_VIEW] || {}).forEach(ym => {
+      let companyTotal = 0;
+      for (const b of ACTIVE) companyTotal += +(sbm[b] || {})[ym] || 0;
+      sharePerMonth[ym] = companyTotal > 0 ? (+sbm[BRANCH_VIEW][ym] || 0) / companyTotal : 0;
+    });
+    Object.keys(skuQtyByMonth).forEach(ym => {
+      const m = skuQtyByMonth[ym] || {};
+      let totalQty = 0;
+      for (const c of Object.keys(m)) totalQty += +m[c] || 0;
+      qtyByMonth[ym] = Math.round(totalQty * (sharePerMonth[ym] || 0));
+    });
+  } else {
+    Object.keys(skuQtyByMonth).forEach(ym => {
+      const m = skuQtyByMonth[ym] || {};
+      let totalQty = 0;
+      for (const c of Object.keys(m)) totalQty += +m[c] || 0;
+      qtyByMonth[ym] = totalQty;
+    });
+  }
+  const cmpQty = buildMonthlyCompare(qtyByMonth, snap);
+
+  // ── KPI 3: 该月客单价 — RM / unit sold, derived from KPIs 1 and 2.
+  const aovByMonth = {};
+  for (const ym of Object.keys(salesByMonth)) {
+    const q = qtyByMonth[ym] || 0;
+    aovByMonth[ym] = q > 0 ? salesByMonth[ym] / q : 0;
+  }
+  const cmpAov = buildMonthlyCompare(aovByMonth, snap);
+
+  const scopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全部 5 家分行' : 'all 5 stores');
+  const k1Val = cmpSales.single ? 'RM ' + fmtMoney(cmpSales.single) : '—';
+  const k1Cls = cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -10 ? 'danger'
+             : cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -5  ? 'warn' : '';
+  const k1Sub = (snap || '—') + ' · ' + scopeLbl;
+
+  const k2Val = cmpQty.single ? fmt(Math.round(cmpQty.single)) + (LANG === 'zh' ? ' 件' : ' units') : '—';
+  const k2Sub = (snap || '—') + ' · ' + (LANG === 'zh' ? '该月销售件数' : 'units sold');
+
+  const k3Val = cmpAov.single ? 'RM ' + fmtMoney(cmpAov.single) : '—';
+  const k3Sub = (snap || '—') + ' · ' + (LANG === 'zh' ? '客单价(销售 ÷ 件数)' : 'AOV (sales ÷ units)');
+
+  document.getElementById('dsSalesCards').innerHTML =
+    dsCardCompare(t('ds-sales-month'),  k1Val, cmpSales,
+                  { sub: k1Sub, valueClass: k1Cls, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
+    dsCardCompare(t('ds-sales-units'),  k2Val, cmpQty,
+                  { sub: k2Sub, fmtVal: (n) => fmt(Math.round(n)) }) +
+    dsCardCompare(t('ds-sales-aov'),    k3Val, cmpAov,
+                  { sub: k3Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+
+  // Per-branch month sales (used by chart + best/worst)
+  const monthSales = {};
+  chartBranches.forEach(b => { monthSales[b] = (sbm[b] && sbm[b][snap]) || 0; });
   let best = null, worst = null;
   chartBranches.forEach(b => {
     const v = monthSales[b];
     if (best  === null || v > monthSales[best])  best  = b;
     if (worst === null || v < monthSales[worst]) worst = b;
   });
-
   const monthLabel = snap || '—';
-  const subText = isBranchScoped()
-    ? (LANG === 'zh' ? snap + ' · ' + BRANCH_VIEW + ' 分行' : snap + ' · ' + BRANCH_VIEW)
-    : (LANG === 'zh' ? snap + ' · 全部分行' : snap + ' · all branches');
-  document.getElementById('dsSalesCards').innerHTML =
-    dsCard(t('ds-sales-month'), 'RM ' + fmtMoney(monthTotalAll), subText) +
-    dsCard(t('ds-sales-best'),  best  || '—',
-           best  ? 'RM ' + fmtMoney(monthSales[best])  + ' · ' + monthLabel : '') +
-    dsCard(t('ds-sales-worst'), worst || '—',
-           worst ? 'RM ' + fmtMoney(monthSales[worst]) + ' · ' + monthLabel : '');
   // For backwards compat with the old chart code below, alias `branches`.
   const branches = chartBranches;
 
@@ -5275,6 +5438,220 @@ function renderHrDashboard() {
   document.getElementById('dsHrDrills').innerHTML =
     drillTile('#', 'drill-soon', 'drill-soon-sub', '👷', true);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   V1.5 — GTD dashboard. Two tables for store managers (and Owner):
+     ① Monthly Task Schedule — task × month × { Done | Updated | Undone }
+     ② Manual KPI Tracking   — KPI × month × actual value (vs Target)
+
+   Persistence: localStorage (immediate, refresh-safe in same browser).
+   Optional Sheet write-back via /api/proxy?type=gtd_save (POST) — best
+   effort; if Apps Script doesn't have the endpoint yet, we fall back to
+   localStorage and tell the user "Saved locally (Sheet write-back next cut)".
+
+   Branch scope: store managers see ONLY their branch's data. Owner can
+   see + edit all (defaults to "All branches" → falls back to W01 view
+   for now since multi-branch overlay is a future cut).
+
+   Default lists are hard-coded here; Owner can edit Sheet and we'll
+   re-pick on next refresh once the API is plumbed.
+   ════════════════════════════════════════════════════════════════════ */
+
+const GTD_DEFAULT_TASKS = [
+  { id: 'bunting',     name_en: 'Bunting & Banners contents',       name_zh: '横幅 & 海报内容',          note_en: 'Update store visual displays each month' },
+  { id: 'sm_profile',  name_en: 'Social media profile contents',    name_zh: '社媒主页内容',            note_en: 'Refresh FB / IG profile + cover' },
+  { id: 'gbp_photos',  name_en: 'Google Business Profile photos',   name_zh: 'Google 商户照片',         note_en: 'Add fresh in-store photos' },
+  { id: 'theme_deco',  name_en: 'Theme decoration',                 name_zh: '主题装饰',                note_en: 'Seasonal / promo theme setup' },
+  { id: 'vital_stock', name_en: 'Vital Stock Review',               name_zh: '关键库存复核',            note_en: 'Top-seller stock cover review' },
+  { id: 'wa_catalog',  name_en: 'WhatsApp Business catalog',        name_zh: 'WhatsApp 商品目录',       note_en: 'Update product catalog' },
+  { id: 'ccnn',        name_en: 'Branches Checklist (CCNN)',        name_zh: '分行 CCNN 清单',          note_en: 'Cleanliness · Comfort · Newness · Niceness' },
+  { id: 'bmm_share',   name_en: 'BMM info sharing to Staffs',       name_zh: 'BMM 信息分享给员工',      note_en: 'Brand merchandising memo to floor staff' },
+  { id: 'training',    name_en: 'Training booklet / updates',       name_zh: '培训手册更新',            note_en: 'Roll out new product / process training' },
+  { id: 'display_bm',  name_en: 'Products Display Benchmark',       name_zh: '产品陈列标杆',            note_en: 'Compare display vs benchmark store' },
+];
+
+const GTD_DEFAULT_KPIS = [
+  { id: 'walkin',      name_en: 'Walk-In Customers',  name_zh: '客流',         target: 350,  unit: '' },
+  { id: 'closing_rate',name_en: 'Closing Rate %',     name_zh: '成交率 %',      target: 70,   unit: '%' },
+  { id: 'gbp_reviews', name_en: 'New Google Reviews', name_zh: '新增 Google 评价', target: 15,  unit: '' },
+  { id: 'ccnn_pct',    name_en: 'Branch Checklist %', name_zh: '分行清单 %',     target: 95,   unit: '%' },
+  { id: 'sm_posts',    name_en: 'Social Media Posts', name_zh: '社媒发帖数',     target: 10,   unit: '' },
+  { id: 'discon_pct',  name_en: 'Discontinued Stock %', name_zh: '停产库存 %',   target: 10,   unit: '%' /* lower-is-better */ },
+];
+
+const GTD_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const GTD_LS_KEY = 'wp_gtd_v1';
+
+function gtdActiveBranch() {
+  // Store managers always see their own branch. Owner sees BRANCH_VIEW if set,
+  // otherwise defaults to W01. (Multi-branch consolidated view is next cut.)
+  if (isBranchScoped() && BRANCH_VIEW) return BRANCH_VIEW;
+  return BRANCH_VIEW || 'W01';
+}
+function gtdLoadStore() {
+  try { return JSON.parse(localStorage.getItem(GTD_LS_KEY) || '{}') || {}; }
+  catch(_) { return {}; }
+}
+function gtdSaveStore(store) {
+  try { localStorage.setItem(GTD_LS_KEY, JSON.stringify(store)); } catch(_){}
+}
+function gtdGetCellValue(store, branch, kind, rowId, monthIdx) {
+  const k = `${branch}::${kind}::${rowId}::${monthIdx}`;
+  return store[k];
+}
+function gtdSetCellValue(store, branch, kind, rowId, monthIdx, value) {
+  const k = `${branch}::${kind}::${rowId}::${monthIdx}`;
+  if (value === null || value === undefined || value === '') delete store[k];
+  else store[k] = value;
+}
+function gtdGetTargetOverride(store, branch, kpiId) {
+  const k = `${branch}::target::${kpiId}`;
+  return store[k];
+}
+function gtdSetTargetOverride(store, branch, kpiId, value) {
+  const k = `${branch}::target::${kpiId}`;
+  if (value === null || value === undefined || value === '') delete store[k];
+  else store[k] = value;
+}
+
+/* Status colour for KPI value vs target. >=100% = ok, 80-99% = near, <80% = bad.
+   For lower-is-better KPIs (e.g. Discontinued %), invert. */
+function gtdKpiStatus(actual, target, kpiId) {
+  if (actual === undefined || actual === null || actual === '' || isNaN(+actual)) return null;
+  if (!target || isNaN(+target) || +target === 0) return null;
+  const ratio = +actual / +target;
+  // Lower-is-better: discon_pct
+  const lowerIsBetter = (kpiId === 'discon_pct');
+  if (lowerIsBetter) {
+    if (ratio <= 1.0) return 'ok';
+    if (ratio <= 1.25) return 'near';
+    return 'bad';
+  }
+  if (ratio >= 1.0) return 'ok';
+  if (ratio >= 0.8) return 'near';
+  return 'bad';
+}
+
+function renderGtd() {
+  const branch = gtdActiveBranch();
+  const isOwnerRole = (window.WP_SESSION?.get()?.role === 'owner');
+  const store = gtdLoadStore();
+
+  const scopeEl = document.getElementById('gtdScope');
+  if (scopeEl) {
+    scopeEl.textContent = (LANG === 'zh'
+      ? `分行视角 · ${branch}`
+      : `Branch · ${branch}`) + (isOwnerRole ? ' · Owner' : '');
+  }
+
+  // ── Tasks table ────────────────────────────────────────────────
+  const tasksEl = document.getElementById('gtdTasksTable');
+  if (tasksEl) {
+    const head = '<thead><tr>'
+      + '<th>' + (LANG === 'zh' ? '任务' : 'Task') + '</th>'
+      + GTD_MONTHS.map(m => '<th class="month">' + m + '</th>').join('')
+      + '<th>' + (LANG === 'zh' ? '说明' : 'Note') + '</th>'
+      + '</tr></thead>';
+    const body = GTD_DEFAULT_TASKS.map(task => {
+      const cells = GTD_MONTHS.map((_, idx) => {
+        const v = gtdGetCellValue(store, branch, 'task', task.id, idx) || '';
+        const cls = v ? ('gtd-status-' + v) : '';
+        const opts = ['', 'Done', 'Updated', 'Undone'].map(o =>
+          `<option value="${o}"${o === v ? ' selected' : ''}>${o || '—'}</option>`
+        ).join('');
+        return `<td class="month"><select class="${cls}" data-gtd="task" data-row="${task.id}" data-month="${idx}">${opts}</select></td>`;
+      }).join('');
+      const name = LANG === 'zh' ? task.name_zh : task.name_en;
+      return '<tr>'
+        + `<td class="task-name">${escapeHtml(name)}</td>`
+        + cells
+        + `<td class="note">${escapeHtml(task.note_en || '')}</td>`
+        + '</tr>';
+    }).join('');
+    tasksEl.innerHTML = head + '<tbody>' + body + '</tbody>';
+  }
+
+  // ── KPI table ──────────────────────────────────────────────────
+  const kpiEl = document.getElementById('gtdKpiTable');
+  if (kpiEl) {
+    const head = '<thead><tr>'
+      + '<th>' + (LANG === 'zh' ? 'KPI' : 'KPI') + '</th>'
+      + '<th class="target-cell">' + (LANG === 'zh' ? '目标' : 'Target') + '</th>'
+      + GTD_MONTHS.map(m => '<th class="month">' + m + '</th>').join('')
+      + '</tr></thead>';
+    const body = GTD_DEFAULT_KPIS.map(kpi => {
+      const ovrTarget = gtdGetTargetOverride(store, branch, kpi.id);
+      const target = (ovrTarget !== undefined && ovrTarget !== '') ? +ovrTarget : kpi.target;
+      const cells = GTD_MONTHS.map((_, idx) => {
+        const v = gtdGetCellValue(store, branch, 'kpi', kpi.id, idx);
+        const status = gtdKpiStatus(v, target, kpi.id);
+        const valStr = (v === undefined || v === null || v === '') ? '' : v;
+        const cls = status ? ('gtd-status-cell kpi-' + status) : '';
+        return `<td class="month ${cls}"><input type="number" step="any" data-gtd="kpi" data-row="${kpi.id}" data-month="${idx}" value="${valStr}"></td>`;
+      }).join('');
+      const name = LANG === 'zh' ? kpi.name_zh : kpi.name_en;
+      const targetCell = isOwnerRole
+        ? `<td class="target-cell"><input type="number" step="any" data-gtd="target" data-row="${kpi.id}" value="${target}"></td>`
+        : `<td class="target-cell target-locked">🔒 ${target}${kpi.unit}</td>`;
+      return '<tr>'
+        + `<td class="kpi-name">${escapeHtml(name)}${kpi.unit ? ' (' + kpi.unit + ')' : ''}</td>`
+        + targetCell
+        + cells
+        + '</tr>';
+    }).join('');
+    kpiEl.innerHTML = head + '<tbody>' + body + '</tbody>';
+  }
+}
+window.renderGtd = renderGtd;
+
+/* GTD persistence handlers — wire once. */
+(function wireGtd() {
+  if (window.__gtd_wired) return;
+  window.__gtd_wired = true;
+  document.addEventListener('change', e => {
+    const tgt = e.target;
+    const kind = tgt && tgt.getAttribute && tgt.getAttribute('data-gtd');
+    if (!kind) return;
+    const branch = gtdActiveBranch();
+    const store = gtdLoadStore();
+    const row = tgt.getAttribute('data-row');
+    if (kind === 'target') {
+      gtdSetTargetOverride(store, branch, row, tgt.value);
+    } else {
+      const month = +tgt.getAttribute('data-month');
+      gtdSetCellValue(store, branch, kind, row, month, tgt.value);
+    }
+    gtdSaveStore(store);
+    // Re-render to pick up the new colour for KPI cells / select highlight.
+    if (CUR_VIEW === 'gtd') renderGtd();
+  });
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('#gtdSaveBtn');
+    if (!btn) return;
+    const status = document.getElementById('gtdSaveStatus');
+    if (status) status.textContent = (LANG === 'zh' ? '已保存到本地。' : 'Saved locally.');
+    // Best-effort Sheet write-back via /api/proxy
+    const branch = gtdActiveBranch();
+    const store = gtdLoadStore();
+    fetch('/api/proxy?type=gtd_save&branch=' + encodeURIComponent(branch), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch, store }),
+    }).then(r => r.json()).then(j => {
+      if (j && j.ok) {
+        if (status) status.textContent = (LANG === 'zh' ? '✓ 已保存到本地 + Sheet。' : '✓ Saved locally + Sheet.');
+      } else {
+        if (status) status.textContent = (LANG === 'zh'
+          ? '⚠ 已保存到本地。Sheet 写回端点未接通(下一刀)。'
+          : '⚠ Saved locally. Sheet write-back endpoint not yet wired (next cut).');
+      }
+    }).catch(() => {
+      if (status) status.textContent = (LANG === 'zh'
+        ? '⚠ 已保存到本地。Sheet 写回端点未接通(下一刀)。'
+        : '⚠ Saved locally. Sheet write-back endpoint not yet wired (next cut).');
+    });
+  });
+})();
 
 /* ── Inventory dashboard (V1 第6刀: merges Stock + Purchasing) ── */
 function renderInventoryDashboard() {
