@@ -1143,6 +1143,121 @@ footer.app-footer {
   .wh-list .wh-row { grid-template-columns: 1fr; gap: 8px; }
   section.content { padding: 16px 12px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.6 — Store-manager Today + Sales styles
+   ════════════════════════════════════════════════════════════════════ */
+.v16-mgr-section-title {
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  margin: 24px 0 8px; padding-left: 4px;
+  border-left: 4px solid var(--brand);
+}
+.v16-mgr-section-sub {
+  font-size: 12px; color: var(--text-secondary); margin: 0 0 14px 4px;
+}
+.v16-kpi-table {
+  width: 100%; border-collapse: collapse; font-size: 14px;
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
+  overflow: hidden;
+}
+.v16-kpi-table th, .v16-kpi-table td {
+  padding: 16px 18px; text-align: left; border-bottom: 1px solid var(--border-soft);
+}
+.v16-kpi-table thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+}
+.v16-kpi-table tbody tr:last-child td { border-bottom: 0; }
+.v16-kpi-table .kpi-name { font-weight: 600; }
+.v16-kpi-table .kpi-val {
+  font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum"; letter-spacing: -0.02em;
+}
+.v16-kpi-table .kpi-target { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.v16-kpi-table .kpi-pct {
+  font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.v16-kpi-table .kpi-pct.kpi-ok   { color: var(--ok); }
+.v16-kpi-table .kpi-pct.kpi-warn { color: var(--warn); }
+.v16-kpi-table .kpi-pct.kpi-bad  { color: var(--danger); }
+.v16-kpi-table .kpi-pct.kpi-na   { color: var(--text-tertiary); font-weight: 500; font-size: 14px; }
+
+.v16-inv-dist {
+  width: 100%; border-collapse: collapse; font-size: 14px;
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
+  overflow: hidden;
+}
+.v16-inv-dist th, .v16-inv-dist td {
+  padding: 14px 18px; text-align: left; border-bottom: 1px solid var(--border-soft);
+}
+.v16-inv-dist thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+}
+.v16-inv-dist tbody tr { cursor: pointer; transition: background 0.12s; }
+.v16-inv-dist tbody tr:hover { background: rgba(31,95,74,0.05); }
+.v16-inv-dist tbody tr:last-child td { border-bottom: 0; }
+.v16-inv-dist .v16-name { font-weight: 600; }
+.v16-inv-dist .num { text-align: right; font-variant-numeric: tabular-nums; }
+.v16-inv-dist .v16-Active    { color: var(--ok); }
+.v16-inv-dist .v16-Slow      { color: var(--warn); }
+.v16-inv-dist .v16-Misplaced { color: var(--brand); }
+.v16-inv-dist .v16-Dead      { color: var(--danger); }
+.v16-inv-dist .v16-arrow { color: var(--text-tertiary); }
+.v16-inv-dist tfoot td {
+  font-weight: 600; background: rgba(31,95,74,0.06);
+  border-top: 2px solid var(--border-soft);
+}
+
+.v16-mgr-headline {
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;
+}
+.v16-mgr-headline .v16-headline-title {
+  font-size: 18px; font-weight: 700; color: var(--text-primary);
+}
+.v16-mgr-headline .v16-headline-meta {
+  font-size: 13px; color: var(--text-secondary);
+}
+
+/* Compare lines: align colon/value via 3-col grid */
+.cmp-lines.v16-aligned {
+  display: grid; grid-template-columns: max-content auto max-content; gap: 2px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.cmp-lines.v16-aligned .cmp-line { display: contents; }
+.cmp-lines.v16-aligned .cmp-line > .v16-l { font-size: 12px; color: var(--text-secondary); }
+.cmp-lines.v16-aligned .cmp-line > .v16-v { font-size: 12px; }
+.cmp-lines.v16-aligned .cmp-line > .v16-p { font-size: 12px; font-weight: 600; }
+
+/* Sales 4-period chart container reuses .chart-wrap */
+.v16-sales-cat-table, .v16-sales-top20-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.v16-sales-cat-table th, .v16-sales-cat-table td,
+.v16-sales-top20-table th, .v16-sales-top20-table td {
+  padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: left;
+}
+.v16-sales-cat-table thead th, .v16-sales-top20-table thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+}
+.v16-sales-cat-table .num, .v16-sales-top20-table .num {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.v16-sales-cat-table .cmp-up,   .v16-sales-top20-table .cmp-up   { color: var(--ok); }
+.v16-sales-cat-table .cmp-down, .v16-sales-top20-table .cmp-down { color: var(--danger); }
+.v16-sales-cat-table .cmp-flat, .v16-sales-top20-table .cmp-flat { color: var(--text-tertiary); }
+
+.v16-cust-action-plan {
+  margin-bottom: 18px;
+}
+.v16-cust-action-plan .v16-cap-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  margin: 0 0 10px; padding-left: 4px; border-left: 4px solid var(--brand);
+}
 </style>
 </head>
 <body>
@@ -1387,6 +1502,8 @@ footer.app-footer {
       <div class="view" id="view-customers">
         <h1 class="page-title" data-i18n="ds-cust-title">Customers</h1>
         <p class="page-sub" data-i18n="ds-cust-sub">客户类型健康 · 老客回购 · 种族转化 · 沉睡客户 · 流失预警。</p>
+        <!-- V1.6: Action Plan moved here from Today (store-manager only) -->
+        <div class="v16-cust-action-plan" id="dsCustActionPlan" style="display:none"></div>
         <div class="ds-cards" id="dsCustCards"></div>
         <!-- V1 第四刀: 4 alert cards (Customers) -->
         <div class="ds-alert-grid" id="dsCustAlerts"></div>
@@ -1783,15 +1900,15 @@ const STR = {
     "tab-all": "All",
     "tab-ACTIVE": "Active",
     "tab-SLOW": "Slow",
-    "tab-DEAD": "Dead",
-    "tab-MISPLACED": "Transferable",
-    "tab-COMPANY_DEAD": "Discontinued",
+    "tab-DEAD": "Dead — branch only",
+    "tab-MISPLACED": "Misplaced",
+    "tab-COMPANY_DEAD": "Dead",
     "card-total": "Total stock",
     "card-ACTIVE": "Active",
     "card-SLOW": "Slow",
-    "card-DEAD": "Dead",
-    "card-MISPLACED": "Transferable",
-    "card-COMPANY_DEAD": "Discontinued",
+    "card-DEAD": "Dead — branch only",
+    "card-MISPLACED": "Misplaced",
+    "card-COMPANY_DEAD": "Dead",
     "filter-class-label": "Class",
     "card-problem-share": "Problem share",
     "col-cls": "Class",
@@ -2227,17 +2344,17 @@ const STR = {
     "block-stores": "5 家门市分布",
     "block-detail": "详细清单",
     "tab-all": "全部",
-    "tab-ACTIVE": "正常货",
-    "tab-SLOW": "慢货",
-    "tab-DEAD": "死货",
-    "tab-MISPLACED": "可调货",
-    "tab-COMPANY_DEAD": "全店死货",
+    "tab-ACTIVE": "活跃 Active",
+    "tab-SLOW": "慢销 Slow",
+    "tab-DEAD": "死货 — 仅本店 Dead (branch)",
+    "tab-MISPLACED": "错位 Misplaced",
+    "tab-COMPANY_DEAD": "呆死 Dead",
     "card-total": "总库存",
-    "card-ACTIVE": "正常货",
-    "card-SLOW": "慢货",
-    "card-DEAD": "死货",
-    "card-MISPLACED": "可调货",
-    "card-COMPANY_DEAD": "全店死货",
+    "card-ACTIVE": "活跃 Active",
+    "card-SLOW": "慢销 Slow",
+    "card-DEAD": "死货 — 仅本店 Dead (branch)",
+    "card-MISPLACED": "错位 Misplaced",
+    "card-COMPANY_DEAD": "呆死 Dead",
     "filter-class-label": "类别",
     "card-problem-share": "问题占比",
     "col-cls": "类别",
@@ -2776,10 +2893,10 @@ function enterApp() {
   if (VIEW_AS === 'warehouse') {
     initialView = 'warehouse';
   } else if (VIEW_AS === 'branch') {
-    // V1.5: store managers default-land on Sales (single-month, own store).
-    // Today's owner-focused 6-domain grid isn't useful for branch staff.
+    // V1.6: store managers land on Today, which now shows the manager-specific
+    // KPI table + per-branch Inventory state distribution. Sales is one click away.
     const url = viewFromUrl();
-    initialView = url && VIEW_ROUTES[url] ? url : 'sales';
+    initialView = url && VIEW_ROUTES[url] ? url : 'today';
   } else {
     const url = viewFromUrl();
     initialView = url && VIEW_ROUTES[url] ? url : 'today';
@@ -4134,6 +4251,111 @@ function buildMonthlyCompare(series, snap) {
   };
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   V1.6 — Store-manager helpers (per-branch 4-state classifier, KPI
+   table targets/actuals). Only used for store-manager Today + Sales
+   pages. Owner views are untouched.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* clsV16(row, ds) → 'Active' | 'Slow' | 'Misplaced' | 'Dead'
+   - Dead       : 全公司 90 天没卖
+   - Misplaced  : 本店 90 天没卖,但其他店有卖
+   - Slow       : 本店有卖,库存 ≥ 90 天销量(货堆太多)
+   - Active     : 本店有卖,库存 < 90 天销量(健康)
+   sku_branch_sales_3m is a per-SKU per-branch 90-day qty map (units). */
+function clsV16(r, ds) {
+  if (!r || !r.code) return 'Active';
+  ds = ds || window.WP_DEADSTOCK || {};
+  const sbs = ds.sku_branch_sales_3m || {};
+  const branchSales = sbs[r.code] || {};
+  let companySold = 0;
+  for (const b of Object.keys(branchSales)) companySold += +branchSales[b] || 0;
+  if (companySold === 0) return 'Dead';
+  const ownSold = +(branchSales[r.branch] || 0);
+  if (ownSold === 0) return 'Misplaced';
+  const stockQty = +(r.qty || 0);
+  return stockQty >= ownSold ? 'Slow' : 'Active';
+}
+
+/* Per-branch inventory distribution — sums r.amount per V1.6 class,
+   plus a row-count. Returns: { Active:{amt,n}, Slow:..., Misplaced:..., Dead:..., total }. */
+function branchInventoryDistV16(branch, ds) {
+  ds = ds || window.WP_DEADSTOCK || {};
+  const out = { Active:{amt:0,n:0}, Slow:{amt:0,n:0}, Misplaced:{amt:0,n:0}, Dead:{amt:0,n:0}, total:0 };
+  (ds.rows || []).forEach(r => {
+    if (!r || r.branch !== branch) return;
+    const c = clsV16(r, ds);
+    const amt = +(r.amount) || 0;
+    out[c].amt += amt;
+    out[c].n   += 1;
+    out.total  += amt;
+  });
+  return out;
+}
+
+function ymToMonthIdx(ym) {
+  if (!/^\d{4}-\d{2}$/.test(ym || '')) return -1;
+  return parseInt(ym.split('-')[1], 10) - 1;
+}
+
+/* getKpiActual(branch, kpi, ym) — kpi ∈ {'sales_rm','walkin','aov','cr'} */
+function getKpiActual(branch, kpi, ym) {
+  if (!branch || !ym) return null;
+  if (kpi === 'sales_rm') {
+    const sl = window.WP_SALES_LIVE || {};
+    const sbm = sl.sales_by_branch_month || {};
+    const v = (sbm[branch] || {})[ym];
+    return (v == null) ? null : +v;
+  }
+  const cd = window.WP_CUSTOMERS || {};
+  const race = cd.race || {};
+  const bf = (race.branches_full || {})[branch];
+  if (!bf || !bf.races || !bf.races.all) return null;
+  const idx = ymToMonthIdx(ym);
+  if (idx < 0) return null;
+  const all = bf.races.all;
+  if (kpi === 'walkin') { const v = all.walkin && all.walkin[idx]; return v == null ? null : +v; }
+  if (kpi === 'aov')    { const v = all.basket && all.basket[idx]; return v == null ? null : +v; }
+  if (kpi === 'cr')     { const v = all.cr     && all.cr[idx];     return v == null ? null : (+v) * 100; } // 0..1 → %
+  return null;
+}
+
+/* getKpiTarget(branch, kpi, ym) — read per-month target from GTD store.
+   Storage keys (set via GTD KPI table monthly cells with the suffix '_target'):
+     <branch>::target_month::<kpiId>::<monthIdx>   (preferred)
+     <branch>::target::<kpiId>                     (legacy global)
+     GTD_DEFAULT_KPIS[i].target                    (hard-coded default) */
+function getKpiTarget(branch, kpi, ym) {
+  const store = (typeof gtdLoadStore === 'function') ? gtdLoadStore() : {};
+  const kpiId = kpi === 'sales_rm' ? 'sales_rm'
+              : kpi === 'walkin'   ? 'walkin'
+              : kpi === 'aov'      ? 'avg_basket_rm'
+              : kpi === 'cr'       ? 'closing_rate'
+              : kpi;
+  const idx = ymToMonthIdx(ym);
+  const perMonthKey = `${branch}::target_month::${kpiId}::${idx}`;
+  if (store[perMonthKey] != null && store[perMonthKey] !== '') return +store[perMonthKey];
+  const branchKey = `${branch}::target::${kpiId}`;
+  if (store[branchKey] != null && store[branchKey] !== '') return +store[branchKey];
+  if (typeof GTD_DEFAULT_KPIS !== 'undefined') {
+    const def = GTD_DEFAULT_KPIS.find(k => k.id === kpiId);
+    if (def && def.target != null) return +def.target;
+  }
+  return null;
+}
+
+function kpiPctColor(actual, target) {
+  if (actual == null || target == null || !isFinite(actual) || !isFinite(target) || +target === 0) return '';
+  const pct = (+actual) / (+target);
+  if (pct >= 1.0) return 'kpi-ok';
+  if (pct >= 0.8) return 'kpi-warn';
+  return 'kpi-bad';
+}
+
+function v16ClassLabel(c) {
+  return LANG === 'zh' ? ({Active:'活跃 Active', Slow:'慢销 Slow', Misplaced:'错位 Misplaced', Dead:'呆死 Dead'}[c] || c) : c;
+}
+
 /* Render the 3 compare lines as inline HTML inside a sub container. */
 function renderCompareLines(compare, fmtVal) {
   if (!compare) return '';
@@ -4786,6 +5008,8 @@ function dsAlert(title, value, sub, tone, pendingNote) {
 
 /* ── Customers dashboard (V1 第四刀: 3 KPIs + 4 alerts) ───────── */
 function renderCustomersDashboard() {
+  // V1.6: Action Plan (3 cards) moved to Customers top for store managers.
+  try { renderV16CustomerActionPlan(); } catch(_){}
   // V1 第四刀: top 3 KPIs are now (1) cust type mix (2) repeat rate +
   // new vs old AOV (3) race walk-in CR. Existing 4 KPIs (members /
   // active / vet share / lapsed) preserved as the legacy chart context
@@ -5486,6 +5710,11 @@ const GTD_DEFAULT_TASKS = [
 ];
 
 const GTD_DEFAULT_KPIS = [
+  // V1.6: 2 new default KPIs at the top — Sales (RM) + Avg Basket (RM) — feed
+  // the store-manager Today KPI table. Per-month per-branch targets via the
+  // GTD KPI table.
+  { id: 'sales_rm',     name_en: 'Sales (RM)',          name_zh: '销售 (RM)',      target: 80000, unit: 'RM' },
+  { id: 'avg_basket_rm',name_en: 'Avg Basket (RM)',     name_zh: '客单价 (RM)',    target: 250,   unit: 'RM' },
   { id: 'walkin',      name_en: 'Walk-In Customers',  name_zh: '客流',         target: 350,  unit: '' },
   { id: 'closing_rate',name_en: 'Closing Rate %',     name_zh: '成交率 %',      target: 70,   unit: '%' },
   { id: 'gbp_reviews', name_en: 'New Google Reviews', name_zh: '新增 Google 评价', target: 15,  unit: '' },
@@ -6158,12 +6387,320 @@ function renderSalesDepth() {
     ? `⭐ Stars (高销·高利): ${q.star} · 🐮 Cash cows (高销·低利): ${q.cow} · ❓ Question marks (低销·高利): ${q.q} · 🐶 Dogs (低销·低利): ${q.dog}`
     : `⭐ Stars: ${q.star} · 🐮 Cash cows: ${q.cow} · ❓ Question marks: ${q.q} · 🐶 Dogs: ${q.dog}`;
 }
-// Wrap original Sales render to also paint depth sections
+// Wrap original Sales render to also paint depth sections.
+// V1.6: store managers get a wholly different Sales view (4-bar period
+// comparison + per-month per-branch category table + slim Top 20, no
+// Pareto / price-band / quadrant). Owner view is unchanged.
 const _origRenderSales = renderSalesDashboard;
 renderSalesDashboard = function() {
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    try { renderSalesManager(); } catch (e) { console.warn('renderSalesManager failed:', e); }
+    return;
+  }
+  // Owner: restore any sections we may have hidden in a previous manager render.
+  const view = document.getElementById('view-sales');
+  if (view) view.querySelectorAll('section.ds-section').forEach(s => { s.style.display = ''; });
   _origRenderSales();
   try { renderSalesDepth(); } catch (e) { console.warn('Sales depth render failed:', e); }
 };
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.6 — Sales dashboard for store managers.
+   Top 3 KPIs (single-month, branch-scoped, with aligned 3-row compare),
+   then 4-bar period chart, then per-month per-branch category table,
+   then slim Top 20 SKU table. No Pareto / price-band / quadrant.
+   ════════════════════════════════════════════════════════════════════ */
+function renderSalesManager() {
+  const sl   = window.WP_SALES_LIVE || {};
+  const ds   = window.WP_DEADSTOCK || {};
+  const sbm  = sl.sales_by_branch_month || {};
+  const skuABM = sl.sku_amt_by_month_branch || {};
+  const skuQBM = sl.sku_qty_by_month_branch || {};
+  const branch = window.BRANCH_VIEW;
+  const snap = snapMonth();
+  const lmKey = ymPrev(snap, 1);
+  const lyKey = ymPrev(snap, 12);
+
+  // ── Top 3 KPIs ────────────────────────────────────────────────────
+  const salesByMonth = {};
+  Object.keys(sbm[branch] || {}).forEach(ym => { salesByMonth[ym] = +sbm[branch][ym] || 0; });
+
+  // qty per month for this branch from sku_qty_by_month_branch[ym][branch][code]
+  const qtyByMonth = {};
+  Object.keys(skuQBM).forEach(ym => {
+    const m = (skuQBM[ym] || {})[branch] || {};
+    let total = 0;
+    for (const c of Object.keys(m)) total += +m[c] || 0;
+    qtyByMonth[ym] = total;
+  });
+  const aovByMonth = {};
+  for (const ym of Object.keys(salesByMonth)) {
+    const q = qtyByMonth[ym] || 0;
+    aovByMonth[ym] = q > 0 ? salesByMonth[ym] / q : 0;
+  }
+
+  const cmpSales = buildMonthlyCompare(salesByMonth, snap);
+  const cmpQty   = buildMonthlyCompare(qtyByMonth,   snap);
+  const cmpAov   = buildMonthlyCompare(aovByMonth,   snap);
+
+  function alignedCmp(c, fmtVal) {
+    if (!c) return '';
+    const arrow = (d) => d === 'up' ? '↑' : d === 'down' ? '↓' : '→';
+    const cls   = (d) => d === 'up' ? 'cmp-up' : d === 'down' ? 'cmp-down' : 'cmp-flat';
+    const pctStr = (v) => v.has ? (v.pct >= 0 ? '+' : '') + v.pct.toFixed(1) + '%' : '—';
+    const lLm  = LANG === 'zh' ? '上月       ' : 'Last month  ';
+    const lLyr = LANG === 'zh' ? '去年同月   ' : 'vs Last Year';
+    const lM6  = LANG === 'zh' ? '6 月均值   ' : '6m avg      ';
+    const ln = (v, prior, label) =>
+      '<div class="cmp-line ' + cls(v.dir) + '">' +
+        '<span class="v16-l">' + label + '</span>' +
+        '<span class="v16-v">: ' + fmtVal(prior) + '</span>' +
+        '<span class="v16-p">(' + pctStr(v) + ')</span>' +
+      '</div>';
+    return '<div class="cmp-lines v16-aligned">' +
+      ln(c.vs.lm,  c.lastMonth,     lLm) +
+      ln(c.vs.lyr, c.lastYearMonth, lLyr) +
+      ln(c.vs.m6,  c.sixMonthAvg,   lM6) +
+    '</div>';
+  }
+
+  const k1Val = cmpSales.single ? 'RM ' + fmtMoney(cmpSales.single) : '—';
+  const k2Val = cmpQty.single   ? fmt(Math.round(cmpQty.single)) + (LANG === 'zh' ? ' 件' : ' units') : '—';
+  const k3Val = cmpAov.single   ? 'RM ' + fmtMoney(cmpAov.single) : '—';
+  const subBase = (snap || '—') + ' · ' + branch;
+  const fmRm  = (n) => 'RM ' + fmtMoney(n);
+  const fmInt = (n) => fmt(Math.round(n));
+
+  function card(label, val, sub, cmpHtml, valCls) {
+    return '<div class="ds-card">' +
+      '<div class="label">' + label + '</div>' +
+      '<div class="value' + (valCls ? ' ' + valCls : '') + '">' + val + '</div>' +
+      '<div class="sub">' + sub + '</div>' +
+      cmpHtml +
+    '</div>';
+  }
+
+  const cardsEl = document.getElementById('dsSalesCards');
+  if (cardsEl) {
+    cardsEl.innerHTML =
+      card(LANG === 'zh' ? '该月销售 (RM)' : 'Month Sales (RM)', k1Val, subBase, alignedCmp(cmpSales, fmRm)) +
+      card(LANG === 'zh' ? '该月销售件数' : 'Units Sold',         k2Val, subBase, alignedCmp(cmpQty,   fmInt)) +
+      card(LANG === 'zh' ? '该月客单价 (RM)' : 'AOV (RM)',         k3Val, subBase, alignedCmp(cmpAov,   fmRm));
+  }
+
+  // ── 4-bar comparison chart (this branch) ──────────────────────────
+  const thisVal = +(sbm[branch] || {})[snap]   || 0;
+  const lmVal   = lmKey ? +(sbm[branch] || {})[lmKey] || 0 : 0;
+  const lyVal   = lyKey ? +(sbm[branch] || {})[lyKey] || 0 : 0;
+  const m6Avg   = cmpSales.sixMonthAvg || 0;
+  const labels = LANG === 'zh'
+    ? ['本月', '上月', '去年同月', '近 6 月均值']
+    : ['This Month', 'Last Month', 'Last Year (same mo)', '6M Avg'];
+  const data = [thisVal, lmVal, lyVal, Math.round(m6Avg)];
+  const titleEl = document.getElementById('dsSalesChartTitle');
+  if (titleEl) titleEl.textContent =
+    (LANG === 'zh' ? `4 期销售对比 · ${branch} · ` : `Sales 4-period comparison · ${branch} · `) + (snap || '—');
+  drawChart('dsSalesChart', {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: [BRAND_GREEN, BRAND_GREEN_SOFT, BRAND_AMBER, '#7C8FA6'] }] },
+    options: {
+      maintainAspectRatio: false, responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  // ── Action block ──────────────────────────────────────────────────
+  let zh, en;
+  if (thisVal > 0 && lmVal > 0) {
+    const mom = (thisVal - lmVal) / lmVal * 100;
+    if (mom < -10)      { zh = `${branch} 本月销售环比下跌 ${Math.abs(mom).toFixed(1)}% — 找客流 / 成交率 / 主推 SKU 三处的原因。`;
+                          en = `${branch} this month is ${Math.abs(mom).toFixed(1)}% down vs last month — investigate walk-in / closing rate / hero SKUs.`; }
+    else if (mom > 10)  { zh = `${branch} 本月环比上涨 ${mom.toFixed(1)}% — 把这次的好做法记下来,继续做。`;
+                          en = `${branch} this month is ${mom.toFixed(1)}% up vs last month — capture what worked, repeat it.`; }
+    else                { zh = `${branch} 本月销售与上月持平(${(mom>=0?'+':'')+mom.toFixed(1)}%)— 看 KPI 表找突破口。`;
+                          en = `${branch} this month is flat vs last month (${(mom>=0?'+':'')+mom.toFixed(1)}%) — use the KPI table to find a lever.`; }
+  } else {
+    zh = `${branch} ${snap || ''} 销售数据待载入。`;
+    en = `${branch} ${snap || ''} sales data pending.`;
+  }
+  const actEl = document.getElementById('dsSalesAction');
+  if (actEl) actEl.innerHTML = actionBlock(zh, en);
+  const drillEl = document.getElementById('dsSalesDrills');
+  if (drillEl) drillEl.innerHTML = '';
+
+  // ── Category table (per-branch, this month) ────────────────────────
+  // Map SKU code → category from ds.rows.
+  const codeToCat = {};
+  (ds.rows || []).forEach(r => { if (r && r.code && !codeToCat[r.code]) codeToCat[r.code] = (r.category || 'Uncategorised') || 'Uncategorised'; });
+
+  function catTotalsForMonth(ym) {
+    const out = {}; // cat -> { amt, qty, codes:Set }
+    const m = (skuABM[ym] || {})[branch] || {};
+    for (const code of Object.keys(m)) {
+      const cat = codeToCat[code] || 'Uncategorised';
+      if (!out[cat]) out[cat] = { amt: 0, qty: 0, codes: new Set() };
+      out[cat].amt += +m[code] || 0;
+      out[cat].codes.add(code);
+    }
+    const qm = (skuQBM[ym] || {})[branch] || {};
+    for (const code of Object.keys(qm)) {
+      const cat = codeToCat[code] || 'Uncategorised';
+      if (!out[cat]) out[cat] = { amt: 0, qty: 0, codes: new Set() };
+      out[cat].qty += +qm[code] || 0;
+      out[cat].codes.add(code);
+    }
+    return out;
+  }
+
+  const catThis = catTotalsForMonth(snap);
+  const catLm   = lmKey ? catTotalsForMonth(lmKey) : {};
+  const catLy   = lyKey ? catTotalsForMonth(lyKey) : {};
+  // 6M avg per cat across [snap-6 .. snap-1]
+  const m6Range = ymsRange(ymPrev(snap, 1), 6);
+  const cat6M   = {};
+  m6Range.forEach(ym => {
+    const t = catTotalsForMonth(ym);
+    for (const c of Object.keys(t)) {
+      if (!cat6M[c]) cat6M[c] = { amt: 0, count: 0 };
+      cat6M[c].amt += t[c].amt;
+      cat6M[c].count += 1;
+    }
+  });
+
+  const totalThis = Object.values(catThis).reduce((a, v) => a + v.amt, 0) || 1;
+  const catRows = Object.entries(catThis)
+    .map(([cat, v]) => {
+      const lmAmt = (catLm[cat] || {}).amt || 0;
+      const lyAmt = (catLy[cat] || {}).amt || 0;
+      const m6Amt = cat6M[cat] ? (cat6M[cat].amt / Math.max(1, cat6M[cat].count)) : 0;
+      return {
+        cat, amt: v.amt, qty: v.qty, skus: v.codes.size,
+        share: v.amt / totalThis * 100,
+        lmAmt, lyAmt, m6Amt,
+      };
+    })
+    .sort((a, b) => b.amt - a.amt);
+
+  function diffCell(cur, prior) {
+    if (!prior) return '<td class="num">—</td>';
+    const diff = cur - prior;
+    const pct  = prior !== 0 ? (cur - prior) / prior * 100 : 0;
+    const cls  = pct > 0.5 ? 'cmp-up' : pct < -0.5 ? 'cmp-down' : 'cmp-flat';
+    const sign = pct >= 0 ? '+' : '';
+    return '<td class="num ' + cls + '">RM ' + fmtMoney(Math.round(diff)) + ' (' + sign + pct.toFixed(1) + '%)</td>';
+  }
+
+  const catTbl = '<table class="v16-sales-cat-table"><thead><tr>' +
+    '<th>' + (LANG === 'zh' ? '品类' : 'Category') + '</th>' +
+    '<th class="num">SKU</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '该月 RM' : 'This month RM') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 上月' : 'vs Last Month') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 去年同月' : 'vs Last Year') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 6M 均值' : 'vs 6M avg') + '</th>' +
+    '</tr></thead><tbody>' +
+    catRows.map(r => '<tr>' +
+      '<td>' + escapeHtml(r.cat) + '</td>' +
+      '<td class="num">' + fmt(r.skus) + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(r.amt)) + '</td>' +
+      '<td class="num">' + r.share.toFixed(1) + '%</td>' +
+      diffCell(r.amt, r.lmAmt) + diffCell(r.amt, r.lyAmt) + diffCell(r.amt, r.m6Amt) +
+    '</tr>').join('') +
+    '</tbody></table>';
+  const catEl = document.getElementById('dsSalesCatTable');
+  if (catEl) catEl.innerHTML = '<div class="ci-table-wrap">' + catTbl + '</div>';
+
+  // ── Pareto / Price-band / Quadrant: hidden in manager view ────────
+  ['dsSalesParetoSummary','dsSalesParetoTitle','dsSalesPriceTitle','dsSalesQuadTitle','dsSalesQuadLegend'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
+  // Hide containing sections via parent <section.ds-section> visibility.
+  const view = document.getElementById('view-sales');
+  if (view) {
+    const sections = view.querySelectorAll('section.ds-section');
+    sections.forEach((s, i) => {
+      // Order on the page: 0=Category, 1=Pareto, 2=Top20, 3=Price, 4=Quad
+      if (i === 0 || i === 2) s.style.display = '';        // keep category + Top 20
+      else                    s.style.display = 'none';    // hide pareto + price + quad
+    });
+  }
+
+  // ── Top 20 SKU (per-branch, this month, slimmed cols) ─────────────
+  const skuThis = (skuABM[snap] || {})[branch] || {};
+  const skuLm   = lmKey ? (skuABM[lmKey] || {})[branch] || {} : {};
+  const skuLy   = lyKey ? (skuABM[lyKey] || {})[branch] || {} : {};
+  const skuM6   = {};
+  m6Range.forEach(ym => {
+    const m = (skuABM[ym] || {})[branch] || {};
+    for (const c of Object.keys(m)) skuM6[c] = (skuM6[c] || 0) + (+m[c] || 0);
+  });
+  for (const c of Object.keys(skuM6)) skuM6[c] = skuM6[c] / m6Range.length;
+
+  const top20 = Object.entries(skuThis)
+    .map(([code, amt]) => ({ code, amt: +amt || 0 }))
+    .sort((a, b) => b.amt - a.amt)
+    .slice(0, 20);
+
+  const top20Tbl = '<table class="v16-sales-top20-table"><thead><tr>' +
+    '<th>#</th>' +
+    '<th>SKU</th>' +
+    '<th class="num">' + (LANG === 'zh' ? '该月 RM' : 'This month RM') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 上月' : 'vs Last Month') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 去年同月' : 'vs Last Year') + '</th>' +
+    '<th class="num">' + (LANG === 'zh' ? 'vs 6M 均值' : 'vs 6M avg') + '</th>' +
+    '</tr></thead><tbody>' +
+    top20.map((s, i) => '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + escapeHtml(s.code) + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(s.amt)) + '</td>' +
+      diffCell(s.amt, +(skuLm[s.code] || 0)) +
+      diffCell(s.amt, +(skuLy[s.code] || 0)) +
+      diffCell(s.amt, +(skuM6[s.code] || 0)) +
+    '</tr>').join('') +
+    '</tbody></table>';
+  const top20El = document.getElementById('dsSalesTop20Table');
+  if (top20El) top20El.innerHTML = '<div class="ci-table-wrap">' + top20Tbl + '</div>';
+}
+window.renderSalesManager = renderSalesManager;
+
+/* V1.6 — Customer Action Plan (top of Customers page, store-manager only).
+   Reuses the existing collectTodayCandidates() + pickTodayThree() engine
+   so the cards behave identically to the old Today layer-2 cards. */
+function renderV16CustomerActionPlan() {
+  const el = document.getElementById('dsCustActionPlan');
+  if (!el) return;
+  if (!isBranchScoped()) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  let top3 = [];
+  try { top3 = pickTodayThree(collectTodayCandidates() || []); } catch(_) { top3 = []; }
+  const title = LANG === 'zh' ? '今日 3 件事' : '3 things to look at today';
+  const sub   = LANG === 'zh' ? '从本周数据自动选出' : 'auto-selected from this week\'s data';
+  if (!top3.length) {
+    el.innerHTML = '<div class="v16-cap-title">' + title + ' · <span style="color:var(--text-secondary);font-weight:400">' + sub + '</span></div>' +
+      '<div class="today-card empty">' + (typeof t === 'function' ? t('td-empty') : (LANG === 'zh' ? '今日无紧急事项' : 'Nothing urgent today')) + '</div>';
+    return;
+  }
+  const cards = top3.map(c => {
+    const tier = (typeof urgencyTier === 'function') ? urgencyTier(c.urgency) : 'low';
+    return '<div class="today-card urg-' + tier + '" data-jump="' + c.jump + '" data-kind="' + c.kind + '">' +
+      '<div class="td-icon">' + c.icon + '</div>' +
+      '<div class="td-body">' +
+        '<div class="td-title">' + c.title + '</div>' +
+        '<div class="td-interp">' + c.interp + '</div>' +
+        '<div class="td-action-label">' + (typeof t === 'function' ? t('td-action-label') : (LANG === 'zh' ? '建议:' : 'Action:')) + '</div>' +
+        '<div class="td-action">' + c.action + '</div>' +
+      '</div>' +
+      '<div class="td-actions-col">' +
+        '<button class="td-jump" type="button" data-jump-btn="' + c.jump + '">' + (typeof t === 'function' ? t('td-jump') : (LANG === 'zh' ? '前往' : 'Open')) + '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  el.innerHTML =
+    '<div class="v16-cap-title">' + title + ' · <span style="color:var(--text-secondary);font-weight:400">' + sub + '</span></div>' +
+    '<div class="today-cards">' + cards + '</div>';
+}
+window.renderV16CustomerActionPlan = renderV16CustomerActionPlan;
 
 /* ── Products depth: 品牌结构 (full brand portfolio) ──────────── */
 function renderProductsDepth() {
@@ -7075,6 +7612,21 @@ function computeBranchTraffic() {
 
 /* ── Render Today (V1 第三刀 · 4 layers) ────────────────────────── */
 function renderToday() {
+  // V1.6 — store-manager view replaces the Owner Today entirely.
+  if (typeof isBranchScoped === 'function' && isBranchScoped()) {
+    try { renderTodayManager(); } catch (e) { console.warn('renderTodayManager failed:', e); }
+    return;
+  }
+  // Restore owner Today layout (in case we previously hid layers for a manager).
+  ['todayStatus','todayBanner','todayDomainGrid','todayRoles','todayRestoreBar'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = '';
+  });
+  document.querySelectorAll('#view-today .today-section-title').forEach(el => { el.style.display = ''; });
+  ['todayCards','todayStores'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.display = ''; el.style.gridTemplateColumns = ''; el.classList.remove('v16-mgr-block'); }
+  });
+  // ── Owner Today below (untouched) ──
   const ds = window.WP_DEADSTOCK || {};
   const m  = ds.meta || {};
 
@@ -7235,6 +7787,145 @@ function renderToday() {
     }).join('');
   }
 }
+
+/* ── V1.6: Render Today for store managers ─────────────────────── */
+function renderTodayManager() {
+  const branch = window.BRANCH_VIEW;
+  const snap = snapMonth();
+
+  // Hide owner-only layers; reuse two existing containers + the section
+  // titles around them. Restore-bar / domain grid / banner / status hidden.
+  const hideIds = ['todayStatus', 'todayBanner', 'todayDomainGrid', 'todayRoles', 'todayRestoreBar'];
+  hideIds.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  // Hide all "today-section-title" headers from the owner layout — managers get their own.
+  document.querySelectorAll('#view-today .today-section-title').forEach(el => { el.style.display = 'none'; });
+
+  const cardsEl  = document.getElementById('todayCards');
+  const storesEl = document.getElementById('todayStores');
+  if (cardsEl)  cardsEl.style.display  = '';
+  if (storesEl) storesEl.style.display = '';
+  // Drop the .today-cards / .today-stores grid styling for our custom blocks.
+  if (cardsEl)  cardsEl.classList.add('v16-mgr-block');
+  if (storesEl) storesEl.classList.add('v16-mgr-block');
+
+  // ── Block 1: 本月业绩 KPI 表格 ──────────────────────────────────
+  const headline = LANG === 'zh'
+    ? `本月业绩 · ${snap || '—'} · ${branch}`
+    : `This month · ${snap || '—'} · ${branch}`;
+
+  const kpis = [
+    { id: 'sales_rm', name_en: 'Sales (RM)',          name_zh: '销售 (RM)',     fmt: (n) => 'RM ' + fmtMoney(Math.round(n)) },
+    { id: 'walkin',   name_en: 'Walk-in Customers',   name_zh: '客流',          fmt: (n) => fmt(Math.round(n)) },
+    { id: 'aov',      name_en: 'Avg Basket (RM)',     name_zh: '客单价 (RM)',   fmt: (n) => 'RM ' + fmtMoney(Math.round(n)) },
+    { id: 'cr',       name_en: 'Closing Rate',        name_zh: '成交率',        fmt: (n) => (+n).toFixed(1) + '%' },
+  ];
+
+  const headerRow =
+    '<thead><tr>' +
+      '<th>' + (LANG === 'zh' ? '指标' : 'KPI') + '</th>' +
+      '<th>' + (LANG === 'zh' ? '目标' : 'Target') + '</th>' +
+      '<th>' + (LANG === 'zh' ? '实际' : 'Actual') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '达成率' : 'Achievement') + '</th>' +
+    '</tr></thead>';
+  const bodyRows = kpis.map(k => {
+    const actual = getKpiActual(branch, k.id, snap);
+    const target = getKpiTarget(branch, k.id, snap);
+    const cls    = kpiPctColor(actual, target);
+    const pctStr = (actual != null && target != null && +target !== 0)
+      ? ((actual / target) * 100).toFixed(0) + '%'
+      : '—';
+    const pctIcon = cls === 'kpi-ok' ? '🟢' : cls === 'kpi-warn' ? '🟡' : cls === 'kpi-bad' ? '🔴' : '';
+    return '<tr>' +
+      '<td class="kpi-name">' + (LANG === 'zh' ? k.name_zh : k.name_en) + '</td>' +
+      '<td class="kpi-target">' + (target == null ? '—' : k.fmt(target)) + '</td>' +
+      '<td class="kpi-val">'    + (actual == null ? '—' : k.fmt(actual)) + '</td>' +
+      '<td class="kpi-pct ' + (cls || 'kpi-na') + '">' + pctIcon + ' ' + pctStr + '</td>' +
+    '</tr>';
+  }).join('');
+
+  if (cardsEl) {
+    cardsEl.style.display = 'block';
+    cardsEl.style.gridTemplateColumns = 'unset';
+    cardsEl.innerHTML =
+      '<div class="v16-mgr-headline">' +
+        '<div class="v16-headline-title">' + headline + '</div>' +
+        '<div class="v16-headline-meta">' + (LANG === 'zh'
+            ? 'Target 由 Owner 在 GTD 表设定 · 颜色:绿 ≥100% · 黄 80-99% · 红 <80%'
+            : 'Targets set by Owner in GTD · green ≥100% · yellow 80-99% · red <80%') + '</div>' +
+      '</div>' +
+      '<div class="v16-mgr-section-title">' + (LANG === 'zh' ? '本月业绩 KPI' : 'This-month KPI') + '</div>' +
+      '<table class="v16-kpi-table">' + headerRow + '<tbody>' + bodyRows + '</tbody></table>';
+  }
+
+  // ── Block 2: 本店 Inventory 状态分布 (V1.6 4-state, per-branch) ──
+  const ds   = window.WP_DEADSTOCK || {};
+  const meta = ds.meta || {};
+  const dist = branchInventoryDistV16(branch, ds);
+  const snapAsOf = meta.snapshot || snap || '—';
+
+  const distOrder = ['Active','Slow','Misplaced','Dead'];
+  const distHead =
+    '<thead><tr>' +
+      '<th>' + (LANG === 'zh' ? '状态' : 'Status') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '金额 (RM)' : 'Amount (RM)') + '</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '占比' : 'Share') + '</th>' +
+      '<th class="num">SKU</th>' +
+      '<th class="num">' + (LANG === 'zh' ? '下钻' : '') + '</th>' +
+    '</tr></thead>';
+  const distBody = distOrder.map(c => {
+    const r = dist[c] || { amt: 0, n: 0 };
+    const sharePct = dist.total ? (r.amt / dist.total * 100) : 0;
+    return '<tr data-v16-state="' + c + '">' +
+      '<td class="v16-name v16-' + c + '">' + v16ClassLabel(c) + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(r.amt)) + '</td>' +
+      '<td class="num">' + sharePct.toFixed(1) + '%</td>' +
+      '<td class="num">' + fmt(r.n) + '</td>' +
+      '<td class="num v16-arrow">→</td>' +
+    '</tr>';
+  }).join('');
+  const distFoot =
+    '<tfoot><tr>' +
+      '<td>' + (LANG === 'zh' ? '总计' : 'Total') + '</td>' +
+      '<td class="num">RM ' + fmtMoney(Math.round(dist.total)) + '</td>' +
+      '<td class="num">100.0%</td>' +
+      '<td class="num">' +
+        fmt(distOrder.reduce((a, c) => a + ((dist[c] || {}).n || 0), 0)) +
+      '</td>' +
+      '<td></td>' +
+    '</tr></tfoot>';
+
+  if (storesEl) {
+    storesEl.style.display = 'block';
+    storesEl.style.gridTemplateColumns = 'unset';
+    storesEl.innerHTML =
+      '<div class="v16-mgr-section-title">' +
+        (LANG === 'zh' ? '本店 Inventory 状态' : 'This-store Inventory state') +
+      '</div>' +
+      '<div class="v16-mgr-section-sub">' +
+        (LANG === 'zh'
+          ? `${branch} · 总值 RM ${fmtMoney(Math.round(dist.total))} · 快照 截止 ${snapAsOf}`
+          : `${branch} · Total RM ${fmtMoney(Math.round(dist.total))} · snapshot as of ${snapAsOf}`) +
+      '</div>' +
+      '<table class="v16-inv-dist">' + distHead + '<tbody>' + distBody + '</tbody>' + distFoot + '</table>';
+
+    // Click row → navigate to Inventory dead-stock list with state pre-filter.
+    storesEl.querySelectorAll('tbody tr[data-v16-state]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const v16 = tr.getAttribute('data-v16-state');
+        // V1.6 → backend-class mapping (best single match; imperfect because the
+        // old DEAD class folds into our new Misplaced when other branches sold).
+        const mapping = { Active:'ACTIVE', Slow:'SLOW', Misplaced:'MISPLACED', Dead:'COMPANY_DEAD' };
+        const targetCls = mapping[v16] || 'all';
+        try {
+          if (typeof CUR_TAB !== 'undefined') CUR_TAB = targetCls;
+          if (typeof persistStatusToUrl === 'function') persistStatusToUrl(targetCls);
+          setView('deadstock');
+        } catch(_) {}
+      });
+    });
+  }
+}
+window.renderTodayManager = renderTodayManager;
 
 /* ── Render Customer Churn page ─────────────────────────────────── */
 function renderChurn() {
