@@ -1657,52 +1657,113 @@ test.describe('Round 11 — V1 第四刀: Products / Inventory / Customers', () 
     expect(total).toBeGreaterThan(500);
   });
 
-  test('Products dashboard: top 3 KPIs render (velocity / stockout / push)', async ({ page }) => {
+  test('Products dashboard: top 3 KPIs render (single-month + compare)', async ({ page }) => {
+    // V1 第四刀 返工: KPIs are now SINGLE-MONTH-aware. Without /api/sales mock
+    // they fall back to '—' (no Raw sale data baked in static deadstock-data).
+    // Mock /api/sales to return a payload with sku_amt_by_month so KPI 1
+    // ("该月销售总额") renders an RM value. Also asserts compare lines exist.
+    const salesPayload = {
+      ok: true, source: 'test', sheet_id: 'TEST',
+      months: ['2026-02','2026-03','2026-04'], groups: [],
+      matrix: {}, by_month: {}, by_group: {},
+      latest_month: '2026-04', rows_n: 3,
+      sales_by_branch_month: { W01: { '2026-03': 50000, '2026-04': 55000 } },
+      total_amt_by_month: { '2026-02': 280000, '2026-03': 350000, '2026-04': 360000 },
+      sku_amt_by_month: {
+        '2026-02': { 'AAA': 100000, 'BBB': 80000 },
+        '2026-03': { 'AAA': 120000, 'BBB': 90000, 'CCC': 50000 },
+        '2026-04': { 'AAA': 140000, 'BBB': 95000, 'CCC': 60000 },
+      },
+      sku_qty_by_month: {
+        '2026-04': { 'AAA': 14, 'BBB': 9, 'CCC': 6 },
+      },
+      months_seen: ['2026-02','2026-03','2026-04'],
+      branches_seen: ['W01'], _raw_ok: true, active_branches: ['W01'],
+    };
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(salesPayload)
+    }));
     await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._raw_ok === true, { timeout: 8000 });
     await page.evaluate(() => (window as any).setView('products'));
     await page.waitForSelector('#view-products.on');
     await page.waitForSelector('#dsProdCards .ds-card', { timeout: 5000 });
     const cards = await page.locator('#dsProdCards .ds-card .value').allTextContents();
     expect(cards).toHaveLength(3);
-    // KPI 1 — SKU Velocity Index, must be a numeric % between 0-100
-    const v1 = parseFloat((cards[0] || '').replace(/[^\d.]/g, ''));
-    expect(v1).toBeGreaterThan(0);
-    expect(v1).toBeLessThanOrEqual(100);
+    // KPI 1 — 该月销售总额 must show RM value (not '—')
+    expect(cards[0]).toMatch(/RM/);
+    // 3 compare lines under each KPI
+    const cmpLines = await page.locator('#dsProdCards .ds-card .cmp-line').count();
+    expect(cmpLines).toBeGreaterThanOrEqual(6);   // ≥2 cards × 3 lines (third KPI may have null compare)
     // Alert grid present with 4 cards
-    const alertCount = await page.locator('#dsProdAlerts .ds-alert').count();
-    expect(alertCount).toBe(4);
+    expect(await page.locator('#dsProdAlerts .ds-alert').count()).toBe(4);
   });
 
-  test('Products dashboard: alerts include "Strategic_Push placeholder" honest note', async ({ page }) => {
+  test('Products dashboard: price-band, top-categories, top-20-SKU sections render with toggles', async ({ page }) => {
+    const salesPayload = {
+      ok: true, source: 'test', sheet_id: 'TEST',
+      months: ['2026-04'], groups: [], matrix: {}, by_month: {}, by_group: {},
+      latest_month: '2026-04', rows_n: 1,
+      sales_by_branch_month: { W01: { '2026-04': 10000 } },
+      total_amt_by_month: { '2026-04': 10000 },
+      sku_amt_by_month: { '2026-04': { 'AAA': 5000, 'BBB': 3000, 'CCC': 2000 } },
+      sku_qty_by_month: { '2026-04': { 'AAA': 5, 'BBB': 3, 'CCC': 2 } },
+      months_seen: ['2026-04'], branches_seen: ['W01'],
+      _raw_ok: true, active_branches: ['W01'],
+    };
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(salesPayload)
+    }));
     await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._raw_ok === true, { timeout: 8000 });
     await page.evaluate(() => (window as any).setView('products'));
     await page.waitForSelector('#view-products.on');
-    await page.waitForSelector('#dsProdCards .ds-card', { timeout: 5000 });
-    const subText = await page.locator('#dsProdCards .ds-card').nth(2).locator('.sub').innerText();
-    // Must mention placeholder / Strategic_Push / 占位 — i.e. an honest disclaimer
-    expect(subText.toLowerCase()).toMatch(/placeholder|strategic_push|占位/);
-    // Migration alert (#3) must show pending note (no daily snapshot infra yet)
-    const alert3pending = await page.locator('#dsProdAlerts .ds-alert').nth(2).locator('.ds-alert-pending').isVisible();
-    expect(alert3pending).toBe(true);
+    // Three new sections all visible
+    await expect(page.locator('#dsProdPriceSection')).toBeVisible();
+    await expect(page.locator('#dsProdCatSection')).toBeVisible();
+    await expect(page.locator('#dsProdTop20Section')).toBeVisible();
+    // Each toggle has 3 pills (single / 6M / 12M) with single selected
+    const pills = await page.locator('#dsProdTop20Toggle .rank-pill').count();
+    expect(pills).toBe(3);
+    const onPill = await page.locator('#dsProdTop20Toggle .rank-pill.on').getAttribute('data-rank-mode');
+    expect(onPill).toBe('single');
+    // Click 12M pill → state flips
+    await page.locator('#dsProdTop20Toggle .rank-pill[data-rank-mode="m12"]').click();
+    await page.waitForTimeout(150);
+    const newOn = await page.locator('#dsProdTop20Toggle .rank-pill.on').getAttribute('data-rank-mode');
+    expect(newOn).toBe('m12');
   });
 
-  test('Inventory dashboard: 4 KPIs render with health/gap/stockout/oem', async ({ page }) => {
+  test('Inventory dashboard: 4 KPIs (snapshot label + monthly PO/gap)', async ({ page }) => {
+    const salesPayload = {
+      ok: true, source: 'test', sheet_id: 'TEST',
+      months: ['2026-03','2026-04'], groups: ['Faucet'],
+      matrix: { '2026-03': { 'Faucet': { po: 100000, grn: 90000 } },
+                '2026-04': { 'Faucet': { po: 120000, grn: 100000 } } },
+      by_month: {}, by_group: {}, latest_month: '2026-04', rows_n: 2,
+      sales_by_branch_month: {}, total_amt_by_month: { '2026-03': 350000, '2026-04': 380000 },
+      sku_amt_by_month: {}, sku_qty_by_month: {},
+      months_seen: ['2026-03','2026-04'], _raw_ok: true,
+    };
+    await page.route('**/api/sales*', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(salesPayload)
+    }));
     await loginOwner(page);
+    await page.waitForFunction(() => (window as any).WP_SALES_LIVE && (window as any).WP_SALES_LIVE._raw_ok === true, { timeout: 8000 });
     await page.evaluate(() => (window as any).setView('inventory'));
     await page.waitForSelector('#view-inventory.on');
     await page.waitForSelector('#dsInvCards .ds-card', { timeout: 5000 });
     const cards = await page.locator('#dsInvCards .ds-card').count();
     expect(cards).toBe(4);
-    // KPI 1 (health %) must be a number, not "—"
-    const k1 = await page.locator('#dsInvCards .ds-card .value').nth(0).innerText();
-    expect(k1).toMatch(/^\d/);
-    // KPI 2 (order gap) and KPI 4 (oem-agency) are 待补 — value should be "—"
-    const k2 = await page.locator('#dsInvCards .ds-card .value').nth(1).innerText();
-    expect(k2.trim()).toBe('—');
-    const k4 = await page.locator('#dsInvCards .ds-card .value').nth(3).innerText();
-    expect(k4.trim()).toBe('—');
-    // 4 alert cards
-    expect(await page.locator('#dsInvAlerts .ds-alert').count()).toBe(4);
+    // KPI 1 — snapshot label "截止 X 数据" / "as of"
+    const k1Sub = await page.locator('#dsInvCards .ds-card').nth(0).locator('.sub').innerText();
+    expect(k1Sub).toMatch(/截止|as of/);
+    // KPI 2 — this month PO total (real, RM value)
+    const k2Val = await page.locator('#dsInvCards .ds-card .value').nth(1).innerText();
+    expect(k2Val).toMatch(/RM/);
+    // KPI 4 — gap (sales - PO), real RM value with sign
+    const k4Val = await page.locator('#dsInvCards .ds-card .value').nth(3).innerText();
+    expect(k4Val).toMatch(/RM/);
   });
 
   test('Customers dashboard: 3 KPIs render (top 100 + cross_by_window mocked)', async ({ page }) => {

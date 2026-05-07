@@ -975,6 +975,28 @@ footer.app-footer {
 .ds-section-title { font-size: 16px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
 .ds-section-sub { font-size: 12px; color: var(--text-meta); margin: 0 0 12px; line-height: 1.5; }
 
+/* V1 第四刀 返工: 3-line monthly comparison block under each KPI value */
+.ds-card .cmp-lines { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.ds-card .cmp-line {
+  font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-meta);
+  line-height: 1.4; display: flex; align-items: baseline; gap: 4px;
+}
+.ds-card .cmp-line .cmp-arrow { width: 10px; display: inline-block; font-weight: 600; }
+.ds-card .cmp-line.cmp-up    { color: var(--ok, #1F5F4A); }
+.ds-card .cmp-line.cmp-down  { color: var(--danger, #C04848); }
+.ds-card .cmp-line.cmp-flat  { color: var(--text-meta); }
+.ds-card .cmp-line .cmp-pct  { font-weight: 600; }
+
+/* V1 第四刀 返工: ranking toggle pills [单月][6M][12M] */
+.rank-toggle { display: inline-flex; gap: 6px; margin: 4px 0 12px; }
+.rank-toggle .rank-pill {
+  background: #fff; border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--text-meta);
+  font-weight: 500; transition: all 0.08s;
+}
+.rank-toggle .rank-pill:hover { color: var(--text); border-color: var(--brand, #1F5F4A); }
+.rank-toggle .rank-pill.on    { background: var(--brand, #1F5F4A); color: #fff; border-color: var(--brand, #1F5F4A); }
+
 /* V1 第四刀: per-dashboard alert-card grid (4 alerts under top KPIs) */
 .ds-alert-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
@@ -1317,15 +1339,40 @@ footer.app-footer {
         <div class="drill-links" id="dsCustDrills"></div>
       </div>
 
-      <!-- ── View: Products (V1 第四刀: 3 KPIs + 4 alert cards + actions) ── -->
+      <!-- ── View: Products (V1 第四刀 返工: monthly KPIs + price-band TOP + ranking toggles) ── -->
       <div class="view" id="view-products">
         <h1 class="page-title" data-i18n="ds-prod-title">Products</h1>
-        <p class="page-sub" data-i18n="ds-prod-sub">SKU Velocity Index · Top SKU 异常 · Strategic Push 追踪 · ABCD 等级。</p>
+        <p class="page-sub" data-i18n="ds-prod-sub">单月 SKU 销售 · 价格带分布 · Top 品类 · Top 20 SKU · 全部支持 6M/12M 对比。</p>
+        <!-- KPIs: single-month with 3-line compare under each value -->
         <div class="ds-cards" id="dsProdCards"></div>
-        <!-- V1 第四刀: 4 alert cards (Products) -->
+        <!-- 4 alert cards (Products) -->
         <div class="ds-alert-grid" id="dsProdAlerts"></div>
+        <!-- V1 第四刀 返工: 价格带 PROMOTED to top of dashboard (Jym 强调重要) -->
+        <section class="ds-section" id="dsProdPriceSection">
+          <h2 class="ds-section-title" data-i18n="ds-prod-price-title">价格带 — Price-band distribution</h2>
+          <p class="ds-section-sub" data-i18n="ds-prod-price-sub">SKU 数 + 销售额按 5 档单价区间(RM)。默认单月,可切 6M/12M。</p>
+          <div id="dsProdPriceToggle"></div>
+          <div class="chart-wrap"><div class="chart-title" id="dsProdPriceTitle"></div>
+            <canvas id="dsProdPriceChart" height="120" aria-label="Price band distribution"></canvas>
+          </div>
+        </section>
+        <!-- V1 第四刀 返工: Top 10 categories ranking with toggle -->
+        <section class="ds-section" id="dsProdCatSection">
+          <h2 class="ds-section-title" data-i18n="ds-prod-cat-title">品类 — Top 10 by sales</h2>
+          <p class="ds-section-sub" data-i18n="ds-prod-cat-sub">默认单月销售排名 · toggle 切 6M / 12M 累计。</p>
+          <div id="dsProdCatToggle"></div>
+          <div id="dsProdCatTable"></div>
+        </section>
+        <!-- V1 第四刀 返工: Top 20 SKU ranking with toggle -->
+        <section class="ds-section" id="dsProdTop20Section">
+          <h2 class="ds-section-title" data-i18n="ds-prod-top20-title">Top 20 SKU — Best sellers</h2>
+          <p class="ds-section-sub" data-i18n="ds-prod-top20-sub">默认单月 · toggle 切 6M / 12M · 来自 Raw sale tab 实数。</p>
+          <div id="dsProdTop20Toggle"></div>
+          <div id="dsProdTop20Table"></div>
+        </section>
+        <!-- 12M trend chart kept (relabelled) -->
         <div class="chart-wrap"><div class="chart-title" id="dsProdChartTitle"></div>
-          <canvas id="dsProdChart" height="140" aria-label="Brand GP ranking"></canvas>
+          <canvas id="dsProdChart" height="140" aria-label="Brand GP — 12M trend"></canvas>
         </div>
         <div id="dsProdAction"></div>
         <section class="ds-section">
@@ -1927,6 +1974,15 @@ const STR = {
     "ds-prod-kpi-velocity":   "SKU Velocity Index",
     "ds-prod-kpi-stockout":   "Top SKU stockout alerts",
     "ds-prod-kpi-push":       "Strategic Push tracking",
+    "ds-prod-kpi-month-sales": "This month's total sales",
+    "ds-prod-kpi-month-skus":  "Active SKUs this month",
+    "ds-prod-kpi-month-top":   "Top SKU this month",
+    "ds-prod-cat-title":      "Top 10 categories — by sales",
+    "ds-prod-cat-sub":        "Single-month default · toggle to 6M / 12M cumulative.",
+    "ds-prod-top20-title":    "Top 20 SKU — best sellers",
+    "ds-prod-top20-sub":      "Single-month default · toggle 6M / 12M · live from Raw sale tab.",
+    "ds-prod-price-title":    "Price-band — unit-cost distribution",
+    "ds-prod-price-sub":      "SKU count + sales across 5 unit-cost bands. Single-month default.",
     "ds-prod-vel-pending":    "3m sales data missing — refresh in a moment",
     "ds-prod-stock-pending":  "stock × velocity match pending data load",
     "ds-prod-push-pending":   "Sheet has no Strategic_Push column yet — using top-5 sales as placeholder",
@@ -1937,10 +1993,11 @@ const STR = {
     "ds-prod-alert-pro-pref-title": "Designer / Contractor SKU preference",
     "ds-prod-alert-pro-pref-pending":"per-cust-type × per-SKU map needs Customer Buy + Item Sales join — pending",
 
-    "ds-inv-kpi-health":      "Inventory health",
-    "ds-inv-kpi-gap":         "Order gap alert",
+    "ds-inv-kpi-health":      "Inventory health (snapshot)",
+    "ds-inv-kpi-gap":         "This month sales − PO gap",
     "ds-inv-kpi-stockout":    "Stockout SKU count",
     "ds-inv-kpi-oem-agency":  "OEM vs Agency",
+    "ds-inv-kpi-po":          "This month PO total",
     "ds-inv-alert-oem-cal-title":   "OEM (China) PO calendar",
     "ds-inv-alert-oem-cal-pending": "Per-SKU PO history + Country field needed — pending",
     "ds-inv-alert-transfer-title":  "Transfer opportunities (misplaced)",
@@ -2352,6 +2409,15 @@ const STR = {
     "ds-prod-kpi-velocity":   "SKU 周转健康度",
     "ds-prod-kpi-stockout":   "Top SKU 异常告警",
     "ds-prod-kpi-push":       "Strategic Push 追踪",
+    "ds-prod-kpi-month-sales": "该月销售总额",
+    "ds-prod-kpi-month-skus":  "该月活跃 SKU 数",
+    "ds-prod-kpi-month-top":   "该月销售冠军 SKU",
+    "ds-prod-cat-title":      "Top 10 品类 — 按销售排名",
+    "ds-prod-cat-sub":        "默认单月 · toggle 切 6M / 12M 累计。",
+    "ds-prod-top20-title":    "Top 20 SKU — 销售冠军",
+    "ds-prod-top20-sub":      "默认单月 · toggle 切 6M / 12M · 来自 Raw sale tab 实数。",
+    "ds-prod-price-title":    "价格带 — 单价分布",
+    "ds-prod-price-sub":      "SKU 数 + 销售按 5 档单价。默认单月,可切 6M/12M。",
     "ds-prod-vel-pending":    "3 月销售数据加载中,稍候点 Refresh",
     "ds-prod-stock-pending":  "库存 × 周转匹配数据待载",
     "ds-prod-push-pending":   "Sheet 还没加 Strategic_Push 列,先用销售 Top 5 占位",
@@ -2362,10 +2428,11 @@ const STR = {
     "ds-prod-alert-pro-pref-title": "Designer/Contractor SKU 偏好",
     "ds-prod-alert-pro-pref-pending":"需 Customer Buy × Item Sales 联表,待补",
 
-    "ds-inv-kpi-health":      "库存健康度",
-    "ds-inv-kpi-gap":         "订单缺口预警",
+    "ds-inv-kpi-health":      "库存健康度(快照)",
+    "ds-inv-kpi-gap":         "该月销售 − PO 缺口",
     "ds-inv-kpi-stockout":    "断货 SKU 预警",
     "ds-inv-kpi-oem-agency":  "OEM vs Agency",
+    "ds-inv-kpi-po":          "该月 PO 总额",
     "ds-inv-alert-oem-cal-title":   "OEM (中国) PO 周期日历",
     "ds-inv-alert-oem-cal-pending": "需逐 SKU PO 历史 + Country 字段,待补",
     "ds-inv-alert-transfer-title":  "调拨机会(错位)",
@@ -3877,6 +3944,165 @@ function dsCard(label, value, sub, valueClass) {
     (sub ? '<div class="sub">' + sub + '</div>' : '') +
     '</div>';
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   V1 第四刀 返工 — UNIVERSAL monthly + 3-line compare + ranking toggle.
+   Every domain dashboard (Products / Inventory / Customers / Today / 6
+   domain grid) follows the same pattern:
+     ① KPIs default to the SELECTED month's number (NOT 12m / NOT trailing).
+     ② Each KPI shows three small comparison lines underneath:
+          ↑/↓ vs last month   X.X%
+          ↑/↓ vs same month last year   X.X%
+          →/↑/↓ vs 6m average   X.X%
+     ③ Trend chart preserved underneath, labelled "12M 趋势".
+     ④ Ranking tables (Top SKU / Top category / Top customer) get a toggle
+        [单月] [近 6 月] [近 12 月], default 单月.
+     ⑤ Inventory snapshot KPIs are clearly labelled "截止 YYYY-MM 数据".
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Pull the current selected month label.                                  */
+function snapMonth() {
+  return window.SNAPSHOT || (window.WP_DEADSTOCK?.meta?.snapshot) || '';
+}
+
+/* Date-arithmetic helpers (string YYYY-MM in / out, no Date object).
+   Avoids timezone surprises across MY / UTC / Vercel-edge.               */
+function ymPrev(ym, n) {
+  if (!/^\d{4}-\d{2}$/.test(ym)) return null;
+  const [yy, mm] = ym.split('-').map(Number);
+  let m = mm - (n || 1);
+  let y = yy;
+  while (m <= 0) { m += 12; y--; }
+  while (m > 12) { m -= 12; y++; }
+  return `${y}-${String(m).padStart(2,'0')}`;
+}
+function ymsRange(latestYm, n) {
+  // returns [latest-n+1, ..., latest] in chronological order
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(ymPrev(latestYm, i));
+  return out;
+}
+
+/* Given a per-month numeric series (object keyed by 'YYYY-MM'), returns
+   the comparison block for the selected snapshot:
+     { single, lastMonth, lastYearMonth, sixMonthAvg, trail12, vs }
+     vs = { lm: {amt, pct, dir}, lyr: {...}, m6: {...} }                   */
+function buildMonthlyCompare(series, snap) {
+  const s = series || {};
+  const single = +s[snap] || 0;
+  const lmKey = ymPrev(snap, 1);
+  const lyrKey = ymPrev(snap, 12);
+  const lastMonth = lmKey ? (+s[lmKey] || 0) : 0;
+  const lastYearMonth = lyrKey ? (+s[lyrKey] || 0) : 0;
+  // 6m avg = mean of months [snap-6 .. snap-1] (excludes the snapshot month)
+  const m6Keys = ymsRange(ymPrev(snap, 1), 6);
+  let m6Sum = 0, m6Count = 0;
+  for (const k of m6Keys) {
+    if (s[k] !== undefined && s[k] !== null) { m6Sum += +s[k] || 0; m6Count++; }
+  }
+  const sixMonthAvg = m6Count ? m6Sum / m6Count : 0;
+  // 12m trailing total
+  let trail12 = 0;
+  for (const k of ymsRange(snap, 12)) trail12 += +s[k] || 0;
+
+  const cmp = (cur, prior) => {
+    if (!prior) return { amt: cur - prior, pct: null, dir: 'flat', has: false };
+    const pct = (cur - prior) / prior * 100;
+    return { amt: cur - prior, pct, dir: pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat', has: true };
+  };
+  return {
+    single, lastMonth, lastYearMonth, sixMonthAvg, trail12,
+    vs: {
+      lm:  cmp(single, lastMonth),
+      lyr: cmp(single, lastYearMonth),
+      m6:  cmp(single, sixMonthAvg),
+    },
+  };
+}
+
+/* Render the 3 compare lines as inline HTML inside a sub container. */
+function renderCompareLines(compare, fmtVal) {
+  if (!compare) return '';
+  const fv = fmtVal || ((n) => 'RM ' + fmtMoney(n));
+  const arrow = (d) => d === 'up' ? '↑' : d === 'down' ? '↓' : '→';
+  const cls = (d) => d === 'up' ? 'cmp-up' : d === 'down' ? 'cmp-down' : 'cmp-flat';
+  const pctStr = (v) => v.has ? (v.pct >= 0 ? '+' : '') + v.pct.toFixed(1) + '%' : '—';
+  const labelLm  = LANG === 'zh' ? '上月'        : 'last month';
+  const labelLyr = LANG === 'zh' ? '去年同月'    : 'same month last yr';
+  const labelM6  = LANG === 'zh' ? '近 6 月均值' : '6m avg';
+  const line = (v, prior, label) =>
+    '<div class="cmp-line ' + cls(v.dir) + '"><span class="cmp-arrow">' + arrow(v.dir) +
+    '</span>' + label + ' ' + fv(prior) + ' (<span class="cmp-pct">' + pctStr(v) + '</span>)</div>';
+  return '<div class="cmp-lines">' +
+    line(compare.vs.lm,  compare.lastMonth,     labelLm) +
+    line(compare.vs.lyr, compare.lastYearMonth, labelLyr) +
+    line(compare.vs.m6,  compare.sixMonthAvg,   labelM6) +
+  '</div>';
+}
+
+/* dsCard variant that bakes in the 3-line compare block under the sub. */
+function dsCardCompare(label, value, compare, opts) {
+  const o = opts || {};
+  const valueCls = o.valueClass ? ' ' + o.valueClass : '';
+  const fv = o.fmtVal || ((n) => 'RM ' + fmtMoney(n));
+  return '<div class="ds-card">' +
+    '<div class="label">' + label + '</div>' +
+    '<div class="value' + valueCls + '">' + value + '</div>' +
+    (o.sub ? '<div class="sub">' + o.sub + '</div>' : '') +
+    renderCompareLines(compare, fv) +
+    '</div>';
+}
+
+/* Dashboard-level ranking toggle pills. State lives in window.WP_RANK_MODE.
+   `key` identifies the ranking section (e.g. 'prod-cat', 'prod-sku'). */
+window.WP_RANK_MODE = window.WP_RANK_MODE || {};
+function getRankMode(key) { return window.WP_RANK_MODE[key] || 'single'; }
+function setRankMode(key, mode) {
+  window.WP_RANK_MODE[key] = mode;
+  // Re-render whatever active dashboard we're on so the toggle takes effect.
+  try { rerenderActiveView(); } catch(_){}
+}
+function rankingToggleHtml(key) {
+  const cur = getRankMode(key);
+  const pill = (mode, label) =>
+    '<button class="rank-pill' + (cur === mode ? ' on' : '') + '" type="button" data-rank-key="' + key + '" data-rank-mode="' + mode + '">' + label + '</button>';
+  return '<div class="rank-toggle">' +
+    pill('single', LANG === 'zh' ? '单月' : 'single') +
+    pill('m6',     LANG === 'zh' ? '近 6 月' : '6M') +
+    pill('m12',    LANG === 'zh' ? '近 12 月' : '12M') +
+  '</div>';
+}
+
+/* Resolve a SKU amount for a given mode, given sku_amt_by_month + snap. */
+function skuAmtForMode(skuAmtByMonth, snap, mode) {
+  const out = {};
+  if (mode === 'single') {
+    const m = (skuAmtByMonth || {})[snap] || {};
+    return Object.assign({}, m);
+  }
+  const months = mode === 'm6' ? ymsRange(snap, 6) : ymsRange(snap, 12);
+  for (const ym of months) {
+    const m = (skuAmtByMonth || {})[ym] || {};
+    for (const code of Object.keys(m)) {
+      out[code] = (out[code] || 0) + (+m[code] || 0);
+    }
+  }
+  return out;
+}
+function skuQtyForMode(skuQtyByMonth, snap, mode) {
+  return skuAmtForMode(skuQtyByMonth, snap, mode);  // same shape, different units
+}
+
+/* Wire ranking-pill clicks once per page load. */
+(function wireRankingToggle() {
+  if (window.__rank_wired) return;
+  window.__rank_wired = true;
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-rank-key][data-rank-mode]');
+    if (!btn) return;
+    setRankMode(btn.getAttribute('data-rank-key'), btn.getAttribute('data-rank-mode'));
+  });
+})();
 function drillTile(viewKey, labelKey, subKey, icon, disabled) {
   // viewKey is the slash-form route (e.g. 'stock/dead'). Click → setView.
   const dis = disabled ? ' disabled' : '';
@@ -4437,9 +4663,26 @@ function renderCustomersDashboard() {
     if (best.cr < 0.5) kpi3Cls = 'warn';
   }
 
+  // V1 第四刀 返工: build per-month series for compare lines.
+  // Active-members and amt_total are already exposed per month via summary_by_month.
+  const cd_local = window.WP_CUSTOMERS || {};
+  const sbmonth = cd_local.summary_by_month || {};
+  const snapForCmp = snapMonth();
+  const activeSeries = {}, amtSeries = {};
+  for (const ym of Object.keys(sbmonth)) {
+    activeSeries[ym] = +(sbmonth[ym] || {}).n_active || 0;
+    amtSeries[ym]    = +(sbmonth[ym] || {}).amt_total || 0;
+  }
+  const cmpActive = buildMonthlyCompare(activeSeries, snapForCmp);
+  const cmpAmt    = buildMonthlyCompare(amtSeries, snapForCmp);
+
   document.getElementById('dsCustCards').innerHTML =
-    dsCard(t('ds-cust-kpi-mix'),     kpi1Val, kpi1Sub, kpi1Cls) +
-    dsCard(t('ds-cust-kpi-repeat'),  kpi2Val, kpi2Sub, kpi2Cls) +
+    dsCardCompare(t('ds-cust-kpi-mix'),  kpi1Val, cmpActive,
+                  { sub: kpi1Sub, valueClass: kpi1Cls,
+                    fmtVal: (n) => fmt(Math.round(n)) + (LANG === 'zh' ? ' 活跃' : ' active') }) +
+    dsCardCompare(t('ds-cust-kpi-repeat'), kpi2Val, cmpAmt,
+                  { sub: kpi2Sub, valueClass: kpi2Cls,
+                    fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
     dsCard(t('ds-cust-kpi-race'),    kpi3Val, kpi3Sub, kpi3Cls);
 
   // ── 4 alert cards ─────────────────────────────────────────────────
@@ -4610,50 +4853,80 @@ function renderCustomersDashboard() {
 function renderProductsDashboard() {
   const fd = window.WP_FINANCIAL || {};
   const ds = window.WP_DEADSTOCK || {};
+  const sl = window.WP_SALES_LIVE || {};
   const brands = fd.brands || [];
+  const snap = snapMonth();
 
-  // V1 第四刀: ABCD + velocity + stockout + strategic-push
+  // V1 第四刀 返工: top 3 KPIs are SINGLE-MONTH + 3-line compare.
+  //   ① 该月销售总额  (single-month total RM)
+  //   ② 该月活跃 SKU 数 (unique SKUs that sold that month)
+  //   ③ 该月 Top SKU 销售冠军 (highest-selling SKU this month + amt)
+  // ABCD / velocity / stockout / strategic push remain as ALERT-CARD content
+  // (those are structure metrics, not single-month metrics).
   const abcd      = computeABCD();
   const velocity  = computeSkuVelocityIndex(abcd);
   const stockout  = computeStockoutRisks(abcd);
   const strategic = computeStrategicPushPlaceholder(abcd);
   const drain     = computeSlowMoverDrain(abcd);
+  const skuAmtByMonth = sl.sku_amt_by_month || {};
+  const totalAmtByMonth = sl.total_amt_by_month || {};
 
-  // KPI 1 — SKU Velocity Index (0-100)
-  let kpi1Val = '—', kpi1Sub = t('ds-prod-vel-pending'), kpi1Cls = '';
-  if (velocity.ok) {
-    kpi1Val = velocity.value.toFixed(1);
-    kpi1Sub = (LANG === 'zh'
-      ? `A:${velocity.a} · B:${velocity.b} · C:${velocity.c} · D:${velocity.d}`
-      : `A:${velocity.a} · B:${velocity.b} · C:${velocity.c} · D:${velocity.d}`);
-    kpi1Cls = velocity.status === 'bad' ? 'danger' : velocity.status === 'warn' ? 'warn' : '';
+  // KPI 1 — 该月销售总额 (RM) + 3-line compare. Falls back to summing
+  // sales_by_branch_month if total_amt_by_month not yet exposed.
+  let totalSeries = totalAmtByMonth;
+  if (!Object.keys(totalSeries).length && sl.sales_by_branch_month) {
+    totalSeries = {};
+    for (const br of Object.keys(sl.sales_by_branch_month)) {
+      const m = sl.sales_by_branch_month[br] || {};
+      for (const ym of Object.keys(m)) totalSeries[ym] = (totalSeries[ym] || 0) + (+m[ym] || 0);
+    }
   }
-  // KPI 2 — Top SKU 异常告警 (count of A/B SKUs with <14 days stock)
-  let kpi2Val = '—', kpi2Sub = t('ds-prod-stock-pending'), kpi2Cls = '';
-  if (stockout.ok) {
-    kpi2Val = fmt(stockout.critical_n) + (LANG === 'zh' ? ' 颗' : '');
-    const worst = stockout.list[0];
-    kpi2Sub = worst
-      ? (LANG === 'zh'
-          ? `Top 25 中最差:${worst.code} 仅剩 ${worst.days.toFixed(0)} 天`
-          : `worst in Top 25: ${worst.code} ~${worst.days.toFixed(0)} days`)
-      : (LANG === 'zh' ? '无紧急 SKU' : 'no urgent SKUs');
-    kpi2Cls = stockout.critical_n > 5 ? 'danger' : stockout.critical_n > 0 ? 'warn' : '';
+  const cmpTotal = buildMonthlyCompare(totalSeries, snap);
+  const k1Val = cmpTotal.single ? 'RM ' + fmtMoney(cmpTotal.single) : '—';
+  const k1Sub = LANG === 'zh' ? `${snap || '—'} · 全分行总销售` : `${snap || '—'} · all-branch total`;
+  const k1Cls = cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -10 ? 'danger'
+               : cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -5 ? 'warn' : '';
+
+  // KPI 2 — 该月活跃 SKU 数 (unique SKUs that sold that month) + compare on count.
+  const skuCountSeries = {};
+  for (const ym of Object.keys(skuAmtByMonth)) {
+    skuCountSeries[ym] = Object.keys(skuAmtByMonth[ym] || {}).length;
   }
-  // KPI 3 — Strategic Push tracking (placeholder: top 5 by 3m sales)
-  let kpi3Val = '—', kpi3Sub = t('ds-prod-push-pending'), kpi3Cls = '';
-  if (strategic.ok) {
-    const top1 = strategic.list[0];
-    kpi3Val = fmt(strategic.list.length) + (LANG === 'zh' ? ' 颗' : '');
-    kpi3Sub = LANG === 'zh'
-      ? `头号:${top1.code} (${fmt(top1.qty)} 件 / 90 天) · Sheet 加 Strategic_Push 列后切真实`
-      : `top: ${top1.code} (${fmt(top1.qty)} units / 90d) · placeholder until Sheet adds Strategic_Push`;
+  const cmpCount = buildMonthlyCompare(skuCountSeries, snap);
+  const k2Val = cmpCount.single ? fmt(cmpCount.single) + (LANG === 'zh' ? ' 颗' : ' SKUs') : '—';
+  const k2Sub = LANG === 'zh' ? `${snap || '—'} · 该月有销售的 SKU 数` : `${snap || '—'} · SKUs with sales`;
+
+  // KPI 3 — 该月 Top SKU (best-seller this month).
+  const skuMonth = skuAmtByMonth[snap] || {};
+  const topThisMonth = Object.entries(skuMonth).sort((a, b) => b[1] - a[1])[0];
+  const k3Val = topThisMonth ? topThisMonth[0] : '—';
+  // For compare we use the top-1 SKU's series value across months
+  let k3Sub = LANG === 'zh' ? '该月销售冠军 SKU' : 'best-seller this month';
+  let cmpTop3 = null;
+  if (topThisMonth) {
+    const code = topThisMonth[0];
+    const topSeries = {};
+    for (const ym of Object.keys(skuAmtByMonth)) {
+      topSeries[ym] = +(skuAmtByMonth[ym] || {})[code] || 0;
+    }
+    cmpTop3 = buildMonthlyCompare(topSeries, snap);
+    k3Sub = (LANG === 'zh' ? `${code} · RM ${fmtMoney(topThisMonth[1])}`
+                           : `${code} · RM ${fmtMoney(topThisMonth[1])}`);
   }
 
   document.getElementById('dsProdCards').innerHTML =
-    dsCard(t('ds-prod-kpi-velocity'),  kpi1Val, kpi1Sub, kpi1Cls) +
-    dsCard(t('ds-prod-kpi-stockout'),  kpi2Val, kpi2Sub, kpi2Cls) +
-    dsCard(t('ds-prod-kpi-push'),      kpi3Val, kpi3Sub, kpi3Cls);
+    dsCardCompare(t('ds-prod-kpi-month-sales'), k1Val, cmpTotal,
+                  { sub: k1Sub, valueClass: k1Cls, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
+    dsCardCompare(t('ds-prod-kpi-month-skus'),  k2Val, cmpCount,
+                  { sub: k2Sub, fmtVal: (n) => fmt(Math.round(n)) }) +
+    dsCardCompare(t('ds-prod-kpi-month-top'),   k3Val, cmpTop3,
+                  { sub: k3Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+
+  // ── V1 第四刀 返工: render Price-band, Top 10 categories, Top 20 SKU
+  // sections at the TOP of the dashboard (per Jym: 价格带 important).
+  renderProductsPriceBand(snap);
+  renderProductsTopCategories(snap);
+  renderProductsTop20Sku(snap);
 
   // ── 4 alert cards ─────────────────────────────────────────────────
   const alerts = [];
@@ -4742,6 +5015,163 @@ function renderProductsDashboard() {
   document.getElementById('dsProdDrills').innerHTML =
     drillTile('finance/depth', 'drill-financial', 'drill-financial-sub', '💰') +
     drillTile('#', 'drill-soon', 'drill-soon-sub', '🏷️', true);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   V1 第四刀 返工 — Products dashboard sub-section renderers (price-band,
+   top categories, top 20 SKUs). Each is single-month default with [单月]
+   [近 6 月] [近 12 月] toggle. Drives off:
+     sl.sku_amt_by_month — last 14 months of per-SKU amount sums
+     ds.rows[].category — SKU → category mapping
+     ds.rows[].unit_cost — for price-band classification
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Price band: bucket SKUs by unit_cost into [<RM50, 50-200, 200-500, 500-2000, 2000+]
+   then sum monthly sales (RM) and SKU count per bucket for the chosen mode. */
+function renderProductsPriceBand(snap) {
+  const sl = window.WP_SALES_LIVE || {};
+  const ds = window.WP_DEADSTOCK || {};
+  const mode = getRankMode('prod-price');
+  const tgEl = document.getElementById('dsProdPriceToggle');
+  if (tgEl) tgEl.innerHTML = rankingToggleHtml('prod-price');
+  const titleEl = document.getElementById('dsProdPriceTitle');
+  if (titleEl) {
+    const modeLbl = mode === 'single' ? (snap || '—') : mode === 'm6' ? (LANG==='zh'?'近 6 月':'last 6m') : (LANG==='zh'?'近 12 月':'last 12m');
+    titleEl.textContent = (LANG==='zh' ? '价格带分布 · ' : 'Price-band · ') + modeLbl;
+  }
+  const skuAmt = skuAmtForMode(sl.sku_amt_by_month, snap, mode);
+  const codeToCost = {};
+  for (const r of (ds.rows || [])) {
+    if (r.code && (r.unit_cost || 0) > 0 && !codeToCost[r.code]) codeToCost[r.code] = +r.unit_cost;
+  }
+  const bands = [
+    { key: '<50',     min: 0,    max: 50,    label: '< RM 50' },
+    { key: '50-200',  min: 50,   max: 200,   label: 'RM 50-200' },
+    { key: '200-500', min: 200,  max: 500,   label: 'RM 200-500' },
+    { key: '500-2000',min: 500,  max: 2000,  label: 'RM 500-2,000' },
+    { key: '2000+',   min: 2000, max: 1e12,  label: '≥ RM 2,000' },
+  ];
+  const counts = bands.map(() => 0);
+  const sales  = bands.map(() => 0);
+  for (const code of Object.keys(skuAmt)) {
+    const cost = codeToCost[code] || 0;
+    const idx = bands.findIndex(b => cost >= b.min && cost < b.max);
+    if (idx < 0) continue;
+    counts[idx]++;
+    sales[idx]  += (+skuAmt[code] || 0);
+  }
+  if (typeof drawChart === 'function') {
+    drawChart('dsProdPriceChart', {
+      type: 'bar',
+      data: {
+        labels: bands.map(b => b.label),
+        datasets: [
+          { label: LANG==='zh' ? '销售 RM' : 'Sales RM', data: sales, backgroundColor: BRAND_GREEN, yAxisID: 'y' },
+          { label: LANG==='zh' ? 'SKU 数' : 'SKU count', data: counts, backgroundColor: BRAND_AMBER, yAxisID: 'y2' },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false, responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+        scales: {
+          y:  { type: 'linear', beginAtZero: true, position: 'left',
+                ticks: { callback: v => 'RM ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v) } },
+          y2: { type: 'linear', beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } },
+        },
+      },
+    });
+  }
+}
+
+/* Top 10 categories by single-month / 6m / 12m sales. */
+function renderProductsTopCategories(snap) {
+  const sl = window.WP_SALES_LIVE || {};
+  const ds = window.WP_DEADSTOCK || {};
+  const mode = getRankMode('prod-cat');
+  const tgEl = document.getElementById('dsProdCatToggle');
+  if (tgEl) tgEl.innerHTML = rankingToggleHtml('prod-cat');
+  const tableEl = document.getElementById('dsProdCatTable');
+  if (!tableEl) return;
+  const skuAmt = skuAmtForMode(sl.sku_amt_by_month, snap, mode);
+  // Map SKU → category from WP_DEADSTOCK rows
+  const codeToCat = {};
+  for (const r of (ds.rows || [])) {
+    if (r.code && r.category && !codeToCat[r.code]) codeToCat[r.code] = r.category;
+  }
+  const catAgg = {};
+  for (const code of Object.keys(skuAmt)) {
+    const cat = codeToCat[code] || (LANG==='zh' ? '未分类' : 'Uncategorised');
+    catAgg[cat] = (catAgg[cat] || 0) + (+skuAmt[code] || 0);
+  }
+  const sorted = Object.entries(catAgg).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const total  = sorted.reduce((a, x) => a + x[1], 0) || 1;
+  const modeLbl = mode === 'single' ? (snap || '—') : mode === 'm6' ? (LANG==='zh'?'近 6 月':'6M') : (LANG==='zh'?'近 12 月':'12M');
+  let html = '<table class="ci-table"><thead><tr>'
+    + '<th>#</th>'
+    + '<th>' + (LANG === 'zh' ? '品类' : 'Category') + '</th>'
+    + '<th>' + (LANG === 'zh' ? `销售 RM (${modeLbl})` : `Sales RM (${modeLbl})`) + '</th>'
+    + '<th>' + (LANG === 'zh' ? '占比' : 'Share') + '</th>'
+    + '</tr></thead><tbody>';
+  if (!sorted.length) {
+    html += '<tr><td colspan="4" style="text-align:center;color:var(--text-meta);font-style:italic">'
+      + (LANG === 'zh' ? `${snap || '—'} 无销售数据` : `no sales for ${snap || '—'}`)
+      + '</td></tr>';
+  } else {
+    for (let i = 0; i < sorted.length; i++) {
+      const [cat, amt] = sorted[i];
+      html += '<tr><td>' + (i + 1) + '</td>'
+        + '<td>' + escapeHtml(cat) + '</td>'
+        + '<td class="num">RM ' + fmtMoney(amt) + '</td>'
+        + '<td class="num">' + (amt / total * 100).toFixed(1) + '%</td></tr>';
+    }
+  }
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
+}
+
+/* Top 20 SKU by single-month / 6m / 12m sales. */
+function renderProductsTop20Sku(snap) {
+  const sl = window.WP_SALES_LIVE || {};
+  const ds = window.WP_DEADSTOCK || {};
+  const mode = getRankMode('prod-sku');
+  const tgEl = document.getElementById('dsProdTop20Toggle');
+  if (tgEl) tgEl.innerHTML = rankingToggleHtml('prod-sku');
+  const tableEl = document.getElementById('dsProdTop20Table');
+  if (!tableEl) return;
+  const skuAmt = skuAmtForMode(sl.sku_amt_by_month, snap, mode);
+  const skuQty = skuQtyForMode(sl.sku_qty_by_month, snap, mode);
+  const codeToDesc = {}, codeToCat = {};
+  for (const r of (ds.rows || [])) {
+    if (r.code && r.desc && !codeToDesc[r.code]) codeToDesc[r.code] = r.desc;
+    if (r.code && r.category && !codeToCat[r.code]) codeToCat[r.code] = r.category;
+  }
+  const sorted = Object.entries(skuAmt).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  const modeLbl = mode === 'single' ? (snap || '—') : mode === 'm6' ? (LANG==='zh'?'近 6 月':'6M') : (LANG==='zh'?'近 12 月':'12M');
+  let html = '<table class="ci-table"><thead><tr>'
+    + '<th>#</th><th>' + (LANG==='zh'?'SKU 编码':'SKU') + '</th>'
+    + '<th>' + (LANG==='zh'?'描述':'Description') + '</th>'
+    + '<th>' + (LANG==='zh'?'品类':'Category') + '</th>'
+    + '<th>' + (LANG==='zh' ? `销售 RM (${modeLbl})` : `Sales RM (${modeLbl})`) + '</th>'
+    + '<th>' + (LANG==='zh'?'件数':'Qty') + '</th>'
+    + '</tr></thead><tbody>';
+  if (!sorted.length) {
+    html += '<tr><td colspan="6" style="text-align:center;color:var(--text-meta);font-style:italic">'
+      + (LANG === 'zh' ? `${snap || '—'} 无 SKU 销售` : `no SKU sales for ${snap || '—'}`)
+      + '</td></tr>';
+  } else {
+    for (let i = 0; i < sorted.length; i++) {
+      const [code, amt] = sorted[i];
+      const qty = +skuQty[code] || 0;
+      html += '<tr><td>' + (i + 1) + '</td>'
+        + '<td><code>' + escapeHtml(code) + '</code></td>'
+        + '<td>' + escapeHtml(codeToDesc[code] || '—') + '</td>'
+        + '<td>' + escapeHtml(codeToCat[code] || '—') + '</td>'
+        + '<td class="num">RM ' + fmtMoney(amt) + '</td>'
+        + '<td class="num">' + fmt(qty) + '</td></tr>';
+    }
+  }
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
 }
 
 /* ── Finance dashboard ──────────────────────────────────────── */
@@ -4904,37 +5334,68 @@ function renderInventoryDashboard() {
   const gap      = computeOrderGap();          // 待补
   const oem      = computeOemAgencySplit();    // 待补
 
-  // KPI 1 — 库存健康度. Subline names the scope (W05 / company-wide) so
-  // branch-manager view tests can detect the scope in dashboard HTML.
+  // V1 第四刀 返工: KPI 1 = SNAPSHOT (label "截止 X 数据"), KPIs 2-4 are
+  // single-month with 3-line compare. Sales-consumption / PO / stock-cover
+  // are computable from sl.matrix (per-cat per-month PO/GRN) + total_amt_by_month.
+  const sl = window.WP_SALES_LIVE || {};
+  const snap = snapMonth();
+
+  // KPI 1 — 库存健康度 (snapshot, NOT month-relative)
   const healthPct = 100 - fnsDeadPct;
+  const stockSnapLabel = m.snapshot || snap || '—';
   const k1Val = healthPct.toFixed(1) + '%';
   const k1Cls = fnsDeadPct > 30 ? 'danger' : fnsDeadPct > 20 ? 'warn' : '';
   const k1Sub = (LANG === 'zh'
-    ? `${scopeLabel} · 呆滞占比 ${fnsDeadPct.toFixed(1)}% · 月环比待补`
-    : `${scopeLabel} · dead share ${fnsDeadPct.toFixed(1)}% · MoM pending`);
+    ? `${scopeLabel} · 呆滞 ${fnsDeadPct.toFixed(1)}% · 截止 ${stockSnapLabel} 数据`
+    : `${scopeLabel} · ${fnsDeadPct.toFixed(1)}% dead · as of ${stockSnapLabel}`);
 
-  // KPI 2 — 订单缺口预警 (待补)
-  const k2Val = '—';
-  const k2Sub = LANG === 'zh' ? '历史 PO 月度序列待 API 接通' : 'monthly PO history not exposed by API';
-  const k2Cls = '';
+  // KPI 2 — 该月 PO 总额 + 3-line compare (sl.matrix[ym][grp] = { po, grn })
+  const poByMonth = {};
+  const grnByMonth = {};
+  const matrix = sl.matrix || {};
+  for (const ym of Object.keys(matrix)) {
+    let po = 0, grn = 0;
+    for (const grp of Object.keys(matrix[ym] || {})) {
+      const c = matrix[ym][grp];
+      if (!c) continue;
+      po  += +c.po  || 0;
+      grn += +c.grn || 0;
+    }
+    poByMonth[ym]  = po;
+    grnByMonth[ym] = grn;
+  }
+  const cmpPo = buildMonthlyCompare(poByMonth, snap);
+  const k2Val = cmpPo.single ? 'RM ' + fmtMoney(cmpPo.single) : '—';
+  const k2Sub = LANG === 'zh' ? `${snap || '—'} · 该月 PO 总额` : `${snap || '—'} · this month's PO total`;
 
-  // KPI 3 — 断货 SKU 预警
+  // KPI 3 — 断货 SKU 预警 (snapshot-derived, not month-shifting)
   const k3Val = stockout.ok ? fmt(stockout.critical_n) + (LANG === 'zh' ? ' 颗' : '') : '—';
   const k3Sub = stockout.ok
-    ? (LANG === 'zh' ? '< 14 天库存 · OEM/Agency 分类待 Country 字段' : '<14d stock · OEM/Agency split pending Country field')
+    ? (LANG === 'zh' ? `< 14 天库存 · 截止 ${stockSnapLabel} 快照` : `<14d stock · as of ${stockSnapLabel}`)
     : (LANG === 'zh' ? '3m 销售数据待载' : '3m sales data missing');
   const k3Cls = stockout.ok ? (stockout.critical_n > 5 ? 'danger' : stockout.critical_n > 0 ? 'warn' : '') : '';
 
-  // KPI 4 — OEM vs Agency (待补)
-  const k4Val = '—';
-  const k4Sub = LANG === 'zh' ? 'Country 字段(SM Sheet col M)待暴露' : 'Country field (SM Sheet col M) not exposed';
-  const k4Cls = '';
+  // KPI 4 — 该月销售 vs 该月 PO 缺口 (gap = sales - PO; positive = depleting stock)
+  // Need monthly sales total. Use total_amt_by_month from Raw sale tab.
+  const totalAmtByMonth = sl.total_amt_by_month || {};
+  const cmpGap = buildMonthlyCompare(
+    Object.fromEntries(Object.keys({ ...poByMonth, ...totalAmtByMonth }).map(ym =>
+      [ym, (+totalAmtByMonth[ym] || 0) - (+poByMonth[ym] || 0)]
+    )),
+    snap
+  );
+  const k4Val = cmpGap.single !== 0 ? 'RM ' + fmtMoney(cmpGap.single) : (cmpPo.single || totalAmtByMonth[snap] ? 'RM 0' : '—');
+  const k4Sub = LANG === 'zh'
+    ? `${snap || '—'} · 销售消耗 - PO 入货 (正=库存下降)`
+    : `${snap || '—'} · sales − PO (positive = depleting)`;
 
   document.getElementById('dsInvCards').innerHTML =
-    dsCard(t('ds-inv-kpi-health'),     k1Val, k1Sub, k1Cls) +
-    dsCard(t('ds-inv-kpi-gap'),        k2Val, k2Sub, k2Cls) +
-    dsCard(t('ds-inv-kpi-stockout'),   k3Val, k3Sub, k3Cls) +
-    dsCard(t('ds-inv-kpi-oem-agency'), k4Val, k4Sub, k4Cls);
+    dsCard(t('ds-inv-kpi-health'),         k1Val, k1Sub, k1Cls) +
+    dsCardCompare(t('ds-inv-kpi-po'),      k2Val, cmpPo,
+                  { sub: k2Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
+    dsCard(t('ds-inv-kpi-stockout'),       k3Val, k3Sub, k3Cls) +
+    dsCardCompare(t('ds-inv-kpi-gap'),     k4Val, cmpGap,
+                  { sub: k4Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
 
   // ── 4 alert cards ─────────────────────────────────────────────────
   const alerts = [];

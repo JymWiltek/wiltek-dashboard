@@ -73,25 +73,44 @@ function monthLabelToYm(label) {
   return `${yy}-${String(mm).padStart(2,'0')}`;
 }
 
-// Parse the "Raw sale" tab CSV → per-branch per-month Amount aggregate.
+// Parse the "Raw sale" tab CSV → per-branch per-month + per-SKU per-month aggregates.
 // Columns:  Month | Code | Branch | Qty | Amount (RM)
-// Returns:  { sales_by_branch_month: { 'W01': { '2026-03': 55491, ... }, ... },
-//             months_seen, branches_seen, n_rows }
+// V1 第四刀 返工: also returns sku_amt_by_month + sku_qty_by_month (last 14
+// months — covers single-month + 12m trailing window). Frontend uses these
+// to drive single-month KPIs + 3-line comparisons (vs last month / vs same
+// month last year / vs 6m avg) + Top SKU rankings with [单月][6M][12M] toggle.
+// Returns: {
+//   sales_by_branch_month: { 'W01': { '2026-03': 55491, ... } },
+//   sku_amt_by_month:      { '2026-03': { 'CODE': 1234, ... }, ... }   // last 14 months
+//   sku_qty_by_month:      { '2026-03': { 'CODE': 5,    ... }, ... }
+//   total_amt_by_month:    { '2026-03': 372608, ... }                  // every month
+//   months_seen, branches_seen, n_rows
+// }
 function buildRawSaleAggregates(text) {
   const grid = parseCsv(text);
-  if (!grid.length) return { sales_by_branch_month: {}, months_seen: [], branches_seen: [], n_rows: 0 };
+  const empty = {
+    sales_by_branch_month: {}, months_seen: [], branches_seen: [],
+    sku_amt_by_month: {}, sku_qty_by_month: {}, total_amt_by_month: {},
+    n_rows: 0,
+  };
+  if (!grid.length) return empty;
   // Header check (gviz wraps each cell in quotes, so case/spacing flexible)
   const hdr = grid[0].map(s => String(s||'').trim().toLowerCase());
   if (!hdr.includes('month') || !hdr.includes('branch')) {
     throw new Error(`Raw sale unexpected header: ${grid[0].slice(0,5).join('|')}`);
   }
   const I_MONTH  = hdr.indexOf('month');
+  const I_CODE   = hdr.indexOf('code');
   const I_BRANCH = hdr.indexOf('branch');
+  const I_QTY    = hdr.findIndex(h => h === 'qty' || h === 'quantity');
   // "Amount (RM)" or just "Amount"
   let I_AMT = hdr.findIndex(h => /^amount/.test(h));
   if (I_AMT < 0) I_AMT = 4;
 
-  const sbm = {};
+  const sbm = {};                        // sales_by_branch_month
+  const totalAmtByMonth = {};            // total_amt_by_month (every month)
+  const skuAmtByMonth   = {};            // sku_amt_by_month (last 14 months only)
+  const skuQtyByMonth   = {};            // sku_qty_by_month (last 14 months only)
   const monthsSet = new Set();
   const branchesSet = new Set();
   let n = 0;
@@ -103,21 +122,59 @@ function buildRawSaleAggregates(text) {
     const br = String(r[I_BRANCH]||'').trim();
     if (!br) continue;
     const amt = parseNum(r[I_AMT]);
+    const qty = I_QTY >= 0 ? parseNum(r[I_QTY]) : 0;
+    const code = I_CODE >= 0 ? String(r[I_CODE]||'').trim() : '';
+
     if (!sbm[br]) sbm[br] = {};
     sbm[br][ym] = (sbm[br][ym] || 0) + amt;
+    totalAmtByMonth[ym] = (totalAmtByMonth[ym] || 0) + amt;
     monthsSet.add(ym);
     branchesSet.add(br);
     n++;
   }
-  // Round to whole ringgit
-  for (const br of Object.keys(sbm)) {
-    for (const ym of Object.keys(sbm[br])) {
-      sbm[br][ym] = Math.round(sbm[br][ym]);
+
+  // Decide which months to keep per-SKU detail for: most recent 14 months.
+  // Anything older keeps only branch-level + total aggregates (small).
+  const allMonthsSorted = [...monthsSet].sort();
+  const recent14 = new Set(allMonthsSorted.slice(-14));
+
+  // Second pass: build per-SKU per-month for recent 14 months only.
+  if (I_CODE >= 0) {
+    for (let i = 1; i < grid.length; i++) {
+      const r = grid[i];
+      if (!r || r.length < 3) continue;
+      const ym = monthLabelToYm(r[I_MONTH]);
+      if (!ym || !recent14.has(ym)) continue;
+      const code = String(r[I_CODE]||'').trim();
+      if (!code) continue;
+      const amt = parseNum(r[I_AMT]);
+      const qty = I_QTY >= 0 ? parseNum(r[I_QTY]) : 0;
+      if (!skuAmtByMonth[ym]) skuAmtByMonth[ym] = {};
+      if (!skuQtyByMonth[ym]) skuQtyByMonth[ym] = {};
+      skuAmtByMonth[ym][code] = (skuAmtByMonth[ym][code] || 0) + amt;
+      skuQtyByMonth[ym][code] = (skuQtyByMonth[ym][code] || 0) + qty;
     }
   }
+
+  // Round to whole ringgit (sales_by_branch_month + totals + per-SKU amt)
+  for (const br of Object.keys(sbm)) {
+    for (const ym of Object.keys(sbm[br])) sbm[br][ym] = Math.round(sbm[br][ym]);
+  }
+  for (const ym of Object.keys(totalAmtByMonth)) {
+    totalAmtByMonth[ym] = Math.round(totalAmtByMonth[ym]);
+  }
+  for (const ym of Object.keys(skuAmtByMonth)) {
+    for (const c of Object.keys(skuAmtByMonth[ym])) {
+      skuAmtByMonth[ym][c] = Math.round(skuAmtByMonth[ym][c]);
+    }
+  }
+
   return {
     sales_by_branch_month: sbm,
-    months_seen: [...monthsSet].sort(),
+    sku_amt_by_month: skuAmtByMonth,
+    sku_qty_by_month: skuQtyByMonth,
+    total_amt_by_month: totalAmtByMonth,
+    months_seen: allMonthsSorted,
     branches_seen: [...branchesSet].sort(),
     n_rows: n,
   };
