@@ -7113,6 +7113,8 @@ async function fetchCustomersLive(ts) {
       top100: j.top100,
       windows: j.windows,
       types: j.types,
+      // V1.7 — dynamic loyalty segments per branch (used by manager Customer page).
+      loyalty_v17_by_branch: j.loyalty_v17_by_branch || {},
       _live: true,
       _fetched_at: j.fetched_at,
     });

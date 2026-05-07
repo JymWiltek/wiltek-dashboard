@@ -406,6 +406,170 @@ function buildPayload(rows, snapshotYm) {
     }));
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // V1.7 — Loyalty 3-segment by-branch aggregates with DYNAMIC segment
+  // assigned at the moment of each purchase. Segment boundaries (months
+  // since enrol):  New < 12, Mid 12..60, Veteran > 60.
+  // ════════════════════════════════════════════════════════════════════
+  function v17Segment(spanMonths) {
+    if (spanMonths < 12) return 'New';
+    if (spanMonths <= 60) return 'Mid';
+    return 'Veteran';
+  }
+
+  // Member's primary branch + first ever purchase month (for new-members curve).
+  // ci_rows already filters to ACTIVE_BRANCHES + valid enrol; reuse that logic.
+  const memMeta = new Map();   // mc → { enrolKey, primary }
+  for (const ci of ci_rows) {
+    const enrolY = +ci.enrol.slice(0, 4), enrolM = +ci.enrol.slice(5, 7);
+    memMeta.set(ci.mc, { enrolKey: ymKey(enrolY, enrolM), primary: ci.branch });
+  }
+
+  // Per-branch 12-month window of YM keys (ending at snapshot, inclusive).
+  const window12 = [];
+  for (let i = 11; i >= 0; i--) window12.push(shiftYm(snapshotYm, i));   // each: {y,m}
+  const window12Strs = window12.map(ymStr);
+
+  // Init structures per branch.
+  const loyalty_v17_by_branch = {};
+  for (const br of ACTIVE_BRANCHES) {
+    const revBySegByMo = {};
+    const newMembersByMo = {};
+    for (const ymS of window12Strs) {
+      revBySegByMo[ymS] = { New: 0, Mid: 0, Veteran: 0 };
+      newMembersByMo[ymS] = 0;
+    }
+    loyalty_v17_by_branch[br] = {
+      revenue_by_segment_by_month: revBySegByMo,
+      new_members_by_month: newMembersByMo,
+      buying_intent_by_segment: { New: {}, Mid: {}, Veteran: {} },
+      total_active_by_segment: { New: 0, Mid: 0, Veteran: 0 },
+      sample_customer: null,
+      _months: window12Strs,
+    };
+  }
+
+  // Window of YM keys to filter purchase rows.
+  const window12KeysSet = new Set(window12.map(ym => ymKey(ym.y, ym.m)));
+
+  // Single pass over all purchase rows.
+  for (const r of rows) {
+    if (!r.mc) continue;
+    if (!r.branch || !ACTIVE_BRANCHES.has(r.branch)) continue;
+    const meta = memMeta.get(String(r.mc));
+    if (!meta) continue;
+    const ymk = ymKey(r.ym.y, r.ym.m);
+    const span = ymk - meta.enrolKey;
+    if (span < 0) continue;   // purchase before enrol → skip (data hygiene)
+    const seg = v17Segment(span);
+
+    // Buying intent: aggregate across the full 12-month window (more data
+    // → richer category mix). Filter to window12.
+    if (window12KeysSet.has(ymk)) {
+      const branchData = loyalty_v17_by_branch[r.branch];
+      const ymS = ymStr(r.ym);
+      branchData.revenue_by_segment_by_month[ymS][seg] += r.amt;
+      const cat = r.main || 'Uncategorised';
+      branchData.buying_intent_by_segment[seg][cat] =
+        (branchData.buying_intent_by_segment[seg][cat] || 0) + r.amt;
+    }
+  }
+
+  // Distinct active members per segment over the 12-month window.
+  const memActiveSeg = {};   // branch → seg → Set(mc)
+  for (const br of ACTIVE_BRANCHES) memActiveSeg[br] = { New: new Set(), Mid: new Set(), Veteran: new Set() };
+  for (const r of rows) {
+    if (!r.mc || !r.branch || !ACTIVE_BRANCHES.has(r.branch)) continue;
+    const meta = memMeta.get(String(r.mc));
+    if (!meta) continue;
+    const ymk = ymKey(r.ym.y, r.ym.m);
+    if (!window12KeysSet.has(ymk)) continue;
+    const span = ymk - meta.enrolKey;
+    if (span < 0) continue;
+    const seg = v17Segment(span);
+    memActiveSeg[r.branch][seg].add(String(r.mc));
+  }
+  for (const br of ACTIVE_BRANCHES) {
+    for (const seg of ['New', 'Mid', 'Veteran']) {
+      loyalty_v17_by_branch[br].total_active_by_segment[seg] = memActiveSeg[br][seg].size;
+    }
+  }
+
+  // New members per month: count members whose enrol month ∈ window12 AND
+  // primary branch = br. Each member contributes to exactly one (branch, ym).
+  for (const ci of ci_rows) {
+    const meta = memMeta.get(ci.mc);
+    if (!meta) continue;
+    const eY = +ci.enrol.slice(0,4), eM = +ci.enrol.slice(5,7);
+    const enrolYmS = ymStr({ y: eY, m: eM });
+    if (window12Strs.includes(enrolYmS) && loyalty_v17_by_branch[ci.branch]) {
+      loyalty_v17_by_branch[ci.branch].new_members_by_month[enrolYmS] += 1;
+    }
+  }
+
+  // Round all amounts.
+  for (const br of ACTIVE_BRANCHES) {
+    const bd = loyalty_v17_by_branch[br];
+    for (const ym of Object.keys(bd.revenue_by_segment_by_month)) {
+      for (const seg of ['New', 'Mid', 'Veteran']) {
+        bd.revenue_by_segment_by_month[ym][seg] = Math.round(bd.revenue_by_segment_by_month[ym][seg]);
+      }
+    }
+    for (const seg of ['New', 'Mid', 'Veteran']) {
+      const cats = bd.buying_intent_by_segment[seg];
+      for (const c of Object.keys(cats)) cats[c] = Math.round(cats[c]);
+    }
+  }
+
+  // Audit sample: pick a real customer per branch whose purchase history
+  // crosses a segment boundary (proves dynamic segmentation works).
+  for (const br of ACTIVE_BRANCHES) {
+    let sampleMc = null, samplePurchases = null;
+    // Build per-member purchase list within the window.
+    const memPurchases = new Map();
+    for (const r of rows) {
+      if (!r.mc || r.branch !== br) continue;
+      const meta = memMeta.get(String(r.mc));
+      if (!meta) continue;
+      const ymk = ymKey(r.ym.y, r.ym.m);
+      const span = ymk - meta.enrolKey;
+      if (span < 0) continue;
+      if (!memPurchases.has(r.mc)) memPurchases.set(r.mc, []);
+      memPurchases.get(r.mc).push({
+        ym: ymStr(r.ym),
+        amt: r.amt,
+        span_months: span,
+        segment: v17Segment(span),
+      });
+    }
+    // Find a member whose purchases span ≥2 segments.
+    for (const [mc, purs] of memPurchases) {
+      const segs = new Set(purs.map(p => p.segment));
+      if (segs.size >= 2 && purs.length >= 3) {
+        sampleMc = mc;
+        // Aggregate to per-month (avoid dumping every transaction).
+        const byYm = {};
+        for (const p of purs) {
+          if (!byYm[p.ym]) byYm[p.ym] = { ym: p.ym, amt: 0, span_months: p.span_months, segment: p.segment };
+          byYm[p.ym].amt += p.amt;
+        }
+        samplePurchases = Object.values(byYm).sort((a, b) => a.ym.localeCompare(b.ym));
+        for (const sp of samplePurchases) sp.amt = Math.round(sp.amt);
+        break;
+      }
+    }
+    if (sampleMc) {
+      const meta = memMeta.get(sampleMc);
+      const enrolY = Math.floor(meta.enrolKey / 12);
+      const enrolM = (meta.enrolKey % 12) + 1;
+      loyalty_v17_by_branch[br].sample_customer = {
+        mc: sampleMc,
+        enrol: ymStr({ y: enrolY, m: enrolM }),
+        purchases: samplePurchases,
+      };
+    }
+  }
+
   return {
     summary,
     summary_by_window,
@@ -417,6 +581,8 @@ function buildPayload(rows, snapshotYm) {
     top100,
     windows: WINDOWS,
     types: TYPES,
+    // V1.7 dynamic loyalty segments.
+    loyalty_v17_by_branch,
     churn: {
       summary: {
         n_total: churned.length,
@@ -456,6 +622,9 @@ function parseCsvText(text) {
   const I_CT    = idx['CUST TYPE']     ?? 8;
   const I_EN    = idx['DATE ENROLLED'] ?? 9;
   const I_LOY   = idx['LOYALTY']       ?? 10;
+  // V1.7 — main / sub group, used for Buying Intent by Segment.
+  const I_MAIN  = idx['MAIN GROUP']    ?? 11;
+  const I_SUB   = idx['SUB GROUP']     ?? idx['SUB-GROUP'] ?? idx['SUB_GROUP'] ?? idx['SUBGROUP'] ?? 12;
 
   const rows = [];
   const monthsSeen = new Set();
@@ -476,6 +645,8 @@ function parseCsvText(text) {
       ct: String(r[I_CT]||'').trim(),
       enrol: parseEnrolDate(r[I_EN]),
       loy: String(r[I_LOY]||'').trim(),
+      main: String(r[I_MAIN]||'').trim(),
+      sub:  String(r[I_SUB]||'').trim(),
     });
     monthsSeen.add(ymStr(ym));
   }
