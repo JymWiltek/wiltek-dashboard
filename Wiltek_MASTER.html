@@ -1432,6 +1432,12 @@ footer.app-footer {
   .v17-loyalty-grid { grid-template-columns: 1fr; }
   .v17-race-grid    { grid-template-columns: 1fr; }
 }
+
+/* V1.7 phase 4 — embedded Dead Stock List inside the Inventory page */
+.v17-embedded-deadstock { margin-top: 26px; }
+.v17-embedded-deadstock .hero { margin-bottom: 12px; }
+.v17-embedded-deadstock .tabs { flex-wrap: wrap; }
+.v17-embedded-deadstock .toolbar { flex-wrap: wrap; gap: 8px; }
 </style>
 </head>
 <body>
@@ -6646,6 +6652,10 @@ function renderInventoryDashboard() {
       // Hide F-N-S donut chart-wrap (sibling of dsInvAlerts + dsInvAction).
       _invView.querySelectorAll('.chart-wrap').forEach(cw => { cw.style.display = 'none'; });
     }
+    // V1.7 phase 4: embed the entire Dead Stock List inline below the
+    // V1.6 4-state cards so managers see all 758 SKU details without
+    // any extra click. Default tab = All.
+    try { v17EmbedDeadstockInInventory(); } catch (e) { console.warn('v17EmbedDeadstockInInventory failed:', e); }
   } else {
     // Owner: restore anything the V1.7 hotfix may have hidden in a prior
     // manager render.
@@ -6657,6 +6667,10 @@ function renderInventoryDashboard() {
       _invView.querySelectorAll('section.ds-section').forEach(s => { s.style.display = ''; });
       _invView.querySelectorAll('.chart-wrap').forEach(cw => { cw.style.display = ''; });
     }
+    // V1.7 phase 4: if a prior manager session embedded the deadstock
+    // DOM into view-inventory, move it back so the standalone Dead
+    // Stock List menu item still works for the owner.
+    try { v17RestoreDeadstockToOwnView(); } catch(_){}
   }
 }
 
@@ -6717,11 +6731,92 @@ function v16OverlayInventoryCards() {
       try {
         if (typeof CUR_TAB !== 'undefined') CUR_TAB = targetCls;
         if (typeof persistStatusToUrl === 'function') persistStatusToUrl(targetCls);
-        setView('deadstock');
+        // V1.7 phase 4: deadstock list is embedded inline below this
+        // table — switch tab + scroll to detail rather than navigating.
+        if (document.getElementById('v17EmbeddedDeadstock')) {
+          if (typeof renderTabs === 'function') renderTabs();
+          if (typeof renderClassFilter === 'function') renderClassFilter();
+          if (typeof renderTable === 'function') renderTable();
+          const detail = document.getElementById('detail');
+          if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          setView('deadstock');
+        }
       } catch(_) {}
     });
   });
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.7 phase 4 — embed the Dead Stock List inline inside the Inventory
+   page (manager view only). The DOM nodes are MOVED out of
+   #view-deadstock into a wrapper inside #view-inventory; the existing
+   element IDs (#hero, #tabs, #detail, #searchBox, #catFilter, #classFilter)
+   keep working unchanged because the renderers only query by ID.
+   v17RestoreDeadstockToOwnView puts them back when an owner re-renders
+   so the standalone Dead Stock List view still works for them.
+   ════════════════════════════════════════════════════════════════════ */
+function v17EmbedDeadstockInInventory() {
+  const invView = document.getElementById('view-inventory');
+  const dsView  = document.getElementById('view-deadstock');
+  if (!invView || !dsView) return;
+
+  let wrap = document.getElementById('v17EmbeddedDeadstock');
+  if (!wrap) {
+    // First call this session — create wrapper + move DOM in.
+    wrap = document.createElement('section');
+    wrap.id = 'v17EmbeddedDeadstock';
+    wrap.className = 'v17-mgr-section v17-embedded-deadstock';
+
+    const heading = document.createElement('h2');
+    heading.className = 'v16-mgr-section-title';
+    heading.textContent = LANG === 'zh'
+      ? '本店 SKU 详情清单(All / Active / Slow / Misplaced / Dead)'
+      : 'Branch SKU detail list (All / Active / Slow / Misplaced / Dead)';
+    wrap.appendChild(heading);
+
+    invView.appendChild(wrap);
+
+    // Move the deadstock content children into wrap (skip page-title/sub).
+    const skipSelectors = ['.page-title', '.page-sub'];
+    Array.from(dsView.children).forEach(child => {
+      const sel = '.' + (child.className || '').split(' ').filter(Boolean).join('.');
+      if (skipSelectors.some(s => child.matches && child.matches(s))) return;
+      wrap.appendChild(child);
+    });
+  }
+  wrap.style.display = '';
+
+  // Default tab = All on first load. Subsequent renders preserve CUR_TAB.
+  if (!window.__v17_embedded_initialised) {
+    if (typeof CUR_TAB !== 'undefined') CUR_TAB = 'all';
+    window.__v17_embedded_initialised = true;
+  }
+  if (typeof buildCategoryFilter === 'function') buildCategoryFilter();
+  if (typeof renderHero === 'function') renderHero();
+  if (typeof renderTabs === 'function') renderTabs();
+  if (typeof renderBranchCards === 'function') renderBranchCards();
+  if (typeof renderClassFilter === 'function') renderClassFilter();
+  if (typeof renderTable === 'function') renderTable();
+}
+window.v17EmbedDeadstockInInventory = v17EmbedDeadstockInInventory;
+
+/* Move embedded deadstock children back into #view-deadstock so the
+   owner's standalone Dead Stock List menu still works. */
+function v17RestoreDeadstockToOwnView() {
+  const wrap = document.getElementById('v17EmbeddedDeadstock');
+  const dsView = document.getElementById('view-deadstock');
+  if (!wrap || !dsView) return;
+  // Skip the heading we added — that one was generated, not moved.
+  const heading = wrap.querySelector('.v16-mgr-section-title');
+  Array.from(wrap.children).forEach(child => {
+    if (child === heading) return;
+    dsView.appendChild(child);
+  });
+  wrap.remove();
+  window.__v17_embedded_initialised = false;
+}
+window.v17RestoreDeadstockToOwnView = v17RestoreDeadstockToOwnView;
 
 /* ── Sales depth: 品类 / 80-20 / Top 20 / 价格带 / 四象限 ──────── */
 function renderSalesDepth() {
