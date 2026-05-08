@@ -1438,6 +1438,28 @@ footer.app-footer {
 .v17-embedded-deadstock .hero { margin-bottom: 12px; }
 .v17-embedded-deadstock .tabs { flex-wrap: wrap; }
 .v17-embedded-deadstock .toolbar { flex-wrap: wrap; gap: 8px; }
+
+/* V1.7 phase 5 — bottom-of-page lists (Customer Top 20 churn) */
+.v17-bottom-list {
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 12px 16px; margin-top: 16px;
+}
+.v17-bottom-list summary { cursor: pointer; font-size: 14px; }
+.v17-bottom-list summary > strong { color: var(--text-primary); }
+.v17-bottom-list-meta {
+  font-size: 12px; color: var(--text-secondary); font-weight: 400; margin-left: 6px;
+}
+.v17-bottom-list-table {
+  width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px;
+}
+.v17-bottom-list-table th, .v17-bottom-list-table td {
+  padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: left;
+}
+.v17-bottom-list-table thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+}
+.v17-bottom-list-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -7417,6 +7439,11 @@ function renderCustomersManagerV17() {
 
   v17RaceCharts(branch, snap);
   v17LoyaltyCharts(branch);
+
+  // V1.7 phase 5: Top 20 high-value churn list lives at the bottom of
+  // the page now (not inside the Action Plan card). Default collapsed;
+  // the "Open Top 20" button on the Action Plan card scrolls + opens.
+  v17CustomerBottomLists(branch);
 }
 window.renderCustomersManagerV17 = renderCustomersManagerV17;
 
@@ -8161,104 +8188,122 @@ function v17ManagerCard(label, val, sub, cmp, fmtVal) {
   '</div>';
 }
 
-/* V1.7 Customer Action Plan (3 cards). */
+/* V1.7 Customer Action Plan — slimmed to ONE card (high-value churn).
+   The card's "Open Top 20" button scrolls to a list at the bottom of
+   the Customer page (see v17CustomerBottomLists). */
 function v17CustActionPlan(branch, snap) {
   const el = document.getElementById('dsCustActionPlan');
   if (!el) return;
   el.style.display = '';
 
-  // Card 1: Lapsed >5y
-  const churnTd = window.WP_TODAY || {};
-  const churnRows = (churnTd.churn && churnTd.churn.rows) || [];
-  // Filter to this branch + months_ago > 60
-  const lapsedLong = churnRows.filter(r => r.branch === branch && (r.months_ago || 0) > 60);
-  lapsedLong.sort((a,b) => (b.amount||0) - (a.amount||0));
-  const lapsedSum = lapsedLong.reduce((a,r) => a + (r.amount||0), 0);
-  const lapsedTop = lapsedLong[0];
-  const lapsedMax = lapsedLong.reduce((m, r) => Math.max(m, r.amount||0), 0);
-
-  // Card 2: m6 active but m1 silent (computeChurnAlerts uses global; we filter to branch)
+  // Card: m6 active but m1 silent — branch-scoped. computeChurnAlerts
+  // returns top100-based churn risks; filter to this branch only.
   const cd = window.WP_CUSTOMERS || {};
-  const allCustomers = (cd.top100 || []);   // top100 already pre-filtered to active branches
   const churnAlertList = (typeof computeChurnAlerts === 'function')
     ? (computeChurnAlerts() || {}).list || []
     : [];
   const churnBranch = churnAlertList.filter(c => c.branch === branch);
   const churnTop = churnBranch[0];
+  const churnTopAmt = churnTop ? (churnTop.m6_amt || churnTop.lifetime_amt || 0) : 0;
+  const churnSum = churnBranch.reduce((a, c) => a + (c.m6_amt || 0), 0);
 
-  // Card 3: New-customer trend anomaly. Use loyalty_v17_by_branch.new_members_by_month.
-  const lv = (cd.loyalty_v17_by_branch || {})[branch];
-  const nmm = (lv && lv.new_members_by_month) || {};
-  const nmmKeys = Object.keys(nmm).sort();
-  const recent = nmmKeys.slice(-12);
-  const recentVals = recent.map(k => nmm[k] || 0);
-  const recentSum = recentVals.reduce((a,v) => a+v, 0);
-  const recentAvg = recent.length ? recentSum / recent.length : 0;
-  const lastMonthCount = recent.length ? recentVals[recent.length - 1] : 0;
-  const peakIdx = recentVals.reduce((bestI, v, i, arr) => v > arr[bestI] ? i : bestI, 0);
-  const peakVal = recentVals[peakIdx] || 0;
-  const peakYm = recent[peakIdx] || '—';
-  const trough = recentVals.length && peakVal > 0 ? (lastMonthCount - peakVal) / peakVal * 100 : 0;
+  const banner = LANG === 'zh'
+    ? `Action: 本周先打 ${branch} 名单 — ${fmt(churnBranch.length)} 位高价值流失,合计近 6 月 RM ${fmtMoney(churnSum)}`
+        + (churnTop ? ` · 头号:${escapeHtml(churnTop.name || '—')} 价值 RM ${fmtMoney(churnTopAmt)}` : '')
+    : `Action: Call ${branch} first this week — ${fmt(churnBranch.length)} high-value at risk, RM ${fmtMoney(churnSum)} in 6m`
+        + (churnTop ? ` · top spender ${escapeHtml(churnTop.name || '—')} worth RM ${fmtMoney(churnTopAmt)}` : '');
 
-  const card = (cls, icon, title, value, body, list) =>
+  const cls = churnBranch.length > 5 ? 'high' : churnBranch.length > 0 ? 'mid' : 'low';
+  const cardHtml =
     '<div class="today-card urg-' + cls + '">' +
-      '<div class="td-icon">' + icon + '</div>' +
+      '<div class="td-icon">🟠</div>' +
       '<div class="td-body">' +
-        '<div class="td-title">' + title + '</div>' +
-        '<div class="td-interp">' + value + '</div>' +
-        '<div class="td-action-label">' + (LANG === 'zh' ? '清单' : 'List') + '</div>' +
-        '<div class="td-action">' + body + '</div>' +
-        (list ? '<details class="v17-cust-card-list"><summary>' + (LANG === 'zh' ? '展开 Top 20' : 'Open Top 20') + '</summary>' + list + '</details>' : '') +
+        '<div class="td-title">' + (LANG === 'zh'
+          ? `高价值客户流失预警 (${branch})`
+          : `High-value churn alert (${branch})`) + '</div>' +
+        '<div class="td-interp">' + fmt(churnBranch.length) +
+          (LANG === 'zh' ? ' 位本月 0 单 · 近 6 月有买' : ' members silent this month · active in last 6m') + '</div>' +
+        '<div class="td-action-label">' + (LANG === 'zh' ? '建议' : 'Action') + '</div>' +
+        '<div class="td-action">' + banner + '</div>' +
+      '</div>' +
+      '<div class="td-actions-col">' +
+        '<button class="td-jump" type="button" id="v17ChurnOpenTop20">' +
+          (LANG === 'zh' ? '打开 Top 20' : 'Open Top 20') + '</button>' +
       '</div>' +
     '</div>';
 
-  const c1 = card('high', '🔴',
-    LANG === 'zh' ? `5 年+ 流失老客 (${branch})` : `Lapsed 5y+ members (${branch})`,
-    fmt(lapsedLong.length) + (LANG === 'zh' ? ' 位 · 终身 RM ' : ' members · lifetime RM ') + fmtMoney(lapsedSum),
-    LANG === 'zh'
-      ? `最大单笔 RM ${fmtMoney(lapsedMax)} · ` + (lapsedTop ? `头号: ${escapeHtml(lapsedTop.name||'—')}` : '')
-      : `Max single RM ${fmtMoney(lapsedMax)} · ` + (lapsedTop ? `top: ${escapeHtml(lapsedTop.name||'—')}` : ''),
-    lapsedLong.slice(0,20).map(r =>
-      '<div class="v17-list-row">' +
-        '<span class="v17-list-name">' + escapeHtml(r.name||r.mc||'—') + '</span>' +
-        '<span class="v17-list-meta">RM ' + fmtMoney(r.amount||0) + ' · ' + (r.months_ago||0) + (LANG === 'zh' ? ' 月前' : 'm ago') + ' · ' + (r.cust_type || '—') + '</span>' +
-      '</div>'
-    ).join('') || '<div class="v17-list-empty">—</div>'
-  );
-
-  const c2 = card(churnBranch.length > 5 ? 'high' : 'mid', '🟠',
-    LANG === 'zh' ? `高价值客户流失预警 (${branch})` : `High-value churn alert (${branch})`,
-    fmt(churnBranch.length) + (LANG === 'zh' ? ' 位本月 0 单' : ' members silent this month'),
-    LANG === 'zh'
-      ? `近 6 月有买,本月 0 单${churnTop ? ' · 头号: ' + escapeHtml(churnTop.name||'—') : ''}`
-      : `Active in 6m, silent this month${churnTop ? ' · top: ' + escapeHtml(churnTop.name||'—') : ''}`,
-    churnBranch.slice(0,20).map(r =>
-      '<div class="v17-list-row">' +
-        '<span class="v17-list-name">' + escapeHtml(r.name||r.mc||'—') + '</span>' +
-        '<span class="v17-list-meta">6m RM ' + fmtMoney(r.m6_amt||0) + ' · ' + (r.cust_type||'—') + '</span>' +
-      '</div>'
-    ).join('') || '<div class="v17-list-empty">—</div>'
-  );
-
-  const trendBody = LANG === 'zh'
-    ? `近 12 月新增会员 ${fmt(recentSum)} · 月均 ${recentAvg.toFixed(1)} · 本月 ${fmt(lastMonthCount)} · 最高峰 ${peakYm} (${fmt(peakVal)})`
-    : `12m new members ${fmt(recentSum)} · monthly avg ${recentAvg.toFixed(1)} · this month ${fmt(lastMonthCount)} · peak ${peakYm} (${fmt(peakVal)})`;
-  const c3 = card(trough < -30 ? 'high' : trough < -10 ? 'mid' : 'low', '📊',
-    LANG === 'zh' ? `新客增长趋势 (${branch})` : `New customer trend (${branch})`,
-    trough < 0 ? `${trough.toFixed(0)}% ` + (LANG === 'zh' ? 'vs 峰值' : 'vs peak') : (LANG === 'zh' ? '稳定' : 'stable'),
-    trendBody,
-    '<table class="v17-trend-table"><thead><tr>' +
-      '<th>' + (LANG === 'zh' ? '月份' : 'Month') + '</th>' +
-      '<th class="num">' + (LANG === 'zh' ? '新会员' : 'New members') + '</th>' +
-    '</tr></thead><tbody>' +
-    recent.map((ym, i) => '<tr><td>' + ym + '</td><td class="num">' + fmt(recentVals[i]) + '</td></tr>').join('') +
-    '</tbody></table>'
-  );
-
   el.innerHTML =
     '<div class="v16-cap-title">' + (LANG === 'zh' ? '🎯 Action Plan' : '🎯 Action Plan') + '</div>' +
-    '<div class="today-cards">' + c1 + c2 + c3 + '</div>';
+    '<div class="today-cards">' + cardHtml + '</div>';
+
+  // Wire "Open Top 20" → scroll to bottom list section + open <details>.
+  const btn = document.getElementById('v17ChurnOpenTop20');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const sec = document.getElementById('v17CustBottomLists');
+      const det = document.getElementById('v17ChurnTop20Details');
+      if (det) det.open = true;
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 }
+
+/* V1.7 phase 5 — bottom-of-page lists for the Customer manager view.
+   Currently renders the Top 20 high-value churn list (collapsed by
+   default). Click "Open Top 20" on the Action Plan card to expand. */
+function v17CustomerBottomLists(branch) {
+  const view = document.getElementById('view-customers');
+  if (!view) return;
+  let sec = document.getElementById('v17CustBottomLists');
+  if (!sec) {
+    sec = document.createElement('section');
+    sec.id = 'v17CustBottomLists';
+    sec.className = 'v17-mgr-section';
+    view.appendChild(sec);
+  }
+  sec.style.display = '';
+
+  const churnAlertList = (typeof computeChurnAlerts === 'function')
+    ? (computeChurnAlerts() || {}).list || []
+    : [];
+  const churnBranch = churnAlertList.filter(c => c.branch === branch);
+
+  const rows = churnBranch.slice(0, 20).map((r, i) =>
+    '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + escapeHtml(r.name || r.mc || '—') + '</td>' +
+      '<td>' + escapeHtml(r.cust_type || '—') + '</td>' +
+      '<td>' + escapeHtml(r.branch || '—') + '</td>' +
+      '<td class="num">RM ' + fmtMoney(r.m6_amt || 0) + '</td>' +
+      '<td class="num">RM ' + fmtMoney(r.lifetime_amt || 0) + '</td>' +
+      '<td class="num">' + (r.m6_visits || 0) + '</td>' +
+      '<td class="num">' + (r.last || '—') + '</td>' +
+    '</tr>'
+  ).join('') || '<tr><td colspan="8" class="v17-list-empty">—</td></tr>';
+
+  sec.innerHTML =
+    '<details class="v17-bottom-list" id="v17ChurnTop20Details">' +
+      '<summary>' +
+        '<strong>' + (LANG === 'zh'
+          ? `Top 20 高价值流失客户 · ${branch}`
+          : `Top 20 high-value churn customers · ${branch}`) + '</strong>' +
+        ' <span class="v17-bottom-list-meta">' + (LANG === 'zh'
+          ? '近 6 月有买,本月 0 单。本店顾客优先名单。'
+          : 'Active in last 6m, silent this month. Branch-scoped call sheet.') + '</span>' +
+      '</summary>' +
+      '<table class="v17-bottom-list-table"><thead><tr>' +
+        '<th>#</th>' +
+        '<th>' + (LANG === 'zh' ? '姓名' : 'Name') + '</th>' +
+        '<th>' + (LANG === 'zh' ? '客户类型' : 'Type') + '</th>' +
+        '<th>' + (LANG === 'zh' ? '主交易店' : 'Primary store') + '</th>' +
+        '<th class="num">' + (LANG === 'zh' ? '近 6 月 RM' : '6m RM') + '</th>' +
+        '<th class="num">' + (LANG === 'zh' ? '终身 RM' : 'Lifetime RM') + '</th>' +
+        '<th class="num">' + (LANG === 'zh' ? '近 6 月 visits' : '6m visits') + '</th>' +
+        '<th class="num">' + (LANG === 'zh' ? '最后购买' : 'Last seen') + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</details>';
+}
+window.v17CustomerBottomLists = v17CustomerBottomLists;
 
 /* V1.7 Race section: pie + 3-month per-race table. */
 function v17RaceCharts(branch, snap) {
