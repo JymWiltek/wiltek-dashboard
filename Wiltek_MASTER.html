@@ -1439,6 +1439,58 @@ footer.app-footer {
 .v17-embedded-deadstock .tabs { flex-wrap: wrap; }
 .v17-embedded-deadstock .toolbar { flex-wrap: wrap; gap: 8px; }
 
+/* V1.7 phase 6 — Lapsed Customer Radar (Customer page, manager view) */
+.v17-radar-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin-top: 8px;
+}
+.v17-radar-card {
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-top: 4px solid; border-radius: 8px;
+  padding: 14px 14px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.v17-radar-amber   { border-top-color: var(--warn); }
+.v17-radar-orange  { border-top-color: #c87b1e; }
+.v17-radar-red     { border-top-color: var(--danger); }
+.v17-radar-darkred { border-top-color: #6e1414; }
+.v17-radar-band {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-secondary); font-weight: 600;
+}
+.v17-radar-card.v17-radar-amber   .v17-radar-band { color: var(--warn); }
+.v17-radar-card.v17-radar-orange  .v17-radar-band { color: #c87b1e; }
+.v17-radar-card.v17-radar-red     .v17-radar-band { color: var(--danger); }
+.v17-radar-card.v17-radar-darkred .v17-radar-band { color: #6e1414; }
+.v17-radar-count {
+  font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em; color: var(--text-primary);
+}
+.v17-radar-amt {
+  font-size: 13px; color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.v17-radar-top-label {
+  font-size: 11px; color: var(--text-tertiary); text-transform: uppercase;
+  letter-spacing: 0.4px; margin-top: 4px;
+}
+.v17-radar-top-list {
+  list-style: none; padding: 0; margin: 0; font-size: 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.v17-radar-top-list li {
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.v17-radar-top-amt {
+  color: var(--text-secondary); font-variant-numeric: tabular-nums;
+}
+.v17-radar-open {
+  margin-top: 6px; align-self: flex-start;
+  background: var(--brand); color: #fff; border: 0; padding: 6px 12px;
+  border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.v17-radar-open:hover { background: #19503e; }
+
 /* V1.7 phase 5 — bottom-of-page lists (Customer Top 20 churn) */
 .v17-bottom-list {
   background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 8px;
@@ -7367,6 +7419,9 @@ function renderCustomersManagerV17() {
   // ── Section 1: Action Plan 3 cards ──
   v17CustActionPlan(branch, snap);
 
+  // ── Section 1b (V1.7 phase 6): Lapsed Customer Radar ──
+  v17LapsedRadarSection(branch);
+
   // ── Section 2: KPI cards (Walk-in / Purchase / Avg Basket / Revenue) ──
   const kpiSpec = [
     { id: 'walkin',   labelEn: 'Walk-in Customers',   labelZh: '客流',          fmt: n => fmt(Math.round(n)) },
@@ -8304,6 +8359,186 @@ function v17CustomerBottomLists(branch) {
     '</details>';
 }
 window.v17CustomerBottomLists = v17CustomerBottomLists;
+
+/* ════════════════════════════════════════════════════════════════════
+   V1.7 phase 6 — Lapsed Customer Radar (manager view).
+   Four buckets by months_ago since last purchase:
+     3-6 mo / 6-12 mo / 1-2 y / 2 y+
+   Per branch. Each card shows count + total lifetime spend +
+   Top 3 spenders. [Open List] opens v17ShowGapModal with the full
+   bucket list + CSV export.
+
+   Data sources (union, deduplicated by member code):
+     - WP_TODAY.churn.rows       — pre-filtered by API (>=5 months;
+                                   amount>=500, visits>=2)
+     - WP_CUSTOMERS.top100       — top spenders, supplements 3-6 mo
+                                   bucket (the API churn cutoff
+                                   starts at 5 mo so the 3-5 mo
+                                   slice would otherwise be empty)
+   ════════════════════════════════════════════════════════════════════ */
+
+function v17LapsedMonthsAgo(lastYm, snapYm) {
+  if (!lastYm || !snapYm) return null;
+  const m = String(lastYm).match(/^(\d{4})-(\d{2})/);
+  const s = String(snapYm).match(/^(\d{4})-(\d{2})/);
+  if (!m || !s) return null;
+  return (+s[1] - +m[1]) * 12 + (+s[2] - +m[2]);
+}
+
+function v17LapsedBuckets(branch) {
+  const cd = window.WP_CUSTOMERS || {};
+  const td = window.WP_TODAY || {};
+  const churnRows = (td.churn && td.churn.rows) || [];
+  const top100 = cd.top100 || [];
+  const snap = (typeof snapMonth === 'function' ? snapMonth() : '');
+
+  const byMc = new Map();
+  // Source A: churn.rows (already filtered, has months_ago).
+  for (const r of churnRows) {
+    if (r.branch !== branch) continue;
+    if (!r.mc) continue;
+    if (!byMc.has(r.mc)) {
+      byMc.set(r.mc, {
+        mc: r.mc,
+        name: r.name || r.mc,
+        branch: r.branch,
+        cust_type: r.cust_type || '—',
+        lifetime_amt: r.amount || 0,
+        last_seen: r.last || '',
+        months_ago: r.months_ago || 0,
+      });
+    }
+  }
+  // Source B: top100 — adds the 3-5 mo bucket (below the API churn cutoff).
+  for (const t of top100) {
+    if (t.branch !== branch) continue;
+    if (!t.mc || byMc.has(t.mc)) continue;
+    const m = v17LapsedMonthsAgo(t.last, snap);
+    if (m == null || m < 3) continue;   // not lapsed
+    byMc.set(t.mc, {
+      mc: t.mc,
+      name: t.name || t.mc,
+      branch: t.branch,
+      cust_type: t.cust_type || '—',
+      lifetime_amt: t.lifetime_amt || 0,
+      last_seen: t.last || '',
+      months_ago: m,
+    });
+  }
+
+  const all = Array.from(byMc.values());
+  const bucket = (lo, hi) => all
+    .filter(c => c.months_ago >= lo && (hi == null || c.months_ago < hi))
+    .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
+  return {
+    'b3_6':   bucket(3, 6),
+    'b6_12':  bucket(6, 12),
+    'b12_24': bucket(12, 24),
+    'b24p':   bucket(24, null),
+    _total: all.length,
+  };
+}
+
+function v17LapsedRadarSection(branch) {
+  const view = document.getElementById('view-customers');
+  if (!view) return;
+  let sec = document.getElementById('v17LapsedRadar');
+  if (!sec) {
+    sec = document.createElement('section');
+    sec.id = 'v17LapsedRadar';
+    sec.className = 'v17-mgr-section';
+    // Insert after the Action Plan, before #dsCustCards (KPIs).
+    const ap = document.getElementById('dsCustActionPlan');
+    const kp = document.getElementById('dsCustCards');
+    if (ap && ap.parentNode) {
+      ap.parentNode.insertBefore(sec, ap.nextSibling);
+    } else if (kp && kp.parentNode) {
+      kp.parentNode.insertBefore(sec, kp);
+    } else {
+      view.appendChild(sec);
+    }
+  }
+
+  const buckets = v17LapsedBuckets(branch);
+  const buckSpec = [
+    { key: 'b3_6',   bandCls: 'amber',     labelEn: '3-6 months',  labelZh: '3-6 个月',
+      lo: 3,  hi: 6 },
+    { key: 'b6_12',  bandCls: 'orange',    labelEn: '6-12 months', labelZh: '6-12 个月',
+      lo: 6,  hi: 12 },
+    { key: 'b12_24', bandCls: 'red',       labelEn: '1-2 years',   labelZh: '1-2 年',
+      lo: 12, hi: 24 },
+    { key: 'b24p',   bandCls: 'darkred',   labelEn: '2+ years',    labelZh: '2 年以上',
+      lo: 24, hi: null },
+  ];
+
+  const cardsHtml = buckSpec.map(b => {
+    const arr = buckets[b.key] || [];
+    const sum = arr.reduce((a, c) => a + (c.lifetime_amt || 0), 0);
+    const top3 = arr.slice(0, 3);
+    return '<div class="v17-radar-card v17-radar-' + b.bandCls + '" data-radar-key="' + b.key + '">' +
+      '<div class="v17-radar-band">' + (LANG === 'zh' ? b.labelZh : b.labelEn) + '</div>' +
+      '<div class="v17-radar-count">' + fmt(arr.length) + (LANG === 'zh' ? ' 人' : '') + '</div>' +
+      '<div class="v17-radar-amt">RM ' + fmtMoney(Math.round(sum)) + '</div>' +
+      '<div class="v17-radar-top-label">Top ' + Math.min(3, top3.length) + '</div>' +
+      '<ul class="v17-radar-top-list">' +
+        top3.map(c => '<li>' + escapeHtml(c.name || c.mc) + ' <span class="v17-radar-top-amt">RM ' +
+          fmtMoney(Math.round(c.lifetime_amt || 0)) + '</span></li>').join('') +
+        (top3.length === 0 ? '<li class="v17-list-empty">—</li>' : '') +
+      '</ul>' +
+      '<button class="v17-radar-open" type="button" data-radar-open="' + b.key + '">' +
+        (LANG === 'zh' ? '查看全部' : 'Open List') + '</button>' +
+    '</div>';
+  }).join('');
+
+  sec.innerHTML =
+    '<h2 class="v16-mgr-section-title">📡 ' + (LANG === 'zh'
+      ? `流失客户雷达 · ${branch}`
+      : `Lapsed Customer Radar · ${branch}`) + '</h2>' +
+    '<p class="v16-mgr-section-sub">' + (LANG === 'zh'
+      ? '按多久没回来分组,优先 call 还能救的。每张卡显示总人数 / 总终身消费 / Top 3 名字。'
+      : 'Grouped by how long since last purchase. Each card: count / total lifetime spend / top 3 names. Click "Open List" for the full bucket roster.') + '</p>' +
+    '<div class="v17-radar-grid">' + cardsHtml + '</div>';
+
+  // Wire [Open List] buttons → v17ShowGapModal with bucket roster + CSV.
+  sec.querySelectorAll('button[data-radar-open]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-radar-open');
+      const spec = buckSpec.find(s => s.key === key);
+      const arr = buckets[key] || [];
+      const items = arr.map(c => ({
+        store: c.branch,
+        name: c.name,
+        mc: c.mc,
+        cust_type: c.cust_type,
+        lifetime_amt: Math.round(c.lifetime_amt || 0),
+        last_seen: c.last_seen || '—',
+        months_ago: c.months_ago,
+      }));
+      const titleSpan = LANG === 'zh' ? spec.labelZh : spec.labelEn;
+      v17ShowGapModal({
+        title: (LANG === 'zh'
+          ? `流失客户 · ${branch} · ${titleSpan}`
+          : `Lapsed customers · ${branch} · ${titleSpan}`),
+        sub: (LANG === 'zh'
+          ? `共 ${arr.length} 位 · 按终身消费降序`
+          : `${arr.length} customers · sorted by lifetime spend`),
+        items,
+        columns: [
+          { key: 'store',        label: LANG === 'zh' ? '主交易店' : 'Store' },
+          { key: 'name',         label: LANG === 'zh' ? '姓名' : 'Name' },
+          { key: 'mc',           label: LANG === 'zh' ? '会员 ID' : 'Member ID' },
+          { key: 'cust_type',    label: LANG === 'zh' ? '客户类型' : 'Type' },
+          { key: 'lifetime_amt', label: LANG === 'zh' ? '终身 RM' : 'Lifetime RM', num: true,
+            format: v => 'RM ' + fmtMoney(v) },
+          { key: 'last_seen',    label: LANG === 'zh' ? '最后购买' : 'Last seen' },
+          { key: 'months_ago',   label: LANG === 'zh' ? '多久没回来 (月)' : 'Months since', num: true },
+        ],
+        filename: `wiltek_lapsed_${branch}_${spec.labelEn.replace(/\W+/g,'')}.csv`,
+      });
+    });
+  });
+}
+window.v17LapsedRadarSection = v17LapsedRadarSection;
 
 /* V1.7 Race section: pie + 3-month per-race table. */
 function v17RaceCharts(branch, snap) {
