@@ -1512,6 +1512,55 @@ footer.app-footer {
   color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
 }
 .v17-bottom-list-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* V1.8 phase 2 — filterable / paged list (used in bottom list + modals) */
+.v17-fpl-toolbar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 10px 0 6px;
+}
+.v17-fpl-search {
+  flex: 1 1 220px; min-width: 180px;
+  padding: 7px 10px; border: 1px solid var(--border-soft); border-radius: 6px;
+  font-size: 13px; background: var(--bg-card); color: var(--text-primary);
+}
+.v17-fpl-search:focus { outline: 2px solid rgba(31,95,74,0.25); border-color: var(--brand); }
+.v17-fpl-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.v17-filter-chip {
+  background: rgba(31,95,74,0.06); border: 1px solid var(--border-soft);
+  padding: 5px 10px; border-radius: 14px; cursor: pointer;
+  font-size: 12px; color: var(--text-secondary);
+}
+.v17-filter-chip.on {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+.v17-fpl-meta {
+  font-size: 12px; color: var(--text-secondary); margin: 4px 0 6px;
+}
+.v17-fpl-table-wrap { max-height: 60vh; overflow: auto; border: 1px solid var(--border-soft); border-radius: 6px; }
+.v17-fpl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.v17-fpl-table th, .v17-fpl-table td {
+  padding: 7px 9px; border-bottom: 1px solid var(--border-soft); text-align: left;
+}
+.v17-fpl-table thead th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-secondary); font-weight: 600; background: rgba(31,95,74,0.04);
+  position: sticky; top: 0; z-index: 1;
+}
+.v17-fpl-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.v17-fpl-pager {
+  display: flex; gap: 12px; align-items: center; justify-content: center;
+  margin-top: 10px;
+}
+.v17-fpl-page-btn {
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  padding: 6px 12px; border-radius: 5px; cursor: pointer;
+  font-size: 13px; color: var(--text-primary);
+}
+.v17-fpl-page-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.v17-fpl-page-btn:not([disabled]):hover { background: rgba(31,95,74,0.06); }
+.v17-fpl-page-meta { font-size: 12px; color: var(--text-secondary); }
+
+.v17-modal.v17-modal-wide { max-width: 1100px; }
 </style>
 </head>
 <body>
@@ -8083,6 +8132,149 @@ function v17CatCell(catName, skuCount, branch) {
 }
 window.v17CatCell = v17CatCell;
 
+/* ════════════════════════════════════════════════════════════════════
+   V1.8 phase 2 — Filterable / paginated customer list helper.
+   Used by:
+     - Customer page bottom-of-page "All churn customers" section.
+     - Lapsed Radar 4-bucket [Open List] modals.
+   Rationale: managers work the list as a call sheet. They need ALL
+   customers, sorted by lifetime RM desc, searchable by name/member,
+   filterable by spend tier + customer type, paged at 50/page so the
+   browser stays fast on lists with hundreds of rows. CSV export pulls
+   the FULL filtered set, not just the visible page.
+   ════════════════════════════════════════════════════════════════════ */
+function v17RenderFilterablePagedList(opts) {
+  const container = opts.container;
+  if (!container) return;
+  const items = opts.items || [];
+  const columns = opts.columns || [];
+  const searchKeys = opts.searchKeys || ['name', 'mc'];
+  const filters = opts.filters || [];   // [{key, label, fn(item)→bool}]
+  const pageSize = opts.pageSize || 50;
+  const csvFilename = opts.csvFilename || 'wiltek_list.csv';
+  const titleHtml = opts.titleHtml || '';
+
+  // Per-container state (reset on each render).
+  const state = { search: '', activeFilters: new Set(), page: 1 };
+
+  function applyFilters() {
+    const q = state.search.trim().toLowerCase();
+    return items.filter(item => {
+      if (q) {
+        const hit = searchKeys.some(k => String(item[k] || '').toLowerCase().includes(q));
+        if (!hit) return false;
+      }
+      for (const f of filters) {
+        if (state.activeFilters.has(f.key) && !f.fn(item)) return false;
+      }
+      return true;
+    });
+  }
+
+  function render() {
+    const filtered = applyFilters();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (state.page > totalPages) state.page = totalPages;
+    const startIdx = (state.page - 1) * pageSize;
+    const pageItems = filtered.slice(startIdx, startIdx + pageSize);
+
+    const filterChipsHtml = filters.map(f =>
+      '<button type="button" class="v17-filter-chip' + (state.activeFilters.has(f.key) ? ' on' : '') +
+      '" data-filter-key="' + f.key + '">' + escapeHtml(f.label) + '</button>'
+    ).join('');
+
+    const headerHtml =
+      '<div class="v17-fpl-toolbar">' +
+        '<input type="search" class="v17-fpl-search" placeholder="' +
+          (LANG === 'zh' ? '搜索姓名 / 会员 ID…' : 'Search name / member ID…') + '" value="' + escapeHtml(state.search) + '">' +
+        (filterChipsHtml ? '<div class="v17-fpl-filters">' + filterChipsHtml + '</div>' : '') +
+        '<button type="button" class="v17-csv-btn v17-fpl-csv">⬇ ' + (LANG === 'zh' ? '下载 CSV' : 'Download CSV') + '</button>' +
+      '</div>';
+
+    const tableHtml =
+      '<div class="v17-fpl-meta">' +
+        (LANG === 'zh'
+          ? `第 ${startIdx + 1}-${startIdx + pageItems.length} 条,共 ${filtered.length} 条`
+          : `Showing ${startIdx + 1}-${startIdx + pageItems.length} of ${filtered.length}`) +
+      '</div>' +
+      '<div class="v17-fpl-table-wrap">' +
+        '<table class="v17-fpl-table"><thead><tr>' +
+          columns.map(c => '<th class="' + (c.num ? 'num' : '') + '">' + escapeHtml(c.label) + '</th>').join('') +
+        '</tr></thead><tbody>' +
+          (pageItems.length
+            ? pageItems.map(item => '<tr>' +
+                columns.map(c => {
+                  const v = item[c.key];
+                  const display = c.format ? c.format(v, item) : (v == null || v === '' ? '—' : escapeHtml(String(v)));
+                  return '<td class="' + (c.num ? 'num' : '') + '">' + display + '</td>';
+                }).join('') +
+              '</tr>').join('')
+            : '<tr><td colspan="' + columns.length + '" class="v17-list-empty">' +
+                (LANG === 'zh' ? '没有匹配的记录' : 'No matching records') + '</td></tr>') +
+        '</tbody></table>' +
+      '</div>';
+
+    let pagerHtml = '';
+    if (totalPages > 1) {
+      pagerHtml = '<div class="v17-fpl-pager">' +
+        '<button type="button" class="v17-fpl-page-btn" data-page-act="prev"' + (state.page === 1 ? ' disabled' : '') + '>‹ ' + (LANG === 'zh' ? '上一页' : 'Prev') + '</button>' +
+        '<span class="v17-fpl-page-meta">' + (LANG === 'zh' ? '第 ' : 'Page ') + state.page + ' / ' + totalPages + '</span>' +
+        '<button type="button" class="v17-fpl-page-btn" data-page-act="next"' + (state.page === totalPages ? ' disabled' : '') + '>' + (LANG === 'zh' ? '下一页' : 'Next') + ' ›</button>' +
+      '</div>';
+    }
+
+    container.innerHTML =
+      (titleHtml || '') + headerHtml + tableHtml + pagerHtml;
+
+    // Wire interactions.
+    const search = container.querySelector('.v17-fpl-search');
+    if (search) {
+      search.addEventListener('input', (e) => {
+        state.search = e.target.value;
+        state.page = 1;
+        render();
+      });
+    }
+    container.querySelectorAll('button[data-filter-key]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const k = btn.getAttribute('data-filter-key');
+        if (state.activeFilters.has(k)) state.activeFilters.delete(k); else state.activeFilters.add(k);
+        state.page = 1;
+        render();
+      });
+    });
+    container.querySelectorAll('button[data-page-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.getAttribute('data-page-act');
+        if (act === 'prev' && state.page > 1) state.page -= 1;
+        if (act === 'next' && state.page < totalPages) state.page += 1;
+        render();
+      });
+    });
+    const csvBtn = container.querySelector('.v17-fpl-csv');
+    if (csvBtn) {
+      csvBtn.addEventListener('click', () => {
+        const head = columns.map(c => '"' + (c.label || c.key).replace(/"/g, '""') + '"').join(',');
+        const lines = filtered.map(it => columns.map(c => {
+          const raw = c.csv ? c.csv(it[c.key], it) : it[c.key];
+          const s = (raw == null ? '' : String(raw)).replace(/"/g, '""');
+          return '"' + s + '"';
+        }).join(','));
+        const csv = '﻿' + [head, ...lines].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = csvFilename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+    }
+  }
+  render();
+}
+window.v17RenderFilterablePagedList = v17RenderFilterablePagedList;
+
 /* V1.7 — Products Action Plan: 3-5 dynamically-generated cards based on
    real numbers vs history. Inserted at the top of the Products view. */
 function v17ProductsActionPlan(ctx) {
@@ -8330,9 +8522,11 @@ function v17CustActionPlan(branch, snap) {
   }
 }
 
-/* V1.7 phase 5 — bottom-of-page lists for the Customer manager view.
-   Currently renders the Top 20 high-value churn list (collapsed by
-   default). Click "Open Top 20" on the Action Plan card to expand. */
+/* V1.7 phase 5 → V1.8 phase 2 — bottom-of-page lists for the manager
+   Customer view. Now shows the FULL branch churn list (sorted by
+   lifetime RM desc) with search + filter chips + pagination + CSV.
+   Click "Open Top 20" on the Action Plan card to expand. The button
+   label kept for muscle memory; the list itself is no longer capped. */
 function v17CustomerBottomLists(branch) {
   const view = document.getElementById('view-customers');
   if (!view) return;
@@ -8345,45 +8539,84 @@ function v17CustomerBottomLists(branch) {
   }
   sec.style.display = '';
 
+  const cd = window.WP_CUSTOMERS || {};
+  // Pull from the SAME source as Action Plan (computeChurnAlerts) but
+  // we no longer .slice(0, 20) — Jym needs to call them all.
   const churnAlertList = (typeof computeChurnAlerts === 'function')
     ? (computeChurnAlerts() || {}).list || []
     : [];
-  const churnBranch = churnAlertList.filter(c => c.branch === branch);
+  // Branch-scope + sort by lifetime RM desc.
+  const items = churnAlertList
+    .filter(c => c.branch === branch)
+    .map(c => ({
+      name: c.name || c.mc || '—',
+      mc: c.mc,
+      cust_type: c.cust_type || 'Other',
+      branch: c.branch,
+      m6_amt: Math.round(c.m6_amt || 0),
+      lifetime_amt: Math.round(c.lifetime_amt || c.amount || 0),
+      m6_visits: c.m6_visits || 0,
+      last: c.last || '—',
+    }))
+    .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
 
-  const rows = churnBranch.slice(0, 20).map((r, i) =>
-    '<tr>' +
-      '<td>' + (i + 1) + '</td>' +
-      '<td>' + escapeHtml(r.name || r.mc || '—') + '</td>' +
-      '<td>' + escapeHtml(r.cust_type || '—') + '</td>' +
-      '<td>' + escapeHtml(r.branch || '—') + '</td>' +
-      '<td class="num">RM ' + fmtMoney(r.m6_amt || 0) + '</td>' +
-      '<td class="num">RM ' + fmtMoney(r.lifetime_amt || 0) + '</td>' +
-      '<td class="num">' + (r.m6_visits || 0) + '</td>' +
-      '<td class="num">' + (r.last || '—') + '</td>' +
-    '</tr>'
-  ).join('') || '<tr><td colspan="8" class="v17-list-empty">—</td></tr>';
-
+  // Build the <details>. Body container will get the helper rendered into it.
   sec.innerHTML =
     '<details class="v17-bottom-list" id="v17ChurnTop20Details">' +
       '<summary>' +
         '<strong>' + (LANG === 'zh'
-          ? `Top 20 高价值流失客户 · ${branch}`
-          : `Top 20 high-value churn customers · ${branch}`) + '</strong>' +
+          ? `本店全部高价值流失客户 · ${branch} (按 lifetime RM 降序)`
+          : `All churn customers · ${branch} (sorted by lifetime RM desc)`) + '</strong>' +
         ' <span class="v17-bottom-list-meta">' + (LANG === 'zh'
-          ? '近 6 月有买,本月 0 单。本店顾客优先名单。'
-          : 'Active in last 6m, silent this month. Branch-scoped call sheet.') + '</span>' +
+          ? `共 ${items.length} 位 · 近 6 月有买,本月 0 单 · 优先 call 名单`
+          : `${items.length} customers · active in 6m, silent this month · call sheet`) + '</span>' +
       '</summary>' +
-      '<table class="v17-bottom-list-table"><thead><tr>' +
-        '<th>#</th>' +
-        '<th>' + (LANG === 'zh' ? '姓名' : 'Name') + '</th>' +
-        '<th>' + (LANG === 'zh' ? '客户类型' : 'Type') + '</th>' +
-        '<th>' + (LANG === 'zh' ? '主交易店' : 'Primary store') + '</th>' +
-        '<th class="num">' + (LANG === 'zh' ? '近 6 月 RM' : '6m RM') + '</th>' +
-        '<th class="num">' + (LANG === 'zh' ? '终身 RM' : 'Lifetime RM') + '</th>' +
-        '<th class="num">' + (LANG === 'zh' ? '近 6 月 visits' : '6m visits') + '</th>' +
-        '<th class="num">' + (LANG === 'zh' ? '最后购买' : 'Last seen') + '</th>' +
-      '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div id="v17ChurnFullListBody"></div>' +
     '</details>';
+
+  // Render the filterable / paginated list lazily — only when the
+  // <details> is opened — to avoid building hundreds of rows on every
+  // Customer page render. Reuses v17RenderFilterablePagedList.
+  const det = document.getElementById('v17ChurnTop20Details');
+  const body = document.getElementById('v17ChurnFullListBody');
+  let renderedOnce = false;
+  function renderFullList() {
+    if (renderedOnce) return;
+    v17RenderFilterablePagedList({
+      container: body,
+      items,
+      searchKeys: ['name', 'mc'],
+      pageSize: 50,
+      filters: [
+        { key: 'high_value', label: LANG === 'zh' ? '6m 价值 > RM 1,000' : '6m > RM 1,000',
+          fn: it => (it.m6_amt || 0) > 1000 },
+        { key: 'walkin',     label: LANG === 'zh' ? 'Walk-in' : 'Walk-in',
+          fn: it => /walk/i.test(it.cust_type || '') },
+        { key: 'designer',   label: LANG === 'zh' ? '设计师' : 'Interior Designer',
+          fn: it => /designer/i.test(it.cust_type || '') },
+        { key: 'other',      label: LANG === 'zh' ? '其他' : 'Other',
+          fn: it => /other|contractor/i.test(it.cust_type || '') },
+      ],
+      columns: [
+        { key: 'name',         label: LANG === 'zh' ? '姓名' : 'Name' },
+        { key: 'mc',           label: LANG === 'zh' ? '会员 ID' : 'Member ID' },
+        { key: 'cust_type',    label: LANG === 'zh' ? '客户类型' : 'Type' },
+        { key: 'branch',       label: LANG === 'zh' ? '主交易店' : 'Primary store' },
+        { key: 'm6_amt',       label: LANG === 'zh' ? '近 6 月 RM' : '6m RM', num: true,
+          format: v => 'RM ' + fmtMoney(v) },
+        { key: 'lifetime_amt', label: LANG === 'zh' ? '终身 RM' : 'Lifetime RM', num: true,
+          format: v => 'RM ' + fmtMoney(v) },
+        { key: 'm6_visits',    label: LANG === 'zh' ? '近 6 月 visits' : '6m visits', num: true },
+        { key: 'last',         label: LANG === 'zh' ? '最后购买' : 'Last seen' },
+      ],
+      csvFilename: `wiltek_churn_${branch}.csv`,
+    });
+    renderedOnce = true;
+  }
+  if (det) {
+    det.addEventListener('toggle', () => { if (det.open) renderFullList(); });
+    if (det.open) renderFullList();
+  }
 }
 window.v17CustomerBottomLists = v17CustomerBottomLists;
 
@@ -8526,7 +8759,7 @@ function v17LapsedRadarSection(branch) {
       : 'Grouped by how long since last purchase. Each card: count / total lifetime spend / top 3 names. Click "Open List" for the full bucket roster.') + '</p>' +
     '<div class="v17-radar-grid">' + cardsHtml + '</div>';
 
-  // Wire [Open List] buttons → v17ShowGapModal with bucket roster + CSV.
+  // Wire [Open List] buttons → filterable/paged modal with bucket roster + CSV.
   sec.querySelectorAll('button[data-radar-open]').forEach(btn => {
     btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-radar-open');
@@ -8542,14 +8775,26 @@ function v17LapsedRadarSection(branch) {
         months_ago: c.months_ago,
       }));
       const titleSpan = LANG === 'zh' ? spec.labelZh : spec.labelEn;
-      v17ShowGapModal({
+      v17ShowFilterableModal({
         title: (LANG === 'zh'
           ? `流失客户 · ${branch} · ${titleSpan}`
           : `Lapsed customers · ${branch} · ${titleSpan}`),
         sub: (LANG === 'zh'
-          ? `共 ${arr.length} 位 · 按终身消费降序`
-          : `${arr.length} customers · sorted by lifetime spend`),
+          ? `共 ${arr.length} 位 · 按终身消费降序 · 搜索 / 筛选 / 分页 / CSV`
+          : `${arr.length} customers · sorted by lifetime spend · search / filter / page / CSV`),
         items,
+        searchKeys: ['name', 'mc'],
+        pageSize: 50,
+        filters: [
+          { key: 'high_value', label: LANG === 'zh' ? '终身 > RM 5,000' : 'Lifetime > RM 5,000',
+            fn: it => (it.lifetime_amt || 0) > 5000 },
+          { key: 'walkin',   label: LANG === 'zh' ? 'Walk-in' : 'Walk-in',
+            fn: it => /walk/i.test(it.cust_type || '') },
+          { key: 'designer', label: LANG === 'zh' ? '设计师' : 'Interior Designer',
+            fn: it => /designer/i.test(it.cust_type || '') },
+          { key: 'other',    label: LANG === 'zh' ? '其他' : 'Other',
+            fn: it => /other|contractor/i.test(it.cust_type || '') },
+        ],
         columns: [
           { key: 'store',        label: LANG === 'zh' ? '主交易店' : 'Store' },
           { key: 'name',         label: LANG === 'zh' ? '姓名' : 'Name' },
@@ -8560,12 +8805,46 @@ function v17LapsedRadarSection(branch) {
           { key: 'last_seen',    label: LANG === 'zh' ? '最后购买' : 'Last seen' },
           { key: 'months_ago',   label: LANG === 'zh' ? '多久没回来 (月)' : 'Months since', num: true },
         ],
-        filename: `wiltek_lapsed_${branch}_${spec.labelEn.replace(/\W+/g,'')}.csv`,
+        csvFilename: `wiltek_lapsed_${branch}_${spec.labelEn.replace(/\W+/g,'')}.csv`,
       });
     });
   });
 }
 window.v17LapsedRadarSection = v17LapsedRadarSection;
+
+/* V1.8 phase 2 — Filterable modal: opens a modal containing the
+   v17RenderFilterablePagedList helper. Same shape as v17ShowGapModal
+   but with search / filter chips / pagination / full-set CSV. */
+function v17ShowFilterableModal(opts) {
+  document.querySelectorAll('.v17-modal-backdrop').forEach(el => el.remove());
+  const backdrop = document.createElement('div');
+  backdrop.className = 'v17-modal-backdrop';
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
+  const modal = document.createElement('div');
+  modal.className = 'v17-modal v17-modal-wide';
+  modal.innerHTML =
+    '<div class="v17-modal-head">' +
+      '<div><div class="v17-modal-title">' + escapeHtml(opts.title || '') + '</div>' +
+      (opts.sub ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">' + escapeHtml(opts.sub) + '</div>' : '') +
+      '</div>' +
+      '<button class="v17-modal-close" aria-label="Close">×</button>' +
+    '</div>' +
+    '<div class="v17-modal-body" id="v17FilterableModalBody"></div>';
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+  modal.querySelector('.v17-modal-close').addEventListener('click', () => backdrop.remove());
+
+  v17RenderFilterablePagedList({
+    container: modal.querySelector('#v17FilterableModalBody'),
+    items: opts.items || [],
+    columns: opts.columns || [],
+    searchKeys: opts.searchKeys,
+    filters: opts.filters,
+    pageSize: opts.pageSize || 50,
+    csvFilename: opts.csvFilename || 'wiltek_list.csv',
+  });
+}
+window.v17ShowFilterableModal = v17ShowFilterableModal;
 
 /* V1.7 Race section: pie + 3-month per-race table. */
 function v17RaceCharts(branch, snap) {
