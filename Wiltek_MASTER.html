@@ -3170,6 +3170,33 @@ function enterApp() {
   // V1 第6刀: run sanity checks once at app entry, paint the status light
   try { if (typeof updateSanityLight === 'function') updateSanityLight(); } catch(_){}
 
+  // V1.8 — cache-first boot. Hydrate window.WP_* from localStorage so
+  // the dashboard paints instantly with the last known data (zero loading
+  // state). Then fire refreshLiveData in the background to detect updates.
+  try {
+    if (typeof v18HydrateFromCache === 'function') {
+      const loaded = v18HydrateFromCache();
+      const anyCached = loaded.sales || loaded.customers || loaded.floatation;
+      if (anyCached) {
+        // Re-render the active view from cache before any network call.
+        try { rerenderActiveView(); } catch(_){}
+      }
+    }
+  } catch(_){}
+
+  // V1.8 — hide the Refresh button for store managers. Cache + the
+  // background refresh below keeps them current; the button would just
+  // confuse them since they don't trigger the build that produces new
+  // snapshots. Owner keeps the button. Match the existing role-detection
+  // pattern (line 3127) — permissions.js isn't loaded inline here.
+  try {
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+      const isMgrRole = /^w\d{2}_mgr$/.test(s.role || '');
+      refreshBtn.style.display = isMgrRole ? 'none' : '';
+    }
+  } catch(_){}
+
   // V1 第二刀: kick off live fetches for ALL channels (floatation + sales + customers)
   // in background — Refresh-without-clicking-Refresh for the first page load. The
   // refreshLiveData orchestrator handles loading state + change detection + toast.
@@ -8916,6 +8943,137 @@ window.updateDataDateLabel = updateDataDateLabel;
    Hits /api/floatation, server reads 5 W0X public Sheets and parses to RACE_DATA shape.
    On success → mutate window.WP_CUSTOMERS.race in-place so renderCustInsights picks up
    live data on next paint. */
+/* ════════════════════════════════════════════════════════════════════
+   V1.8 — Client-side cache with version stamps.
+
+   Boot flow becomes:
+     1. login → v18HydrateFromCache() pulls last known data from
+        localStorage and assigns to window.WP_SALES_LIVE / WP_CUSTOMERS
+        / WP_CUSTOMERS.race / WP_TODAY.churn — instantly (no spinner).
+     2. rerenderActiveView() paints from cache.
+     3. refreshLiveData({silent:true}) fires in the background.
+     4. Each fetchXxxLive() now writes its API response into
+        wpCache.set(<key>, payload) so the next session boots from it.
+     5. If any response's fetched_at differs from the cached version,
+        a small toast says "Data updated to <ts> · refresh page" and
+        the active view re-renders.
+
+   Managers (isBranchScopedRole) never see the Refresh button — the
+   cache + background fetch keeps them current without any extra UI.
+   Owner keeps the button + can force a fresh fetch.
+   ════════════════════════════════════════════════════════════════════ */
+const WP_CACHE_PREFIX = 'wp_cache_v18_';
+const wpCache = {
+  get(key) {
+    try {
+      const s = localStorage.getItem(WP_CACHE_PREFIX + key);
+      if (!s) return null;
+      return JSON.parse(s);
+    } catch(_) { return null; }
+  },
+  set(key, data, fetched_at) {
+    try {
+      const blob = JSON.stringify({ fetched_at: fetched_at || data?.fetched_at || new Date().toISOString(), data });
+      localStorage.setItem(WP_CACHE_PREFIX + key, blob);
+      return true;
+    } catch(_) {
+      try { localStorage.removeItem(WP_CACHE_PREFIX + key); } catch(_){}
+      return false;
+    }
+  },
+  clear() {
+    for (const k of ['sales', 'customers', 'floatation']) {
+      try { localStorage.removeItem(WP_CACHE_PREFIX + k); } catch(_){}
+    }
+  },
+};
+window.wpCache = wpCache;
+
+/* Hydrate window.WP_* from localStorage cache. Returns the set of
+   resources that loaded so callers can decide whether to render or
+   wait for a network fetch. */
+function v18HydrateFromCache() {
+  const loaded = { sales: false, customers: false, floatation: false };
+
+  const sales = wpCache.get('sales');
+  if (sales && sales.data) {
+    window.WP_SALES_LIVE = sales.data;
+    window.WP_SALES_LIVE._fetched_at = sales.fetched_at;
+    window.WP_SALES_LIVE._live = true;
+    loaded.sales = true;
+  }
+
+  const cust = wpCache.get('customers');
+  if (cust && cust.data) {
+    if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
+    const race = window.WP_CUSTOMERS.race;
+    Object.assign(window.WP_CUSTOMERS, {
+      meta: { ...(window.WP_CUSTOMERS.meta||{}), generated: cust.fetched_at, snapshot: cust.data.snapshot, _live: true },
+      summary: cust.data.summary,
+      summary_by_window: cust.data.summary_by_window,
+      summary_by_month: cust.data.summary_by_month,
+      buckets_by_window: cust.data.buckets_by_window,
+      buckets_by_month: cust.data.buckets_by_month,
+      cross_by_window: cust.data.cross_by_window,
+      sales_by_branch_month: cust.data.sales_by_branch_month || {},
+      top100: cust.data.top100,
+      windows: cust.data.windows,
+      types: cust.data.types,
+      loyalty_v17_by_branch: cust.data.loyalty_v17_by_branch || {},
+      _live: true,
+      _fetched_at: cust.fetched_at,
+    });
+    if (race) window.WP_CUSTOMERS.race = race;
+    if (!window.WP_TODAY) window.WP_TODAY = {};
+    window.WP_TODAY.churn = cust.data.churn;
+    if (cust.data.snapshot && /^\d{4}-\d{2}$/.test(cust.data.snapshot) && !window.SNAPSHOT) {
+      window.SNAPSHOT = cust.data.snapshot;
+    }
+    loaded.customers = true;
+  }
+
+  const flo = wpCache.get('floatation');
+  if (flo && flo.data) {
+    if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
+    window.WP_CUSTOMERS.race = {
+      months: flo.data.months,
+      races: flo.data.races,
+      totals: flo.data.totals,
+      by_branch: flo.data.by_branch,
+      branches_full: flo.data.branches_full,
+      note_en: flo.data.note_en,
+      note_zh: flo.data.note_zh,
+      year: flo.data.year,
+      _live: true,
+      _fetched_at: flo.fetched_at,
+    };
+    loaded.floatation = true;
+  }
+
+  return loaded;
+}
+window.v18HydrateFromCache = v18HydrateFromCache;
+
+/* Compare two ISO timestamp strings — returns true if `b` is newer. */
+function v18IsNewer(a, b) {
+  if (!a) return !!b;
+  if (!b) return false;
+  return new Date(b).getTime() > new Date(a).getTime();
+}
+
+/* Display a transient toast announcing a silent data update. Skips
+   the toast on first-ever load (when no cache existed). */
+function v18AnnounceUpdate(ts) {
+  if (typeof showToast !== 'function') return;
+  const stamp = ts ? String(ts).replace(/T/, ' ').slice(0, 16) : '';
+  showToast(
+    LANG === 'zh'
+      ? `数据已更新到最新 (snapshot ${stamp}) — 刷新页面`
+      : `Data updated to latest (snapshot ${stamp}) — refresh page`,
+    'ok'
+  );
+}
+
 async function fetchFloatationLive(ts) {
   const url = '/api/floatation?t=' + (ts || Date.now());
   try {
@@ -8939,8 +9097,13 @@ async function fetchFloatationLive(ts) {
       _fetched_at:   j.fetched_at,
     };
     if (!window.WP_CUSTOMERS) window.WP_CUSTOMERS = {};
+    // V1.8: detect new fetched_at vs cache before overwriting.
+    const cached = wpCache.get('floatation');
+    const isNewer = v18IsNewer(cached?.fetched_at, j.fetched_at);
     window.WP_CUSTOMERS.race = race;
-    return { ok: true, fetched_at: j.fetched_at, months: j.months, payload: j };
+    wpCache.set('floatation', j, j.fetched_at);
+    if (cached && isNewer) v18AnnounceUpdate(j.fetched_at);
+    return { ok: true, fetched_at: j.fetched_at, months: j.months, payload: j, _isNewer: isNewer };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -8960,8 +9123,12 @@ async function fetchSalesLive(ts) {
     if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
     j._live = true;
     j._fetched_at = j.fetched_at;
+    // V1.8: cache + diff before overwriting.
+    const cached = wpCache.get('sales');
+    const isNewer = v18IsNewer(cached?.fetched_at, j.fetched_at);
     window.WP_SALES_LIVE = j;
-    return { ok: true, fetched_at: j.fetched_at, months: j.months, payload: j };
+    wpCache.set('sales', j, j.fetched_at);
+    return { ok: true, fetched_at: j.fetched_at, months: j.months, payload: j, _isNewer: isNewer };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -9023,7 +9190,11 @@ async function fetchCustomersLive(ts) {
     window.WP_TODAY.churn = j.churn;
     window.WP_TODAY.meta = { ...(window.WP_TODAY.meta||{}), snapshot: j.snapshot };
 
-    return { ok: true, fetched_at: j.fetched_at, snapshot: j.snapshot, payload: j };
+    // V1.8: cache + diff
+    const cached = wpCache.get('customers');
+    const isNewer = v18IsNewer(cached?.fetched_at, j.fetched_at);
+    wpCache.set('customers', j, j.fetched_at);
+    return { ok: true, fetched_at: j.fetched_at, snapshot: j.snapshot, payload: j, _isNewer: isNewer };
   } catch (e) {
     return { ok: false, error: e.message };
   }
