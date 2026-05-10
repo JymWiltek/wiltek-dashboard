@@ -84,20 +84,21 @@ async function loadSessionUser(username) {
 // ── Build payload from Supabase data ─────────────────────────────────
 async function buildPayload(snapshotYm, allowedBranch) {
   // snapshotYm = 'YYYY-MM'. allowedBranch = 'W05' or null (=all branches).
+  // V2 Phase 1 design: compute the entire payload COMPANY-WIDE (so churn
+  // top-500 cap + top100 cap apply globally, matching V1.7 semantics
+  // expected by the frontend lapsed-radar logic), THEN filter the
+  // manager-visible fields to their branch on the way out. This keeps
+  // the verification target (76 lapsed customers at W05) unchanged.
   const k_now = ymKeyFromStr(snapshotYm);
   const k_ltm = k_now - 11;
   const k_m6  = k_now - 5;
   const k_m3  = k_now - 2;
   const k_m1  = k_now;
 
-  // Pull all data we need in parallel.
-  const [memPurchases, customers, latestMembers] = await Promise.all([
-    // v_member_purchases — rows per (customer × branch × ym).
-    fetchAllRows('v_member_purchases', 'customer_id, branch, ym, amount, visits',
-      allowedBranch ? [q => q.eq('branch', allowedBranch)] : []),
-    fetchAllRows('customers', 'customer_id, name, type, primary_store, enrol_date'),
-    // Last sale date per member at any branch (for `last` field).
-    null,   // computed below from memPurchases (faster than separate query)
+  // Pull ALL data (no branch filter); branch filter applied post-build.
+  const [memPurchases, customers] = await Promise.all([
+    fetchAllRows('v_member_purchases', 'customer_id, branch, ym, amount, visits'),
+    fetchAllRows('customers',          'customer_id, name, type, primary_store, enrol_date'),
   ]);
 
   // Index customers by id.
@@ -131,17 +132,13 @@ async function buildPayload(snapshotYm, allowedBranch) {
     if (ymk === k_m1) { d.m1_amt  += +r.amount; d.m1_visits  += +r.visits; }
   }
 
-  // Build ci_rows (customer master).
+  // Build ci_rows (customer master) — COMPANY-WIDE, no branch pre-filter.
+  // (Post-build branch filtering happens at the bottom of this function.)
   const ci_rows = [];
   for (const [mc, d] of mem) {
     const c = cMap.get(mc);
     if (!c || !c.enrol_date) continue;
-    if (allowedBranch && c.primary_store !== allowedBranch) continue;
-    if (!ACTIVE_BRANCHES.includes(c.primary_store) && !allowedBranch) {
-      // Skip non-active-store customers when serving owner overview, to
-      // mirror the legacy /api/customers behaviour.
-      continue;
-    }
+    if (!ACTIVE_BRANCHES.includes(c.primary_store)) continue;   // skip W11/WCO customers in the customer view
     const enrolDt = new Date(c.enrol_date + 'T00:00:00Z');
     const eom = new Date(Date.UTC(+snapshotYm.slice(0,4), +snapshotYm.slice(5,7), 0));
     const years = (eom - enrolDt) / (1000 * 60 * 60 * 24 * 365.25);
@@ -333,6 +330,23 @@ async function buildPayload(snapshotYm, allowedBranch) {
     }
   }));
 
+  // ── Post-build branch filter (manager-only) ───────────────────────
+  // The bulk computation above is company-wide so caps (churn 500,
+  // top100 100) apply globally — that matches V1.7 frontend
+  // expectations for the lapsed radar. Now narrow each manager-facing
+  // field to the user's branch.
+  let out_top100 = top100;
+  let out_churn  = churned.slice(0, 500);
+  let out_sales_by_branch_month = sales_by_branch_month;
+  if (allowedBranch) {
+    out_top100 = top100.filter(r => r.branch === allowedBranch);
+    out_churn  = out_churn.filter(r => r.branch === allowedBranch);
+    out_sales_by_branch_month = sales_by_branch_month[allowedBranch]
+      ? { [allowedBranch]: sales_by_branch_month[allowedBranch] }
+      : {};
+  }
+  const out_high_value_churn = out_churn.filter(c => c.amount >= 1000);
+
   return {
     summary,
     summary_by_window,
@@ -340,26 +354,28 @@ async function buildPayload(snapshotYm, allowedBranch) {
     buckets_by_window,
     buckets_by_month,
     cross_by_window,
-    sales_by_branch_month,
-    top100,
+    sales_by_branch_month: out_sales_by_branch_month,
+    top100: out_top100,
     windows: WINDOWS,
     types: TYPES,
     loyalty_v17_by_branch,
     churn: {
       summary: {
-        n_total: churned.length,
-        n_high_value: high_value_churn.length,
-        lifetime_rm: total_high_value_lifetime,
+        n_total: out_churn.length,
+        n_high_value: out_high_value_churn.length,
+        lifetime_rm: out_high_value_churn.reduce((s, c) => s + c.amount, 0),
         cutoff_months: 6,
         high_value_threshold: 1000,
       },
-      rows: churned.slice(0, 500),
+      rows: out_churn,
     },
     diagnostics: {
       mem_purchase_rows: memPurchases.length,
       n_members: cMap.size,
       n_ci_rows: ci_rows.length,
-      n_churn: churned.length,
+      n_churn_global: churned.length,
+      n_churn_visible: out_churn.length,
+      branch_scope: allowedBranch || 'all',
       snapshot: snapshotYm,
     },
   };
