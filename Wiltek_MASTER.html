@@ -9410,7 +9410,7 @@ function v18AnnounceUpdate(ts) {
 async function fetchFloatationLive(ts) {
   const url = '/api/floatation?t=' + (ts || Date.now());
   try {
-    const r = await fetch(url, { cache: 'no-store' });
+    const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
     if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
     const j = await r.json();
     if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };

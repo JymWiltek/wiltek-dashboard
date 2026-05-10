@@ -501,6 +501,21 @@ async function floatation() {
       const walk_in_total   = all_.walkin    ? Math.round(all_.walkin[mIdx])    : 0;
       const closed_count    = all_.purchase  ? Math.round(all_.purchase[mIdx])  : 0;
       const closing_rate    = all_.cr        ? +(all_.cr[mIdx] * 100).toFixed(2) : 0;
+      const amount_total    = all_.amount    ? Math.round(all_.amount[mIdx]   * 100) / 100 : 0;
+      const basket_total    = all_.basket    ? Math.round(all_.basket[mIdx]   * 100) / 100 : 0;
+
+      // Per-race purchase / amount breakdown (walk-in already in flat columns).
+      const racePack = (rowMap, field) => rowMap?.[field] ? rowMap[field][mIdx] : null;
+      const by_race = {
+        chinese: { purchase: Math.round(racePack(chRow, 'purchase') || 0),
+                   amount:   +(racePack(chRow, 'amount')   || 0).toFixed(2) },
+        malay:   { purchase: Math.round(racePack(myRow, 'purchase') || 0),
+                   amount:   +(racePack(myRow, 'amount')   || 0).toFixed(2) },
+        indian:  { purchase: Math.round(racePack(inRow, 'purchase') || 0),
+                   amount:   +(racePack(inRow, 'amount')   || 0).toFixed(2) },
+        others:  { purchase: Math.round(racePack(oRow,  'purchase') || 0),
+                   amount:   +(racePack(oRow,  'amount')   || 0).toFixed(2) },
+      };
 
       // Skip empty months (year not yet started or no data).
       if (!walk_in_total && !closed_count) continue;
@@ -515,6 +530,9 @@ async function floatation() {
         walk_in_other:   oRow.walkin  ? Math.round(oRow.walkin[mIdx])  : null,
         closed_count,
         closing_rate,
+        amount_total,
+        basket_total,
+        by_race,
         updated_by:      'migration',
       });
     }
