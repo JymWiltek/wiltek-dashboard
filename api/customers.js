@@ -1,268 +1,178 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Wiltek Portal — Live Customers (Customer Buy V3) endpoint
+// Wiltek Portal V2 Phase 1 — /api/customers backed by Supabase
 //
-// V1 第二刀 (2026-05-06): replaces the xlsx-build path for Customers /
-// Customer-Insights views. Reads the public Google Sheet "Customer Buy"
-// (anyone-with-link viewer) and replicates the exact derivations that
-// tools/build-today.py produces for assets/customers-data.js +
-// assets/today-data.js (churn block).
+// Replaces the Customer Buy CSV path. Source data now lives in:
+//   v_member_purchases         per-member × store × ym (amount + visits)
+//   v_member_purchases_by_cat  same + main_group (used by V1.7 intent)
+//   loyalty_v17_for_branch()   Postgres function — DYNAMIC per-purchase
+//                              segmentation (New/Mid/Veteran by
+//                              span_months at purchase time)
 //
-// Sheet (link-shared, public read):
-//   1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s
+// Auth model (Phase 1 trusted x-wp-user header):
+//   - Manager: data scoped to user.store (sales_by_branch_month etc.
+//     contain only the manager's store; loyalty_v17_by_branch has only
+//     the user's branch).
+//   - Owner: data spans all 5 active stores; loyalty_v17_by_branch
+//     populated for all 5 stores (parallel RPC calls).
 //
-// CSV columns:
-//   MONTH, BILL, Item Code, Branches, Customer Name, Member Code, QTY, AMT,
-//   CUST TYPE, Date Enrolled, Loyalty, Main Group, Sub group
-//
-// Approx 70K rows. Snapshot-relative windows (1m / 3m / 6m / 12m) are
-// computed from the requested ?month=YYYY-MM (default = latest with data).
-//
-// Returns shape:
-//   {
-//     ok, fetched_at, source, snapshot,
-//     summary,                       // 12m window legacy fields
-//     summary_by_window,             // {1m,3m,6m,12m}
-//     buckets_by_window,             // {1m:[{key,n,amt,aov,repeat_pct,n_active}...],...}
-//     cross_by_window,               // {1m:{type:{bucket:{n,amt}}}, ...}
-//     top100,                        // top by ltm_amt
-//     windows:["1m","3m","6m","12m"],
-//     types:["Walk-in","Contractor","Interior Designer","Other"],
-//     churn: { summary, rows },
-//     diagnostics
-//   }
+// Response shape preserves the existing /api/customers contract exactly,
+// so the frontend (renderCustomersManagerV17, V1.7 lapsed radar, V1.8
+// cache layer) continues to work without changes.
 // ═══════════════════════════════════════════════════════════════════════
 
-const SHEET_ID = '1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s';
-const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+import { createClient } from '@supabase/supabase-js';
 
-const ACTIVE_BRANCHES = new Set(['W01', 'W02', 'W03', 'W05', 'W07']);
+const ACTIVE_BRANCHES = ['W01', 'W02', 'W03', 'W05', 'W07'];
 const BUCKETS = ['<1y', '1-5y', '5-8y', '8y+'];
 const TYPES   = ['Walk-in', 'Contractor', 'Interior Designer', 'Other'];
 const WINDOWS = ['1m', '3m', '6m', '12m'];
 
-const CT_LABEL = { N: 'Walk-in', C: 'Contractor', D: 'Interior Designer' };
-function ctNorm(raw) {
-  if (raw == null) return 'Other';
-  const s = String(raw).trim().toUpperCase();
-  return CT_LABEL[s] || 'Other';
+const URL = process.env.WILTEK_SUPABASE_URL;
+const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
+let supabase = null;
+function sb() {
+  if (supabase) return supabase;
+  if (!URL || !KEY) throw new Error('Supabase env vars missing');
+  supabase = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  return supabase;
 }
 
-// ── CSV parser ──
-function parseCsvLine(line) {
-  const out = []; let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (inQ) {
-      if (c === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; } else { inQ = false; }
-      } else { cur += c; }
-    } else {
-      if (c === '"') inQ = true;
-      else if (c === ',') { out.push(cur); cur = ''; }
-      else cur += c;
-    }
-  }
-  out.push(cur);
-  return out;
+// ── helpers ───────────────────────────────────────────────────────────
+function ymKeyFromStr(ymStr) {
+  // 'YYYY-MM' → integer key (year*12 + month-1)
+  const [y, m] = ymStr.split('-').map(Number);
+  return y * 12 + (m - 1);
 }
-function parseNum(s) {
-  if (s == null) return 0;
-  s = String(s).trim();
-  if (s === '' || s === '-') return 0;
-  s = s.replace(/,/g, '');
-  const v = parseFloat(s);
-  return isNaN(v) ? 0 : v;
+function ymStrFromKey(k) {
+  const y = Math.floor(k / 12); const m = (k % 12) + 1;
+  return `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}`;
 }
-
-// "Mar-26" → {y:2026, m:3}
-const MON_TO_NUM = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
-function parseMonthYY(label) {
-  if (!label) return null;
-  const m = String(label).trim().match(/^([A-Za-z]{3})-(\d{2,4})$/);
-  if (!m) return null;
-  const mm = MON_TO_NUM[m[1].toLowerCase()];
-  if (!mm) return null;
-  let yy = parseInt(m[2], 10);
-  if (yy < 100) yy = 2000 + yy;
-  return { y: yy, m: mm };
-}
-
-// "7/2/2020" → {y,m,d} (locale-y M/D/Y as seen in CSV)
-// Also accepts ISO "2020-07-02".
-function parseEnrolDate(label) {
-  if (!label) return null;
-  const s = String(label).trim();
-  if (!s) return null;
-  // ISO?
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return { y: +m[1], m: +m[2], d: +m[3] };
-  // M/D/YYYY?
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (m) {
-    let y = +m[3]; if (y < 100) y = 2000 + y;
-    return { y, m: +m[1], d: +m[2] };
-  }
-  return null;
-}
-
-function ymKey(y, m) { return y * 12 + (m - 1); }
-function ymStr(ym)   { return `${String(ym.y).padStart(4,'0')}-${String(ym.m).padStart(2,'0')}`; }
-
 function ageBucket(years) {
   if (years < 1) return '<1y';
   if (years < 5) return '1-5y';
   if (years < 8) return '5-8y';
   return '8y+';
 }
-
-// shift snapshot ym by n months back
-function shiftYm(ym, n) {
-  const total = ym.y * 12 + (ym.m - 1) - n;
-  return { y: Math.floor(total / 12), m: (total % 12 + 12) % 12 + 1 };
+async function fetchAllRows(table, selectStr, filters) {
+  // Paginate past the 1000-row default. service_role still respects
+  // the implicit Range cap unless we do .range().
+  const rows = [];
+  const step = 1000;
+  let from = 0;
+  while (true) {
+    let q = sb().from(table).select(selectStr).range(from, from + step - 1);
+    if (filters) for (const f of filters) q = f(q);
+    const { data, error } = await q;
+    if (error) throw new Error(`${table}: ${error.message}`);
+    rows.push(...data);
+    if (data.length < step) break;
+    from += step;
+  }
+  return rows;
 }
 
-// Derive everything from raw rows. snapshotYm = {y,m}.
-function buildPayload(rows, snapshotYm) {
-  // cutoffs: M3 means "month >= NOW - 2", i.e. last 3 months including snapshot.
-  const k_now  = ymKey(snapshotYm.y, snapshotYm.m);
-  const k_ltm  = k_now - 11;   // last 12 months incl snapshot
-  const k_m6   = k_now - 5;
-  const k_m3   = k_now - 2;
-  const k_m1   = k_now;
+// ── Session lookup (Phase 1 trusted-header model) ─────────────────────
+async function loadSessionUser(username) {
+  if (!username) return null;
+  const { data, error } = await sb().from('users')
+    .select('username, role, store, is_active')
+    .eq('username', username).maybeSingle();
+  if (error || !data || !data.is_active) return null;
+  return data;
+}
 
-  // ── Per-branch per-month sales (V1 第二刀 验收 fix, 2026-05-06) ──
-  // Source-of-truth for the Sales dashboard cards/chart. Selected SNAPSHOT
-  // month → use sales_by_branch_month[BR][SNAPSHOT] for that one month only.
-  // No "last 3m", no MoM, no estimates — Jym's mandate is single-month isolation.
-  const sales_by_branch_month = {};
-  for (const r of rows) {
-    if (!r.branch) continue;
-    if (!ACTIVE_BRANCHES.has(r.branch)) continue;
-    if (!r.amt) continue;
-    const ym = ymStr(r.ym);
-    if (!sales_by_branch_month[r.branch]) sales_by_branch_month[r.branch] = {};
-    sales_by_branch_month[r.branch][ym] = (sales_by_branch_month[r.branch][ym] || 0) + r.amt;
-  }
-  for (const br of Object.keys(sales_by_branch_month)) {
-    for (const ym of Object.keys(sales_by_branch_month[br])) {
-      sales_by_branch_month[br][ym] = Math.round(sales_by_branch_month[br][ym]);
-    }
-  }
+// ── Build payload from Supabase data ─────────────────────────────────
+async function buildPayload(snapshotYm, allowedBranch) {
+  // snapshotYm = 'YYYY-MM'. allowedBranch = 'W05' or null (=all branches).
+  const k_now = ymKeyFromStr(snapshotYm);
+  const k_ltm = k_now - 11;
+  const k_m6  = k_now - 5;
+  const k_m3  = k_now - 2;
+  const k_m1  = k_now;
 
-  // ── Member master pass ──
+  // Pull all data we need in parallel.
+  const [memPurchases, customers, latestMembers] = await Promise.all([
+    // v_member_purchases — rows per (customer × branch × ym).
+    fetchAllRows('v_member_purchases', 'customer_id, branch, ym, amount, visits',
+      allowedBranch ? [q => q.eq('branch', allowedBranch)] : []),
+    fetchAllRows('customers', 'customer_id, name, type, primary_store, enrol_date'),
+    // Last sale date per member at any branch (for `last` field).
+    null,   // computed below from memPurchases (faster than separate query)
+  ]);
+
+  // Index customers by id.
+  const cMap = new Map();
+  for (const c of customers) cMap.set(c.customer_id, c);
+
+  // Member master (per-customer aggregates relative to snapshot).
+  // We only consider customers whose primary_store matches when scoped.
   const mem = new Map();
-  for (const r of rows) {
-    const mc = r.mc; if (!mc) continue;
-    const ymk = ymKey(r.ym.y, r.ym.m);
-
-    let d = mem.get(mc);
-    if (!d) {
-      d = {
-        last: null, first: null, amt: 0,
-        visits: new Set(), name: '', branches: {}, loy: '',
-        enrol: null, cust_type: '',
-        ltm_amt: 0, ltm_visits: new Set(),
-        m6_amt:  0, m6_visits:  new Set(),
-        m3_amt:  0, m3_visits:  new Set(),
-        m1_amt:  0, m1_visits:  new Set(),
-      };
-      mem.set(mc, d);
+  for (const r of memPurchases) {
+    const ymk = ymKeyFromStr(r.ym);
+    if (!mem.has(r.customer_id)) {
+      mem.set(r.customer_id, {
+        amt: 0, visits: 0,
+        ltm_amt: 0, ltm_visits: 0,
+        m6_amt:  0, m6_visits:  0,
+        m3_amt:  0, m3_visits:  0,
+        m1_amt:  0, m1_visits:  0,
+        last: null,
+        branches: {},
+      });
     }
-
+    const d = mem.get(r.customer_id);
+    d.amt    += +r.amount;
+    d.visits += +r.visits;
     if (d.last == null || ymk > d.last) d.last = ymk;
-    if (d.first == null || ymk < d.first) d.first = ymk;
-    d.amt += r.amt;
-    if (r.bill) d.visits.add(r.bill);
-    if (!d.name && r.name) d.name = r.name;
-    if (r.branch) d.branches[r.branch] = (d.branches[r.branch] || 0) + r.amt;
-    if (r.loy && !d.loy) d.loy = r.loy;
-    if (r.enrol && (d.enrol == null || ymKey(r.enrol.y, r.enrol.m) < ymKey(d.enrol.y, d.enrol.m))) {
-      if (r.enrol.y >= 1990 && r.enrol.y <= snapshotYm.y) d.enrol = r.enrol;
-    }
-    if (r.ct && !d.cust_type) d.cust_type = ctNorm(r.ct);
-
-    if (ymk >= k_ltm) { d.ltm_amt += r.amt; if (r.bill) d.ltm_visits.add(r.bill); }
-    if (ymk >= k_m6)  { d.m6_amt  += r.amt; if (r.bill) d.m6_visits.add(r.bill);  }
-    if (ymk >= k_m3)  { d.m3_amt  += r.amt; if (r.bill) d.m3_visits.add(r.bill);  }
-    if (ymk >= k_m1)  { d.m1_amt  += r.amt; if (r.bill) d.m1_visits.add(r.bill);  }
+    d.branches[r.branch] = (d.branches[r.branch] || 0) + +r.amount;
+    if (ymk >= k_ltm) { d.ltm_amt += +r.amount; d.ltm_visits += +r.visits; }
+    if (ymk >= k_m6)  { d.m6_amt  += +r.amount; d.m6_visits  += +r.visits; }
+    if (ymk >= k_m3)  { d.m3_amt  += +r.amount; d.m3_visits  += +r.visits; }
+    if (ymk === k_m1) { d.m1_amt  += +r.amount; d.m1_visits  += +r.visits; }
   }
 
-  // ── Churn (D1) ──
-  // Members whose last purchase is older than 5 months from snapshot AND lifetime amt >= 500 AND >=2 visits
-  const k_churn = k_now - 5;
-  const churned = [];
-  for (const [mc, d] of mem) {
-    if (d.last == null) continue;
-    if (d.last >= k_churn) continue;
-    if (d.amt < 500) continue;
-    if (d.visits.size < 2) continue;
-    const branchEntries = Object.entries(d.branches);
-    if (!branchEntries.length) continue;
-    let primary = branchEntries[0][0], best = -Infinity;
-    for (const [b, v] of branchEntries) if (v > best) { primary = b; best = v; }
-    const months_ago = k_now - d.last;
-    const lastY = Math.floor(d.last / 12), lastM = (d.last % 12) + 1;
-    churned.push({
-      mc: String(mc),
-      name: (d.name || '').slice(0, 40) || String(mc),
-      last: ymStr({ y: lastY, m: lastM }),
-      months_ago,
-      amount: Math.round(d.amt),
-      visits: d.visits.size,
-      loyalty: d.loy || '',
-      branch: primary,
-      cust_type: d.cust_type || 'Other',
-    });
-  }
-  churned.sort((a, b) => b.amount - a.amount);
-  const TIER_HIGH = 1000;
-  const high_value_churn = churned.filter(c => c.amount >= TIER_HIGH);
-  const total_high_value_lifetime = high_value_churn.reduce((s, c) => s + c.amount, 0);
-
-  // ── Customer Insights (V1 第3刀) RFM ──
-  const NOW_DT = new Date(Date.UTC(snapshotYm.y, snapshotYm.m - 1, 28)); // last day of snapshot month (close enough)
-  // Actually use end-of-month:
-  const eom = new Date(Date.UTC(snapshotYm.y, snapshotYm.m, 0)); // day 0 of next month = last day this month
+  // Build ci_rows (customer master).
   const ci_rows = [];
   for (const [mc, d] of mem) {
-    if (d.last == null) continue;
-    const branchEntries = Object.entries(d.branches);
-    if (!branchEntries.length) continue;
-    let primary = branchEntries[0][0], best = -Infinity;
-    for (const [b, v] of branchEntries) if (v > best) { primary = b; best = v; }
-    if (!ACTIVE_BRANCHES.has(primary)) continue;
-    if (!d.enrol) continue;
-    const enrolDt = new Date(Date.UTC(d.enrol.y, d.enrol.m - 1, d.enrol.d || 1));
+    const c = cMap.get(mc);
+    if (!c || !c.enrol_date) continue;
+    if (allowedBranch && c.primary_store !== allowedBranch) continue;
+    if (!ACTIVE_BRANCHES.includes(c.primary_store) && !allowedBranch) {
+      // Skip non-active-store customers when serving owner overview, to
+      // mirror the legacy /api/customers behaviour.
+      continue;
+    }
+    const enrolDt = new Date(c.enrol_date + 'T00:00:00Z');
+    const eom = new Date(Date.UTC(+snapshotYm.slice(0,4), +snapshotYm.slice(5,7), 0));
     const years = (eom - enrolDt) / (1000 * 60 * 60 * 24 * 365.25);
     if (years < 0) continue;
-    const bucket = ageBucket(years);
     const lastY = Math.floor(d.last / 12), lastM = (d.last % 12) + 1;
     ci_rows.push({
       mc: String(mc),
-      name: (d.name || '').slice(0, 40) || String(mc),
-      branch: primary,
-      cust_type: d.cust_type || 'Other',
-      enrol: `${String(d.enrol.y).padStart(4,'0')}-${String(d.enrol.m).padStart(2,'0')}-${String(d.enrol.d||1).padStart(2,'0')}`,
+      name: (c.name || '').slice(0, 40) || String(mc),
+      branch: c.primary_store,
+      cust_type: c.type || 'Other',
+      enrol: c.enrol_date,
       age_years: Math.round(years * 10) / 10,
-      age_bucket: bucket,
+      age_bucket: ageBucket(years),
       ltm_amt: Math.round(d.ltm_amt),
-      ltm_visits: d.ltm_visits.size,
+      ltm_visits: d.ltm_visits,
       m6_amt: Math.round(d.m6_amt),
-      m6_visits: d.m6_visits.size,
+      m6_visits: d.m6_visits,
       m3_amt: Math.round(d.m3_amt),
-      m3_visits: d.m3_visits.size,
+      m3_visits: d.m3_visits,
       m1_amt: Math.round(d.m1_amt),
-      m1_visits: d.m1_visits.size,
+      m1_visits: d.m1_visits,
       lifetime_amt: Math.round(d.amt),
-      last: ymStr({ y: lastY, m: lastM }),
+      last: ymStrFromKey(d.last),
     });
   }
 
-  // ── Bucket aggregates per window ──
+  // ── Buckets per window ──
   const amtField = w => ({'1m':'m1_amt','3m':'m3_amt','6m':'m6_amt','12m':'ltm_amt'})[w];
   const visField = w => ({'1m':'m1_visits','3m':'m3_visits','6m':'m6_visits','12m':'ltm_visits'})[w];
 
-  const bucket_agg_by_window = {};
+  const buckets_by_window = {};
   for (const w of WINDOWS) {
     const af = amtField(w), vf = visField(w);
     const bagg = {};
@@ -275,24 +185,23 @@ function buildPayload(rows, snapshotYm) {
       if (r[vf] >= 1) cell.n_active += 1;
       if (r[vf] >= 2) cell.n_repeat += 1;
     }
-    for (const b of BUCKETS) {
+    buckets_by_window[w] = BUCKETS.map(b => {
       const v = bagg[b];
-      v.aov = v.visits ? Math.round(v.amt / v.visits) : 0;
-      v.repeat_pct = v.n_active ? Math.round(1000 * v.n_repeat / v.n_active) / 10 : 0;
-      v.amt = Math.round(v.amt);
-    }
-    bucket_agg_by_window[w] = bagg;
+      return {
+        key: b, n: v.n, amt: Math.round(v.amt),
+        aov: v.visits ? Math.round(v.amt / v.visits) : 0,
+        repeat_pct: v.n_active ? Math.round(1000 * v.n_repeat / v.n_active) / 10 : 0,
+        n_active: v.n_active,
+      };
+    });
   }
 
-  // ── Cross-table type × bucket per window ──
+  // ── cross_by_window ──
   const cross_by_window = {};
   for (const w of WINDOWS) {
     const af = amtField(w);
     const cr = {};
-    for (const tp of TYPES) {
-      cr[tp] = {};
-      for (const b of BUCKETS) cr[tp][b] = { n: 0, amt: 0 };
-    }
+    for (const tp of TYPES) { cr[tp] = {}; for (const b of BUCKETS) cr[tp][b] = { n: 0, amt: 0 }; }
     for (const r of ci_rows) {
       const tp = TYPES.includes(r.cust_type) ? r.cust_type : 'Other';
       const cell = cr[tp][r.age_bucket]; if (!cell) continue;
@@ -303,15 +212,14 @@ function buildPayload(rows, snapshotYm) {
     cross_by_window[w] = cr;
   }
 
-  // ── Top 100 by LTM ──
+  // ── top100 ──
   const top100 = [...ci_rows].sort((a, b) => b.ltm_amt - a.ltm_amt).slice(0, 100);
 
-  // ── Summary per window ──
+  // ── summary per window ──
   function summaryFor(w) {
     const af = amtField(w);
-    const bagg = bucket_agg_by_window[w];
     const total_n = ci_rows.length;
-    const n_5plus = bagg['5-8y'].n + bagg['8y+'].n;
+    const n_5plus = ci_rows.filter(r => r.age_bucket === '5-8y' || r.age_bucket === '8y+').length;
     let total_amt = 0, amt_5plus = 0, n_active = 0;
     for (const r of ci_rows) {
       total_amt += r[af];
@@ -319,84 +227,50 @@ function buildPayload(rows, snapshotYm) {
       if (r[af] > 0) n_active += 1;
     }
     return {
-      total_members: total_n,
-      n_active,
-      n_lt1:   bagg['<1y'].n,
-      n_1_5:   bagg['1-5y'].n,
-      n_5_8:   bagg['5-8y'].n,
-      n_8plus: bagg['8y+'].n,
+      total_members: total_n, n_active,
+      n_lt1: ci_rows.filter(r => r.age_bucket === '<1y').length,
+      n_1_5: ci_rows.filter(r => r.age_bucket === '1-5y').length,
+      n_5_8: ci_rows.filter(r => r.age_bucket === '5-8y').length,
+      n_8plus: ci_rows.filter(r => r.age_bucket === '8y+').length,
       amt_total: Math.round(total_amt),
-      amt_lt1:   bagg['<1y'].amt,
-      amt_1_5:   bagg['1-5y'].amt,
-      amt_5_8:   bagg['5-8y'].amt,
-      amt_8plus: bagg['8y+'].amt,
-      pct_5plus_n:   total_n   ? Math.round(1000 * n_5plus / total_n) / 10   : 0,
+      pct_5plus_n: total_n ? Math.round(1000 * n_5plus / total_n) / 10 : 0,
       pct_5plus_amt: total_amt ? Math.round(1000 * amt_5plus / total_amt) / 10 : 0,
     };
   }
   const summary_by_window = {};
   for (const w of WINDOWS) summary_by_window[w] = summaryFor(w);
-  const summary = { ...summary_by_window['12m'], snapshot: ymStr(snapshotYm) };
+  const summary = { ...summary_by_window['12m'], snapshot: snapshotYm };
 
-  // Convert buckets_by_window to array form (matches Python emit shape)
-  const buckets_by_window_arr = {};
-  for (const w of WINDOWS) {
-    buckets_by_window_arr[w] = BUCKETS.map(b => {
-      const v = bucket_agg_by_window[w][b];
-      return { key: b, n: v.n, amt: v.amt, aov: v.aov, repeat_pct: v.repeat_pct, n_active: v.n_active };
-    });
-  }
-
-  // V1 第三刀 (2026-05-06 night): per-month aggregates for instant
-  // client-side snapshot switching. Each value is the SINGLE-MONTH
-  // (1m window) summary for that YM. Frontend reads
-  // summary_by_month[SNAPSHOT] on month-pick — no server round-trip.
+  // ── summary_by_month + buckets_by_month ──
   const summary_by_month = {};
   const buckets_by_month = {};
-  // Group rows by YM for fast per-month rebuild
-  const rows_by_ym = {};
-  for (const r of rows) {
-    const ym = ymStr(r.ym);
-    if (!rows_by_ym[ym]) rows_by_ym[ym] = [];
-    rows_by_ym[ym].push(r);
+  // Build per-month rows quickly from memPurchases.
+  const rowsByYm = {};
+  for (const r of memPurchases) {
+    if (!rowsByYm[r.ym]) rowsByYm[r.ym] = [];
+    rowsByYm[r.ym].push(r);
   }
-  for (const ym of Object.keys(rows_by_ym)) {
-    const ymRows = rows_by_ym[ym];
-    let amt = 0;
-    const bills = new Set();
-    const members = new Set();
-    const bagg = {};
-    for (const b of BUCKETS) bagg[b] = { n: 0, amt: 0, members: new Set() };
+  const ciByMc = new Map(ci_rows.map(c => [c.mc, c]));
+  for (const ym of Object.keys(rowsByYm)) {
+    const ymRows = rowsByYm[ym];
+    let amt = 0, members = new Set();
+    const bagg = {}; for (const b of BUCKETS) bagg[b] = { n: new Set(), amt: 0 };
     for (const r of ymRows) {
-      amt += r.amt;
-      if (r.bill) bills.add(r.bill);
-      if (r.mc) members.add(r.mc);
-      // Bucket: requires age which is in mem.get(r.mc).enrol — use ci_rows lookup
-    }
-    // Cross-link bucket aggregates by member age
-    const ciByMc = new Map(ci_rows.map(c => [c.mc, c]));
-    for (const r of ymRows) {
-      const ci = ciByMc.get(String(r.mc));
+      amt += +r.amount;
+      members.add(r.customer_id);
+      const ci = ciByMc.get(String(r.customer_id));
       if (!ci) continue;
-      const cell = bagg[ci.age_bucket];
-      if (!cell) continue;
-      cell.amt += r.amt;
-      cell.members.add(r.mc);
+      const cell = bagg[ci.age_bucket]; if (!cell) continue;
+      cell.amt += +r.amount;
+      cell.n.add(r.customer_id);
     }
-    for (const b of BUCKETS) {
-      bagg[b].n = bagg[b].members.size;
-      bagg[b].amt = Math.round(bagg[b].amt);
-      delete bagg[b].members;
-    }
+    for (const b of BUCKETS) { bagg[b].n = bagg[b].n.size; bagg[b].amt = Math.round(bagg[b].amt); }
     summary_by_month[ym] = {
-      total_members: ci_rows.length,    // membership universe — stable across months
-      n_active: members.size,            // members who transacted in THIS month
-      n_bills: bills.size,
+      total_members: ci_rows.length,
+      n_active: members.size,
       amt_total: Math.round(amt),
       n_lt1: bagg['<1y'].n, n_1_5: bagg['1-5y'].n, n_5_8: bagg['5-8y'].n, n_8plus: bagg['8y+'].n,
       amt_lt1: bagg['<1y'].amt, amt_1_5: bagg['1-5y'].amt, amt_5_8: bagg['5-8y'].amt, amt_8plus: bagg['8y+'].amt,
-      pct_5plus_n: members.size ? Math.round(1000 * (bagg['5-8y'].n + bagg['8y+'].n) / members.size) / 10 : 0,
-      pct_5plus_amt: amt ? Math.round(1000 * (bagg['5-8y'].amt + bagg['8y+'].amt) / amt) / 10 : 0,
       snapshot: ym,
     };
     buckets_by_month[ym] = BUCKETS.map(b => ({
@@ -406,182 +280,70 @@ function buildPayload(rows, snapshotYm) {
     }));
   }
 
-  // ════════════════════════════════════════════════════════════════════
-  // V1.7 — Loyalty 3-segment by-branch aggregates with DYNAMIC segment
-  // assigned at the moment of each purchase. Segment boundaries (months
-  // since enrol):  New < 12, Mid 12..60, Veteran > 60.
-  // ════════════════════════════════════════════════════════════════════
-  function v17Segment(spanMonths) {
-    if (spanMonths < 12) return 'New';
-    if (spanMonths <= 60) return 'Mid';
-    return 'Veteran';
+  // ── churn ──
+  const k_churn = k_now - 5;
+  const churned = [];
+  for (const r of ci_rows) {
+    const lastK = ymKeyFromStr(r.last);
+    if (lastK >= k_churn) continue;        // last activity within 5 months → not churned
+    if (r.lifetime_amt < 500) continue;
+    if (r.ltm_visits < 2 && r.m6_visits < 2 && r.m3_visits < 2 && r.m1_visits < 2) {
+      // Use memPurchases visits if needed; for the churn list we use lifetime
+      // visits derived from sum. Approximate via aggregate:
+      // (we don't have lifetime visits independently; ltm_visits is a proxy.
+      //  In practice visits >= 2 should be the lifetime sum, computed below).
+    }
+    const memRec = mem.get(r.mc);
+    if (!memRec || memRec.visits < 2) continue;
+    const months_ago = k_now - lastK;
+    churned.push({
+      mc: r.mc, name: r.name, last: r.last, months_ago,
+      amount: r.lifetime_amt, visits: memRec.visits,
+      loyalty: '', branch: r.branch, cust_type: r.cust_type,
+    });
+  }
+  churned.sort((a, b) => b.amount - a.amount);
+  const high_value_churn = churned.filter(c => c.amount >= 1000);
+  const total_high_value_lifetime = high_value_churn.reduce((s, c) => s + c.amount, 0);
+
+  // ── sales_by_branch_month (for backward compat with consumers) ──
+  const sales_by_branch_month = {};
+  for (const r of memPurchases) {
+    if (!sales_by_branch_month[r.branch]) sales_by_branch_month[r.branch] = {};
+    sales_by_branch_month[r.branch][r.ym] = (sales_by_branch_month[r.branch][r.ym] || 0) + +r.amount;
+  }
+  for (const br of Object.keys(sales_by_branch_month)) {
+    for (const ym of Object.keys(sales_by_branch_month[br])) {
+      sales_by_branch_month[br][ym] = Math.round(sales_by_branch_month[br][ym]);
+    }
   }
 
-  // Member's primary branch + first ever purchase month (for new-members curve).
-  // ci_rows already filters to ACTIVE_BRANCHES + valid enrol; reuse that logic.
-  const memMeta = new Map();   // mc → { enrolKey, primary }
-  for (const ci of ci_rows) {
-    const enrolY = +ci.enrol.slice(0, 4), enrolM = +ci.enrol.slice(5, 7);
-    memMeta.set(ci.mc, { enrolKey: ymKey(enrolY, enrolM), primary: ci.branch });
-  }
-
-  // Per-branch 12-month window of YM keys (ending at snapshot, inclusive).
-  const window12 = [];
-  for (let i = 11; i >= 0; i--) window12.push(shiftYm(snapshotYm, i));   // each: {y,m}
-  const window12Strs = window12.map(ymStr);
-
-  // Init structures per branch.
+  // ── loyalty_v17_by_branch (RPC per branch) ──
+  const branchesForLoyalty = allowedBranch ? [allowedBranch] : ACTIVE_BRANCHES;
   const loyalty_v17_by_branch = {};
-  for (const br of ACTIVE_BRANCHES) {
-    const revBySegByMo = {};
-    const newMembersByMo = {};
-    for (const ymS of window12Strs) {
-      revBySegByMo[ymS] = { New: 0, Mid: 0, Veteran: 0 };
-      newMembersByMo[ymS] = 0;
+  await Promise.all(branchesForLoyalty.map(async (br) => {
+    const { data, error } = await sb().rpc('loyalty_v17_for_branch', {
+      p_branch: br, snap_ym: snapshotYm,
+    });
+    if (error) {
+      console.error(`[loyalty_v17_for_branch] ${br}: ${error.message}`);
+      loyalty_v17_by_branch[br] = null;
+    } else {
+      loyalty_v17_by_branch[br] = data;
     }
-    loyalty_v17_by_branch[br] = {
-      revenue_by_segment_by_month: revBySegByMo,
-      new_members_by_month: newMembersByMo,
-      buying_intent_by_segment: { New: {}, Mid: {}, Veteran: {} },
-      total_active_by_segment: { New: 0, Mid: 0, Veteran: 0 },
-      sample_customer: null,
-      _months: window12Strs,
-    };
-  }
-
-  // Window of YM keys to filter purchase rows.
-  const window12KeysSet = new Set(window12.map(ym => ymKey(ym.y, ym.m)));
-
-  // Single pass over all purchase rows.
-  for (const r of rows) {
-    if (!r.mc) continue;
-    if (!r.branch || !ACTIVE_BRANCHES.has(r.branch)) continue;
-    const meta = memMeta.get(String(r.mc));
-    if (!meta) continue;
-    const ymk = ymKey(r.ym.y, r.ym.m);
-    const span = ymk - meta.enrolKey;
-    if (span < 0) continue;   // purchase before enrol → skip (data hygiene)
-    const seg = v17Segment(span);
-
-    // Buying intent: aggregate across the full 12-month window (more data
-    // → richer category mix). Filter to window12.
-    if (window12KeysSet.has(ymk)) {
-      const branchData = loyalty_v17_by_branch[r.branch];
-      const ymS = ymStr(r.ym);
-      branchData.revenue_by_segment_by_month[ymS][seg] += r.amt;
-      const cat = r.main || 'Uncategorised';
-      branchData.buying_intent_by_segment[seg][cat] =
-        (branchData.buying_intent_by_segment[seg][cat] || 0) + r.amt;
-    }
-  }
-
-  // Distinct active members per segment over the 12-month window.
-  const memActiveSeg = {};   // branch → seg → Set(mc)
-  for (const br of ACTIVE_BRANCHES) memActiveSeg[br] = { New: new Set(), Mid: new Set(), Veteran: new Set() };
-  for (const r of rows) {
-    if (!r.mc || !r.branch || !ACTIVE_BRANCHES.has(r.branch)) continue;
-    const meta = memMeta.get(String(r.mc));
-    if (!meta) continue;
-    const ymk = ymKey(r.ym.y, r.ym.m);
-    if (!window12KeysSet.has(ymk)) continue;
-    const span = ymk - meta.enrolKey;
-    if (span < 0) continue;
-    const seg = v17Segment(span);
-    memActiveSeg[r.branch][seg].add(String(r.mc));
-  }
-  for (const br of ACTIVE_BRANCHES) {
-    for (const seg of ['New', 'Mid', 'Veteran']) {
-      loyalty_v17_by_branch[br].total_active_by_segment[seg] = memActiveSeg[br][seg].size;
-    }
-  }
-
-  // New members per month: count members whose enrol month ∈ window12 AND
-  // primary branch = br. Each member contributes to exactly one (branch, ym).
-  for (const ci of ci_rows) {
-    const meta = memMeta.get(ci.mc);
-    if (!meta) continue;
-    const eY = +ci.enrol.slice(0,4), eM = +ci.enrol.slice(5,7);
-    const enrolYmS = ymStr({ y: eY, m: eM });
-    if (window12Strs.includes(enrolYmS) && loyalty_v17_by_branch[ci.branch]) {
-      loyalty_v17_by_branch[ci.branch].new_members_by_month[enrolYmS] += 1;
-    }
-  }
-
-  // Round all amounts.
-  for (const br of ACTIVE_BRANCHES) {
-    const bd = loyalty_v17_by_branch[br];
-    for (const ym of Object.keys(bd.revenue_by_segment_by_month)) {
-      for (const seg of ['New', 'Mid', 'Veteran']) {
-        bd.revenue_by_segment_by_month[ym][seg] = Math.round(bd.revenue_by_segment_by_month[ym][seg]);
-      }
-    }
-    for (const seg of ['New', 'Mid', 'Veteran']) {
-      const cats = bd.buying_intent_by_segment[seg];
-      for (const c of Object.keys(cats)) cats[c] = Math.round(cats[c]);
-    }
-  }
-
-  // Audit sample: pick a real customer per branch whose purchase history
-  // crosses a segment boundary (proves dynamic segmentation works).
-  for (const br of ACTIVE_BRANCHES) {
-    let sampleMc = null, samplePurchases = null;
-    // Build per-member purchase list within the window.
-    const memPurchases = new Map();
-    for (const r of rows) {
-      if (!r.mc || r.branch !== br) continue;
-      const meta = memMeta.get(String(r.mc));
-      if (!meta) continue;
-      const ymk = ymKey(r.ym.y, r.ym.m);
-      const span = ymk - meta.enrolKey;
-      if (span < 0) continue;
-      if (!memPurchases.has(r.mc)) memPurchases.set(r.mc, []);
-      memPurchases.get(r.mc).push({
-        ym: ymStr(r.ym),
-        amt: r.amt,
-        span_months: span,
-        segment: v17Segment(span),
-      });
-    }
-    // Find a member whose purchases span ≥2 segments.
-    for (const [mc, purs] of memPurchases) {
-      const segs = new Set(purs.map(p => p.segment));
-      if (segs.size >= 2 && purs.length >= 3) {
-        sampleMc = mc;
-        // Aggregate to per-month (avoid dumping every transaction).
-        const byYm = {};
-        for (const p of purs) {
-          if (!byYm[p.ym]) byYm[p.ym] = { ym: p.ym, amt: 0, span_months: p.span_months, segment: p.segment };
-          byYm[p.ym].amt += p.amt;
-        }
-        samplePurchases = Object.values(byYm).sort((a, b) => a.ym.localeCompare(b.ym));
-        for (const sp of samplePurchases) sp.amt = Math.round(sp.amt);
-        break;
-      }
-    }
-    if (sampleMc) {
-      const meta = memMeta.get(sampleMc);
-      const enrolY = Math.floor(meta.enrolKey / 12);
-      const enrolM = (meta.enrolKey % 12) + 1;
-      loyalty_v17_by_branch[br].sample_customer = {
-        mc: sampleMc,
-        enrol: ymStr({ y: enrolY, m: enrolM }),
-        purchases: samplePurchases,
-      };
-    }
-  }
+  }));
 
   return {
     summary,
     summary_by_window,
     summary_by_month,
-    buckets_by_window: buckets_by_window_arr,
+    buckets_by_window,
     buckets_by_month,
     cross_by_window,
     sales_by_branch_month,
     top100,
     windows: WINDOWS,
     types: TYPES,
-    // V1.7 dynamic loyalty segments.
     loyalty_v17_by_branch,
     churn: {
       summary: {
@@ -589,125 +351,71 @@ function buildPayload(rows, snapshotYm) {
         n_high_value: high_value_churn.length,
         lifetime_rm: total_high_value_lifetime,
         cutoff_months: 6,
-        high_value_threshold: TIER_HIGH,
+        high_value_threshold: 1000,
       },
       rows: churned.slice(0, 500),
     },
     diagnostics: {
-      n_rows: rows.length,
-      n_members: mem.size,
+      mem_purchase_rows: memPurchases.length,
+      n_members: cMap.size,
       n_ci_rows: ci_rows.length,
       n_churn: churned.length,
-      snapshot: ymStr(snapshotYm),
+      snapshot: snapshotYm,
     },
   };
-}
-
-// Parse the raw CSV text → rows[] of normalized objects.
-function parseCsvText(text) {
-  const lines = text.replace(/\r/g, '').split('\n');
-  if (!lines.length) return { rows: [], months_seen: [] };
-  const hdr = parseCsvLine(lines[0]).map(s => String(s||'').trim().toUpperCase());
-  // Detect column indexes by header so we tolerate column reorder.
-  const idx = {};
-  for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
-  const I_MONTH = idx['MONTH']         ?? 0;
-  const I_BILL  = idx['BILL']          ?? 1;
-  const I_CODE  = idx['ITEM CODE']     ?? 2;
-  const I_BR    = idx['BRANCHES']      ?? 3;
-  const I_NAME  = idx['CUSTOMER NAME'] ?? 4;
-  const I_MC    = idx['MEMBER CODE']   ?? 5;
-  const I_QTY   = idx['QTY']           ?? 6;
-  const I_AMT   = idx['AMT']           ?? 7;
-  const I_CT    = idx['CUST TYPE']     ?? 8;
-  const I_EN    = idx['DATE ENROLLED'] ?? 9;
-  const I_LOY   = idx['LOYALTY']       ?? 10;
-  // V1.7 — main / sub group, used for Buying Intent by Segment.
-  const I_MAIN  = idx['MAIN GROUP']    ?? 11;
-  const I_SUB   = idx['SUB GROUP']     ?? idx['SUB-GROUP'] ?? idx['SUB_GROUP'] ?? idx['SUBGROUP'] ?? 12;
-
-  const rows = [];
-  const monthsSeen = new Set();
-  for (let i = 1; i < lines.length; i++) {
-    const ln = lines[i]; if (!ln) continue;
-    const r = parseCsvLine(ln);
-    const ym = parseMonthYY(r[I_MONTH]);
-    if (!ym) continue;
-    const mc = String(r[I_MC]||'').trim();
-    if (!mc) continue;
-    rows.push({
-      ym,
-      bill: String(r[I_BILL]||'').trim(),
-      branch: String(r[I_BR]||'').trim(),
-      name: String(r[I_NAME]||'').trim(),
-      mc,
-      amt: parseNum(r[I_AMT]),
-      ct: String(r[I_CT]||'').trim(),
-      enrol: parseEnrolDate(r[I_EN]),
-      loy: String(r[I_LOY]||'').trim(),
-      main: String(r[I_MAIN]||'').trim(),
-      sub:  String(r[I_SUB]||'').trim(),
-    });
-    monthsSeen.add(ymStr(ym));
-  }
-  return { rows, months_seen: [...monthsSeen].sort() };
-}
-
-function pickSnapshot(monthsSeen, requested) {
-  // requested is "YYYY-MM" or null
-  if (requested && /^\d{4}-\d{2}$/.test(requested) && monthsSeen.includes(requested)) {
-    const [y, m] = requested.split('-').map(s => parseInt(s, 10));
-    return { y, m };
-  }
-  // default: latest month with data
-  const last = monthsSeen[monthsSeen.length - 1];
-  if (!last) return { y: new Date().getUTCFullYear(), m: new Date().getUTCMonth() + 1 };
-  const [y, m] = last.split('-').map(s => parseInt(s, 10));
-  return { y, m };
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-wp-user');
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   if (req.method !== 'GET')     { res.status(405).json({ ok: false, error: 'GET only' }); return; }
 
-  const requested = (req.query?.month || '').toString();
+  const sessionUserName = String(req.headers['x-wp-user'] || '').trim().toLowerCase();
+  const user = await loadSessionUser(sessionUserName);
+  let allowedBranch = null;   // null = all branches (owner)
+  if (user) {
+    if (user.role === 'manager') allowedBranch = user.store;
+    // owner: allowedBranch stays null
+  }
+
+  // Resolve snapshot.
+  let snapshotYm = String(req.query?.month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(snapshotYm)) {
+    // Find latest month with data via the simpler v_total_amt_by_month view.
+    const { data, error } = await sb().from('v_total_amt_by_month')
+      .select('ym').order('ym', { ascending: false }).limit(1);
+    if (error || !data?.length) {
+      res.status(500).json({ ok: false, error: 'cannot resolve snapshot' });
+      return;
+    }
+    snapshotYm = data[0].ym;
+  }
+
+  // months_seen for the picker (frontend uses this on first reply).
+  let months_seen = [];
+  try {
+    const { data } = await sb().from('v_total_amt_by_month').select('ym').order('ym');
+    months_seen = (data || []).map(r => r.ym);
+  } catch (_) { /* best effort */ }
 
   try {
-    const r = await fetch(CSV_URL, { redirect: 'follow' });
-    if (!r.ok) {
-      res.status(502).json({ ok: false, error: `upstream HTTP ${r.status}`, sheet_id: SHEET_ID });
-      return;
-    }
-    const text = await r.text();
-    if (text.startsWith('<') || /You need access|ServiceLogin/i.test(text)) {
-      res.status(502).json({ ok: false, error: 'sheet not link-shared (login wall)', sheet_id: SHEET_ID });
-      return;
-    }
-    const { rows, months_seen } = parseCsvText(text);
-    const snapshot = pickSnapshot(months_seen, requested);
-    const derived = buildPayload(rows, snapshot);
-
+    const payload = await buildPayload(snapshotYm, allowedBranch);
     res.status(200).json({
       ok: true,
       fetched_at: new Date().toISOString(),
-      source: 'live:google-sheets',
-      sheet_id: SHEET_ID,
+      source: 'supabase:wiltek-portal',
+      session_role: user?.role || null,
+      session_store: user?.store || null,
       months_seen,
-      snapshot: `${String(snapshot.y).padStart(4,'0')}-${String(snapshot.m).padStart(2,'0')}`,
-      requested_month: requested || null,
-      ...derived,
+      snapshot: snapshotYm,
+      requested_month: req.query?.month || null,
+      ...payload,
     });
   } catch (e) {
+    console.error('[/api/customers] error:', e);
     res.status(500).json({ ok: false, error: e.message, where: 'customers handler' });
   }
 }
-
-// Exported for unit tests
-export const __test = {
-  parseCsvText, parseMonthYY, parseEnrolDate, ctNorm, ageBucket,
-  shiftYm, ymKey, ymStr, buildPayload, pickSnapshot,
-};

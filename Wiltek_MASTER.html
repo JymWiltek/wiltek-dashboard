@@ -9488,7 +9488,7 @@ async function fetchCustomersLive(ts) {
   const qs = month ? ('&month=' + encodeURIComponent(month)) : '';
   const url = '/api/customers?t=' + (ts || Date.now()) + qs;
   try {
-    const r = await fetch(url, { cache: 'no-store' });
+    const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
     if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
     const j = await r.json();
     if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
