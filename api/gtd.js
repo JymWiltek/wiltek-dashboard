@@ -32,7 +32,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const ACTIVE_BRANCHES = ['W01', 'W02', 'W03', 'W05', 'W07', 'W11'];
+// 5 active retail stores. Keep this list in sync with api/sales.js,
+// api/floatation.js, etc. — single source of truth.
+const ACTIVE_BRANCHES = ['W01', 'W02', 'W03', 'W05', 'W07'];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
 const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
@@ -171,7 +173,10 @@ async function handlePost(req, res, user) {
       if (!ym) { skipped.push({ key: k, reason: 'bad monthIdx' }); continue; }
       const num = (v === '' || v == null) ? null : Number(v);
       if (num != null && !Number.isFinite(num)) { skipped.push({ key: k, reason: 'NaN actual' }); continue; }
-      kpiActualUpserts.push({ store: branch, year_month: ym, kpi_name: parsed.id, actual: num });
+      kpiActualUpserts.push({
+        store: branch, year_month: ym, kpi_name: parsed.id,
+        actual: num, updated_by: user.username,
+      });
     } else if (parsed.kind === 'target_month') {
       if (!isOwner) {
         return res.status(403).json({ ok: false, error: 'only owner can write target' });
@@ -180,7 +185,10 @@ async function handlePost(req, res, user) {
       if (!ym) { skipped.push({ key: k, reason: 'bad monthIdx' }); continue; }
       const num = (v === '' || v == null) ? null : Number(v);
       if (num != null && !Number.isFinite(num)) { skipped.push({ key: k, reason: 'NaN target' }); continue; }
-      kpiTargetUpserts.push({ store: branch, year_month: ym, kpi_name: parsed.id, target: num });
+      kpiTargetUpserts.push({
+        store: branch, year_month: ym, kpi_name: parsed.id,
+        target: num, updated_by: user.username,
+      });
     } else if (parsed.kind === 'target') {
       // Branch-default target (no month). Phase 1 fans out to all 12 months.
       if (!isOwner) {
@@ -190,7 +198,10 @@ async function handlePost(req, res, user) {
       if (num != null && !Number.isFinite(num)) { skipped.push({ key: k, reason: 'NaN target' }); continue; }
       for (let m = 0; m < 12; m++) {
         const ym = ymFromMonthIdx(m, 2026);
-        kpiTargetUpserts.push({ store: branch, year_month: ym, kpi_name: parsed.id, target: num });
+        kpiTargetUpserts.push({
+          store: branch, year_month: ym, kpi_name: parsed.id,
+          target: num, updated_by: user.username,
+        });
       }
     }
   }
