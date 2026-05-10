@@ -9447,10 +9447,20 @@ window.fetchFloatationLive = fetchFloatationLive;
    Hits /api/sales (public Sheet). Stores raw payload at window.WP_SALES_LIVE
    for downstream renderers to pivot. Does NOT overwrite WP_FINANCIAL (those
    are different cuts — financial = cash, sales = unit movement). */
+// V2 Phase 1: shared header builder. /api/sales (and later /customers etc.)
+// reads x-wp-user to enforce branch scoping at the database layer. Phase 2
+// will replace this trusted-header model with a signed JWT.
+function wpAuthHeaders() {
+  try {
+    const s = window.WP_SESSION && window.WP_SESSION.get && window.WP_SESSION.get();
+    return s && s.userId ? { 'x-wp-user': s.userId } : {};
+  } catch (_) { return {}; }
+}
+
 async function fetchSalesLive(ts) {
   const url = '/api/sales?t=' + (ts || Date.now());
   try {
-    const r = await fetch(url, { cache: 'no-store' });
+    const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
     if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
     const j = await r.json();
     if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };

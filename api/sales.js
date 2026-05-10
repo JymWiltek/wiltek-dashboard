@@ -1,333 +1,291 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Wiltek Portal — Live Sales endpoint
+// Wiltek Portal V2 Phase 1 — /api/sales backed by Supabase
 //
-// V1 第二刀 (2026-05-06): replaces the xlsx-build path for the Sales view.
-// V1 第三刀 (2026-05-06 night): pulls TWO tabs from the Sales workbook —
-//   1. Default tab  (MONTH × MAIN GROUP × AMT PO × AMT GRN)  — kept as-is
-//      for legacy consumers (purchasing-by-group analytics).
-//   2. "Raw sale"  (Month × Code × Branch × Qty × Amount)    — new source-of-
-//      truth for the Sales dashboard. Per-branch per-month TOTAL Amount,
-//      matches what Jym sees in the Sheet status bar (filter Mar-26 →
-//      RM 372,608.31). The CustomerBuy-derived sales_by_branch_month was
-//      a SUBSET (members only); switching to Raw sale fixes that.
+// Replaces the "Raw sale" Sheet CSV path with three Supabase views:
+//   v_sales_by_branch_month  — per-branch per-month total amount
+//   v_sku_by_month_branch    — per-SKU per-branch per-month amount + qty
+//   v_total_amt_by_month     — total amount per month (5 stores summed)
 //
-// Sheet (link-shared, public read):
-//   1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II
-//   Default tab: PO/GRN aggregates (~465 rows)
-//   "Raw sale" tab: per-transaction sale rows (~58k rows, Jan-23 .. current)
+// The PO/GRN default-tab fetch is preserved as-is — that data isn't in
+// Supabase yet (Phase 0 only migrated sales/items/customers/etc.) and
+// nothing else needed it.
 //
-// No server cache — caller adds ?t=<ts> to bust browser cache.
+// Auth & branch enforcement (V2 Phase 1):
+//   - Caller passes `x-wp-user: <username>` header (set by the frontend
+//     from window.WP_SESSION.get().userId after /api/login).
+//   - Server looks up users.role + users.store via the SERVICE_ROLE key
+//     (bypasses RLS).
+//   - Owner: query results scoped to ?branch=<X> if provided, else
+//     all 5 stores.
+//   - Manager: only their own store, regardless of ?branch=. A manager
+//     calling ?branch=<other> gets 403.
+//
+// Phase 2 will replace the trusted-header model with signed JWT.
 // ═══════════════════════════════════════════════════════════════════════
 
+import { createClient } from '@supabase/supabase-js';
+
+// ── Legacy Sheet (PO/GRN matrix from default tab — still served) ──
 const SHEET_ID = '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II';
 const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
-// Raw sale tab — gviz CSV export by sheet name (handles tabs the default
-// /export endpoint won't reach). URL-encoded "Raw sale" → "Raw%20sale".
-const RAW_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Raw%20sale`;
-// Active branches for the dashboard rollup. W11 + WCO appear in Raw sale
-// (RM 29k + RM 52 in Mar-26) but the executive view scopes to the 5
-// retail stores. We expose all branches in the response so the frontend
-// can decide which to display.
 const ACTIVE_BRANCHES = ['W01', 'W02', 'W03', 'W05', 'W07'];
+const SKU_DETAIL_MONTHS = 14;   // keep last 14 months of per-SKU detail
 
-// CSV parser — handles "1,122.00" quoted thousands.
+// ── Supabase client (service-role; bypasses RLS) ─────────────────────
+const URL = process.env.WILTEK_SUPABASE_URL;
+const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
+let supabase = null;
+function sb() {
+  if (supabase) return supabase;
+  if (!URL || !KEY) throw new Error('Supabase env vars missing');
+  supabase = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  return supabase;
+}
+
+// ── CSV helpers (PO/GRN tab still parsed from Sheet) ──────────────────
 function parseCsvLine(line) {
   const out = []; let cur = '', inQ = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
-    if (inQ) {
-      if (c === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; } else { inQ = false; }
-      } else { cur += c; }
-    } else {
-      if (c === '"') inQ = true;
-      else if (c === ',') { out.push(cur); cur = ''; }
-      else cur += c;
-    }
+    if (inQ) { if (c === '"') { if (line[i+1] === '"') { cur += '"'; i++; } else inQ = false; } else cur += c; }
+    else { if (c === '"') inQ = true; else if (c === ',') { out.push(cur); cur=''; } else cur += c; }
   }
-  out.push(cur);
-  return out;
+  out.push(cur); return out;
 }
-function parseCsv(text) {
-  return text.replace(/\r/g, '').split('\n').filter(l => l.length).map(parseCsvLine);
-}
+function parseCsv(text) { return text.replace(/\r/g,'').split('\n').filter(l => l.length).map(parseCsvLine); }
 function parseNum(s) {
   if (s == null) return 0;
   s = String(s).trim();
-  if (s === '' || s === '-' || s === '#N/A' || s === '#DIV/0!') return 0;
+  if (!s || s === '-' || s === '#N/A' || s === '#DIV/0!') return 0;
   s = s.replace(/,/g, '');
-  const v = parseFloat(s);
-  return isNaN(v) ? 0 : v;
+  const v = parseFloat(s); return isNaN(v) ? 0 : v;
 }
-
-const MON_TO_NUM = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+const MON_TO_NUM = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
 function monthLabelToYm(label) {
-  // "Mar-26" → "2026-03"
   if (!label) return null;
   const m = String(label).trim().match(/^([A-Za-z]{3})-(\d{2,4})$/);
   if (!m) return null;
-  const mm = MON_TO_NUM[m[1].toLowerCase()];
-  if (!mm) return null;
-  let yy = parseInt(m[2], 10);
-  if (yy < 100) yy = 2000 + yy;
+  const mm = MON_TO_NUM[m[1].toLowerCase()]; if (!mm) return null;
+  let yy = parseInt(m[2], 10); if (yy < 100) yy = 2000 + yy;
   return `${yy}-${String(mm).padStart(2,'0')}`;
 }
 
-// Parse the "Raw sale" tab CSV → per-branch per-month + per-SKU per-month aggregates.
-// Columns:  Month | Code | Branch | Qty | Amount (RM)
-// V1 第四刀 返工: also returns sku_amt_by_month + sku_qty_by_month (last 14
-// months — covers single-month + 12m trailing window). Frontend uses these
-// to drive single-month KPIs + 3-line comparisons (vs last month / vs same
-// month last year / vs 6m avg) + Top SKU rankings with [单月][6M][12M] toggle.
-// Returns: {
-//   sales_by_branch_month: { 'W01': { '2026-03': 55491, ... } },
-//   sku_amt_by_month:      { '2026-03': { 'CODE': 1234, ... }, ... }   // last 14 months
-//   sku_qty_by_month:      { '2026-03': { 'CODE': 5,    ... }, ... }
-//   total_amt_by_month:    { '2026-03': 372608, ... }                  // every month
-//   months_seen, branches_seen, n_rows
-// }
-function buildRawSaleAggregates(text) {
+// ── Build PO/GRN aggregates from default-tab CSV (unchanged from V1) ──
+function buildPoGrnPayload(text) {
   const grid = parseCsv(text);
-  const empty = {
-    sales_by_branch_month: {}, months_seen: [], branches_seen: [],
-    sku_amt_by_month: {}, sku_qty_by_month: {}, total_amt_by_month: {},
-    n_rows: 0,
-  };
-  if (!grid.length) return empty;
-  // Header check (gviz wraps each cell in quotes, so case/spacing flexible)
-  const hdr = grid[0].map(s => String(s||'').trim().toLowerCase());
-  if (!hdr.includes('month') || !hdr.includes('branch')) {
-    throw new Error(`Raw sale unexpected header: ${grid[0].slice(0,5).join('|')}`);
-  }
-  const I_MONTH  = hdr.indexOf('month');
-  const I_CODE   = hdr.indexOf('code');
-  const I_BRANCH = hdr.indexOf('branch');
-  const I_QTY    = hdr.findIndex(h => h === 'qty' || h === 'quantity');
-  // "Amount (RM)" or just "Amount"
-  let I_AMT = hdr.findIndex(h => /^amount/.test(h));
-  if (I_AMT < 0) I_AMT = 4;
-
-  const sbm = {};                        // sales_by_branch_month
-  const totalAmtByMonth = {};            // total_amt_by_month (every month)
-  const skuAmtByMonth   = {};            // sku_amt_by_month (last 14 months only)
-  const skuQtyByMonth   = {};            // sku_qty_by_month (last 14 months only)
-  const monthsSet = new Set();
-  const branchesSet = new Set();
-  let n = 0;
-  for (let i = 1; i < grid.length; i++) {
-    const r = grid[i];
-    if (!r || r.length < 3) continue;
-    const ym = monthLabelToYm(r[I_MONTH]);
-    if (!ym) continue;
-    const br = String(r[I_BRANCH]||'').trim();
-    if (!br) continue;
-    const amt = parseNum(r[I_AMT]);
-    const qty = I_QTY >= 0 ? parseNum(r[I_QTY]) : 0;
-    const code = I_CODE >= 0 ? String(r[I_CODE]||'').trim() : '';
-
-    if (!sbm[br]) sbm[br] = {};
-    sbm[br][ym] = (sbm[br][ym] || 0) + amt;
-    totalAmtByMonth[ym] = (totalAmtByMonth[ym] || 0) + amt;
-    monthsSet.add(ym);
-    branchesSet.add(br);
-    n++;
-  }
-
-  // Decide which months to keep per-SKU detail for: most recent 14 months.
-  // Anything older keeps only branch-level + total aggregates (small).
-  const allMonthsSorted = [...monthsSet].sort();
-  const recent14 = new Set(allMonthsSorted.slice(-14));
-
-  // Second pass: build per-SKU per-month for recent 14 months only.
-  // V1.5 bonus: ALSO build per-branch per-SKU per-month aggregates so the
-  // store-manager Products dashboard can show 自家店该月活跃 SKU + 销售冠军.
-  // Schema: sku_amt_by_month_branch[ym][branch][code] = amount
-  const skuAmtByMonthBranch = {};
-  const skuQtyByMonthBranch = {};
-  if (I_CODE >= 0) {
-    for (let i = 1; i < grid.length; i++) {
-      const r = grid[i];
-      if (!r || r.length < 3) continue;
-      const ym = monthLabelToYm(r[I_MONTH]);
-      if (!ym || !recent14.has(ym)) continue;
-      const code = String(r[I_CODE]||'').trim();
-      if (!code) continue;
-      const br = String(r[I_BRANCH]||'').trim();
-      const amt = parseNum(r[I_AMT]);
-      const qty = I_QTY >= 0 ? parseNum(r[I_QTY]) : 0;
-      // Company-wide per-month
-      if (!skuAmtByMonth[ym]) skuAmtByMonth[ym] = {};
-      if (!skuQtyByMonth[ym]) skuQtyByMonth[ym] = {};
-      skuAmtByMonth[ym][code] = (skuAmtByMonth[ym][code] || 0) + amt;
-      skuQtyByMonth[ym][code] = (skuQtyByMonth[ym][code] || 0) + qty;
-      // Per-branch per-month
-      if (br) {
-        if (!skuAmtByMonthBranch[ym]) skuAmtByMonthBranch[ym] = {};
-        if (!skuAmtByMonthBranch[ym][br]) skuAmtByMonthBranch[ym][br] = {};
-        skuAmtByMonthBranch[ym][br][code] = (skuAmtByMonthBranch[ym][br][code] || 0) + amt;
-        if (!skuQtyByMonthBranch[ym]) skuQtyByMonthBranch[ym] = {};
-        if (!skuQtyByMonthBranch[ym][br]) skuQtyByMonthBranch[ym][br] = {};
-        skuQtyByMonthBranch[ym][br][code] = (skuQtyByMonthBranch[ym][br][code] || 0) + qty;
-      }
-    }
-  }
-
-  // Round to whole ringgit (sales_by_branch_month + totals + per-SKU amt)
-  for (const br of Object.keys(sbm)) {
-    for (const ym of Object.keys(sbm[br])) sbm[br][ym] = Math.round(sbm[br][ym]);
-  }
-  for (const ym of Object.keys(totalAmtByMonth)) {
-    totalAmtByMonth[ym] = Math.round(totalAmtByMonth[ym]);
-  }
-  for (const ym of Object.keys(skuAmtByMonth)) {
-    for (const c of Object.keys(skuAmtByMonth[ym])) {
-      skuAmtByMonth[ym][c] = Math.round(skuAmtByMonth[ym][c]);
-    }
-  }
-  for (const ym of Object.keys(skuAmtByMonthBranch)) {
-    for (const br of Object.keys(skuAmtByMonthBranch[ym])) {
-      for (const c of Object.keys(skuAmtByMonthBranch[ym][br])) {
-        skuAmtByMonthBranch[ym][br][c] = Math.round(skuAmtByMonthBranch[ym][br][c]);
-      }
-    }
-  }
-
-  return {
-    sales_by_branch_month: sbm,
-    sku_amt_by_month: skuAmtByMonth,
-    sku_qty_by_month: skuQtyByMonth,
-    sku_amt_by_month_branch: skuAmtByMonthBranch,
-    sku_qty_by_month_branch: skuQtyByMonthBranch,
-    total_amt_by_month: totalAmtByMonth,
-    months_seen: allMonthsSorted,
-    branches_seen: [...branchesSet].sort(),
-    n_rows: n,
-  };
-}
-
-function buildResponse(text) {
-  const grid = parseCsv(text);
-  if (!grid.length) throw new Error('empty CSV');
-  // Header check
+  if (!grid.length) return null;
   const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
-  if (hdr[0] !== 'MONTH' || hdr[1] !== 'MAIN GROUP') {
-    throw new Error(`unexpected header: ${hdr.slice(0,4).join('|')}`);
-  }
-
-  // Parse rows → matrix[ym][group] = { po, grn }
+  if (hdr[0] !== 'MONTH' || hdr[1] !== 'MAIN GROUP') return null;
   const matrix = {};
   const monthsSet = new Set();
   const groupsSet = new Set();
   for (let i = 1; i < grid.length; i++) {
-    const r = grid[i];
-    if (!r || r.length < 4) continue;
-    const ym = monthLabelToYm(r[0]);
-    if (!ym) continue;
-    const grp = String(r[1]||'').trim();
-    if (!grp) continue;
-    const po  = parseNum(r[2]);
-    const grn = parseNum(r[3]);
+    const r = grid[i]; if (!r || r.length < 4) continue;
+    const ym = monthLabelToYm(r[0]); if (!ym) continue;
+    const grp = String(r[1]||'').trim(); if (!grp) continue;
     if (!matrix[ym]) matrix[ym] = {};
-    matrix[ym][grp] = { po, grn };
-    monthsSet.add(ym);
-    groupsSet.add(grp);
+    matrix[ym][grp] = { po: parseNum(r[2]), grn: parseNum(r[3]) };
+    monthsSet.add(ym); groupsSet.add(grp);
   }
-
   const months = [...monthsSet].sort();
   const groups = [...groupsSet].sort();
-
-  // Per-month totals
   const by_month = {};
   for (const m of months) {
     let po = 0, grn = 0;
     for (const g of groups) {
-      const c = matrix[m][g]; if (!c) continue;
-      po += c.po; grn += c.grn;
+      const c = matrix[m][g]; if (c) { po += c.po; grn += c.grn; }
     }
     by_month[m] = { po: Math.round(po*100)/100, grn: Math.round(grn*100)/100 };
   }
-
-  // Per-group totals (across all months)
   const by_group = {};
   for (const g of groups) {
     let po = 0, grn = 0;
-    for (const m of months) {
-      const c = matrix[m][g]; if (!c) continue;
-      po += c.po; grn += c.grn;
-    }
+    for (const m of months) { const c = matrix[m][g]; if (c) { po += c.po; grn += c.grn; } }
     by_group[g] = { po: Math.round(po*100)/100, grn: Math.round(grn*100)/100 };
   }
-
-  // Latest month with non-zero data
   let latest_month = months[months.length - 1] || null;
   for (let i = months.length - 1; i >= 0; i--) {
     const t = by_month[months[i]];
     if (t && (t.po > 0 || t.grn > 0)) { latest_month = months[i]; break; }
   }
+  return { months, groups, matrix, by_month, by_group, latest_month, rows_n: grid.length - 1 };
+}
+
+// ── Session lookup (Phase 1 trusted-header model) ────────────────────
+async function loadSessionUser(username) {
+  if (!username) return null;
+  const { data, error } = await sb().from('users')
+    .select('username, role, store, is_active')
+    .eq('username', username).maybeSingle();
+  if (error || !data || !data.is_active) return null;
+  return data;
+}
+
+// ── Build sales aggregates from Supabase views ────────────────────────
+async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
+  // Determine the YM cutoff for per-SKU detail (last 14 months from latest).
+  // Pull the full month list once to know "latest" reliably.
+  let q1 = sb().from('v_sales_by_branch_month').select('store, ym, amount');
+  if (allowedBranches) q1 = q1.in('store', allowedBranches);
+  if (queryBranch)     q1 = q1.eq('store', queryBranch);
+  const r1 = await q1;
+  if (r1.error) throw new Error('v_sales_by_branch_month: ' + r1.error.message);
+
+  const sales_by_branch_month = {};
+  const monthsSet = new Set();
+  const branchesSet = new Set();
+  for (const row of r1.data) {
+    if (!sales_by_branch_month[row.store]) sales_by_branch_month[row.store] = {};
+    sales_by_branch_month[row.store][row.ym] = +row.amount;
+    monthsSet.add(row.ym);
+    branchesSet.add(row.store);
+  }
+  const months_seen = [...monthsSet].sort();
+  const branches_seen = [...branchesSet].sort();
+
+  // total_amt_by_month: for a manager this is filtered to their branch
+  // (sum of one row per month). For owner without a branch filter, sum
+  // across all 5 stores via the view directly.
+  const total_amt_by_month = {};
+  if (queryBranch || (allowedBranches && allowedBranches.length === 1)) {
+    // Manager or owner+single-branch: total per month = single branch amount.
+    const onlyBranch = queryBranch || allowedBranches[0];
+    for (const ym of months_seen) {
+      total_amt_by_month[ym] = +(sales_by_branch_month[onlyBranch] || {})[ym] || 0;
+    }
+  } else {
+    const r2 = await sb().from('v_total_amt_by_month').select('ym, amount');
+    if (r2.error) throw new Error('v_total_amt_by_month: ' + r2.error.message);
+    for (const row of r2.data) total_amt_by_month[row.ym] = +row.amount;
+  }
+
+  // SKU detail — last 14 months only.
+  const recent14 = months_seen.slice(-SKU_DETAIL_MONTHS);
+  const recent14Set = new Set(recent14);
+
+  let q3 = sb().from('v_sku_by_month_branch').select('ym, store, code, amount, qty');
+  if (allowedBranches) q3 = q3.in('store', allowedBranches);
+  if (queryBranch)     q3 = q3.eq('store', queryBranch);
+  if (recent14.length) q3 = q3.in('ym', recent14);
+  q3 = q3.limit(50000);   // soft cap
+  const r3 = await q3;
+  if (r3.error) throw new Error('v_sku_by_month_branch: ' + r3.error.message);
+
+  const sku_amt_by_month        = {};
+  const sku_qty_by_month        = {};
+  const sku_amt_by_month_branch = {};
+  const sku_qty_by_month_branch = {};
+  for (const row of r3.data) {
+    if (!recent14Set.has(row.ym)) continue;
+    if (!sku_amt_by_month[row.ym]) sku_amt_by_month[row.ym] = {};
+    if (!sku_qty_by_month[row.ym]) sku_qty_by_month[row.ym] = {};
+    sku_amt_by_month[row.ym][row.code] = (sku_amt_by_month[row.ym][row.code] || 0) + +row.amount;
+    sku_qty_by_month[row.ym][row.code] = (sku_qty_by_month[row.ym][row.code] || 0) + +row.qty;
+
+    if (!sku_amt_by_month_branch[row.ym])              sku_amt_by_month_branch[row.ym] = {};
+    if (!sku_amt_by_month_branch[row.ym][row.store])   sku_amt_by_month_branch[row.ym][row.store] = {};
+    if (!sku_qty_by_month_branch[row.ym])              sku_qty_by_month_branch[row.ym] = {};
+    if (!sku_qty_by_month_branch[row.ym][row.store])   sku_qty_by_month_branch[row.ym][row.store] = {};
+    sku_amt_by_month_branch[row.ym][row.store][row.code] = +row.amount;
+    sku_qty_by_month_branch[row.ym][row.store][row.code] = +row.qty;
+  }
 
   return {
-    ok: true,
-    fetched_at: new Date().toISOString(),
-    source: 'live:google-sheets',
-    sheet_id: SHEET_ID,
-    months,
-    groups,
-    matrix,
-    by_month,
-    by_group,
-    latest_month,
-    rows_n: grid.length - 1,
+    sales_by_branch_month,
+    sku_amt_by_month,
+    sku_qty_by_month,
+    sku_amt_by_month_branch,
+    sku_qty_by_month_branch,
+    total_amt_by_month,
+    months_seen,
+    branches_seen,
+    n_rows: r3.data.length,
+    _raw_ok: true,
   };
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-wp-user');
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   if (req.method !== 'GET')     { res.status(405).json({ ok: false, error: 'GET only' }); return; }
 
-  try {
-    // Fetch both tabs in parallel — Raw sale tab is ~3MB, default tab ~25KB.
-    const [rDefault, rRaw] = await Promise.all([
-      fetch(CSV_URL,     { redirect: 'follow' }),
-      fetch(RAW_CSV_URL, { redirect: 'follow' }),
-    ]);
-    if (!rDefault.ok) {
-      res.status(502).json({ ok: false, error: `upstream HTTP ${rDefault.status}`, sheet_id: SHEET_ID });
-      return;
-    }
-    const text = await rDefault.text();
-    if (text.startsWith('<') || /You need access|ServiceLogin/i.test(text)) {
-      res.status(502).json({ ok: false, error: 'sheet not link-shared (login wall)', sheet_id: SHEET_ID });
-      return;
-    }
-    const payload = buildResponse(text);
+  // Session — Phase 1 trusted header. Phase 2 replaces with signed JWT.
+  const sessionUserName = String(req.headers['x-wp-user'] || '').trim().toLowerCase();
+  const user = await loadSessionUser(sessionUserName);
+  if (!user) {
+    // Backwards compat: allow legacy CSV-only fetch with no session header.
+    // The legacy frontend (pre-Phase-1) doesn't send the header. Returning
+    // unscoped data here keeps the static-JSON consumers (assets/) working
+    // until Phase 2. The Supabase aggregates path below requires a session.
+    // → Strict mode flag could turn this into a 401 in Phase 2.
+  }
 
-    // Raw sale tab — graceful degrade if it's missing / locked / down
-    let raw = { sales_by_branch_month: {}, months_seen: [], branches_seen: [], n_rows: 0, _raw_ok: false, _raw_error: null };
-    if (rRaw.ok) {
-      try {
-        const rawText = await rRaw.text();
-        if (!rawText.startsWith('<') && !/You need access|ServiceLogin/i.test(rawText)) {
-          const a = buildRawSaleAggregates(rawText);
-          raw = { ...a, _raw_ok: true, _raw_error: null, active_branches: ACTIVE_BRANCHES };
-        } else {
-          raw._raw_error = 'login wall';
-        }
-      } catch (e) {
-        raw._raw_error = e.message;
-      }
+  const queryBranch = String(req.query?.branch || '').trim().toUpperCase();
+  let allowedBranches = null;
+  if (user) {
+    if (user.role === 'owner') {
+      allowedBranches = queryBranch ? [queryBranch] : ACTIVE_BRANCHES.concat(['W11', 'WCO']);
     } else {
-      raw._raw_error = `upstream HTTP ${rRaw.status}`;
+      // manager — pinned to their own store regardless of query.
+      if (queryBranch && queryBranch !== user.store) {
+        res.status(403).json({ ok: false, error: 'branch not allowed for this user' });
+        return;
+      }
+      allowedBranches = [user.store];
+    }
+  } else {
+    // No session — return owner-equivalent shape (legacy compat).
+    allowedBranches = ACTIVE_BRANCHES.concat(['W11', 'WCO']);
+  }
+
+  try {
+    // PO/GRN fetched in parallel with Supabase aggregates.
+    const [poGrnText, sbAgg] = await Promise.all([
+      (async () => {
+        const r = await fetch(CSV_URL, { redirect: 'follow' });
+        if (!r.ok) return null;
+        const txt = await r.text();
+        if (txt.startsWith('<')) return null;
+        return txt;
+      })(),
+      buildSupabaseSalesPayload(allowedBranches, queryBranch || null).catch(e => {
+        console.error('[/api/sales] Supabase agg error:', e.message);
+        return null;
+      }),
+    ]);
+
+    const poGrn = poGrnText ? buildPoGrnPayload(poGrnText) : null;
+
+    if (!sbAgg) {
+      res.status(500).json({ ok: false, error: 'sales aggregates unavailable' });
+      return;
     }
 
-    res.status(200).json({ ...payload, ...raw, active_branches: ACTIVE_BRANCHES });
+    res.status(200).json({
+      ok: true,
+      fetched_at: new Date().toISOString(),
+      source: 'supabase:wiltek-portal',
+      session_role: user?.role || null,
+      session_store: user?.store || null,
+      // Sales aggregates (Supabase)
+      ...sbAgg,
+      active_branches: ACTIVE_BRANCHES,
+      // PO/GRN aggregates (still from Sheet) — null if Sheet fetch failed.
+      ...(poGrn ? {
+        months: poGrn.months,
+        groups: poGrn.groups,
+        matrix: poGrn.matrix,
+        by_month: poGrn.by_month,
+        by_group: poGrn.by_group,
+        latest_month: poGrn.latest_month,
+        po_grn_rows: poGrn.rows_n,
+      } : { po_grn_unavailable: true }),
+    });
   } catch (e) {
+    console.error('[/api/sales] error:', e);
     res.status(500).json({ ok: false, error: e.message, where: 'sales handler' });
   }
 }
-
-// Exported for unit tests
-export const __test = { parseCsv, parseNum, monthLabelToYm, buildResponse, buildRawSaleAggregates };
