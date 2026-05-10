@@ -3120,6 +3120,10 @@ function fmtMoney(n) { return fmt(Math.round(n)); }
 function fmtPct(n) { return (n||0).toFixed(1) + '%'; }
 
 /* ── Login ─────────────────────────────────────────────────────── */
+// V2 Phase 1 (2026-05-10): primary auth path is POST /api/login →
+// Supabase users table (bcrypt). The hardcoded SHA-256 path stays as
+// a fallback so a Vercel outage / cold-start error doesn't lock
+// everyone out. Phase 2 will remove the fallback.
 async function doLogin(ev) {
   if (ev) ev.preventDefault();
   const u = document.getElementById('loginUser').value.trim().toLowerCase();
@@ -3131,6 +3135,56 @@ async function doLogin(ev) {
   const lock = window.WP_SESSION.lockStatus(u);
   if (lock.locked) { errEl.textContent = t('loginErrLocked'); return false; }
 
+  // ── Primary path: /api/login (Supabase users + bcrypt) ──
+  let supabaseLoginOk = false;
+  try {
+    const resp = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p }),
+      cache: 'no-store',
+    });
+    if (resp.status === 200) {
+      const j = await resp.json();
+      if (j && j.ok && j.user) {
+        // Map API shape → WP_SESSION.start() shape (id / role / branch / name).
+        const sessionUser = {
+          id:     j.user.username,
+          role:   j.user.role === 'manager' ? (j.user.username + '') : j.user.role, // see note below
+          branch: j.user.store || null,
+          name:   j.user.display_name || j.user.username,
+        };
+        // The legacy permissions.js rolePages keys are 'owner' / 'w05_mgr' / etc.
+        // The Supabase users.role is just 'owner' / 'manager'. To keep page-
+        // visibility logic working without a permissions.js refactor, we
+        // re-derive the legacy role from the username for managers.
+        if (j.user.role === 'manager' && /^w\d{2}_mgr$/.test(j.user.username)) {
+          sessionUser.role = j.user.username;   // 'w05_mgr' etc.
+        } else if (j.user.role === 'owner') {
+          sessionUser.role = 'owner';
+        }
+        window.WP_SESSION.recordSuccess(u);
+        window.WP_SESSION.start(sessionUser);
+        supabaseLoginOk = true;
+      }
+    } else if (resp.status === 401) {
+      // Authoritative reject — record fail and stop. Don't fall back.
+      window.WP_SESSION.recordFail(u);
+      errEl.textContent = t('loginErrInvalid');
+      return false;
+    } else if (resp.status === 423) {
+      errEl.textContent = LANG === 'zh' ? '账号已停用 — 联系 Owner' : 'Account inactive — contact Owner';
+      return false;
+    }
+    // 500 / network error → silently fall through to hardcoded path.
+  } catch (e) {
+    // Network error — fall through.
+    console.warn('[login] /api/login error, falling back to hardcoded:', e?.message);
+  }
+
+  if (supabaseLoginOk) { enterApp(); return false; }
+
+  // ── Fallback path: hardcoded users.js (SHA-256). Phase 2 will remove. ──
   const user = (window.WP_USERS || []).find(x => x.id === u);
   if (!user) {
     window.WP_SESSION.recordFail(u);

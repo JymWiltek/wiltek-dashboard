@@ -11,8 +11,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
-    "@supabase/supabase-js": "^2.105.4",
-    "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "bcryptjs": "^3.0.3"
   }
 }

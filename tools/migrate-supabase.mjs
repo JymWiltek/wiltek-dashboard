@@ -27,7 +27,7 @@
 
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';   // pure JS — works on Vercel Linux without native rebuild
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
