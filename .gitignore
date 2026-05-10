@@ -5,3 +5,8 @@ tests/playwright-report.json
 tests/qa-findings.json
 tests/shots/
 .claude/
+
+# V2 Phase 0 — local env for Supabase migration scripts (NEVER commit)
+.env
+.env.local
+.env.*.local
