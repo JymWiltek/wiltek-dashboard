@@ -6397,7 +6397,7 @@ function gtdKpiStatus(actual, target, kpiId) {
 async function gtdHydrateFromServer() {
   if (window.__gtd_hydrated_at && Date.now() - window.__gtd_hydrated_at < 30000) return;
   try {
-    const r = await fetch('/api/gtd?t=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch('/api/gtd?t=' + Date.now(), { cache: 'no-store', headers: wpAuthHeaders() });
     const j = await r.json();
     if (j && j.ok) {
       // Merge server store INTO localStorage. Server is source of truth for
@@ -6526,7 +6526,7 @@ window.renderGtd = renderGtd;
     // V1.5: real cross-device persistence via /api/gtd (Gist-backed).
     fetch('/api/gtd', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...wpAuthHeaders() },
       body: JSON.stringify({ branch, store }),
     }).then(r => r.json()).then(j => {
       if (j && j.ok) {
