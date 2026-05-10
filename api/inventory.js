@@ -161,15 +161,11 @@ export default async function handler(req, res) {
       sku_branch_stock[r.item_code][r.store] = +r.qty || 0;
     }
 
-    // 5. last_sale per code (latest sale_date across all branches).
-    const lastSaleRows = await fetchAllRows('sales',
-      'item_code, sale_date',
-      []).catch(() => []);
+    // 5. last_sale per code (pre-aggregated view, avoids 60k row scan).
+    const lastSaleRows = await fetchAllRows('v_item_last_sale',
+      'item_code, last_sale_date', []).catch(() => []);
     const lastSaleByCode = {};
-    for (const r of lastSaleRows) {
-      const cur = lastSaleByCode[r.item_code];
-      if (!cur || r.sale_date > cur) lastSaleByCode[r.item_code] = r.sale_date;
-    }
+    for (const r of lastSaleRows) lastSaleByCode[r.item_code] = r.last_sale_date;
 
     // 6. Build rows[] + per-row classification.
     const allRows = [];
