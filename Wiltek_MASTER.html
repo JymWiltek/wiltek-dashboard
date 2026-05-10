@@ -9315,7 +9315,7 @@ const wpCache = {
     }
   },
   clear() {
-    for (const k of ['sales', 'customers', 'floatation']) {
+    for (const k of ['sales', 'customers', 'floatation', 'inventory']) {
       try { localStorage.removeItem(WP_CACHE_PREFIX + k); } catch(_){}
     }
   },
@@ -9326,7 +9326,17 @@ window.wpCache = wpCache;
    resources that loaded so callers can decide whether to render or
    wait for a network fetch. */
 function v18HydrateFromCache() {
-  const loaded = { sales: false, customers: false, floatation: false };
+  const loaded = { sales: false, customers: false, floatation: false, inventory: false };
+
+  // V2 Phase 1 Task 6 — inventory cache hydrate (replaces static
+  // assets/deadstock-data.js for cached repeat boots).
+  const inv = wpCache.get('inventory');
+  if (inv && inv.data) {
+    window.WP_DEADSTOCK = inv.data;
+    window.WP_DEADSTOCK._fetched_at = inv.fetched_at;
+    window.WP_DEADSTOCK._live = true;
+    loaded.inventory = true;
+  }
 
   const sales = wpCache.get('sales');
   if (sales && sales.data) {
@@ -9478,6 +9488,30 @@ async function fetchSalesLive(ts) {
 }
 window.fetchSalesLive = fetchSalesLive;
 
+// V2 Phase 1 Task 6 — live inventory from /api/inventory (Supabase
+// inventory_snapshots + items + 90d sales). Replaces the
+// assets/deadstock-data.js static asset on every refresh. Same shape
+// (WP_DEADSTOCK) so V1.6 clsV16 + renderInventoryDashboard untouched.
+async function fetchInventoryLive(ts) {
+  const url = '/api/inventory?t=' + (ts || Date.now());
+  try {
+    const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    const j = await r.json();
+    if (!j || !j.ok) return { ok: false, error: (j && j.error) || 'bad payload' };
+    j._live = true;
+    j._fetched_at = j.fetched_at;
+    const cached = wpCache.get('inventory');
+    const isNewer = v18IsNewer(cached?.fetched_at, j.fetched_at);
+    window.WP_DEADSTOCK = j;
+    wpCache.set('inventory', j, j.fetched_at);
+    return { ok: true, fetched_at: j.fetched_at, snapshot: j.snapshot, payload: j, _isNewer: isNewer };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+window.fetchInventoryLive = fetchInventoryLive;
+
 /* V1 第二刀 — Live customers (RFM + churn + buckets, snapshot-scoped).
    Hits /api/customers?month=YYYY-MM (uses window.SNAPSHOT or falls back to latest).
    On success → mutate window.WP_CUSTOMERS.* and window.WP_TODAY.churn in place,
@@ -9608,10 +9642,12 @@ async function refreshLiveData(opts) {
       .then(j => (j && j.ok) ? { type, data: j.data } : Promise.reject(new Error((j && j.error) || 'bad payload')))
   ));
 
-  const [salesR, custR, floR, proxyResults] = await Promise.all([
+  const [salesR, custR, floR, invR, proxyResults] = await Promise.all([
     Promise.resolve().then(() => fetchSalesLive(ts)).catch(e => ({ ok: false, error: e.message })),
     Promise.resolve().then(() => fetchCustomersLive(ts)).catch(e => ({ ok: false, error: e.message })),
     Promise.resolve().then(() => fetchFloatationLive(ts)).catch(e => ({ ok: false, error: e.message })),
+    Promise.resolve().then(() => (typeof fetchInventoryLive === 'function' ? fetchInventoryLive(ts) : { ok: false, skipped: true }))
+      .catch(e => ({ ok: false, error: e.message })),
     proxyP,
   ]);
 
