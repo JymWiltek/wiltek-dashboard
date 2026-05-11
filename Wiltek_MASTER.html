@@ -8687,6 +8687,18 @@ function v2RenderPreviewTable(previews) {
           `(${v2Fmt(p.new_members)} new, ${v2Fmt(p.existing_members)} existing)</span>` +
         '</div>';
     }
+    // CP2 Step 3: po_grn breakdown — FK drops + lead-time anomalies + amount totals.
+    if (p.target_table === 'po_grn' && p.dropped_no_po_date != null) {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>rows after FK filter: <b>${v2Fmt(p.rows_after_fk_filter)}</b></span><br>` +
+        `<span>dropped (unknown item FK): <b>${v2Fmt(p.dropped_unknown_item)}</b></span><br>` +
+        `<span>dropped (no PO date): <b>${v2Fmt(p.dropped_no_po_date)}</b></span><br>` +
+        `<span>negative lead-time (warn): <b>${v2Fmt(p.negative_lead_time)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">` +
+          `SUM PO=${v2Fmt(p.sum_po_amt_latest)} · SUM GRN=${v2Fmt(p.sum_grn_amt_latest)}` +
+        '</span></div>';
+    }
     // CP2 Step 2: floatation breakdown — 6 stores, latest_ym + W11 history backfill.
     if (p.target_table === 'floatation' && p.backfill_w11_rows != null) {
       const psd = p.per_store_delta || {};

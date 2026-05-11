@@ -51,6 +51,7 @@ const SHEETS = {
   customer_buy_v3:    { id: '1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s', tab: null,        target: ['sales','customer_buy_lines'] },
   raw_cs:             { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'Raw CS',   target: 'inventory_snapshots' },
   sm_item_master:     { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'SM',       target: 'items' },
+  po_grn_raw_pivot:   { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'Raw Pivot',target: 'po_grn' },
 };
 const ACTIVE_BRANCHES = new Set(['W01','W02','W03','W05','W07']);
 
@@ -68,7 +69,7 @@ const FLOATATION_YEAR = 2026;   // current year — sheets are one per year
 
 // CP2: customer_buy_lines / customers UPSERT side-effect when CBL applies.
 // floatation source feeds the floatation table (6 stores, monthly aggregate).
-const ALL_TARGETS = ['sales','inventory_snapshots','items','customer_buy_lines','floatation'];
+const ALL_TARGETS = ['sales','inventory_snapshots','items','customer_buy_lines','floatation','po_grn'];
 
 // ── Session lookup ────────────────────────────────────────────────────
 async function loadSessionUser(username) {
@@ -461,6 +462,72 @@ async function loadSm() {
   return { rows, total_rows: rows.length };
 }
 
+// CP2 Step 3: PO/GRN Raw Pivot → po_grn table.
+// Date format: DD/MM/YYYY (Wiltek POS export, MY locale; sometimes single-digit
+// like "7/4/2026" = 7 Apr 2026). PO date may be present without GRN date
+// (PO placed, not yet received).
+function parseDmyDate(s) {
+  if (!s) return null;
+  s = String(s).trim(); if (!s || s === '-') return null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
+  let y = +m[3]; if (y < 100) y = 2000 + y;
+  return `${y}-${String(+m[2]).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`;
+}
+
+async function loadPoGrn() {
+  const text = await fetchSheetCsv(SHEETS.po_grn_raw_pivot.id, SHEETS.po_grn_raw_pivot.tab);
+  const grid = parseCsv(text);
+  if (!grid.length) return { rows: [], latest_ym: null, total_rows: 0,
+                             dropped_no_po_date: 0, negative_lead_time: 0 };
+  const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
+  const idx = {}; for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
+  const I = {
+    PO:    idx['P/O DATE']  ?? 0,
+    GRN:   idx['GRF DATE']  ?? idx['GRN DATE'] ?? 1,
+    CODE:  idx['ITEM CODE'] ?? 2,
+    BR:    idx['BRANCH']    ?? 3,
+    POQ:   idx['PO QTY']    ?? 4,
+    GRNQ:  idx['GRN QTY']   ?? 5,
+    POA:   idx['PO AMT']    ?? 6,
+    GRNA:  idx['GRN AMT']   ?? 7,
+  };
+
+  const rows = [];
+  let latestKey = -Infinity;
+  let dropped_no_po_date = 0, dropped_no_item = 0, negative_lead_time = 0;
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i]; if (!r) continue;
+    const po = parseDmyDate(r[I.PO]);
+    if (!po) { dropped_no_po_date += 1; continue; }
+    const code = String(r[I.CODE] || '').trim();
+    if (!code) { dropped_no_item += 1; continue; }
+    const branch = String(r[I.BR] || '').trim() || 'WLO';
+    const grn = parseDmyDate(r[I.GRN]);
+    if (grn && grn < po) negative_lead_time += 1;
+    rows.push({
+      po_date:   po,
+      grn_date:  grn,
+      item_code: code,
+      branch,
+      po_qty:    parseNum(r[I.POQ]),
+      grn_qty:   parseNum(r[I.GRNQ]),
+      po_amt:    parseNum(r[I.POA]),
+      grn_amt:   parseNum(r[I.GRNA]),
+    });
+    const [y, m] = po.split('-').map(Number);
+    const key = y * 12 + m;
+    if (key > latestKey) latestKey = key;
+  }
+  const latest_ym = latestKey > 0
+    ? `${Math.floor((latestKey - 1) / 12)}-${String(((latestKey - 1) % 12) + 1).padStart(2, '0')}`
+    : null;
+  return {
+    rows, latest_ym, total_rows: rows.length,
+    dropped_no_po_date, dropped_no_item, negative_lead_time,
+  };
+}
+
 // ── Preview helpers (incremental detection) ───────────────────────────
 async function previewSales(parsed) {
   if (!parsed.latest_ym) return { ok: false, error: 'no rows from sheet' };
@@ -770,6 +837,95 @@ async function applyFloatation(parsed, overwrite, user) {
   };
 }
 
+// CP2 Step 3: po_grn preview + apply.
+async function previewPoGrn(parsed) {
+  if (!parsed.latest_ym) {
+    return { source: 'po_grn_raw_pivot', target_table: 'po_grn',
+             sheet_total_rows: parsed.total_rows || 0, action: 'noop', preview_rows_to_add: 0 };
+  }
+  const startOfMonth = parsed.latest_ym + '-01';
+  const startOfNext  = (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  })();
+  const sheetForLatest = parsed.rows.filter(r => r.po_date >= startOfMonth && r.po_date < startOfNext);
+
+  // FK validation: count rows whose item_code is NOT in items.
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  let dropped_unknown_item = 0;
+  const passingRows = [];
+  for (const r of sheetForLatest) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    passingRows.push(r);
+  }
+
+  const { count: dbCount } = await sb().from('po_grn')
+    .select('*', { count: 'exact', head: true })
+    .gte('po_date', startOfMonth).lt('po_date', startOfNext);
+
+  // Aggregate stats for the report.
+  const sumPoAmt  = passingRows.reduce((s, r) => s + (+r.po_amt  || 0), 0);
+  const sumGrnAmt = passingRows.reduce((s, r) => s + (+r.grn_amt || 0), 0);
+
+  return {
+    source: 'po_grn_raw_pivot', target_table: 'po_grn',
+    sheet_total_rows:           parsed.total_rows,
+    latest_ym:                  parsed.latest_ym,
+    sheet_rows_for_latest_ym:   sheetForLatest.length,
+    rows_after_fk_filter:       passingRows.length,
+    db_rows_for_latest_ym:      dbCount,
+    dropped_no_po_date:         parsed.dropped_no_po_date,
+    dropped_no_item:            parsed.dropped_no_item || 0,
+    dropped_unknown_item,
+    negative_lead_time:         parsed.negative_lead_time,
+    sum_po_amt_latest:          +sumPoAmt.toFixed(2),
+    sum_grn_amt_latest:         +sumGrnAmt.toFixed(2),
+    action: dbCount === 0 ? 'append'
+          : dbCount === passingRows.length ? 'noop'
+          : 'conflict',
+    preview_rows_to_add: dbCount === 0 ? passingRows.length : 0,
+  };
+}
+
+async function applyPoGrn(parsed, overwrite, user) {
+  if (!parsed.latest_ym) {
+    return { source: 'po_grn_raw_pivot', target_table: 'po_grn', ok: false, error: 'no rows' };
+  }
+  const startOfMonth = parsed.latest_ym + '-01';
+  const startOfNext  = (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  })();
+  const monthRows = parsed.rows.filter(r => r.po_date >= startOfMonth && r.po_date < startOfNext);
+
+  // FK filter against items.
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  let dropped_unknown_item = 0;
+  const validRows = [];
+  for (const r of monthRows) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    validRows.push(r);
+  }
+
+  if (overwrite) {
+    await sb().from('po_grn').delete().gte('po_date', startOfMonth).lt('po_date', startOfNext);
+  }
+
+  const inserts = validRows.map(r => ({ ...r, updated_by: user.username, updated_at: new Date().toISOString() }));
+  const res = await chunkInsert('po_grn', inserts, { onConflict: 'po_date,item_code,branch' });
+
+  return {
+    source: 'po_grn_raw_pivot', target_table: 'po_grn',
+    latest_ym:                parsed.latest_ym,
+    rows_appended:            res.ok,
+    rows_failed:              res.err,
+    rows_dropped_unknown_item: dropped_unknown_item,
+    mode: overwrite ? 'overwrite' : 'append',
+  };
+}
+
 // CP2: customer_buy_lines apply.
 //   1. Filter rows by item_code FK (already filtered no-member at parse).
 //   2. UPSERT customers (member_code → customer_id, name, type, enrol_date)
@@ -943,20 +1099,22 @@ export default async function handler(req, res) {
   // 1. Read sources in parallel (network bound). CBv3 feeds BOTH sales
   //    (CP1) and customer_buy_lines (CP2) — one fetch, two transforms.
   //    Floatation = 6 stores' Sheet 1 fetched in parallel inside loadFloatation.
-  let parsedSales = null, parsedCbl = null, parsedInv = null, parsedSm = null, parsedFloat = null;
+  let parsedSales = null, parsedCbl = null, parsedInv = null, parsedSm = null,
+      parsedFloat = null, parsedPoGrn = null;
   try {
     const needCbv3 = onlyTargets.includes('sales') || onlyTargets.includes('customer_buy_lines');
-    const [a, b, c, d] = await Promise.all([
+    const [a, b, c, d, e2] = await Promise.all([
       needCbv3 ? loadCbv3() : Promise.resolve(null),
       onlyTargets.includes('inventory_snapshots') ? loadRawCs()     : Promise.resolve(null),
       onlyTargets.includes('items')               ? loadSm()        : Promise.resolve(null),
       onlyTargets.includes('floatation')          ? loadFloatation(): Promise.resolve(null),
+      onlyTargets.includes('po_grn')              ? loadPoGrn()     : Promise.resolve(null),
     ]);
     if (a) {
       if (onlyTargets.includes('sales'))               parsedSales = a.sales;
       if (onlyTargets.includes('customer_buy_lines'))  parsedCbl   = a.cbl;
     }
-    parsedInv = b; parsedSm = c; parsedFloat = d;
+    parsedInv = b; parsedSm = c; parsedFloat = d; parsedPoGrn = e2;
   } catch (e) {
     return res.status(502).json({ ok: false, error: 'sheet fetch failed: ' + e.message });
   }
@@ -971,6 +1129,7 @@ export default async function handler(req, res) {
     if (parsedSm)    previews.push(await previewItems(parsedSm));
     if (parsedCbl)   previews.push(await previewCbl(parsedCbl));
     if (parsedFloat) previews.push(await previewFloatation(parsedFloat));
+    if (parsedPoGrn) previews.push(await previewPoGrn(parsedPoGrn));
     let preview_log_id = null;
     try {
       const conflicts = {};
@@ -1060,6 +1219,11 @@ export default async function handler(req, res) {
       });
     }
   }
+  if (parsedPoGrn) {
+    const p = await previewPoGrn(parsedPoGrn);
+    if (p.action === 'append' || (p.action === 'conflict' && confirmOverwrite.po_grn))
+      targets.push({ table: 'po_grn', plan: p, overwrite: !!confirmOverwrite.po_grn });
+  }
 
   // CBL apply UPSERTs customers as a side-effect → must also back up customers.
   const backupTables = new Set(targets.map(t => t.table));
@@ -1114,6 +1278,7 @@ export default async function handler(req, res) {
       else if (t.table === 'items')               r = await applyItems(parsedSm);
       else if (t.table === 'customer_buy_lines')  r = await applyCbl(parsedCbl, t.overwrite, user);
       else if (t.table === 'floatation')          r = await applyFloatation(parsedFloat, t.overwrite, user);
+      else if (t.table === 'po_grn')              r = await applyPoGrn(parsedPoGrn, t.overwrite, user);
       results.push(r);
       appended[t.table] = r.rows_appended ?? r.rows_upserted ?? 0;
       if (r.rows_failed) failed[t.table] = r.rows_failed;
