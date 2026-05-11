@@ -45,12 +45,16 @@ function sb() {
 }
 
 // ── Notion-authoritative sheet IDs / tabs ─────────────────────────────
+// CBv3 feeds BOTH sales (CP1, aggregate) AND customer_buy_lines (CP2,
+// per-member-line). One fetch, two transforms.
 const SHEETS = {
-  customer_buy_v3:    { id: '1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s', tab: null,        target: 'sales' },
+  customer_buy_v3:    { id: '1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s', tab: null,        target: ['sales','customer_buy_lines'] },
   raw_cs:             { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'Raw CS',   target: 'inventory_snapshots' },
   sm_item_master:     { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'SM',       target: 'items' },
 };
 const ACTIVE_BRANCHES = new Set(['W01','W02','W03','W05','W07']);
+// CP2: customer_buy_lines / customers UPSERT side-effect when CBL applies.
+const ALL_TARGETS = ['sales','inventory_snapshots','items','customer_buy_lines'];
 
 // ── Session lookup ────────────────────────────────────────────────────
 async function loadSessionUser(username) {
@@ -118,49 +122,109 @@ async function fetchSheetCsv(sheetId, tab) {
 
 // ── Source parsers (each returns rows + meta for incremental detection) ─
 
-async function loadCbv3Sales() {
+// CBv3 Date Enrolled is M/D/YYYY (US locale, Wiltek POS export quirk).
+function parseMdyDate(s) {
+  if (!s) return null;
+  s = String(s).trim(); if (!s || s === '-') return null;
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y = 2000 + y;
+    return `${y}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  return null;
+}
+
+// Read CBv3 once, derive two row shapes:
+//   - sales:           CP1-compatible (sale_date, store, item_code, qty,
+//                      amount, customer_id, invoice_no, source).
+//   - customer_buy_lines (CP2): per-line member purchases. Walk-in rows
+//                      (no member_code) dropped at parse time and counted.
+async function loadCbv3() {
   const text = await fetchSheetCsv(SHEETS.customer_buy_v3.id, null);
   const grid = parseCsv(text);
-  if (!grid.length) return { rows: [], latest_ym: null };
+  const empty = {
+    sales: { rows: [], latest_ym: null, total_rows: 0 },
+    cbl:   { rows: [], latest_ym: null, total_rows: 0, dropped_no_member: 0, dropped_no_bill_or_branch: 0 },
+  };
+  if (!grid.length) return empty;
   const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
   const idx = {}; for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
   const I = {
-    MONTH: idx['MONTH'] ?? 0,
-    BILL:  idx['BILL']  ?? 1,
-    CODE:  idx['ITEM CODE'] ?? 2,
-    BR:    idx['BRANCHES']  ?? 3,
-    MC:    idx['MEMBER CODE'] ?? 5,
-    QTY:   idx['QTY']   ?? 6,
-    AMT:   idx['AMT']   ?? 7,
+    MONTH:  idx['MONTH']          ?? 0,
+    BILL:   idx['BILL']           ?? 1,
+    CODE:   idx['ITEM CODE']      ?? 2,
+    BR:     idx['BRANCHES']       ?? 3,
+    CNAME:  idx['CUSTOMER NAME']  ?? 4,
+    MC:     idx['MEMBER CODE']    ?? 5,
+    QTY:    idx['QTY']            ?? 6,
+    AMT:    idx['AMT']            ?? 7,
+    CTYPE:  idx['CUST TYPE']      ?? null,
+    ENROL:  idx['DATE ENROLLED']  ?? idx['DATE ENROL'] ?? null,
+    MAIN:   idx['MAIN GROUP']     ?? null,
+    SUB:    idx['SUB GROUP']      ?? null,
   };
-  const rows = [];
+  const salesRows = [];
+  const cblRows   = [];
+  let dropped_no_member = 0, dropped_no_bill_or_branch = 0;
   let latestYmKey = -Infinity;
   for (let i = 1; i < grid.length; i++) {
     const r = grid[i]; if (!r) continue;
     const ym = parseMonthYY(r[I.MONTH]); if (!ym) continue;
-    if (ym.y < 2023) continue;          // Notion: cutoff 2023
+    if (ym.y < 2023) continue;
     const code = String(r[I.CODE] || '').trim(); if (!code) continue;
     const branch = String(r[I.BR] || '').trim();
     const amt = parseNum(r[I.AMT]);
-    if (!amt) continue;                  // skip zero-amount lines
-    rows.push({
+    if (!amt) continue;
+
+    const ymStr = `${String(ym.y).padStart(4,'0')}-${String(ym.m).padStart(2,'0')}`;
+    const ymKey = ym.y * 12 + ym.m;
+    if (ymKey > latestYmKey) latestYmKey = ymKey;
+    const mc   = String(r[I.MC]||'').trim();
+    const bill = String(r[I.BILL]||'').trim();
+
+    // SALES shape (CP1-compat, walk-in customer_id may be null)
+    salesRows.push({
       sale_date:  ymToFirstOfMonth(ym),
       store:      branch || 'WCO',
       item_code:  code,
       qty:        parseNum(r[I.QTY]),
-      unit_price: null,                  // can't derive cleanly from CBv3
+      unit_price: null,
       amount:     amt,
-      customer_id: String(r[I.MC]||'').trim() || null,
-      invoice_no: String(r[I.BILL]||'').trim() || null,
+      customer_id: mc || null,
+      invoice_no: bill || null,
       source:     'sync_cbv3',
     });
-    const ymKey = ym.y * 12 + ym.m;
-    if (ymKey > latestYmKey) latestYmKey = ymKey;
+
+    // CBL shape (CP2, member rows only — Jym's anomaly rule rejects NULL mc).
+    if (!mc)           { dropped_no_member += 1; continue; }
+    if (!bill||!branch){ dropped_no_bill_or_branch += 1; continue; }
+    cblRows.push({
+      year_month:    ymStr,
+      bill_no:       bill,
+      item_code:     code,
+      branch,
+      customer_name: String(r[I.CNAME]||'').trim() || null,
+      member_code:   mc,
+      qty:           parseNum(r[I.QTY]),
+      amt,
+      cust_type:     I.CTYPE != null ? (String(r[I.CTYPE]||'').trim() || null) : null,
+      date_enrol:    I.ENROL != null ? parseMdyDate(r[I.ENROL]) : null,
+      main_group:    I.MAIN  != null ? (String(r[I.MAIN]||'').trim()  || null) : null,
+      sub_group:     I.SUB   != null ? (String(r[I.SUB] ||'').trim()  || null) : null,
+    });
   }
   const latest_ym = latestYmKey > 0
     ? `${Math.floor((latestYmKey-1)/12)}-${String(((latestYmKey-1)%12)+1).padStart(2,'0')}`
     : null;
-  return { rows, latest_ym, total_rows: rows.length };
+  return {
+    sales: { rows: salesRows, latest_ym, total_rows: salesRows.length },
+    cbl:   {
+      rows: cblRows, latest_ym, total_rows: cblRows.length,
+      dropped_no_member, dropped_no_bill_or_branch,
+    },
+  };
 }
 
 async function loadRawCs() {
@@ -288,6 +352,70 @@ async function previewSales(parsed) {
   };
 }
 
+// CP2: customer_buy_lines preview. Aggregates expected by Jym:
+//   - sheet_rows_for_latest_ym + db_rows_for_latest_ym (incremental)
+//   - dropped_no_member (parse-time, walk-in/anomaly)
+//   - dropped_unknown_item (items FK check)
+//   - members_seen / new_members (UPSERT side-effect counts)
+async function previewCbl(parsed) {
+  if (!parsed.latest_ym) {
+    return { source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
+             sheet_total_rows: 0, action: 'noop', preview_rows_to_add: 0 };
+  }
+  const sheetForLatest = parsed.rows.filter(r => r.year_month === parsed.latest_ym);
+
+  // FK check vs items (paginated lookup so it's accurate >1000 rows).
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  let dropped_unknown_item = 0;
+  const passingRows = [];
+  for (const r of sheetForLatest) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    passingRows.push(r);
+  }
+
+  // Customer UPSERT preview: how many unique members in the month? How many
+  // are new (not in customers yet)?
+  const seenMembers = new Set(passingRows.map(r => r.member_code));
+  const memberArr   = [...seenMembers];
+  let new_members = 0, existing_members = 0;
+  if (memberArr.length) {
+    // Page through .in() in chunks of 500 to avoid query-length explosion.
+    const existingSet = new Set();
+    const chunk = 500;
+    for (let i = 0; i < memberArr.length; i += chunk) {
+      const slice = memberArr.slice(i, i + chunk);
+      const { data } = await sb().from('customers').select('customer_id').in('customer_id', slice);
+      for (const r of (data || [])) existingSet.add(r.customer_id);
+    }
+    existing_members = existingSet.size;
+    new_members      = memberArr.length - existing_members;
+  }
+
+  const { count: dbRowsThisMonth } = await sb().from('customer_buy_lines')
+    .select('*', { count: 'exact', head: true })
+    .eq('year_month', parsed.latest_ym);
+
+  return {
+    source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
+    sheet_total_rows:             parsed.total_rows,
+    latest_ym:                    parsed.latest_ym,
+    sheet_rows_for_latest_ym:     sheetForLatest.length,
+    db_rows_for_latest_ym:        dbRowsThisMonth,
+    rows_after_fk_filter:         passingRows.length,
+    dropped_no_member:            parsed.dropped_no_member || 0,
+    dropped_no_bill_or_branch:    parsed.dropped_no_bill_or_branch || 0,
+    dropped_unknown_item,
+    members_in_month:             memberArr.length,
+    new_members,
+    existing_members,
+    action: dbRowsThisMonth === 0       ? 'append'
+          : dbRowsThisMonth === passingRows.length ? 'noop'
+          : 'conflict',
+    preview_rows_to_add: dbRowsThisMonth === 0 ? passingRows.length : 0,
+  };
+}
+
 async function previewInventory(parsed) {
   if (!parsed.snapshot_date) return { ok: false, error: 'no rows from sheet' };
   const { count: dbCount } = await sb().from('inventory_snapshots')
@@ -388,6 +516,65 @@ async function chunkInsert(table, rows, opts = {}) {
     else       { ok  += chunk.length; }
   }
   return { ok, err };
+}
+
+// CP2: customer_buy_lines apply.
+//   1. Filter rows by item_code FK (already filtered no-member at parse).
+//   2. UPSERT customers (member_code → customer_id, name, type, enrol_date)
+//      BEFORE inserting lines so the customer FK is satisfied. We do not
+//      overwrite customers.type from CBv3 (which is per-line numeric flag,
+//      not the lifecycle category). primary_store / phone also preserved.
+//   3. DELETE existing lines for latest_ym if overwrite, then INSERT.
+async function applyCbl(parsed, overwrite, user) {
+  if (!parsed.latest_ym) return { source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines', ok: false, error: 'no rows' };
+
+  const monthRows = parsed.rows.filter(r => r.year_month === parsed.latest_ym);
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  const validRows = [];
+  let dropped_unknown_item = 0;
+  for (const r of monthRows) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    validRows.push(r);
+  }
+
+  // 2. Customer UPSERT: aggregate one row per unique member_code in this
+  //    batch. Pick name/enrol_date from FIRST occurrence (CBv3 is internally
+  //    consistent per member so first-wins is fine).
+  const custMap = new Map();
+  for (const r of validRows) {
+    if (custMap.has(r.member_code)) continue;
+    custMap.set(r.member_code, {
+      customer_id: r.member_code,
+      name:        r.customer_name || 'UNKNOWN',
+      enrol_date:  r.date_enrol || null,
+      updated_at:  new Date().toISOString(),
+      // NOTE: customers.updated_by ALTER was denied by safety policy; audit
+      //       attribution falls back to sync_log.triggered_by + updated_at.
+      //       Owner-owned columns (type, primary_store, phone) preserved.
+    });
+  }
+  const upsertCustomers = [...custMap.values()];
+  const resCust = await chunkInsert('customers', upsertCustomers, { onConflict: 'customer_id' });
+
+  // 3. DELETE-then-INSERT for overwrite; UPSERT-on-PK otherwise to be safe.
+  if (overwrite) {
+    await sb().from('customer_buy_lines').delete().eq('year_month', parsed.latest_ym);
+  }
+  const inserts = validRows.map(r => ({ ...r, updated_by: user.username }));
+  const resCbl = await chunkInsert('customer_buy_lines', inserts,
+    { onConflict: 'year_month,bill_no,item_code' });
+
+  return {
+    source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
+    latest_ym: parsed.latest_ym,
+    rows_appended:               resCbl.ok,
+    rows_failed:                 resCbl.err,
+    rows_dropped_unknown_item:   dropped_unknown_item,
+    customers_upserted:          resCust.ok,
+    customers_failed:            resCust.err,
+    mode: overwrite ? 'overwrite' : 'append',
+  };
 }
 
 async function applySales(parsed, overwrite, manifestId) {
@@ -499,17 +686,23 @@ export default async function handler(req, res) {
   }
   const mode             = body?.mode || 'preview';
   const confirmOverwrite = body?.confirm_overwrite || {};
-  const onlyTargets      = body?.tables || ['sales','inventory_snapshots','items'];
+  const onlyTargets      = body?.tables || ALL_TARGETS;
 
-  // 1. Read all 3 sources in parallel (network bound).
-  let parsedSales = null, parsedInv = null, parsedSm = null;
+  // 1. Read sources in parallel (network bound). CBv3 feeds BOTH sales
+  //    (CP1) and customer_buy_lines (CP2) — one fetch, two transforms.
+  let parsedSales = null, parsedCbl = null, parsedInv = null, parsedSm = null;
   try {
+    const needCbv3 = onlyTargets.includes('sales') || onlyTargets.includes('customer_buy_lines');
     const [a, b, c] = await Promise.all([
-      onlyTargets.includes('sales')               ? loadCbv3Sales() : Promise.resolve(null),
-      onlyTargets.includes('inventory_snapshots') ? loadRawCs()     : Promise.resolve(null),
-      onlyTargets.includes('items')               ? loadSm()        : Promise.resolve(null),
+      needCbv3 ? loadCbv3() : Promise.resolve(null),
+      onlyTargets.includes('inventory_snapshots') ? loadRawCs() : Promise.resolve(null),
+      onlyTargets.includes('items')               ? loadSm()    : Promise.resolve(null),
     ]);
-    parsedSales = a; parsedInv = b; parsedSm = c;
+    if (a) {
+      if (onlyTargets.includes('sales'))               parsedSales = a.sales;
+      if (onlyTargets.includes('customer_buy_lines'))  parsedCbl   = a.cbl;
+    }
+    parsedInv = b; parsedSm = c;
   } catch (e) {
     return res.status(502).json({ ok: false, error: 'sheet fetch failed: ' + e.message });
   }
@@ -522,6 +715,7 @@ export default async function handler(req, res) {
     if (parsedSales) previews.push(await previewSales(parsedSales));
     if (parsedInv)   previews.push(await previewInventory(parsedInv));
     if (parsedSm)    previews.push(await previewItems(parsedSm));
+    if (parsedCbl)   previews.push(await previewCbl(parsedCbl));
     let preview_log_id = null;
     try {
       const conflicts = {};
@@ -533,7 +727,7 @@ export default async function handler(req, res) {
       }
       const { data: logIns } = await sb().from('sync_log').insert({
         triggered_by: user.username, mode: 'preview',
-        sheet_ids: ['CBv3','RawCS','SM'],
+        sheet_ids: ['CBv3','RawCS','SM'],   // CBv3 feeds sales + customer_buy_lines
         target_tables: onlyTargets,
         status: 'success',
         preview_only: true,
@@ -569,7 +763,7 @@ export default async function handler(req, res) {
   // 3b. Open sync_log row (status=running).
   const { data: logIns, error: logErr } = await sb().from('sync_log').insert({
     triggered_by: user.username, mode: 'apply',
-    sheet_ids: ['CBv3','RawCS','SM'],
+    sheet_ids: ['CBv3','RawCS','SM'],   // CBv3 feeds sales + customer_buy_lines
     target_tables: onlyTargets, status: 'running',
     started_at: startedAtIso,
   }).select('id').single();
@@ -594,6 +788,15 @@ export default async function handler(req, res) {
   if (parsedSm) {
     targets.push({ table: 'items', plan: await previewItems(parsedSm), overwrite: false });
   }
+  if (parsedCbl) {
+    const p = await previewCbl(parsedCbl);
+    if (p.action === 'append' || (p.action === 'conflict' && confirmOverwrite.customer_buy_lines))
+      targets.push({ table: 'customer_buy_lines', plan: p, overwrite: !!confirmOverwrite.customer_buy_lines });
+  }
+
+  // CBL apply UPSERTs customers as a side-effect → must also back up customers.
+  const backupTables = new Set(targets.map(t => t.table));
+  if (backupTables.has('customer_buy_lines')) backupTables.add('customers');
 
   if (targets.length === 0) {
     await sb().from('sync_log').update({
@@ -604,17 +807,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, mode: 'apply', skipped: 'noop (everything up to date or pending overwrite confirm)', sync_log_id });
   }
 
-  // 3d. Backup every target table BEFORE writes.
+  // 3d. Backup every target table BEFORE writes (incl. side-effects).
   const suffix = nowSuffix();
   const backups = [];
-  for (const t of targets) {
+  for (const tbl of backupTables) {
     try {
       const { data: bk } = await sb().rpc('backup_table', {
-        p_src_schema: 'public', p_src_table: t.table, p_suffix: suffix,
+        p_src_schema: 'public', p_src_table: tbl, p_suffix: suffix,
       });
       backups.push(bk);
     } catch (e) {
-      console.error('[sync] backup failed for', t.table, e.message);
+      console.error('[sync] backup failed for', tbl, e.message);
       await sb().from('sync_log').update({
         finished_at: new Date().toISOString(),
         status: 'failed', error_msg: 'backup failed: ' + e.message,
@@ -639,9 +842,10 @@ export default async function handler(req, res) {
   for (const t of targets) {
     try {
       let r;
-      if (t.table === 'sales')               r = await applySales(parsedSales, t.overwrite, manifest.id);
+      if (t.table === 'sales')                    r = await applySales(parsedSales, t.overwrite, manifest.id);
       else if (t.table === 'inventory_snapshots') r = await applyInventory(parsedInv, t.overwrite);
-      else if (t.table === 'items')          r = await applyItems(parsedSm);
+      else if (t.table === 'items')               r = await applyItems(parsedSm);
+      else if (t.table === 'customer_buy_lines')  r = await applyCbl(parsedCbl, t.overwrite, user);
       results.push(r);
       appended[t.table] = r.rows_appended ?? r.rows_upserted ?? 0;
       if (r.rows_failed) failed[t.table] = r.rows_failed;

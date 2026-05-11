@@ -8677,6 +8677,16 @@ function v2RenderPreviewTable(previews) {
           `S-SLOW=${v2Fmt(sd['S-SLOW']||0)} · NULL=${v2Fmt(sd.NULL||0)} · OTHER=${v2Fmt(sd.OTHER||0)}` +
         '</span></div>';
     }
+    // CP2: customer_buy_lines breakdown — drop counts + customer-side UPSERT.
+    if (p.target_table === 'customer_buy_lines' && p.dropped_no_member != null) {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>dropped (no member_code): <b>${v2Fmt(p.dropped_no_member)}</b></span><br>` +
+        `<span>dropped (unknown item FK): <b>${v2Fmt(p.dropped_unknown_item)}</b></span><br>` +
+        `<span>customers in month: <b>${v2Fmt(p.members_in_month)}</b> ` +
+          `(${v2Fmt(p.new_members)} new, ${v2Fmt(p.existing_members)} existing)</span>` +
+        '</div>';
+    }
     return '<tr>' +
       '<td>' + v2EscapeHtml(p.source) + '</td>' +
       '<td><code>' + v2EscapeHtml(p.target_table) + '</code></td>' +
