@@ -645,15 +645,14 @@ async function previewSales(parsed) {
   };
 }
 
-// CP2: customer_buy_lines preview. Aggregates expected by Jym:
-//   - sheet_rows_for_latest_ym + db_rows_for_latest_ym (incremental)
-//   - dropped_no_member (parse-time, walk-in/anomaly)
-//   - dropped_unknown_item (items FK check)
-//   - members_seen / new_members (UPSERT side-effect counts)
+// CP2: customer_buy_lines preview. Emits TWO preview rows so the sync UI
+// shows customer_buy_lines AND customers (UPSERT side-effect) separately.
 async function previewCbl(parsed) {
   if (!parsed.latest_ym) {
-    return { source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
-             sheet_total_rows: 0, action: 'noop', preview_rows_to_add: 0 };
+    return [
+      { source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines', sheet_total_rows: 0, action: 'noop', preview_rows_to_add: 0 },
+      { source: 'customer_buy_v3_customers', target_table: 'customers', action: 'noop', preview_rows_to_add: 0, note: 'UPSERT side-effect — runs alongside customer_buy_lines apply' },
+    ];
   }
   const sheetForLatest = parsed.rows.filter(r => r.year_month === parsed.latest_ym);
 
@@ -673,7 +672,6 @@ async function previewCbl(parsed) {
   const memberArr   = [...seenMembers];
   let new_members = 0, existing_members = 0;
   if (memberArr.length) {
-    // Page through .in() in chunks of 500 to avoid query-length explosion.
     const existingSet = new Set();
     const chunk = 500;
     for (let i = 0; i < memberArr.length; i += chunk) {
@@ -688,25 +686,40 @@ async function previewCbl(parsed) {
   const { count: dbRowsThisMonth } = await sb().from('customer_buy_lines')
     .select('*', { count: 'exact', head: true })
     .eq('year_month', parsed.latest_ym);
+  const { count: customersDbTotal } = await sb().from('customers')
+    .select('*', { count: 'exact', head: true });
 
-  return {
-    source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
-    sheet_total_rows:             parsed.total_rows,
-    latest_ym:                    parsed.latest_ym,
-    sheet_rows_for_latest_ym:     sheetForLatest.length,
-    db_rows_for_latest_ym:        dbRowsThisMonth,
-    rows_after_fk_filter:         passingRows.length,
-    dropped_no_member:            parsed.dropped_no_member || 0,
-    dropped_no_bill_or_branch:    parsed.dropped_no_bill_or_branch || 0,
-    dropped_unknown_item,
-    members_in_month:             memberArr.length,
-    new_members,
-    existing_members,
-    action: dbRowsThisMonth === 0       ? 'append'
-          : dbRowsThisMonth === passingRows.length ? 'noop'
-          : 'conflict',
-    preview_rows_to_add: dbRowsThisMonth === 0 ? passingRows.length : 0,
-  };
+  return [
+    {
+      source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
+      sheet_total_rows:             parsed.total_rows,
+      latest_ym:                    parsed.latest_ym,
+      sheet_rows_for_latest_ym:     sheetForLatest.length,
+      db_rows_for_latest_ym:        dbRowsThisMonth,
+      rows_after_fk_filter:         passingRows.length,
+      dropped_no_member:            parsed.dropped_no_member || 0,
+      dropped_no_bill_or_branch:    parsed.dropped_no_bill_or_branch || 0,
+      dropped_unknown_item,
+      members_in_month:             memberArr.length,
+      new_members,
+      existing_members,
+      action: dbRowsThisMonth === 0       ? 'append'
+            : dbRowsThisMonth === passingRows.length ? 'noop'
+            : 'conflict',
+      preview_rows_to_add: dbRowsThisMonth === 0 ? passingRows.length : 0,
+    },
+    {
+      source: 'customer_buy_v3_customers', target_table: 'customers',
+      sheet_total_rows:    memberArr.length,
+      db_total_rows:       customersDbTotal,
+      members_in_month:    memberArr.length,
+      new_members,
+      existing_members,
+      action: 'upsert',
+      preview_rows_to_add: new_members,
+      note: 'UPSERT side-effect of CBL apply. customer_id PK; name + enrol_date refreshed. Owner-owned cols (type, primary_store, phone) preserved.',
+    },
+  ];
 }
 
 async function previewInventory(parsed) {
@@ -1017,31 +1030,59 @@ async function applyPoGrn(parsed, overwrite, user) {
   };
 }
 
-// CP3: financial preview + apply. Two-table fan-out (balance_sheet + monthly).
+// CP3: financial preview. Emits THREE preview rows so the sync UI shows
+// each destination table separately:
+//   - financial_balance_sheet (snap_date PK)
+//   - financial_monthly       (year_month, branch)
+//   - financial_brand_margin  (BACKLOG — Apps Script doesn't expose yet)
 async function previewFinancial(parsed) {
   if (!parsed || parsed.ok === false) {
-    return { source: 'fmm_apps_script', target_table: 'financial_*', sheet_total_rows: 0,
-             action: 'noop', preview_rows_to_add: 0, error: parsed?.error || 'no data' };
+    const errNote = parsed?.error || 'no data';
+    return [
+      { source: 'fmm_liability',      target_table: 'financial_balance_sheet', action: 'noop', preview_rows_to_add: 0, error: errNote },
+      { source: 'fmm_monthly',        target_table: 'financial_monthly',       action: 'noop', preview_rows_to_add: 0, error: errNote },
+      { source: 'fmm_sales_vs_cost',  target_table: 'financial_brand_margin',  action: 'backlog', preview_rows_to_add: 0,
+        note: 'BACKLOG — Apps Script does not expose Sales VS Cost data yet (Phase 3)' },
+    ];
   }
-  // Balance sheet: snap_date PK; UPSERT, no conflict concept (always overwrite the same day).
-  // Monthly: PK (year_month, branch); UPSERT.
+
   const { count: bsCount } = await sb().from('financial_balance_sheet')
     .select('*', { count: 'exact', head: true }).eq('snap_date', parsed.snap_date);
   const { count: monthCount } = await sb().from('financial_monthly')
     .select('*', { count: 'exact', head: true }).eq('year_month', parsed.latest_ym);
-  return {
-    source: 'fmm_apps_script', target_table: 'financial_*',
-    sheet_total_rows:           parsed.monthly.length + (parsed.balance_sheet ? 1 : 0),
-    latest_ym:                  parsed.latest_ym,
-    snap_date:                  parsed.snap_date,
-    sheet_balance_sheet_rows:   parsed.balance_sheet ? 1 : 0,
-    sheet_monthly_rows:         parsed.monthly.length,
-    db_balance_sheet_for_date:  bsCount,
-    db_monthly_for_ym:          monthCount,
-    action: 'upsert',
-    preview_rows_to_add:        parsed.monthly.length + (parsed.balance_sheet ? 1 : 0),
-    note: 'UPSERT keys: balance_sheet=snap_date, monthly=(year_month,branch). Brand margin BACKLOG (Apps Script does not expose Sales VS Cost yet).',
-  };
+  const { count: brandCount } = await sb().from('financial_brand_margin')
+    .select('*', { count: 'exact', head: true });
+
+  return [
+    {
+      source: 'fmm_liability', target_table: 'financial_balance_sheet',
+      sheet_total_rows:        parsed.balance_sheet ? 1 : 0,
+      snap_date:               parsed.snap_date,
+      sheet_rows_for_snapshot: parsed.balance_sheet ? 1 : 0,
+      db_rows_for_snapshot:    bsCount,
+      action: bsCount === 0 ? 'append' : 'upsert',
+      preview_rows_to_add: parsed.balance_sheet ? 1 : 0,
+      note: 'UPSERT key: snap_date',
+    },
+    {
+      source: 'fmm_monthly', target_table: 'financial_monthly',
+      sheet_total_rows:         parsed.monthly.length,
+      latest_ym:                parsed.latest_ym,
+      sheet_rows_for_latest_ym: parsed.monthly.length,
+      db_rows_for_latest_ym:    monthCount,
+      action: monthCount === 0 ? 'append' : 'upsert',
+      preview_rows_to_add: parsed.monthly.length,
+      note: 'UPSERT key: (year_month, branch). 7 rows = TOTAL + W01..W11.',
+    },
+    {
+      source: 'fmm_sales_vs_cost', target_table: 'financial_brand_margin',
+      sheet_total_rows: 0,
+      db_total_rows:    brandCount,
+      action: 'backlog',
+      preview_rows_to_add: 0,
+      note: 'BACKLOG — Apps Script does not expose Sales VS Cost yet. Schema ready; loader pending Phase 3.',
+    },
+  ];
 }
 
 async function applyFinancial(parsed, overwrite, user) {
@@ -1280,13 +1321,19 @@ export default async function handler(req, res) {
   //    trail captures every preview attempt (per Jym's verification spec).
   if (mode === 'preview') {
     const previews = [];
-    if (parsedSales) previews.push(await previewSales(parsedSales));
-    if (parsedInv)   previews.push(await previewInventory(parsedInv));
-    if (parsedSm)    previews.push(await previewItems(parsedSm));
-    if (parsedCbl)   previews.push(await previewCbl(parsedCbl));
-    if (parsedFloat) previews.push(await previewFloatation(parsedFloat));
-    if (parsedPoGrn) previews.push(await previewPoGrn(parsedPoGrn));
-    if (parsedFin)   previews.push(await previewFinancial(parsedFin));
+    // Helper: previewers may return a single object or an array of rows.
+    const pushPreview = (p) => {
+      if (p == null) return;
+      if (Array.isArray(p)) previews.push(...p);
+      else previews.push(p);
+    };
+    if (parsedSales) pushPreview(await previewSales(parsedSales));
+    if (parsedInv)   pushPreview(await previewInventory(parsedInv));
+    if (parsedSm)    pushPreview(await previewItems(parsedSm));
+    if (parsedCbl)   pushPreview(await previewCbl(parsedCbl));        // → 2 rows (CBL + customers)
+    if (parsedFloat) pushPreview(await previewFloatation(parsedFloat));
+    if (parsedPoGrn) pushPreview(await previewPoGrn(parsedPoGrn));
+    if (parsedFin)   pushPreview(await previewFinancial(parsedFin));   // → 3 rows (BS + monthly + brand backlog)
     let preview_log_id = null;
     try {
       const conflicts = {};
@@ -1360,9 +1407,10 @@ export default async function handler(req, res) {
     targets.push({ table: 'items', plan: await previewItems(parsedSm), overwrite: false });
   }
   if (parsedCbl) {
-    const p = await previewCbl(parsedCbl);
-    if (p.action === 'append' || (p.action === 'conflict' && confirmOverwrite.customer_buy_lines))
-      targets.push({ table: 'customer_buy_lines', plan: p, overwrite: !!confirmOverwrite.customer_buy_lines });
+    const cblRows = await previewCbl(parsedCbl);
+    const cblRow = (Array.isArray(cblRows) ? cblRows[0] : cblRows);   // first = customer_buy_lines
+    if (cblRow.action === 'append' || (cblRow.action === 'conflict' && confirmOverwrite.customer_buy_lines))
+      targets.push({ table: 'customer_buy_lines', plan: cblRow, overwrite: !!confirmOverwrite.customer_buy_lines });
   }
   if (parsedFloat) {
     const p = await previewFloatation(parsedFloat);
@@ -1382,10 +1430,13 @@ export default async function handler(req, res) {
       targets.push({ table: 'po_grn', plan: p, overwrite: !!confirmOverwrite.po_grn });
   }
   if (parsedFin) {
-    const p = await previewFinancial(parsedFin);
-    // Financial is pure UPSERT (always apply when called).
-    if (p.preview_rows_to_add > 0)
-      targets.push({ table: 'financial', plan: p, overwrite: false });
+    const finRows = await previewFinancial(parsedFin);
+    // financial fans out across 3 preview rows but applies as ONE
+    // virtual 'financial' target (loader fills BS + monthly together).
+    const anyToAdd = (Array.isArray(finRows) ? finRows : [finRows])
+      .some(r => r && r.preview_rows_to_add > 0);
+    if (anyToAdd)
+      targets.push({ table: 'financial', plan: finRows, overwrite: false });
   }
 
   // CBL apply UPSERTs customers as a side-effect → must also back up customers.
