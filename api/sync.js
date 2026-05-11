@@ -814,14 +814,19 @@ async function fetchAllItemCodes() {
 async function chunkInsert(table, rows, opts = {}) {
   const size = opts.chunkSize || 1000;
   let ok = 0, err = 0;
+  let first_error = null, error_chunks = 0;
   for (let i = 0; i < rows.length; i += size) {
     const chunk = rows.slice(i, i + size);
     const q = sb().from(table).upsert(chunk, opts.onConflict ? { onConflict: opts.onConflict, ignoreDuplicates: false } : {});
     const { error } = await q;
-    if (error) { err += chunk.length; console.error(`[sync] ${table} chunk ${i}: ${error.message}`); }
-    else       { ok  += chunk.length; }
+    if (error) {
+      err += chunk.length;
+      error_chunks += 1;
+      if (!first_error) first_error = { message: error.message, code: error.code, details: error.details, hint: error.hint, sample_row_keys: Object.keys(chunk[0] || {}), sample_row: chunk[0] };
+      console.error(`[sync] ${table} chunk ${i}: ${error.message}`);
+    } else { ok += chunk.length; }
   }
-  return { ok, err };
+  return { ok, err, first_error, error_chunks };
 }
 
 // CP2 Step 2: floatation preview — 6 stores' Sheet-1 monthly aggregates.
@@ -936,6 +941,7 @@ async function applyFloatation(parsed, overwrite, user) {
     rows_appended:           resInsert.ok,
     rows_overwritten:        resOver.ok,
     rows_failed:             resInsert.err + resOver.err,
+    first_error:             resInsert.first_error || resOver.first_error || null,
     backfill_count:          newInserts.filter(r => r.date < startOfMonth).length,
     mode: overwrite ? 'overwrite_latest_plus_backfill' : 'append_plus_backfill',
   };
@@ -1025,6 +1031,7 @@ async function applyPoGrn(parsed, overwrite, user) {
     latest_ym:                parsed.latest_ym,
     rows_appended:            res.ok,
     rows_failed:              res.err,
+    first_error:              res.first_error || null,
     rows_dropped_unknown_item: dropped_unknown_item,
     mode: overwrite ? 'overwrite' : 'append',
   };
@@ -1174,6 +1181,7 @@ async function applyCbl(parsed, overwrite, user) {
     latest_ym: parsed.latest_ym,
     rows_appended:               resCbl.ok,
     rows_failed:                 resCbl.err,
+    first_error:                 resCbl.first_error || resCust.first_error || null,
     rows_dropped_unknown_item:   dropped_unknown_item,
     customers_upserted:          resCust.ok,
     customers_failed:            resCust.err,
@@ -1492,7 +1500,7 @@ export default async function handler(req, res) {
 
   // 3e. Apply each target. One failure does NOT block the others.
   const results = [];
-  const appended = {}; const failed = {};
+  const appended = {}; const failed = {}; const errorDetails = {};
   for (const t of targets) {
     try {
       let r;
@@ -1506,23 +1514,29 @@ export default async function handler(req, res) {
       results.push(r);
       appended[t.table] = r.rows_appended ?? r.rows_upserted ?? 0;
       if (r.rows_failed) failed[t.table] = r.rows_failed;
+      if (r.first_error)  errorDetails[t.table] = r.first_error;
     } catch (e) {
       results.push({ target_table: t.table, error: e.message });
       failed[t.table] = 'exception';
+      errorDetails[t.table] = { message: e.message, code: 'EXCEPTION' };
     }
   }
   const anyFailed = Object.keys(failed).length > 0;
+  const errSummary = Object.keys(errorDetails).length
+    ? Object.entries(errorDetails).map(([t, e]) => `${t}: [${e.code || '?'}] ${e.message}`).join(' | ')
+    : null;
   await sb().from('sync_log').update({
     finished_at: new Date().toISOString(),
     status: anyFailed ? 'partial' : 'success',
     rows_appended: appended, rows_skipped: failed,
+    error_msg: errSummary,
   }).eq('id', sync_log_id);
   await sb().rpc('release_sync_lock');
 
   return res.status(200).json({
     ok: true, mode: 'apply',
     sync_log_id, backup_manifest_id: manifest.id,
-    results, appended, failed,
+    results, appended, failed, errorDetails,
     timestamp: new Date().toISOString(),
   });
 }
