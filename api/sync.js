@@ -303,16 +303,54 @@ async function previewInventory(parsed) {
   };
 }
 
+// Item status filter for NEW rows (Jym CP1 rule):
+//   KEEP   : NULL / starts F- / starts N- / starts S- / unknown
+//   DROP   : starts D- / starts O- / exactly 'OBS' / exactly 'OBSOLETE'
+// Existing rows are ALWAYS kept (UPSERTed) regardless of status — Owner
+// may have legitimate reasons to retain (e.g. recently discontinued SKU
+// with active warranty notes).
+function itemStatusFilter(status) {
+  if (status == null || status === '') return { keep: true, bucket: 'NULL' };
+  const s = String(status).trim().toUpperCase();
+  if (s === 'OBS' || s === 'OBSOLETE') return { keep: false, bucket: 'FILTERED' };
+  if (s.startsWith('D-')) return { keep: false, bucket: 'FILTERED' };
+  if (s.startsWith('O-')) return { keep: false, bucket: 'FILTERED' };
+  if (s.startsWith('F-')) return { keep: true, bucket: 'F-FAST' };
+  if (s.startsWith('N-')) return { keep: true, bucket: 'N-NORMAL' };
+  if (s.startsWith('S-')) return { keep: true, bucket: 'S-SLOW' };
+  return { keep: true, bucket: 'OTHER' };
+}
+
 async function previewItems(parsed) {
-  const { count: dbCount } = await sb().from('items').select('*', { count: 'exact', head: true });
-  // Items are an UPSERT (POS-owned fields only). Always safe to re-run.
+  // Partition SM rows: existing (always UPSERT) vs new (filter by status).
+  const { data: existing } = await sb().from('items').select('item_code').limit(50000);
+  const existingCodes = new Set((existing || []).map(r => r.item_code));
+  let existing_updated = 0, new_insert_proposed = 0, new_filtered_out = 0;
+  const new_status_dist = { 'F-FAST': 0, 'N-NORMAL': 0, 'S-SLOW': 0, NULL: 0, OTHER: 0 };
+  for (const r of parsed.rows) {
+    if (existingCodes.has(r.item_code)) {
+      existing_updated += 1;
+    } else {
+      const f = itemStatusFilter(r.item_status);
+      if (!f.keep) {
+        new_filtered_out += 1;
+      } else {
+        new_insert_proposed += 1;
+        new_status_dist[f.bucket] += 1;
+      }
+    }
+  }
   return {
     source: 'sm_item_master', target_table: 'items',
     sheet_total_rows: parsed.total_rows,
-    db_total_rows: dbCount,
+    db_total_rows: existingCodes.size,
     action: 'upsert',
-    preview_rows_to_add: parsed.total_rows - (dbCount || 0),    // approximate
-    note: 'Owner-owned columns (strategic_push / description_zh / notes) are NEVER overwritten.',
+    existing_updated,
+    new_insert_proposed,
+    new_filtered_out,
+    new_status_dist,
+    preview_rows_to_add: new_insert_proposed,
+    note: 'Existing rows UPSERTed (all 13 master cols). New rows filtered by item_status (D-/O-/OBS dropped). Owner-owned cols never overwritten.',
   };
 }
 
@@ -366,21 +404,50 @@ async function applyInventory(parsed, overwrite) {
 }
 
 async function applyItems(parsed) {
-  // UPSERT all SM rows. Map to items columns; Owner-owned fields
-  // (strategic_push / description_zh / notes) are NOT in the UPSERT
-  // payload → preserved on existing rows.
-  const upserts = parsed.rows.map(r => {
-    const out = { item_code: r.item_code, source: 'sync_sm' };
-    for (const k of ['open_date','item_status','main_group','sub_group','application',
-                     'capacity','clr_finishing','shape_design','brand','prc_range',
-                     'movement','country','manufacturer']) {
-      if (r[k] !== undefined) out[k] = r[k];
+  // Two-pass items apply (Jym CP1 spec):
+  //   1. existing rows (item_code in items) → UPSERT all 13 master cols.
+  //      Owner-owned (strategic_push / description_zh / notes) excluded
+  //      from payload so they're preserved.
+  //   2. new rows → filter by item_status, INSERT survivors (UPSERT
+  //      semantically same since they don't exist yet).
+  const { data: existing } = await sb().from('items').select('item_code').limit(50000);
+  const existingCodes = new Set((existing || []).map(r => r.item_code));
+
+  const MASTER_COLS = ['open_date','item_status','main_group','sub_group','application',
+                       'capacity','clr_finishing','shape_design','brand','prc_range',
+                       'movement','country','manufacturer'];
+
+  const upsertsExisting = [];
+  const insertsNew = [];
+  let filtered_out = 0;
+  const new_status_dist = { 'F-FAST': 0, 'N-NORMAL': 0, 'S-SLOW': 0, NULL: 0, OTHER: 0 };
+
+  for (const r of parsed.rows) {
+    const obj = { item_code: r.item_code, source: 'sync_sm' };
+    for (const k of MASTER_COLS) if (r[k] !== undefined) obj[k] = r[k];
+    if (existingCodes.has(r.item_code)) {
+      upsertsExisting.push(obj);
+    } else {
+      const f = itemStatusFilter(r.item_status);
+      if (!f.keep) { filtered_out += 1; continue; }
+      insertsNew.push(obj);
+      new_status_dist[f.bucket] += 1;
     }
-    return out;
-  });
-  const res = await chunkInsert('items', upserts, { onConflict: 'item_code' });
-  return { source: 'sm_item_master', target_table: 'items',
-           rows_upserted: res.ok, rows_failed: res.err, mode: 'upsert' };
+  }
+
+  const resExisting = await chunkInsert('items', upsertsExisting, { onConflict: 'item_code' });
+  const resNew      = await chunkInsert('items', insertsNew,      { onConflict: 'item_code' });
+
+  return {
+    source: 'sm_item_master', target_table: 'items',
+    rows_existing_updated: resExisting.ok,
+    rows_new_inserted:     resNew.ok,
+    rows_filtered_out:     filtered_out,
+    new_status_dist,
+    rows_failed: resExisting.err + resNew.err,
+    rows_appended: resExisting.ok + resNew.ok,
+    mode: 'upsert',
+  };
 }
 
 // ── Handler ───────────────────────────────────────────────────────────
@@ -397,6 +464,11 @@ export default async function handler(req, res) {
   const user = await loadSessionUser(sessionUserName);
   if (!user) return res.status(401).json({ ok: false, error: 'no session' });
   if (user.role !== 'owner') return res.status(403).json({ ok: false, error: 'owner only' });
+
+  // JS-side timestamp captured once at handler start, used for BOTH
+  // started_at + finished_at on every sync_log INSERT/UPDATE — keeps
+  // them on the same clock (Postgres NOW() drifts ~700ms from V8 clock).
+  const startedAtIso = new Date().toISOString();
 
   let body = req.body;
   if (typeof body === 'string') {
@@ -443,6 +515,7 @@ export default async function handler(req, res) {
         target_tables: onlyTargets,
         status: 'success',
         preview_only: true,
+        started_at:  startedAtIso,
         finished_at: new Date().toISOString(),
         conflicts,
       }).select('id').single();
@@ -476,6 +549,7 @@ export default async function handler(req, res) {
     triggered_by: user.username, mode: 'apply',
     sheet_ids: ['CBv3','RawCS','SM'],
     target_tables: onlyTargets, status: 'running',
+    started_at: startedAtIso,
   }).select('id').single();
   if (logErr) {
     await sb().rpc('release_sync_lock');

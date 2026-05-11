@@ -8661,14 +8661,29 @@ function v2RenderPreviewTable(previews) {
     const confirmCell = p.action === 'conflict'
       ? `<label class="v2-conflict-confirm"><input type="checkbox" data-confirm-overwrite="${v2EscapeHtml(p.target_table)}"> 覆盖该月 / overwrite</label>`
       : '—';
+    // Items breakdown sub-row (per CP1 spec): existing updated / new
+    // insert proposed / filtered out + status distribution.
+    let actionCell = v2EscapeHtml(p.action) +
+      (p.preview_rows_to_add ? ` (+${v2Fmt(p.preview_rows_to_add)})` : '');
+    if (p.target_table === 'items' && p.existing_updated != null) {
+      const sd = p.new_status_dist || {};
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>existing updated: <b>${v2Fmt(p.existing_updated)}</b></span><br>` +
+        `<span>new insert proposed: <b>${v2Fmt(p.new_insert_proposed)}</b></span><br>` +
+        `<span>filtered out (OBS/D-/O-): <b>${v2Fmt(p.new_filtered_out)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">` +
+          `F-FAST=${v2Fmt(sd['F-FAST']||0)} · N-NORMAL=${v2Fmt(sd['N-NORMAL']||0)} · ` +
+          `S-SLOW=${v2Fmt(sd['S-SLOW']||0)} · NULL=${v2Fmt(sd.NULL||0)} · OTHER=${v2Fmt(sd.OTHER||0)}` +
+        '</span></div>';
+    }
     return '<tr>' +
       '<td>' + v2EscapeHtml(p.source) + '</td>' +
       '<td><code>' + v2EscapeHtml(p.target_table) + '</code></td>' +
       '<td>' + v2EscapeHtml(latest) + '</td>' +
       '<td class="num">' + v2Fmt(sheetN) + '</td>' +
       '<td class="num">' + v2Fmt(dbN) + '</td>' +
-      '<td class="' + actionCls + '">' + v2EscapeHtml(p.action) +
-        (p.preview_rows_to_add ? ` (+${v2Fmt(p.preview_rows_to_add)})` : '') + '</td>' +
+      '<td class="' + actionCls + '">' + actionCell + '</td>' +
       '<td>' + confirmCell + '</td>' +
     '</tr>';
   }).join('');
