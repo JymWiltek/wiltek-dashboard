@@ -143,15 +143,29 @@ async function fetchSheetCsv(sheetId, tab) {
 
 // CBv3 Date Enrolled is M/D/YYYY (US locale, Wiltek POS export quirk).
 function parseMdyDate(s) {
+  // CBv3 export is inconsistent: some rows M/D/YYYY, others D/M/YYYY.
+  // Bound-detect: if first part > 12 it MUST be a day; if second part > 12
+  // it MUST be a month. Default to M/D/Y (Wiltek POS US-locale convention)
+  // when ambiguous. Returns null for invalid dates so Postgres won't 22008.
   if (!s) return null;
   s = String(s).trim(); if (!s || s === '-') return null;
   let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (m) {
+    const a = +m[1], b = +m[2];
     let y = +m[3]; if (y < 100) y = 2000 + y;
-    return `${y}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
+    let mon, day;
+    if      (a > 12 && b <= 12) { day = a; mon = b; }   // unambiguous D/M/Y
+    else if (b > 12 && a <= 12) { mon = a; day = b; }   // unambiguous M/D/Y
+    else                         { mon = a; day = b; }   // ambiguous → M/D/Y default
+    if (mon < 1 || mon > 12 || day < 1 || day > 31) return null;
+    return `${y}-${String(mon).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
   }
   m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  if (m) {
+    const mon = +m[2], day = +m[3];
+    if (mon < 1 || mon > 12 || day < 1 || day > 31) return null;
+    return `${m[1]}-${String(mon).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  }
   return null;
 }
 
@@ -337,7 +351,15 @@ async function loadFloatationOne(sheetId, store) {
     const closed_count  = all_.purchase ? Math.round(all_.purchase[mIdx]) : 0;
     if (!walk_in_total && !closed_count) continue;  // skip empty months (future, or W11 post-close)
 
-    const closing_rate = all_.cr     ? +(all_.cr[mIdx] * 100).toFixed(2)           : 0;
+    // closing_rate column is numeric(5,2) → max ±999.99.
+    // Apps Script returns either decimal (0..1) or already-percentage (0..100)
+    // depending on store. Detect by magnitude. If still out of range after
+    // detection, set null (data quality issue, will surface in dashboards).
+    let cr_raw = all_.cr ? +all_.cr[mIdx] : 0;
+    let closing_rate = !Number.isFinite(cr_raw) ? null
+      : cr_raw <= 1.5  ? +(cr_raw * 100).toFixed(2)     // decimal form
+      : cr_raw <= 999  ? +cr_raw.toFixed(2)              // already a percentage
+      :                  null;                            // overflow / sentinel
     const amount_total = all_.amount ? Math.round(all_.amount[mIdx] * 100) / 100   : 0;
     const basket_total = all_.basket ? Math.round(all_.basket[mIdx] * 100) / 100   : 0;
 
@@ -1023,7 +1045,29 @@ async function applyPoGrn(parsed, overwrite, user) {
     await sb().from('po_grn').delete().gte('po_date', startOfMonth).lt('po_date', startOfNext);
   }
 
-  const inserts = validRows.map(r => ({ ...r, updated_by: user.username, updated_at: new Date().toISOString() }));
+  // Dedupe within batch: PostgreSQL refuses ON CONFLICT DO UPDATE when the
+  // same row would be touched twice. Source Raw Pivot can have multiple
+  // rows with identical (po_date, item_code, branch) — different GRN dates
+  // or split deliveries. We sum qty/amt across dupes; keep earliest grn_date.
+  const dedupeMap = new Map();
+  let dropped_duplicates = 0;
+  for (const r of validRows) {
+    const k = `${r.po_date}|${r.item_code}|${r.branch}`;
+    if (dedupeMap.has(k)) {
+      const cur = dedupeMap.get(k);
+      cur.po_qty  = (+cur.po_qty  || 0) + (+r.po_qty  || 0);
+      cur.grn_qty = (+cur.grn_qty || 0) + (+r.grn_qty || 0);
+      cur.po_amt  = (+cur.po_amt  || 0) + (+r.po_amt  || 0);
+      cur.grn_amt = (+cur.grn_amt || 0) + (+r.grn_amt || 0);
+      // earliest grn_date wins (more conservative)
+      if (r.grn_date && (!cur.grn_date || r.grn_date < cur.grn_date)) cur.grn_date = r.grn_date;
+      dropped_duplicates += 1;
+    } else {
+      dedupeMap.set(k, { ...r });
+    }
+  }
+  const deduped = [...dedupeMap.values()];
+  const inserts = deduped.map(r => ({ ...r, updated_by: user.username, updated_at: new Date().toISOString() }));
   const res = await chunkInsert('po_grn', inserts, { onConflict: 'po_date,item_code,branch' });
 
   return {
@@ -1033,6 +1077,7 @@ async function applyPoGrn(parsed, overwrite, user) {
     rows_failed:              res.err,
     first_error:              res.first_error || null,
     rows_dropped_unknown_item: dropped_unknown_item,
+    rows_dropped_duplicates:  dropped_duplicates,
     mode: overwrite ? 'overwrite' : 'append',
   };
 }
@@ -1172,7 +1217,24 @@ async function applyCbl(parsed, overwrite, user) {
   if (overwrite) {
     await sb().from('customer_buy_lines').delete().eq('year_month', parsed.latest_ym);
   }
-  const inserts = validRows.map(r => ({ ...r, updated_by: user.username }));
+  // Dedupe within batch on PK (year_month, bill_no, item_code) — same item
+  // can legitimately appear twice on one bill if POS issued two line items.
+  // Sum qty/amt; keep first customer_name/date_enrol.
+  const dedupeMap = new Map();
+  let dropped_duplicates = 0;
+  for (const r of validRows) {
+    const k = `${r.year_month}|${r.bill_no}|${r.item_code}`;
+    if (dedupeMap.has(k)) {
+      const cur = dedupeMap.get(k);
+      cur.qty = (+cur.qty || 0) + (+r.qty || 0);
+      cur.amt = (+cur.amt || 0) + (+r.amt || 0);
+      dropped_duplicates += 1;
+    } else {
+      dedupeMap.set(k, { ...r });
+    }
+  }
+  const dedupedRows = [...dedupeMap.values()];
+  const inserts = dedupedRows.map(r => ({ ...r, updated_by: user.username }));
   const resCbl = await chunkInsert('customer_buy_lines', inserts,
     { onConflict: 'year_month,bill_no,item_code' });
 
