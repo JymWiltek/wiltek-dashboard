@@ -420,17 +420,42 @@ export default async function handler(req, res) {
     return res.status(502).json({ ok: false, error: 'sheet fetch failed: ' + e.message });
   }
 
-  // 2. Preview path: just report deltas, no writes.
+  // 2. Preview path: just report deltas, no main-table writes.
+  //    Still writes a sync_log row with preview_only=true so the audit
+  //    trail captures every preview attempt (per Jym's verification spec).
   if (mode === 'preview') {
     const previews = [];
     if (parsedSales) previews.push(await previewSales(parsedSales));
     if (parsedInv)   previews.push(await previewInventory(parsedInv));
     if (parsedSm)    previews.push(await previewItems(parsedSm));
+    let preview_log_id = null;
+    try {
+      const conflicts = {};
+      for (const p of previews) {
+        if (p && p.action === 'conflict') conflicts[p.target_table] = {
+          db_rows: p.db_rows_for_latest_ym ?? p.db_rows_for_snapshot,
+          sheet_rows: p.sheet_rows_for_latest_ym ?? p.sheet_rows_for_snapshot,
+        };
+      }
+      const { data: logIns } = await sb().from('sync_log').insert({
+        triggered_by: user.username, mode: 'preview',
+        sheet_ids: ['CBv3','RawCS','SM'],
+        target_tables: onlyTargets,
+        status: 'success',
+        preview_only: true,
+        finished_at: new Date().toISOString(),
+        conflicts,
+      }).select('id').single();
+      preview_log_id = logIns?.id || null;
+    } catch (e) {
+      console.error('[sync] preview log insert failed:', e.message);
+    }
     return res.status(200).json({
       ok: true,
       mode: 'preview',
       session_role: user.role,
       previews,
+      preview_log_id,
       timestamp: new Date().toISOString(),
     });
   }
