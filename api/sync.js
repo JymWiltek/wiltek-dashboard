@@ -45,12 +45,35 @@ function sb() {
 }
 
 // ── Notion-authoritative sheet IDs / tabs ─────────────────────────────
+// CBv3 feeds BOTH sales (CP1, aggregate) AND customer_buy_lines (CP2,
+// per-member-line). One fetch, two transforms.
 const SHEETS = {
-  customer_buy_v3:    { id: '1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s', tab: null,        target: 'sales' },
+  customer_buy_v3:    { id: '1AjYt9plWymcQMeW4tIZ6A_3QdDlUB_ShreX-d4_mA8s', tab: null,        target: ['sales','customer_buy_lines'] },
   raw_cs:             { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'Raw CS',   target: 'inventory_snapshots' },
   sm_item_master:     { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'SM',       target: 'items' },
+  po_grn_raw_pivot:   { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'Raw Pivot',target: 'po_grn' },
 };
 const ACTIVE_BRANCHES = new Set(['W01','W02','W03','W05','W07']);
+
+// CP2 Step 2: 6 Floatation Sheets (W11 INCLUDED — historical preserved
+// per Jym's hard rule; UI hides W11, code never if-skips it).
+const FLOATATION_SHEETS = [
+  { id: '1FgXzgOUMmF8UVA9lcuBwd9nfbY2Sw_LY6GZVnNJcvRw', store: 'W01' },
+  { id: '15dvmfamAhjsKP8ANllKlDhBDumNfDfx_iOlr5W48lZA', store: 'W02' },
+  { id: '1syxvPHOMOtIVICVcG1ZyscOJ-Lih_rPEiYZRsPTN0y8', store: 'W03' },
+  { id: '1KMUZGkfLrdkJh5-ECuzDbHRClatykFBlFIOZKqqirY8', store: 'W05' },
+  { id: '1-yUL4N6UPuaUbHua0rHew3HvwqqXCvQ0cYDuMLcN-aE', store: 'W07' },
+  { id: '19oXG7KCWPNukt2HK-zkM9j-Kwuyjc5SESuweooYRzLs', store: 'W11' },
+];
+const FLOATATION_YEAR = 2026;   // current year — sheets are one per year
+
+// CP2: customer_buy_lines / customers UPSERT side-effect when CBL applies.
+// floatation source feeds the floatation table (6 stores, monthly aggregate).
+const ALL_TARGETS = ['sales','inventory_snapshots','items','customer_buy_lines','floatation','po_grn','financial'];
+
+// CP3: Apps Script endpoint (already-parsed FMM data via WTK_APPS_SCRIPT_URL).
+const APPS_SCRIPT_URL = process.env.WTK_APPS_SCRIPT_URL;
+const APPS_SCRIPT_KEY = process.env.WTK_API_KEY;
 
 // ── Session lookup ────────────────────────────────────────────────────
 async function loadSessionUser(username) {
@@ -118,49 +141,109 @@ async function fetchSheetCsv(sheetId, tab) {
 
 // ── Source parsers (each returns rows + meta for incremental detection) ─
 
-async function loadCbv3Sales() {
+// CBv3 Date Enrolled is M/D/YYYY (US locale, Wiltek POS export quirk).
+function parseMdyDate(s) {
+  if (!s) return null;
+  s = String(s).trim(); if (!s || s === '-') return null;
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y = 2000 + y;
+    return `${y}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  return null;
+}
+
+// Read CBv3 once, derive two row shapes:
+//   - sales:           CP1-compatible (sale_date, store, item_code, qty,
+//                      amount, customer_id, invoice_no, source).
+//   - customer_buy_lines (CP2): per-line member purchases. Walk-in rows
+//                      (no member_code) dropped at parse time and counted.
+async function loadCbv3() {
   const text = await fetchSheetCsv(SHEETS.customer_buy_v3.id, null);
   const grid = parseCsv(text);
-  if (!grid.length) return { rows: [], latest_ym: null };
+  const empty = {
+    sales: { rows: [], latest_ym: null, total_rows: 0 },
+    cbl:   { rows: [], latest_ym: null, total_rows: 0, dropped_no_member: 0, dropped_no_bill_or_branch: 0 },
+  };
+  if (!grid.length) return empty;
   const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
   const idx = {}; for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
   const I = {
-    MONTH: idx['MONTH'] ?? 0,
-    BILL:  idx['BILL']  ?? 1,
-    CODE:  idx['ITEM CODE'] ?? 2,
-    BR:    idx['BRANCHES']  ?? 3,
-    MC:    idx['MEMBER CODE'] ?? 5,
-    QTY:   idx['QTY']   ?? 6,
-    AMT:   idx['AMT']   ?? 7,
+    MONTH:  idx['MONTH']          ?? 0,
+    BILL:   idx['BILL']           ?? 1,
+    CODE:   idx['ITEM CODE']      ?? 2,
+    BR:     idx['BRANCHES']       ?? 3,
+    CNAME:  idx['CUSTOMER NAME']  ?? 4,
+    MC:     idx['MEMBER CODE']    ?? 5,
+    QTY:    idx['QTY']            ?? 6,
+    AMT:    idx['AMT']            ?? 7,
+    CTYPE:  idx['CUST TYPE']      ?? null,
+    ENROL:  idx['DATE ENROLLED']  ?? idx['DATE ENROL'] ?? null,
+    MAIN:   idx['MAIN GROUP']     ?? null,
+    SUB:    idx['SUB GROUP']      ?? null,
   };
-  const rows = [];
+  const salesRows = [];
+  const cblRows   = [];
+  let dropped_no_member = 0, dropped_no_bill_or_branch = 0;
   let latestYmKey = -Infinity;
   for (let i = 1; i < grid.length; i++) {
     const r = grid[i]; if (!r) continue;
     const ym = parseMonthYY(r[I.MONTH]); if (!ym) continue;
-    if (ym.y < 2023) continue;          // Notion: cutoff 2023
+    if (ym.y < 2023) continue;
     const code = String(r[I.CODE] || '').trim(); if (!code) continue;
     const branch = String(r[I.BR] || '').trim();
     const amt = parseNum(r[I.AMT]);
-    if (!amt) continue;                  // skip zero-amount lines
-    rows.push({
+    if (!amt) continue;
+
+    const ymStr = `${String(ym.y).padStart(4,'0')}-${String(ym.m).padStart(2,'0')}`;
+    const ymKey = ym.y * 12 + ym.m;
+    if (ymKey > latestYmKey) latestYmKey = ymKey;
+    const mc   = String(r[I.MC]||'').trim();
+    const bill = String(r[I.BILL]||'').trim();
+
+    // SALES shape (CP1-compat, walk-in customer_id may be null)
+    salesRows.push({
       sale_date:  ymToFirstOfMonth(ym),
       store:      branch || 'WCO',
       item_code:  code,
       qty:        parseNum(r[I.QTY]),
-      unit_price: null,                  // can't derive cleanly from CBv3
+      unit_price: null,
       amount:     amt,
-      customer_id: String(r[I.MC]||'').trim() || null,
-      invoice_no: String(r[I.BILL]||'').trim() || null,
+      customer_id: mc || null,
+      invoice_no: bill || null,
       source:     'sync_cbv3',
     });
-    const ymKey = ym.y * 12 + ym.m;
-    if (ymKey > latestYmKey) latestYmKey = ymKey;
+
+    // CBL shape (CP2, member rows only — Jym's anomaly rule rejects NULL mc).
+    if (!mc)           { dropped_no_member += 1; continue; }
+    if (!bill||!branch){ dropped_no_bill_or_branch += 1; continue; }
+    cblRows.push({
+      year_month:    ymStr,
+      bill_no:       bill,
+      item_code:     code,
+      branch,
+      customer_name: String(r[I.CNAME]||'').trim() || null,
+      member_code:   mc,
+      qty:           parseNum(r[I.QTY]),
+      amt,
+      cust_type:     I.CTYPE != null ? (String(r[I.CTYPE]||'').trim() || null) : null,
+      date_enrol:    I.ENROL != null ? parseMdyDate(r[I.ENROL]) : null,
+      main_group:    I.MAIN  != null ? (String(r[I.MAIN]||'').trim()  || null) : null,
+      sub_group:     I.SUB   != null ? (String(r[I.SUB] ||'').trim()  || null) : null,
+    });
   }
   const latest_ym = latestYmKey > 0
     ? `${Math.floor((latestYmKey-1)/12)}-${String(((latestYmKey-1)%12)+1).padStart(2,'0')}`
     : null;
-  return { rows, latest_ym, total_rows: rows.length };
+  return {
+    sales: { rows: salesRows, latest_ym, total_rows: salesRows.length },
+    cbl:   {
+      rows: cblRows, latest_ym, total_rows: cblRows.length,
+      dropped_no_member, dropped_no_bill_or_branch,
+    },
+  };
 }
 
 async function loadRawCs() {
@@ -197,6 +280,127 @@ async function loadRawCs() {
     });
   }
   return { rows, snapshot_date, total_rows: rows.length };
+}
+
+// ── Floatation: Sheet 1 (yearly summary, one row per month) ──────────
+// Logic mirrors tools/migrate-supabase.mjs floatation() so monthly
+// outputs are byte-compatible with the 25 Phase 0 rows.
+async function loadFloatationOne(sheetId, store) {
+  let text;
+  try { text = await fetchSheetCsv(sheetId, null); }
+  catch (e) { return { store, rows: [], latest_ym: null, error: e.message }; }
+  const grid = parseCsv(text);
+  if (!grid.length) return { store, rows: [], latest_ym: null };
+
+  // Row 0: ",",All,Jan,Feb,...,Dec  →  pick month columns by 3-letter prefix.
+  const hdr = grid[0].map(s => String(s || '').trim());
+  const monthCols = [];
+  for (let i = 0; i < hdr.length; i++) {
+    const lab = hdr[i].toLowerCase();
+    const mm  = MON_TO_NUM[lab.slice(0, 3)];
+    if (mm) monthCols.push({ idx: i, m: mm });
+  }
+  if (!monthCols.length) return { store, rows: [], latest_ym: null };
+
+  // byRace[<label>] = { walkin: [12], purchase: [12], amount: [12], basket: [12], cr: [12] }
+  const byRace = {};
+  let curRace = null;
+  for (let i = 1; i < grid.length; i++) {
+    const row = grid[i]; if (!row) continue;
+    const c0 = String(row[0] || '').trim();
+    const c1 = String(row[1] || '').trim();
+    if (c0) curRace = c0;
+    if (!curRace) continue;
+    const lc = c1.toLowerCase();
+    let metric = null;
+    if (lc.includes('walk-in') || lc === 'walk in') metric = 'walkin';
+    else if (lc.includes('purchase'))               metric = 'purchase';
+    else if (lc === 'amount')                       metric = 'amount';
+    else if (lc.includes('basket'))                 metric = 'basket';
+    else if (lc.includes('closing'))                metric = 'cr';
+    if (!metric) continue;
+    if (!byRace[curRace]) byRace[curRace] = {};
+    byRace[curRace][metric] = monthCols.map(({ idx }) => parseNum(row[idx]));
+  }
+
+  const rows = [];
+  let latestKey = -Infinity;
+  for (const { m } of monthCols) {
+    const mIdx  = monthCols.findIndex(x => x.m === m);
+    const all_  = byRace['All']     || {};
+    const chRow = byRace['Chinese'] || {};
+    const myRow = byRace['Malay']   || {};
+    const inRow = byRace['India']   || byRace['Indian'] || {};
+    const oRow  = byRace['Others']  || {};
+
+    const walk_in_total = all_.walkin   ? Math.round(all_.walkin[mIdx])   : 0;
+    const closed_count  = all_.purchase ? Math.round(all_.purchase[mIdx]) : 0;
+    if (!walk_in_total && !closed_count) continue;  // skip empty months (future, or W11 post-close)
+
+    const closing_rate = all_.cr     ? +(all_.cr[mIdx] * 100).toFixed(2)           : 0;
+    const amount_total = all_.amount ? Math.round(all_.amount[mIdx] * 100) / 100   : 0;
+    const basket_total = all_.basket ? Math.round(all_.basket[mIdx] * 100) / 100   : 0;
+
+    const racePack = (rowMap, field) => (rowMap && rowMap[field]) ? rowMap[field][mIdx] : null;
+    const by_race = {
+      chinese: { purchase: Math.round(racePack(chRow, 'purchase') || 0),
+                 amount:   +((racePack(chRow, 'amount')   || 0)).toFixed(2) },
+      malay:   { purchase: Math.round(racePack(myRow, 'purchase') || 0),
+                 amount:   +((racePack(myRow, 'amount')   || 0)).toFixed(2) },
+      indian:  { purchase: Math.round(racePack(inRow, 'purchase') || 0),
+                 amount:   +((racePack(inRow, 'amount')   || 0)).toFixed(2) },
+      others:  { purchase: Math.round(racePack(oRow,  'purchase') || 0),
+                 amount:   +((racePack(oRow,  'amount')   || 0)).toFixed(2) },
+    };
+
+    rows.push({
+      date: ymToLastOfMonth({ y: FLOATATION_YEAR, m }),
+      store,
+      walk_in_total,
+      walk_in_chinese: chRow.walkin ? Math.round(chRow.walkin[mIdx]) : null,
+      walk_in_malay:   myRow.walkin ? Math.round(myRow.walkin[mIdx]) : null,
+      walk_in_indian:  inRow.walkin ? Math.round(inRow.walkin[mIdx]) : null,
+      walk_in_other:   oRow.walkin  ? Math.round(oRow.walkin[mIdx])  : null,
+      closed_count,
+      closing_rate,
+      amount_total,
+      basket_total,
+      by_race,
+    });
+    const key = FLOATATION_YEAR * 12 + m;
+    if (key > latestKey) latestKey = key;
+  }
+  const latest_ym = latestKey > 0
+    ? `${Math.floor((latestKey - 1) / 12)}-${String(((latestKey - 1) % 12) + 1).padStart(2, '0')}`
+    : null;
+  return { store, rows, latest_ym };
+}
+
+// 6 stores fetched in parallel; result is one combined source for the
+// floatation table.
+async function loadFloatation() {
+  const results = await Promise.all(
+    FLOATATION_SHEETS.map(s => loadFloatationOne(s.id, s.store))
+  );
+  const allRows = [];
+  const per_store = {};
+  let latestKey = -Infinity;
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const store = FLOATATION_SHEETS[i].store;
+    if (r.error) { per_store[store] = { rows: 0, latest_ym: null, error: r.error }; continue; }
+    allRows.push(...r.rows);
+    per_store[store] = { rows: r.rows.length, latest_ym: r.latest_ym };
+    if (r.latest_ym) {
+      const [y, m] = r.latest_ym.split('-').map(Number);
+      const key = y * 12 + m;
+      if (key > latestKey) latestKey = key;
+    }
+  }
+  const latest_ym = latestKey > 0
+    ? `${Math.floor((latestKey - 1) / 12)}-${String(((latestKey - 1) % 12) + 1).padStart(2, '0')}`
+    : null;
+  return { rows: allRows, latest_ym, per_store, total_rows: allRows.length };
 }
 
 async function loadSm() {
@@ -262,6 +466,159 @@ async function loadSm() {
   return { rows, total_rows: rows.length };
 }
 
+// CP2 Step 3: PO/GRN Raw Pivot → po_grn table.
+// Date format: DD/MM/YYYY (Wiltek POS export, MY locale; sometimes single-digit
+// like "7/4/2026" = 7 Apr 2026). PO date may be present without GRN date
+// (PO placed, not yet received).
+function parseDmyDate(s) {
+  if (!s) return null;
+  s = String(s).trim(); if (!s || s === '-') return null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
+  let y = +m[3]; if (y < 100) y = 2000 + y;
+  return `${y}-${String(+m[2]).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`;
+}
+
+async function loadPoGrn() {
+  const text = await fetchSheetCsv(SHEETS.po_grn_raw_pivot.id, SHEETS.po_grn_raw_pivot.tab);
+  const grid = parseCsv(text);
+  if (!grid.length) return { rows: [], latest_ym: null, total_rows: 0,
+                             dropped_no_po_date: 0, negative_lead_time: 0 };
+  const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
+  const idx = {}; for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
+  const I = {
+    PO:    idx['P/O DATE']  ?? 0,
+    GRN:   idx['GRF DATE']  ?? idx['GRN DATE'] ?? 1,
+    CODE:  idx['ITEM CODE'] ?? 2,
+    BR:    idx['BRANCH']    ?? 3,
+    POQ:   idx['PO QTY']    ?? 4,
+    GRNQ:  idx['GRN QTY']   ?? 5,
+    POA:   idx['PO AMT']    ?? 6,
+    GRNA:  idx['GRN AMT']   ?? 7,
+  };
+
+  const rows = [];
+  let latestKey = -Infinity;
+  let dropped_no_po_date = 0, dropped_no_item = 0, negative_lead_time = 0;
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i]; if (!r) continue;
+    const po = parseDmyDate(r[I.PO]);
+    if (!po) { dropped_no_po_date += 1; continue; }
+    const code = String(r[I.CODE] || '').trim();
+    if (!code) { dropped_no_item += 1; continue; }
+    const branch = String(r[I.BR] || '').trim() || 'WLO';
+    const grn = parseDmyDate(r[I.GRN]);
+    if (grn && grn < po) negative_lead_time += 1;
+    rows.push({
+      po_date:   po,
+      grn_date:  grn,
+      item_code: code,
+      branch,
+      po_qty:    parseNum(r[I.POQ]),
+      grn_qty:   parseNum(r[I.GRNQ]),
+      po_amt:    parseNum(r[I.POA]),
+      grn_amt:   parseNum(r[I.GRNA]),
+    });
+    const [y, m] = po.split('-').map(Number);
+    const key = y * 12 + m;
+    if (key > latestKey) latestKey = key;
+  }
+  const latest_ym = latestKey > 0
+    ? `${Math.floor((latestKey - 1) / 12)}-${String(((latestKey - 1) % 12) + 1).padStart(2, '0')}`
+    : null;
+  return {
+    rows, latest_ym, total_rows: rows.length,
+    dropped_no_po_date, dropped_no_item, negative_lead_time,
+  };
+}
+
+// CP3: financial loader. Reads Apps Script ?type=financial (already parses
+// FMM Liability + monthly P&L + cashflow). Outputs two row-sets:
+//   - balance_sheet: 1 snapshot row (today)
+//   - monthly:       1 row per (year_month, branch) — TOTAL + W01..W11
+async function loadFinancial() {
+  if (!APPS_SCRIPT_URL || !APPS_SCRIPT_KEY) {
+    return { balance_sheet: null, monthly: [], ok: false, error: 'WTK_APPS_SCRIPT_URL/WTK_API_KEY env not set' };
+  }
+  const url = `${APPS_SCRIPT_URL}?type=financial&key=${encodeURIComponent(APPS_SCRIPT_KEY)}`;
+  const r = await fetch(url, { redirect: 'follow' });
+  if (!r.ok) throw new Error(`Apps Script HTTP ${r.status}`);
+  const txt = await r.text();
+  if (txt.startsWith('<')) throw new Error('Apps Script returned HTML (login wall?)');
+  const j = JSON.parse(txt);
+  if (!j.ok) throw new Error('Apps Script error: ' + (j.error || ''));
+  const D = j.data || {};
+
+  // Latest snapshot date — today's date (Apps Script reads "now" each call).
+  const today = new Date();
+  const snap_date = today.toISOString().slice(0, 10);
+
+  // year_month — derived from period label (e.g. "APRIL'2026") or fallback to current month.
+  // The Apps Script doesn't expose the parsed period cleanly. Use the FMM tab's last
+  // populated month from cashflow.months[0].
+  const cashMonths = D.cashflow?.months || [];
+  let latest_ym = null;
+  if (cashMonths.length) {
+    const s = String(cashMonths[0]); // e.g. "202503" or "202504"
+    if (/^\d{6}$/.test(s)) latest_ym = `${s.slice(0,4)}-${s.slice(4,6)}`;
+  }
+  if (!latest_ym) {
+    const m = today.getUTCMonth();
+    const y = m === 0 ? today.getUTCFullYear() - 1 : today.getUTCFullYear();
+    latest_ym = `${y}-${String(m === 0 ? 12 : m).padStart(2,'0')}`;
+  }
+
+  // Balance sheet from liability section.
+  const liab = D.liability || {};
+  const a = liab.assets || {}, l = liab.liabilities || {};
+  const balance_sheet = {
+    snap_date,
+    building:        a.building     ?? null,
+    stock_value:     a.stock        ?? null,
+    cash_total:      a.cash_total   ?? null,
+    asset_subtotal:  a.subtotal     ?? null,
+    term_loan:       l.term_loan    ?? null,
+    overdraft:       l.overdraft    ?? null,
+    hire_purchase:   l.hire_purchase?? null,
+    oaf:             l.oaf          ?? null,
+    loan_subtotal:   l.total        ?? null,
+    net_equity:      liab.net_equity?? null,
+    ratio:           liab.ratio     ?? null,
+    raw:             liab.raw       || null,
+  };
+
+  // Monthly P&L: one row per (latest_ym, branch). branches = TOTAL + W01..W11
+  // (preserve W11 per Jym hard rule).
+  function mapMetrics(node) {
+    if (!node) return null;
+    const get = (k, b) => node[k]?.[b] ?? null;
+    return {
+      gross_sales_inv:   get('gross_sales',  'inv'),
+      net_sales_inv:     get('net_sales',    'inv'),
+      gross_profit_inv:  get('gross_profit', 'inv'),
+      net_profit_inv:    get('net_profit',   'inv'),
+      total_exp_inv:     get('total_exp',    'inv'),
+      cogs_inv:          get('cogs',         'inv'),
+      gross_sales_coll:  get('gross_sales',  'coll'),
+      net_sales_coll:    get('net_sales',    'coll'),
+      gross_profit_coll: get('gross_profit', 'coll'),
+      net_profit_coll:   get('net_profit',   'coll'),
+      metrics:           node,                 // full jsonb for audit / drilldown
+    };
+  }
+
+  const monthly = [];
+  const totalRow = mapMetrics(D.current_period?.total);
+  if (totalRow) monthly.push({ year_month: latest_ym, branch: 'TOTAL', ...totalRow });
+  const branchObjs = D.current_period?.branches || {};
+  for (const br of ['W01','W02','W03','W05','W07','W11']) {
+    const m = mapMetrics(branchObjs[br]);
+    if (m) monthly.push({ year_month: latest_ym, branch: br, ...m });
+  }
+
+  return { balance_sheet, monthly, latest_ym, snap_date, total_rows: monthly.length };
+}
+
 // ── Preview helpers (incremental detection) ───────────────────────────
 async function previewSales(parsed) {
   if (!parsed.latest_ym) return { ok: false, error: 'no rows from sheet' };
@@ -286,6 +643,83 @@ async function previewSales(parsed) {
           : 'conflict',
     preview_rows_to_add: dbCountThisMonth === 0 ? sheetCountThisMonth : 0,
   };
+}
+
+// CP2: customer_buy_lines preview. Emits TWO preview rows so the sync UI
+// shows customer_buy_lines AND customers (UPSERT side-effect) separately.
+async function previewCbl(parsed) {
+  if (!parsed.latest_ym) {
+    return [
+      { source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines', sheet_total_rows: 0, action: 'noop', preview_rows_to_add: 0 },
+      { source: 'customer_buy_v3_customers', target_table: 'customers', action: 'noop', preview_rows_to_add: 0, note: 'UPSERT side-effect — runs alongside customer_buy_lines apply' },
+    ];
+  }
+  const sheetForLatest = parsed.rows.filter(r => r.year_month === parsed.latest_ym);
+
+  // FK check vs items (paginated lookup so it's accurate >1000 rows).
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  let dropped_unknown_item = 0;
+  const passingRows = [];
+  for (const r of sheetForLatest) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    passingRows.push(r);
+  }
+
+  // Customer UPSERT preview: how many unique members in the month? How many
+  // are new (not in customers yet)?
+  const seenMembers = new Set(passingRows.map(r => r.member_code));
+  const memberArr   = [...seenMembers];
+  let new_members = 0, existing_members = 0;
+  if (memberArr.length) {
+    const existingSet = new Set();
+    const chunk = 500;
+    for (let i = 0; i < memberArr.length; i += chunk) {
+      const slice = memberArr.slice(i, i + chunk);
+      const { data } = await sb().from('customers').select('customer_id').in('customer_id', slice);
+      for (const r of (data || [])) existingSet.add(r.customer_id);
+    }
+    existing_members = existingSet.size;
+    new_members      = memberArr.length - existing_members;
+  }
+
+  const { count: dbRowsThisMonth } = await sb().from('customer_buy_lines')
+    .select('*', { count: 'exact', head: true })
+    .eq('year_month', parsed.latest_ym);
+  const { count: customersDbTotal } = await sb().from('customers')
+    .select('*', { count: 'exact', head: true });
+
+  return [
+    {
+      source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
+      sheet_total_rows:             parsed.total_rows,
+      latest_ym:                    parsed.latest_ym,
+      sheet_rows_for_latest_ym:     sheetForLatest.length,
+      db_rows_for_latest_ym:        dbRowsThisMonth,
+      rows_after_fk_filter:         passingRows.length,
+      dropped_no_member:            parsed.dropped_no_member || 0,
+      dropped_no_bill_or_branch:    parsed.dropped_no_bill_or_branch || 0,
+      dropped_unknown_item,
+      members_in_month:             memberArr.length,
+      new_members,
+      existing_members,
+      action: dbRowsThisMonth === 0       ? 'append'
+            : dbRowsThisMonth === passingRows.length ? 'noop'
+            : 'conflict',
+      preview_rows_to_add: dbRowsThisMonth === 0 ? passingRows.length : 0,
+    },
+    {
+      source: 'customer_buy_v3_customers', target_table: 'customers',
+      sheet_total_rows:    memberArr.length,
+      db_total_rows:       customersDbTotal,
+      members_in_month:    memberArr.length,
+      new_members,
+      existing_members,
+      action: 'upsert',
+      preview_rows_to_add: new_members,
+      note: 'UPSERT side-effect of CBL apply. customer_id PK; name + enrol_date refreshed. Owner-owned cols (type, primary_store, phone) preserved.',
+    },
+  ];
 }
 
 async function previewInventory(parsed) {
@@ -388,6 +822,363 @@ async function chunkInsert(table, rows, opts = {}) {
     else       { ok  += chunk.length; }
   }
   return { ok, err };
+}
+
+// CP2 Step 2: floatation preview — 6 stores' Sheet-1 monthly aggregates.
+// Two parallel concerns:
+//   1. LATEST-MONTH delta — standard append/noop/conflict on latest_ym
+//      across all 6 stores. Conflict prompts owner overwrite confirm.
+//   2. HISTORICAL BACKFILL — any (date, store) row in sheet that doesn't
+//      exist in DB and isn't in the latest_ym range. Auto-inserts on
+//      every apply regardless of overwrite flag (purely additive — most
+//      relevant for first-time W11 history import).
+async function previewFloatation(parsed) {
+  if (!parsed.rows.length) {
+    return { source: 'floatation_6stores', target_table: 'floatation',
+             sheet_total_rows: 0, action: 'noop', preview_rows_to_add: 0 };
+  }
+
+  // Look up which (date, store) are already in DB across all sheet rows.
+  const dates  = [...new Set(parsed.rows.map(r => r.date))];
+  const stores = [...new Set(parsed.rows.map(r => r.store))];
+  const { data: dbExist } = await sb().from('floatation')
+    .select('date, store').in('date', dates).in('store', stores);
+  const dbKeys = new Set((dbExist || []).map(r => `${r.date}|${r.store}`));
+
+  // Determine latest-month range.
+  const startOfMonth = parsed.latest_ym + '-01';
+  const startOfNext  = (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  })();
+
+  let latest_new = 0, latest_existing = 0;
+  let backfill_w11 = 0, backfill_other = 0;
+  const per_store_delta = {};
+  for (const r of parsed.rows) {
+    const isLatest = r.date >= startOfMonth && r.date < startOfNext;
+    const inDb     = dbKeys.has(`${r.date}|${r.store}`);
+    if (!per_store_delta[r.store]) per_store_delta[r.store] = { latest_new: 0, latest_existing: 0, backfill: 0 };
+    if (isLatest) {
+      if (inDb) { latest_existing++; per_store_delta[r.store].latest_existing++; }
+      else      { latest_new++;      per_store_delta[r.store].latest_new++; }
+    } else if (!inDb) {
+      if (r.store === 'W11') backfill_w11++; else backfill_other++;
+      per_store_delta[r.store].backfill++;
+    }
+  }
+
+  const action = latest_existing === 0 ? (latest_new === 0 ? 'noop' : 'append')
+               : (latest_new === 0     ? 'noop' : 'conflict');
+
+  return {
+    source: 'floatation_6stores', target_table: 'floatation',
+    sheet_total_rows:              parsed.rows.length,
+    latest_ym:                     parsed.latest_ym,
+    sheet_rows_for_latest_ym:      latest_new + latest_existing,
+    db_rows_for_latest_ym:         latest_existing,
+    action,
+    preview_rows_to_add:           latest_new + backfill_w11 + backfill_other,
+    backfill_w11_rows:             backfill_w11,
+    backfill_other_rows:           backfill_other,
+    per_store_delta,
+    per_store_load:                parsed.per_store,
+  };
+}
+
+// CP2 Step 2: floatation apply.
+//   1. Insert all "new (date, store)" rows (no overwrite needed — additive).
+//      This includes W11 historical backfill.
+//   2. For latest_ym rows where (date, store) already exists in DB, replace
+//      ONLY if owner confirmed overwrite.
+async function applyFloatation(parsed, overwrite, user) {
+  if (!parsed.rows.length) {
+    return { source: 'floatation_6stores', target_table: 'floatation', ok: false, error: 'no rows' };
+  }
+
+  const dates  = [...new Set(parsed.rows.map(r => r.date))];
+  const stores = [...new Set(parsed.rows.map(r => r.store))];
+  const { data: dbExist } = await sb().from('floatation')
+    .select('date, store').in('date', dates).in('store', stores);
+  const dbKeys = new Set((dbExist || []).map(r => `${r.date}|${r.store}`));
+
+  const startOfMonth = parsed.latest_ym ? parsed.latest_ym + '-01' : '9999-12-31';
+  const startOfNext  = parsed.latest_ym ? (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  })() : '9999-12-31';
+
+  const newInserts = [];                 // not in DB → always insert
+  const overwriteRows = [];              // in DB + latest_ym → maybe replace
+  for (const r of parsed.rows) {
+    const enriched = { ...r, updated_by: user.username };
+    const inDb = dbKeys.has(`${r.date}|${r.store}`);
+    if (!inDb) { newInserts.push(enriched); continue; }
+    if (overwrite && r.date >= startOfMonth && r.date < startOfNext) {
+      overwriteRows.push(enriched);
+    }
+    // else: row exists and not overwriting → skip (preserve existing data,
+    // including the Phase 0 migration rows for the other stores).
+  }
+
+  // Insert pass — additive, no conflict possible since these keys are new.
+  const resInsert = await chunkInsert('floatation', newInserts, { onConflict: 'date,store' });
+  // Overwrite pass — UPSERT replaces existing rows for latest_ym only when
+  // owner explicitly confirmed.
+  let resOver = { ok: 0, err: 0 };
+  if (overwriteRows.length) {
+    resOver = await chunkInsert('floatation', overwriteRows, { onConflict: 'date,store' });
+  }
+
+  return {
+    source: 'floatation_6stores', target_table: 'floatation',
+    latest_ym: parsed.latest_ym,
+    rows_appended:           resInsert.ok,
+    rows_overwritten:        resOver.ok,
+    rows_failed:             resInsert.err + resOver.err,
+    backfill_count:          newInserts.filter(r => r.date < startOfMonth).length,
+    mode: overwrite ? 'overwrite_latest_plus_backfill' : 'append_plus_backfill',
+  };
+}
+
+// CP2 Step 3: po_grn preview + apply.
+async function previewPoGrn(parsed) {
+  if (!parsed.latest_ym) {
+    return { source: 'po_grn_raw_pivot', target_table: 'po_grn',
+             sheet_total_rows: parsed.total_rows || 0, action: 'noop', preview_rows_to_add: 0 };
+  }
+  const startOfMonth = parsed.latest_ym + '-01';
+  const startOfNext  = (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  })();
+  const sheetForLatest = parsed.rows.filter(r => r.po_date >= startOfMonth && r.po_date < startOfNext);
+
+  // FK validation: count rows whose item_code is NOT in items.
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  let dropped_unknown_item = 0;
+  const passingRows = [];
+  for (const r of sheetForLatest) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    passingRows.push(r);
+  }
+
+  const { count: dbCount } = await sb().from('po_grn')
+    .select('*', { count: 'exact', head: true })
+    .gte('po_date', startOfMonth).lt('po_date', startOfNext);
+
+  // Aggregate stats for the report.
+  const sumPoAmt  = passingRows.reduce((s, r) => s + (+r.po_amt  || 0), 0);
+  const sumGrnAmt = passingRows.reduce((s, r) => s + (+r.grn_amt || 0), 0);
+
+  return {
+    source: 'po_grn_raw_pivot', target_table: 'po_grn',
+    sheet_total_rows:           parsed.total_rows,
+    latest_ym:                  parsed.latest_ym,
+    sheet_rows_for_latest_ym:   sheetForLatest.length,
+    rows_after_fk_filter:       passingRows.length,
+    db_rows_for_latest_ym:      dbCount,
+    dropped_no_po_date:         parsed.dropped_no_po_date,
+    dropped_no_item:            parsed.dropped_no_item || 0,
+    dropped_unknown_item,
+    negative_lead_time:         parsed.negative_lead_time,
+    sum_po_amt_latest:          +sumPoAmt.toFixed(2),
+    sum_grn_amt_latest:         +sumGrnAmt.toFixed(2),
+    action: dbCount === 0 ? 'append'
+          : dbCount === passingRows.length ? 'noop'
+          : 'conflict',
+    preview_rows_to_add: dbCount === 0 ? passingRows.length : 0,
+  };
+}
+
+async function applyPoGrn(parsed, overwrite, user) {
+  if (!parsed.latest_ym) {
+    return { source: 'po_grn_raw_pivot', target_table: 'po_grn', ok: false, error: 'no rows' };
+  }
+  const startOfMonth = parsed.latest_ym + '-01';
+  const startOfNext  = (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  })();
+  const monthRows = parsed.rows.filter(r => r.po_date >= startOfMonth && r.po_date < startOfNext);
+
+  // FK filter against items.
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  let dropped_unknown_item = 0;
+  const validRows = [];
+  for (const r of monthRows) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    validRows.push(r);
+  }
+
+  if (overwrite) {
+    await sb().from('po_grn').delete().gte('po_date', startOfMonth).lt('po_date', startOfNext);
+  }
+
+  const inserts = validRows.map(r => ({ ...r, updated_by: user.username, updated_at: new Date().toISOString() }));
+  const res = await chunkInsert('po_grn', inserts, { onConflict: 'po_date,item_code,branch' });
+
+  return {
+    source: 'po_grn_raw_pivot', target_table: 'po_grn',
+    latest_ym:                parsed.latest_ym,
+    rows_appended:            res.ok,
+    rows_failed:              res.err,
+    rows_dropped_unknown_item: dropped_unknown_item,
+    mode: overwrite ? 'overwrite' : 'append',
+  };
+}
+
+// CP3: financial preview. Emits THREE preview rows so the sync UI shows
+// each destination table separately:
+//   - financial_balance_sheet (snap_date PK)
+//   - financial_monthly       (year_month, branch)
+//   - financial_brand_margin  (BACKLOG — Apps Script doesn't expose yet)
+async function previewFinancial(parsed) {
+  if (!parsed || parsed.ok === false) {
+    const errNote = parsed?.error || 'no data';
+    return [
+      { source: 'fmm_liability',      target_table: 'financial_balance_sheet', action: 'noop', preview_rows_to_add: 0, error: errNote },
+      { source: 'fmm_monthly',        target_table: 'financial_monthly',       action: 'noop', preview_rows_to_add: 0, error: errNote },
+      { source: 'fmm_sales_vs_cost',  target_table: 'financial_brand_margin',  action: 'backlog', preview_rows_to_add: 0,
+        note: 'BACKLOG — Apps Script does not expose Sales VS Cost data yet (Phase 3)' },
+    ];
+  }
+
+  const { count: bsCount } = await sb().from('financial_balance_sheet')
+    .select('*', { count: 'exact', head: true }).eq('snap_date', parsed.snap_date);
+  const { count: monthCount } = await sb().from('financial_monthly')
+    .select('*', { count: 'exact', head: true }).eq('year_month', parsed.latest_ym);
+  const { count: brandCount } = await sb().from('financial_brand_margin')
+    .select('*', { count: 'exact', head: true });
+
+  return [
+    {
+      source: 'fmm_liability', target_table: 'financial_balance_sheet',
+      sheet_total_rows:        parsed.balance_sheet ? 1 : 0,
+      snap_date:               parsed.snap_date,
+      sheet_rows_for_snapshot: parsed.balance_sheet ? 1 : 0,
+      db_rows_for_snapshot:    bsCount,
+      action: bsCount === 0 ? 'append' : 'upsert',
+      preview_rows_to_add: parsed.balance_sheet ? 1 : 0,
+      note: 'UPSERT key: snap_date',
+    },
+    {
+      source: 'fmm_monthly', target_table: 'financial_monthly',
+      sheet_total_rows:         parsed.monthly.length,
+      latest_ym:                parsed.latest_ym,
+      sheet_rows_for_latest_ym: parsed.monthly.length,
+      db_rows_for_latest_ym:    monthCount,
+      action: monthCount === 0 ? 'append' : 'upsert',
+      preview_rows_to_add: parsed.monthly.length,
+      note: 'UPSERT key: (year_month, branch). 7 rows = TOTAL + W01..W11.',
+    },
+    {
+      source: 'fmm_sales_vs_cost', target_table: 'financial_brand_margin',
+      sheet_total_rows: 0,
+      db_total_rows:    brandCount,
+      action: 'backlog',
+      preview_rows_to_add: 0,
+      note: 'BACKLOG — Apps Script does not expose Sales VS Cost yet. Schema ready; loader pending Phase 3.',
+    },
+  ];
+}
+
+async function applyFinancial(parsed, overwrite, user) {
+  if (!parsed || parsed.ok === false) {
+    return { source: 'fmm_apps_script', target_table: 'financial_*', ok: false, error: parsed?.error || 'no data' };
+  }
+  const updated_by = user.username;
+  const updated_at = new Date().toISOString();
+
+  // 1. Balance sheet snapshot.
+  let bs_rows_upserted = 0, bs_failed = 0;
+  if (parsed.balance_sheet) {
+    const row = { ...parsed.balance_sheet, updated_by, updated_at };
+    const { error } = await sb().from('financial_balance_sheet')
+      .upsert([row], { onConflict: 'snap_date' });
+    if (error) { bs_failed = 1; console.error('[sync] financial_balance_sheet:', error.message); }
+    else bs_rows_upserted = 1;
+  }
+
+  // 2. Monthly P&L rows.
+  const monthlyInserts = (parsed.monthly || []).map(r => ({ ...r, updated_by, updated_at }));
+  let m_upserted = 0, m_failed = 0;
+  if (monthlyInserts.length) {
+    const res = await chunkInsert('financial_monthly', monthlyInserts, { onConflict: 'year_month,branch' });
+    m_upserted = res.ok; m_failed = res.err;
+  }
+
+  return {
+    source: 'fmm_apps_script', target_table: 'financial_*',
+    latest_ym:                parsed.latest_ym,
+    snap_date:                parsed.snap_date,
+    rows_appended:            bs_rows_upserted + m_upserted,
+    balance_sheet_upserted:   bs_rows_upserted,
+    monthly_upserted:         m_upserted,
+    rows_failed:              bs_failed + m_failed,
+    mode: 'upsert',
+  };
+}
+
+// CP2: customer_buy_lines apply.
+//   1. Filter rows by item_code FK (already filtered no-member at parse).
+//   2. UPSERT customers (member_code → customer_id, name, type, enrol_date)
+//      BEFORE inserting lines so the customer FK is satisfied. We do not
+//      overwrite customers.type from CBv3 (which is per-line numeric flag,
+//      not the lifecycle category). primary_store / phone also preserved.
+//   3. DELETE existing lines for latest_ym if overwrite, then INSERT.
+async function applyCbl(parsed, overwrite, user) {
+  if (!parsed.latest_ym) return { source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines', ok: false, error: 'no rows' };
+
+  const monthRows = parsed.rows.filter(r => r.year_month === parsed.latest_ym);
+  const items = await fetchAllItemCodes();
+  const validItems = new Set(items.map(r => r.item_code));
+  const validRows = [];
+  let dropped_unknown_item = 0;
+  for (const r of monthRows) {
+    if (!validItems.has(r.item_code)) { dropped_unknown_item += 1; continue; }
+    validRows.push(r);
+  }
+
+  // 2. Customer UPSERT: aggregate one row per unique member_code in this
+  //    batch. Pick name/enrol_date from FIRST occurrence (CBv3 is internally
+  //    consistent per member so first-wins is fine).
+  const custMap = new Map();
+  for (const r of validRows) {
+    if (custMap.has(r.member_code)) continue;
+    custMap.set(r.member_code, {
+      customer_id: r.member_code,
+      name:        r.customer_name || 'UNKNOWN',
+      enrol_date:  r.date_enrol || null,
+      updated_at:  new Date().toISOString(),
+      // NOTE: customers.updated_by ALTER was denied by safety policy; audit
+      //       attribution falls back to sync_log.triggered_by + updated_at.
+      //       Owner-owned columns (type, primary_store, phone) preserved.
+    });
+  }
+  const upsertCustomers = [...custMap.values()];
+  const resCust = await chunkInsert('customers', upsertCustomers, { onConflict: 'customer_id' });
+
+  // 3. DELETE-then-INSERT for overwrite; UPSERT-on-PK otherwise to be safe.
+  if (overwrite) {
+    await sb().from('customer_buy_lines').delete().eq('year_month', parsed.latest_ym);
+  }
+  const inserts = validRows.map(r => ({ ...r, updated_by: user.username }));
+  const resCbl = await chunkInsert('customer_buy_lines', inserts,
+    { onConflict: 'year_month,bill_no,item_code' });
+
+  return {
+    source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
+    latest_ym: parsed.latest_ym,
+    rows_appended:               resCbl.ok,
+    rows_failed:                 resCbl.err,
+    rows_dropped_unknown_item:   dropped_unknown_item,
+    customers_upserted:          resCust.ok,
+    customers_failed:            resCust.err,
+    mode: overwrite ? 'overwrite' : 'append',
+  };
 }
 
 async function applySales(parsed, overwrite, manifestId) {
@@ -499,17 +1290,28 @@ export default async function handler(req, res) {
   }
   const mode             = body?.mode || 'preview';
   const confirmOverwrite = body?.confirm_overwrite || {};
-  const onlyTargets      = body?.tables || ['sales','inventory_snapshots','items'];
+  const onlyTargets      = body?.tables || ALL_TARGETS;
 
-  // 1. Read all 3 sources in parallel (network bound).
-  let parsedSales = null, parsedInv = null, parsedSm = null;
+  // 1. Read sources in parallel (network bound). CBv3 feeds BOTH sales
+  //    (CP1) and customer_buy_lines (CP2) — one fetch, two transforms.
+  //    Floatation = 6 stores' Sheet 1 fetched in parallel inside loadFloatation.
+  let parsedSales = null, parsedCbl = null, parsedInv = null, parsedSm = null,
+      parsedFloat = null, parsedPoGrn = null, parsedFin = null;
   try {
-    const [a, b, c] = await Promise.all([
-      onlyTargets.includes('sales')               ? loadCbv3Sales() : Promise.resolve(null),
+    const needCbv3 = onlyTargets.includes('sales') || onlyTargets.includes('customer_buy_lines');
+    const [a, b, c, d, e2, f] = await Promise.all([
+      needCbv3 ? loadCbv3() : Promise.resolve(null),
       onlyTargets.includes('inventory_snapshots') ? loadRawCs()     : Promise.resolve(null),
       onlyTargets.includes('items')               ? loadSm()        : Promise.resolve(null),
+      onlyTargets.includes('floatation')          ? loadFloatation(): Promise.resolve(null),
+      onlyTargets.includes('po_grn')              ? loadPoGrn()     : Promise.resolve(null),
+      onlyTargets.includes('financial')           ? loadFinancial() : Promise.resolve(null),
     ]);
-    parsedSales = a; parsedInv = b; parsedSm = c;
+    if (a) {
+      if (onlyTargets.includes('sales'))               parsedSales = a.sales;
+      if (onlyTargets.includes('customer_buy_lines'))  parsedCbl   = a.cbl;
+    }
+    parsedInv = b; parsedSm = c; parsedFloat = d; parsedPoGrn = e2; parsedFin = f;
   } catch (e) {
     return res.status(502).json({ ok: false, error: 'sheet fetch failed: ' + e.message });
   }
@@ -519,9 +1321,19 @@ export default async function handler(req, res) {
   //    trail captures every preview attempt (per Jym's verification spec).
   if (mode === 'preview') {
     const previews = [];
-    if (parsedSales) previews.push(await previewSales(parsedSales));
-    if (parsedInv)   previews.push(await previewInventory(parsedInv));
-    if (parsedSm)    previews.push(await previewItems(parsedSm));
+    // Helper: previewers may return a single object or an array of rows.
+    const pushPreview = (p) => {
+      if (p == null) return;
+      if (Array.isArray(p)) previews.push(...p);
+      else previews.push(p);
+    };
+    if (parsedSales) pushPreview(await previewSales(parsedSales));
+    if (parsedInv)   pushPreview(await previewInventory(parsedInv));
+    if (parsedSm)    pushPreview(await previewItems(parsedSm));
+    if (parsedCbl)   pushPreview(await previewCbl(parsedCbl));        // → 2 rows (CBL + customers)
+    if (parsedFloat) pushPreview(await previewFloatation(parsedFloat));
+    if (parsedPoGrn) pushPreview(await previewPoGrn(parsedPoGrn));
+    if (parsedFin)   pushPreview(await previewFinancial(parsedFin));   // → 3 rows (BS + monthly + brand backlog)
     let preview_log_id = null;
     try {
       const conflicts = {};
@@ -533,7 +1345,7 @@ export default async function handler(req, res) {
       }
       const { data: logIns } = await sb().from('sync_log').insert({
         triggered_by: user.username, mode: 'preview',
-        sheet_ids: ['CBv3','RawCS','SM'],
+        sheet_ids: ['CBv3','RawCS','SM'],   // CBv3 feeds sales + customer_buy_lines
         target_tables: onlyTargets,
         status: 'success',
         preview_only: true,
@@ -569,7 +1381,7 @@ export default async function handler(req, res) {
   // 3b. Open sync_log row (status=running).
   const { data: logIns, error: logErr } = await sb().from('sync_log').insert({
     triggered_by: user.username, mode: 'apply',
-    sheet_ids: ['CBv3','RawCS','SM'],
+    sheet_ids: ['CBv3','RawCS','SM'],   // CBv3 feeds sales + customer_buy_lines
     target_tables: onlyTargets, status: 'running',
     started_at: startedAtIso,
   }).select('id').single();
@@ -594,6 +1406,49 @@ export default async function handler(req, res) {
   if (parsedSm) {
     targets.push({ table: 'items', plan: await previewItems(parsedSm), overwrite: false });
   }
+  if (parsedCbl) {
+    const cblRows = await previewCbl(parsedCbl);
+    const cblRow = (Array.isArray(cblRows) ? cblRows[0] : cblRows);   // first = customer_buy_lines
+    if (cblRow.action === 'append' || (cblRow.action === 'conflict' && confirmOverwrite.customer_buy_lines))
+      targets.push({ table: 'customer_buy_lines', plan: cblRow, overwrite: !!confirmOverwrite.customer_buy_lines });
+  }
+  if (parsedFloat) {
+    const p = await previewFloatation(parsedFloat);
+    // Float apply always runs if there's ANY work to do (latest_new OR backfill).
+    // The 'noop' action only fires when both are zero.
+    if (p.action === 'append' || p.action === 'conflict' ||
+        p.backfill_w11_rows > 0 || p.backfill_other_rows > 0) {
+      targets.push({
+        table: 'floatation', plan: p,
+        overwrite: !!confirmOverwrite.floatation,
+      });
+    }
+  }
+  if (parsedPoGrn) {
+    const p = await previewPoGrn(parsedPoGrn);
+    if (p.action === 'append' || (p.action === 'conflict' && confirmOverwrite.po_grn))
+      targets.push({ table: 'po_grn', plan: p, overwrite: !!confirmOverwrite.po_grn });
+  }
+  if (parsedFin) {
+    const finRows = await previewFinancial(parsedFin);
+    // financial fans out across 3 preview rows but applies as ONE
+    // virtual 'financial' target (loader fills BS + monthly together).
+    const anyToAdd = (Array.isArray(finRows) ? finRows : [finRows])
+      .some(r => r && r.preview_rows_to_add > 0);
+    if (anyToAdd)
+      targets.push({ table: 'financial', plan: finRows, overwrite: false });
+  }
+
+  // CBL apply UPSERTs customers as a side-effect → must also back up customers.
+  const backupTables = new Set(targets.map(t => t.table));
+  if (backupTables.has('customer_buy_lines')) backupTables.add('customers');
+  // Financial 'target' is a virtual fan-out → 2 real tables. Replace virtual
+  // 'financial' entry with the actual table names for backup purposes.
+  if (backupTables.has('financial')) {
+    backupTables.delete('financial');
+    backupTables.add('financial_balance_sheet');
+    backupTables.add('financial_monthly');
+  }
 
   if (targets.length === 0) {
     await sb().from('sync_log').update({
@@ -604,17 +1459,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, mode: 'apply', skipped: 'noop (everything up to date or pending overwrite confirm)', sync_log_id });
   }
 
-  // 3d. Backup every target table BEFORE writes.
+  // 3d. Backup every target table BEFORE writes (incl. side-effects).
   const suffix = nowSuffix();
   const backups = [];
-  for (const t of targets) {
+  for (const tbl of backupTables) {
     try {
       const { data: bk } = await sb().rpc('backup_table', {
-        p_src_schema: 'public', p_src_table: t.table, p_suffix: suffix,
+        p_src_schema: 'public', p_src_table: tbl, p_suffix: suffix,
       });
       backups.push(bk);
     } catch (e) {
-      console.error('[sync] backup failed for', t.table, e.message);
+      console.error('[sync] backup failed for', tbl, e.message);
       await sb().from('sync_log').update({
         finished_at: new Date().toISOString(),
         status: 'failed', error_msg: 'backup failed: ' + e.message,
@@ -639,9 +1494,13 @@ export default async function handler(req, res) {
   for (const t of targets) {
     try {
       let r;
-      if (t.table === 'sales')               r = await applySales(parsedSales, t.overwrite, manifest.id);
+      if (t.table === 'sales')                    r = await applySales(parsedSales, t.overwrite, manifest.id);
       else if (t.table === 'inventory_snapshots') r = await applyInventory(parsedInv, t.overwrite);
-      else if (t.table === 'items')          r = await applyItems(parsedSm);
+      else if (t.table === 'items')               r = await applyItems(parsedSm);
+      else if (t.table === 'customer_buy_lines')  r = await applyCbl(parsedCbl, t.overwrite, user);
+      else if (t.table === 'floatation')          r = await applyFloatation(parsedFloat, t.overwrite, user);
+      else if (t.table === 'po_grn')              r = await applyPoGrn(parsedPoGrn, t.overwrite, user);
+      else if (t.table === 'financial')           r = await applyFinancial(parsedFin, t.overwrite, user);
       results.push(r);
       appended[t.table] = r.rows_appended ?? r.rows_upserted ?? 0;
       if (r.rows_failed) failed[t.table] = r.rows_failed;

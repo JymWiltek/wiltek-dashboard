@@ -1457,6 +1457,7 @@ footer.app-footer {
 .v2-action-noop     { color:var(--text-tertiary); }
 .v2-action-conflict { color:var(--danger);font-weight:600; }
 .v2-action-upsert   { color:var(--brand);font-weight:600; }
+.v2-action-backlog  { color:var(--text-meta);font-style:italic; }
 .v2-backup-table code { font-family:ui-monospace,monospace;font-size:11px;background:rgba(31,95,74,0.06);padding:1px 5px;border-radius:3px; }
 .v2-conflict-confirm { display:flex;align-items:center;gap:8px;font-size:13px;color:var(--danger); }
 
@@ -8676,6 +8677,78 @@ function v2RenderPreviewTable(previews) {
           `F-FAST=${v2Fmt(sd['F-FAST']||0)} · N-NORMAL=${v2Fmt(sd['N-NORMAL']||0)} · ` +
           `S-SLOW=${v2Fmt(sd['S-SLOW']||0)} · NULL=${v2Fmt(sd.NULL||0)} · OTHER=${v2Fmt(sd.OTHER||0)}` +
         '</span></div>';
+    }
+    // CP2: customer_buy_lines breakdown — drop counts + customer-side UPSERT.
+    if (p.target_table === 'customer_buy_lines' && p.dropped_no_member != null) {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>dropped (no member_code): <b>${v2Fmt(p.dropped_no_member)}</b></span><br>` +
+        `<span>dropped (unknown item FK): <b>${v2Fmt(p.dropped_unknown_item)}</b></span><br>` +
+        `<span>customers in month: <b>${v2Fmt(p.members_in_month)}</b> ` +
+          `(${v2Fmt(p.new_members)} new, ${v2Fmt(p.existing_members)} existing)</span>` +
+        '</div>';
+    }
+    // CP3 split rows: per-table breakdown for financial_balance_sheet / monthly / brand_margin.
+    if (p.target_table === 'financial_balance_sheet') {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>snap_date: <b>${v2EscapeHtml(p.snap_date || '—')}</b></span><br>` +
+        `<span>sheet: <b>${v2Fmt(p.sheet_rows_for_snapshot||0)}</b> / db: <b>${v2Fmt(p.db_rows_for_snapshot||0)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">${v2EscapeHtml(p.note||'')}</span>` +
+        '</div>';
+    }
+    if (p.target_table === 'financial_monthly') {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>latest_ym: <b>${v2EscapeHtml(p.latest_ym || '—')}</b></span><br>` +
+        `<span>sheet: <b>${v2Fmt(p.sheet_rows_for_latest_ym||0)}</b> / db: <b>${v2Fmt(p.db_rows_for_latest_ym||0)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">${v2EscapeHtml(p.note||'')}</span>` +
+        '</div>';
+    }
+    if (p.target_table === 'financial_brand_margin') {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span style="color:var(--text-meta);font-size:12px">${v2EscapeHtml(p.note||'BACKLOG')}</span>` +
+        '</div>';
+    }
+    // CBv3 → customers (UPSERT side-effect surface row).
+    if (p.target_table === 'customers' && p.members_in_month != null) {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>members in month: <b>${v2Fmt(p.members_in_month)}</b> (${v2Fmt(p.new_members||0)} new / ${v2Fmt(p.existing_members||0)} existing)</span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">${v2EscapeHtml(p.note||'')}</span>` +
+        '</div>';
+    }
+    // CP2 Step 3: po_grn breakdown — FK drops + lead-time anomalies + amount totals.
+    if (p.target_table === 'po_grn' && p.dropped_no_po_date != null) {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>rows after FK filter: <b>${v2Fmt(p.rows_after_fk_filter)}</b></span><br>` +
+        `<span>dropped (unknown item FK): <b>${v2Fmt(p.dropped_unknown_item)}</b></span><br>` +
+        `<span>dropped (no PO date): <b>${v2Fmt(p.dropped_no_po_date)}</b></span><br>` +
+        `<span>negative lead-time (warn): <b>${v2Fmt(p.negative_lead_time)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">` +
+          `SUM PO=${v2Fmt(p.sum_po_amt_latest)} · SUM GRN=${v2Fmt(p.sum_grn_amt_latest)}` +
+        '</span></div>';
+    }
+    // CP2 Step 2: floatation breakdown — 6 stores, latest_ym + W11 history backfill.
+    if (p.target_table === 'floatation' && p.backfill_w11_rows != null) {
+      const psd = p.per_store_delta || {};
+      const psdLine = Object.keys(psd).sort().map(st => {
+        const d = psd[st];
+        const parts = [`${st}:`];
+        if (d.latest_new)      parts.push(`+${v2Fmt(d.latest_new)}new`);
+        if (d.latest_existing) parts.push(`${v2Fmt(d.latest_existing)}existing`);
+        if (d.backfill)        parts.push(`${v2Fmt(d.backfill)}backfill`);
+        return parts.join(' ');
+      }).join(' · ');
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>latest_ym new rows: <b>${v2Fmt((p.sheet_rows_for_latest_ym||0) - (p.db_rows_for_latest_ym||0))}</b></span><br>` +
+        `<span>W11 history backfill: <b>${v2Fmt(p.backfill_w11_rows)}</b></span><br>` +
+        `<span>other history backfill: <b>${v2Fmt(p.backfill_other_rows)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">` + v2EscapeHtml(psdLine) + '</span>' +
+        '</div>';
     }
     return '<tr>' +
       '<td>' + v2EscapeHtml(p.source) + '</td>' +
