@@ -1433,6 +1433,33 @@ footer.app-footer {
   .v17-race-grid    { grid-template-columns: 1fr; }
 }
 
+/* V2 Phase 2 Sprint 1 — Sync + Backups views (Owner only) */
+.v2-sync-card { background:var(--bg-card);border:1px solid var(--border-soft);border-radius:8px;padding:18px;margin-bottom:18px; }
+.v2-sync-actions { display:flex;gap:14px;align-items:center;flex-wrap:wrap; }
+.v2-btn-primary, .v2-btn-apply, .v2-btn-recover {
+  background:var(--brand);color:#fff;border:0;padding:9px 18px;border-radius:6px;
+  font-size:14px;font-weight:600;cursor:pointer;
+}
+.v2-btn-primary:hover, .v2-btn-apply:hover, .v2-btn-recover:hover { background:#19503e; }
+.v2-btn-apply { background:#c87b1e; } .v2-btn-apply:hover { background:#a86819; }
+.v2-btn-recover { background:#6e1414; padding:6px 12px;font-size:12px; } .v2-btn-recover:hover { background:#4d0e0e; }
+.v2-btn-primary[disabled], .v2-btn-apply[disabled], .v2-btn-recover[disabled] { opacity:0.5;cursor:not-allowed; }
+.v2-sync-status { font-size:13px;color:var(--text-secondary); }
+.v2-sync-note { font-size:12px;color:var(--text-secondary);margin-left:10px; }
+.v2-sync-table, .v2-backup-table { width:100%;border-collapse:collapse;font-size:13px;margin-top:10px; }
+.v2-sync-table th, .v2-sync-table td, .v2-backup-table th, .v2-backup-table td { padding:8px 10px;border-bottom:1px solid var(--border-soft);text-align:left;vertical-align:top; }
+.v2-sync-table thead th, .v2-backup-table thead th {
+  font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-secondary);
+  font-weight:600;background:rgba(31,95,74,0.04);
+}
+.v2-sync-table .num, .v2-backup-table .num { text-align:right;font-variant-numeric:tabular-nums; }
+.v2-action-append   { color:var(--ok);font-weight:600; }
+.v2-action-noop     { color:var(--text-tertiary); }
+.v2-action-conflict { color:var(--danger);font-weight:600; }
+.v2-action-upsert   { color:var(--brand);font-weight:600; }
+.v2-backup-table code { font-family:ui-monospace,monospace;font-size:11px;background:rgba(31,95,74,0.06);padding:1px 5px;border-radius:3px; }
+.v2-conflict-confirm { display:flex;align-items:center;gap:8px;font-size:13px;color:var(--danger); }
+
 /* V1.7 phase 4 — embedded Dead Stock List inside the Inventory page */
 .v17-embedded-deadstock { margin-top: 26px; }
 .v17-embedded-deadstock .hero { margin-bottom: 12px; }
@@ -1690,6 +1717,13 @@ footer.app-footer {
         <div class="sub-item" data-view="gtd" id="navGtd" onclick="setView('gtd')" style="padding-left:12px">
           <span class="icon">✅</span><span data-i18n="nav-gtd">GTD Tracker</span>
         </div>
+        <!-- V2 Phase 2 — Owner-only: Sheet sync + Backups & Recover. -->
+        <div class="sub-item v2-owner-only" data-view="sync" id="navSync" onclick="setView('sync')" style="padding-left:12px;display:none">
+          <span class="icon">🔄</span><span data-i18n="nav-sync">数据同步</span>
+        </div>
+        <div class="sub-item v2-owner-only" data-view="backups" id="navBackups" onclick="setView('backups')" style="padding-left:12px;display:none">
+          <span class="icon">📁</span><span data-i18n="nav-backups">备份与恢复</span>
+        </div>
       </div>
       <!-- Hidden legacy menu anchors — visually clipped off-screen so they
            don't show up in the UI, but still in the layout box so existing
@@ -1904,6 +1938,35 @@ footer.app-footer {
           <p class="ds-section-sub" data-i18n="gtd-kpi-sub">填实际数字 · Status 自动算颜色(绿=达标 / 黄=接近 / 红=不达标)· Target 仅 Owner 可编辑。</p>
           <div class="gtd-table-wrap"><table class="gtd-table" id="gtdKpiTable"></table></div>
         </section>
+      </div>
+
+      <!-- ── V2 Phase 2 — View: Sheet Sync (Owner only) ─────────── -->
+      <div class="view" id="view-sync">
+        <h1 class="page-title">🔄 数据同步 · Google Sheet → Supabase</h1>
+        <p class="page-sub" data-i18n="sync-sub">同事继续在 Sheet 填数据,Owner 这里一键追加最新月份。历史月份永远不动。</p>
+        <div class="v2-sync-card">
+          <div class="v2-sync-actions">
+            <button id="v2SyncPreviewBtn" type="button" class="v2-btn-primary">🔍 检测增量 / Detect changes</button>
+            <span id="v2SyncStatus" class="v2-sync-status"></span>
+          </div>
+          <div id="v2SyncPreviewBody"></div>
+          <div id="v2SyncApplyWrap" style="display:none;margin-top:14px">
+            <button id="v2SyncApplyBtn" type="button" class="v2-btn-apply">⬆ 同步并备份 / Sync (auto-backup first)</button>
+            <span class="v2-sync-note">点击前会自动备份受影响表,可在「📁 备份与恢复」里恢复。</span>
+          </div>
+          <div id="v2SyncResult" style="margin-top:16px"></div>
+        </div>
+        <section class="ds-section">
+          <h2 class="ds-section-title">最近同步记录 / Recent syncs</h2>
+          <div id="v2SyncLog"></div>
+        </section>
+      </div>
+
+      <!-- ── V2 Phase 2 — View: Backups & Recover (Owner only) ──── -->
+      <div class="view" id="view-backups">
+        <h1 class="page-title">📁 备份与恢复 · Backups</h1>
+        <p class="page-sub">每次同步前自动备份 · 永久保留 · 一键恢复到任何时间点。</p>
+        <div id="v2BackupsBody"></div>
       </div>
 
       <!-- ── View: Dead Stock List ─────────────────────────────── -->
@@ -3300,6 +3363,14 @@ function enterApp() {
     }
   } catch(_){}
 
+  // V2 Phase 2 — reveal Owner-only sidebar tabs (Sync / Backups).
+  try {
+    const isOwner = (s.role === 'owner');
+    document.querySelectorAll('.v2-owner-only').forEach(el => {
+      el.style.display = isOwner ? '' : 'none';
+    });
+  } catch(_){}
+
   // V1 第二刀: kick off live fetches for ALL channels (floatation + sales + customers)
   // in background — Refresh-without-clicking-Refresh for the first page load. The
   // refreshLiveData orchestrator handles loading state + change detection + toast.
@@ -3950,6 +4021,8 @@ const VIEW_ROUTES = {
   'finance':         'finance',
   'hr':              'hr',
   'gtd':             'gtd',
+  'sync':            'sync',
+  'backups':         'backups',
   // Legacy aliases — old top-level keys now resolve to Inventory
   'stock':           'inventory',
   'purchasing':      'inventory',
@@ -4039,6 +4112,8 @@ function setView(v) {
   else if (leaf === 'finance')    renderFinanceDashboard();
   else if (leaf === 'hr')         renderHrDashboard();
   else if (leaf === 'gtd')        renderGtd();
+  else if (leaf === 'sync')       { try { renderV2Sync(); }    catch(e){ console.warn('renderV2Sync', e); } }
+  else if (leaf === 'backups')    { try { renderV2Backups(); } catch(e){ console.warn('renderV2Backups', e); } }
   else if (leaf === 'admin-sanity') renderAdminSanity();
   else if (leaf === 'transfers')  renderTransfers();
   else if (leaf === 'warehouse')  renderWarehouse();
@@ -8486,6 +8561,243 @@ function v17ProductsActionPlan(ctx) {
     '</div>';
 }
 window.v17ProductsActionPlan = v17ProductsActionPlan;
+
+/* ════════════════════════════════════════════════════════════════════
+   V2 Phase 2 Sprint 1 — Owner-only Sync + Backups UI
+   ════════════════════════════════════════════════════════════════════ */
+
+function v2EscapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function v2Fmt(n) { return new Intl.NumberFormat('en-MY').format(+n||0); }
+function v2FmtTs(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' +
+         String(d.getUTCDate()).padStart(2,'0') + ' ' +
+         String(d.getUTCHours()).padStart(2,'0') + ':' +
+         String(d.getUTCMinutes()).padStart(2,'0') + ' UTC';
+}
+
+// State held across preview → apply.
+window.__v2SyncLastPreview = null;
+window.__v2SyncConfirmOverwrite = {};
+
+async function renderV2Sync() {
+  const body = document.getElementById('v2SyncPreviewBody');
+  const resultEl = document.getElementById('v2SyncResult');
+  const applyWrap = document.getElementById('v2SyncApplyWrap');
+  if (body) body.innerHTML = '';
+  if (resultEl) resultEl.innerHTML = '';
+  if (applyWrap) applyWrap.style.display = 'none';
+
+  // Wire buttons (idempotent — only attach once).
+  const previewBtn = document.getElementById('v2SyncPreviewBtn');
+  const applyBtn   = document.getElementById('v2SyncApplyBtn');
+  if (previewBtn && !previewBtn.__wired) {
+    previewBtn.__wired = true;
+    previewBtn.addEventListener('click', v2SyncDoPreview);
+  }
+  if (applyBtn && !applyBtn.__wired) {
+    applyBtn.__wired = true;
+    applyBtn.addEventListener('click', v2SyncDoApply);
+  }
+
+  // Load + render recent sync log.
+  await v2RenderSyncLog();
+}
+
+async function v2SyncDoPreview() {
+  const status = document.getElementById('v2SyncStatus');
+  const body   = document.getElementById('v2SyncPreviewBody');
+  const applyWrap = document.getElementById('v2SyncApplyWrap');
+  status.textContent = '⏳ 检测中 (~10-20 秒, 读 3 个 Sheet)…';
+  body.innerHTML = '';
+  applyWrap.style.display = 'none';
+  window.__v2SyncConfirmOverwrite = {};
+
+  try {
+    const r = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...wpAuthHeaders() },
+      body: JSON.stringify({ mode: 'preview' }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      status.textContent = '❌ ' + (j.error || ('HTTP ' + r.status));
+      return;
+    }
+    const j = await r.json();
+    window.__v2SyncLastPreview = j;
+    status.textContent = '✓ 检测完毕';
+    body.innerHTML = v2RenderPreviewTable(j.previews);
+    applyWrap.style.display = '';
+
+    // Wire conflict checkboxes.
+    body.querySelectorAll('input[data-confirm-overwrite]').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const tbl = e.target.getAttribute('data-confirm-overwrite');
+        window.__v2SyncConfirmOverwrite[tbl] = e.target.checked;
+      });
+    });
+  } catch (e) {
+    status.textContent = '❌ ' + e.message;
+  }
+}
+
+function v2RenderPreviewTable(previews) {
+  if (!previews || !previews.length) return '<p class="v2-sync-status">没有可同步的数据源。</p>';
+  const head = '<thead><tr>' +
+    '<th>Source</th><th>Target</th><th>Latest</th>' +
+    '<th class="num">Sheet rows</th><th class="num">DB rows</th>' +
+    '<th>Action</th><th>Confirm?</th></tr></thead>';
+  const body = previews.map(p => {
+    const latest = p.latest_ym || p.snapshot_date || '—';
+    const sheetN = p.sheet_rows_for_latest_ym ?? p.sheet_rows_for_snapshot ?? p.sheet_total_rows ?? '—';
+    const dbN    = p.db_rows_for_latest_ym ?? p.db_rows_for_snapshot ?? p.db_total_rows ?? '—';
+    const actionCls = 'v2-action-' + (p.action || 'noop');
+    const confirmCell = p.action === 'conflict'
+      ? `<label class="v2-conflict-confirm"><input type="checkbox" data-confirm-overwrite="${v2EscapeHtml(p.target_table)}"> 覆盖该月 / overwrite</label>`
+      : '—';
+    return '<tr>' +
+      '<td>' + v2EscapeHtml(p.source) + '</td>' +
+      '<td><code>' + v2EscapeHtml(p.target_table) + '</code></td>' +
+      '<td>' + v2EscapeHtml(latest) + '</td>' +
+      '<td class="num">' + v2Fmt(sheetN) + '</td>' +
+      '<td class="num">' + v2Fmt(dbN) + '</td>' +
+      '<td class="' + actionCls + '">' + v2EscapeHtml(p.action) +
+        (p.preview_rows_to_add ? ` (+${v2Fmt(p.preview_rows_to_add)})` : '') + '</td>' +
+      '<td>' + confirmCell + '</td>' +
+    '</tr>';
+  }).join('');
+  return '<table class="v2-sync-table">' + head + '<tbody>' + body + '</tbody></table>';
+}
+
+async function v2SyncDoApply() {
+  if (!window.__v2SyncLastPreview) {
+    document.getElementById('v2SyncStatus').textContent = '⚠ 请先点「检测增量」';
+    return;
+  }
+  const applyBtn = document.getElementById('v2SyncApplyBtn');
+  applyBtn.disabled = true;
+  const status = document.getElementById('v2SyncStatus');
+  const resultEl = document.getElementById('v2SyncResult');
+  status.textContent = '⏳ 备份 + 同步中…';
+  resultEl.innerHTML = '';
+
+  try {
+    const r = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...wpAuthHeaders() },
+      body: JSON.stringify({
+        mode: 'apply',
+        confirm_overwrite: window.__v2SyncConfirmOverwrite,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      status.textContent = '❌ ' + (j.error || ('HTTP ' + r.status));
+      resultEl.innerHTML = '<pre style="font-size:11px">' + v2EscapeHtml(JSON.stringify(j, null, 2)) + '</pre>';
+      return;
+    }
+    status.textContent = '✓ 同步完成';
+    resultEl.innerHTML =
+      '<div class="v2-sync-card">' +
+        '<h3 style="margin:0 0 8px">同步结果 · sync_log #' + j.sync_log_id + '</h3>' +
+        '<p style="margin:0 0 8px;font-size:13px">备份记录 ID: <code>' + v2EscapeHtml(j.backup_manifest_id) + '</code> — 可在「📁 备份与恢复」恢复</p>' +
+        '<pre style="font-size:11px;max-height:240px;overflow:auto">' + v2EscapeHtml(JSON.stringify(j.appended || j.results, null, 2)) + '</pre>' +
+      '</div>';
+    await v2RenderSyncLog();
+  } catch (e) {
+    status.textContent = '❌ ' + e.message;
+  } finally {
+    applyBtn.disabled = false;
+  }
+}
+
+async function v2RenderSyncLog() {
+  const el = document.getElementById('v2SyncLog');
+  if (!el) return;
+  el.innerHTML = '<p class="v2-sync-status">⏳ 加载中…</p>';
+  try {
+    const r = await fetch('/api/backups', { headers: wpAuthHeaders() });
+    const j = await r.json();
+    if (!j.ok) { el.innerHTML = '❌ ' + v2EscapeHtml(j.error || ''); return; }
+    const syncs = j.recent_syncs || [];
+    if (!syncs.length) { el.innerHTML = '<p class="v2-sync-status">还没有同步记录</p>'; return; }
+    const head = '<thead><tr><th>ID</th><th>Started</th><th>By</th><th>Mode</th><th>Status</th><th>Tables</th><th>Rows</th></tr></thead>';
+    const rows = syncs.map(s => '<tr>' +
+      '<td>#' + s.id + '</td>' +
+      '<td>' + v2FmtTs(s.started_at) + '</td>' +
+      '<td>' + v2EscapeHtml(s.triggered_by) + '</td>' +
+      '<td>' + v2EscapeHtml(s.mode) + '</td>' +
+      '<td>' + v2EscapeHtml(s.status) + '</td>' +
+      '<td>' + v2EscapeHtml((s.target_tables || []).join(', ')) + '</td>' +
+      '<td>' + v2EscapeHtml(JSON.stringify(s.rows_appended || {})) + '</td>' +
+    '</tr>').join('');
+    el.innerHTML = '<table class="v2-sync-table">' + head + '<tbody>' + rows + '</tbody></table>';
+  } catch (e) {
+    el.innerHTML = '❌ ' + e.message;
+  }
+}
+window.renderV2Sync = renderV2Sync;
+
+/* ── Backups view ─────────────────────────────────────────────────── */
+async function renderV2Backups() {
+  const el = document.getElementById('v2BackupsBody');
+  if (!el) return;
+  el.innerHTML = '<p class="v2-sync-status">⏳ 加载中…</p>';
+  try {
+    const r = await fetch('/api/backups', { headers: wpAuthHeaders() });
+    const j = await r.json();
+    if (!j.ok) { el.innerHTML = '❌ ' + v2EscapeHtml(j.error || ''); return; }
+    const manifests = j.manifests || [];
+    if (!manifests.length) { el.innerHTML = '<p class="v2-sync-status">还没有备份。同步一次后自动出现。</p>'; return; }
+    const head = '<thead><tr><th>Created</th><th>By</th><th>Kind</th><th>Tables</th><th>Notes</th><th>Action</th></tr></thead>';
+    const rows = manifests.map(m => {
+      const tabs = (m.tables_backed_up || []).map(t =>
+        `<code>${v2EscapeHtml(t.table)}</code> (${v2Fmt(t.rows)})`
+      ).join('<br>');
+      return '<tr>' +
+        '<td>' + v2FmtTs(m.created_at) + '</td>' +
+        '<td>' + v2EscapeHtml(m.triggered_by) + '</td>' +
+        '<td>' + v2EscapeHtml(m.kind) + '</td>' +
+        '<td>' + tabs + '</td>' +
+        '<td style="font-size:11px;color:var(--text-secondary)">' + v2EscapeHtml(m.notes || '') + '</td>' +
+        '<td><button class="v2-btn-recover" type="button" data-recover-id="' + v2EscapeHtml(m.id) + '">↩ Recover</button></td>' +
+      '</tr>';
+    }).join('');
+    el.innerHTML = '<table class="v2-backup-table">' + head + '<tbody>' + rows + '</tbody></table>';
+    el.querySelectorAll('button[data-recover-id]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.target.getAttribute('data-recover-id');
+        if (!confirm('⚠️ 真的要从这个备份恢复吗?\n\n会先备份当前状态再覆盖。\n\nBackup ID: ' + id)) return;
+        if (!confirm('再次确认: 恢复后所有当前数据被覆盖。继续?')) return;
+        e.target.disabled = true;
+        e.target.textContent = '⏳ Recovering…';
+        try {
+          const r = await fetch('/api/backups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...wpAuthHeaders() },
+            body: JSON.stringify({ backup_id: id }),
+          });
+          const j = await r.json();
+          if (j.ok) {
+            alert('✓ Recovery 完成。Pre-recover backup: ' + j.pre_recover_manifest_id);
+          } else {
+            alert('❌ Recovery 失败: ' + (j.error || ''));
+          }
+        } catch (err) { alert('❌ ' + err.message); }
+        renderV2Backups();
+      });
+    });
+  } catch (e) {
+    el.innerHTML = '❌ ' + e.message;
+  }
+}
+window.renderV2Backups = renderV2Backups;
 
 /* Aligned KPI card with 3-line compare (used by V1.7 Customers + Sales). */
 function v17ManagerCard(label, val, sub, cmp, fmtVal) {
