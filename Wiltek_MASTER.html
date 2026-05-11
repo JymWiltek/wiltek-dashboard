@@ -8687,6 +8687,25 @@ function v2RenderPreviewTable(previews) {
           `(${v2Fmt(p.new_members)} new, ${v2Fmt(p.existing_members)} existing)</span>` +
         '</div>';
     }
+    // CP2 Step 2: floatation breakdown — 6 stores, latest_ym + W11 history backfill.
+    if (p.target_table === 'floatation' && p.backfill_w11_rows != null) {
+      const psd = p.per_store_delta || {};
+      const psdLine = Object.keys(psd).sort().map(st => {
+        const d = psd[st];
+        const parts = [`${st}:`];
+        if (d.latest_new)      parts.push(`+${v2Fmt(d.latest_new)}new`);
+        if (d.latest_existing) parts.push(`${v2Fmt(d.latest_existing)}existing`);
+        if (d.backfill)        parts.push(`${v2Fmt(d.backfill)}backfill`);
+        return parts.join(' ');
+      }).join(' · ');
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>latest_ym new rows: <b>${v2Fmt((p.sheet_rows_for_latest_ym||0) - (p.db_rows_for_latest_ym||0))}</b></span><br>` +
+        `<span>W11 history backfill: <b>${v2Fmt(p.backfill_w11_rows)}</b></span><br>` +
+        `<span>other history backfill: <b>${v2Fmt(p.backfill_other_rows)}</b></span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">` + v2EscapeHtml(psdLine) + '</span>' +
+        '</div>';
+    }
     return '<tr>' +
       '<td>' + v2EscapeHtml(p.source) + '</td>' +
       '<td><code>' + v2EscapeHtml(p.target_table) + '</code></td>' +
