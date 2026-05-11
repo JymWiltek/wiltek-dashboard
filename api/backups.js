@@ -98,7 +98,7 @@ async function handleRecover(req, res, user) {
       const { data: bk } = await sb().rpc('backup_table', {
         p_src_schema: schema || 'public', p_src_table: targetTable, p_suffix: 'prerecover_' + suffix,
       });
-      preBackups.push(bk);
+      preBackups.push(bk || { table: targetTable, rows: 0, backup: null });
     } catch (e) {
       await sb().from('sync_log').update({
         finished_at: new Date().toISOString(),
