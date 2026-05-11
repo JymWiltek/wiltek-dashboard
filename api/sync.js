@@ -1467,7 +1467,9 @@ export default async function handler(req, res) {
       const { data: bk } = await sb().rpc('backup_table', {
         p_src_schema: 'public', p_src_table: tbl, p_suffix: suffix,
       });
-      backups.push(bk);
+      // backup_table can return null for empty tables — coerce to a stub
+      // record so manifest.tables_backed_up is never poisoned with nulls.
+      backups.push(bk || { table: tbl, rows: 0, backup: null });
     } catch (e) {
       console.error('[sync] backup failed for', tbl, e.message);
       await sb().from('sync_log').update({

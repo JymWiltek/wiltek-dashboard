@@ -8845,16 +8845,19 @@ async function renderV2Backups() {
     if (!manifests.length) { el.innerHTML = '<p class="v2-sync-status">还没有备份。同步一次后自动出现。</p>'; return; }
     const head = '<thead><tr><th>Created</th><th>By</th><th>Kind</th><th>Tables</th><th>Notes</th><th>Action</th></tr></thead>';
     const rows = manifests.map(m => {
-      const tabs = (m.tables_backed_up || []).map(t =>
-        `<code>${v2EscapeHtml(t.table)}</code> (${v2Fmt(t.rows)})`
-      ).join('<br>');
+      // Defensive: backup_table RPC can return null for empty tables → filter +
+      // fall back so a single bad entry never breaks the whole backups page.
+      const tabs = (m.tables_backed_up || [])
+        .filter(t => t && (t.table || t.rows != null))
+        .map(t => `<code>${v2EscapeHtml(t.table || '?')}</code> (${v2Fmt(t.rows ?? 0)})`)
+        .join('<br>') || '<span style="color:var(--text-meta)">—</span>';
       return '<tr>' +
         '<td>' + v2FmtTs(m.created_at) + '</td>' +
-        '<td>' + v2EscapeHtml(m.triggered_by) + '</td>' +
-        '<td>' + v2EscapeHtml(m.kind) + '</td>' +
+        '<td>' + v2EscapeHtml(m.triggered_by || '—') + '</td>' +
+        '<td>' + v2EscapeHtml(m.kind || '—') + '</td>' +
         '<td>' + tabs + '</td>' +
         '<td style="font-size:11px;color:var(--text-secondary)">' + v2EscapeHtml(m.notes || '') + '</td>' +
-        '<td><button class="v2-btn-recover" type="button" data-recover-id="' + v2EscapeHtml(m.id) + '">↩ Recover</button></td>' +
+        '<td><button class="v2-btn-recover" type="button" data-recover-id="' + v2EscapeHtml(m.id || '') + '">↩ Recover</button></td>' +
       '</tr>';
     }).join('');
     el.innerHTML = '<table class="v2-backup-table">' + head + '<tbody>' + rows + '</tbody></table>';
