@@ -8687,6 +8687,16 @@ function v2RenderPreviewTable(previews) {
           `(${v2Fmt(p.new_members)} new, ${v2Fmt(p.existing_members)} existing)</span>` +
         '</div>';
     }
+    // CP3: financial breakdown — balance sheet + monthly P&L (7 branch rows).
+    if (p.target_table === 'financial_*' && p.sheet_balance_sheet_rows != null) {
+      actionCell +=
+        '<div class="v2-items-breakdown">' +
+        `<span>snap_date: <b>${v2EscapeHtml(p.snap_date || '—')}</b></span><br>` +
+        `<span>balance_sheet: <b>${v2Fmt(p.sheet_balance_sheet_rows)}</b> sheet / <b>${v2Fmt(p.db_balance_sheet_for_date)}</b> db</span><br>` +
+        `<span>monthly rows: <b>${v2Fmt(p.sheet_monthly_rows)}</b> sheet (TOTAL+W01..W11) / <b>${v2Fmt(p.db_monthly_for_ym)}</b> db</span><br>` +
+        `<span style="color:var(--text-secondary);font-size:11px">${v2EscapeHtml(p.note||'')}</span>` +
+        '</div>';
+    }
     // CP2 Step 3: po_grn breakdown — FK drops + lead-time anomalies + amount totals.
     if (p.target_table === 'po_grn' && p.dropped_no_po_date != null) {
       actionCell +=

@@ -69,7 +69,11 @@ const FLOATATION_YEAR = 2026;   // current year — sheets are one per year
 
 // CP2: customer_buy_lines / customers UPSERT side-effect when CBL applies.
 // floatation source feeds the floatation table (6 stores, monthly aggregate).
-const ALL_TARGETS = ['sales','inventory_snapshots','items','customer_buy_lines','floatation','po_grn'];
+const ALL_TARGETS = ['sales','inventory_snapshots','items','customer_buy_lines','floatation','po_grn','financial'];
+
+// CP3: Apps Script endpoint (already-parsed FMM data via WTK_APPS_SCRIPT_URL).
+const APPS_SCRIPT_URL = process.env.WTK_APPS_SCRIPT_URL;
+const APPS_SCRIPT_KEY = process.env.WTK_API_KEY;
 
 // ── Session lookup ────────────────────────────────────────────────────
 async function loadSessionUser(username) {
@@ -528,6 +532,93 @@ async function loadPoGrn() {
   };
 }
 
+// CP3: financial loader. Reads Apps Script ?type=financial (already parses
+// FMM Liability + monthly P&L + cashflow). Outputs two row-sets:
+//   - balance_sheet: 1 snapshot row (today)
+//   - monthly:       1 row per (year_month, branch) — TOTAL + W01..W11
+async function loadFinancial() {
+  if (!APPS_SCRIPT_URL || !APPS_SCRIPT_KEY) {
+    return { balance_sheet: null, monthly: [], ok: false, error: 'WTK_APPS_SCRIPT_URL/WTK_API_KEY env not set' };
+  }
+  const url = `${APPS_SCRIPT_URL}?type=financial&key=${encodeURIComponent(APPS_SCRIPT_KEY)}`;
+  const r = await fetch(url, { redirect: 'follow' });
+  if (!r.ok) throw new Error(`Apps Script HTTP ${r.status}`);
+  const txt = await r.text();
+  if (txt.startsWith('<')) throw new Error('Apps Script returned HTML (login wall?)');
+  const j = JSON.parse(txt);
+  if (!j.ok) throw new Error('Apps Script error: ' + (j.error || ''));
+  const D = j.data || {};
+
+  // Latest snapshot date — today's date (Apps Script reads "now" each call).
+  const today = new Date();
+  const snap_date = today.toISOString().slice(0, 10);
+
+  // year_month — derived from period label (e.g. "APRIL'2026") or fallback to current month.
+  // The Apps Script doesn't expose the parsed period cleanly. Use the FMM tab's last
+  // populated month from cashflow.months[0].
+  const cashMonths = D.cashflow?.months || [];
+  let latest_ym = null;
+  if (cashMonths.length) {
+    const s = String(cashMonths[0]); // e.g. "202503" or "202504"
+    if (/^\d{6}$/.test(s)) latest_ym = `${s.slice(0,4)}-${s.slice(4,6)}`;
+  }
+  if (!latest_ym) {
+    const m = today.getUTCMonth();
+    const y = m === 0 ? today.getUTCFullYear() - 1 : today.getUTCFullYear();
+    latest_ym = `${y}-${String(m === 0 ? 12 : m).padStart(2,'0')}`;
+  }
+
+  // Balance sheet from liability section.
+  const liab = D.liability || {};
+  const a = liab.assets || {}, l = liab.liabilities || {};
+  const balance_sheet = {
+    snap_date,
+    building:        a.building     ?? null,
+    stock_value:     a.stock        ?? null,
+    cash_total:      a.cash_total   ?? null,
+    asset_subtotal:  a.subtotal     ?? null,
+    term_loan:       l.term_loan    ?? null,
+    overdraft:       l.overdraft    ?? null,
+    hire_purchase:   l.hire_purchase?? null,
+    oaf:             l.oaf          ?? null,
+    loan_subtotal:   l.total        ?? null,
+    net_equity:      liab.net_equity?? null,
+    ratio:           liab.ratio     ?? null,
+    raw:             liab.raw       || null,
+  };
+
+  // Monthly P&L: one row per (latest_ym, branch). branches = TOTAL + W01..W11
+  // (preserve W11 per Jym hard rule).
+  function mapMetrics(node) {
+    if (!node) return null;
+    const get = (k, b) => node[k]?.[b] ?? null;
+    return {
+      gross_sales_inv:   get('gross_sales',  'inv'),
+      net_sales_inv:     get('net_sales',    'inv'),
+      gross_profit_inv:  get('gross_profit', 'inv'),
+      net_profit_inv:    get('net_profit',   'inv'),
+      total_exp_inv:     get('total_exp',    'inv'),
+      cogs_inv:          get('cogs',         'inv'),
+      gross_sales_coll:  get('gross_sales',  'coll'),
+      net_sales_coll:    get('net_sales',    'coll'),
+      gross_profit_coll: get('gross_profit', 'coll'),
+      net_profit_coll:   get('net_profit',   'coll'),
+      metrics:           node,                 // full jsonb for audit / drilldown
+    };
+  }
+
+  const monthly = [];
+  const totalRow = mapMetrics(D.current_period?.total);
+  if (totalRow) monthly.push({ year_month: latest_ym, branch: 'TOTAL', ...totalRow });
+  const branchObjs = D.current_period?.branches || {};
+  for (const br of ['W01','W02','W03','W05','W07','W11']) {
+    const m = mapMetrics(branchObjs[br]);
+    if (m) monthly.push({ year_month: latest_ym, branch: br, ...m });
+  }
+
+  return { balance_sheet, monthly, latest_ym, snap_date, total_rows: monthly.length };
+}
+
 // ── Preview helpers (incremental detection) ───────────────────────────
 async function previewSales(parsed) {
   if (!parsed.latest_ym) return { ok: false, error: 'no rows from sheet' };
@@ -926,6 +1017,70 @@ async function applyPoGrn(parsed, overwrite, user) {
   };
 }
 
+// CP3: financial preview + apply. Two-table fan-out (balance_sheet + monthly).
+async function previewFinancial(parsed) {
+  if (!parsed || parsed.ok === false) {
+    return { source: 'fmm_apps_script', target_table: 'financial_*', sheet_total_rows: 0,
+             action: 'noop', preview_rows_to_add: 0, error: parsed?.error || 'no data' };
+  }
+  // Balance sheet: snap_date PK; UPSERT, no conflict concept (always overwrite the same day).
+  // Monthly: PK (year_month, branch); UPSERT.
+  const { count: bsCount } = await sb().from('financial_balance_sheet')
+    .select('*', { count: 'exact', head: true }).eq('snap_date', parsed.snap_date);
+  const { count: monthCount } = await sb().from('financial_monthly')
+    .select('*', { count: 'exact', head: true }).eq('year_month', parsed.latest_ym);
+  return {
+    source: 'fmm_apps_script', target_table: 'financial_*',
+    sheet_total_rows:           parsed.monthly.length + (parsed.balance_sheet ? 1 : 0),
+    latest_ym:                  parsed.latest_ym,
+    snap_date:                  parsed.snap_date,
+    sheet_balance_sheet_rows:   parsed.balance_sheet ? 1 : 0,
+    sheet_monthly_rows:         parsed.monthly.length,
+    db_balance_sheet_for_date:  bsCount,
+    db_monthly_for_ym:          monthCount,
+    action: 'upsert',
+    preview_rows_to_add:        parsed.monthly.length + (parsed.balance_sheet ? 1 : 0),
+    note: 'UPSERT keys: balance_sheet=snap_date, monthly=(year_month,branch). Brand margin BACKLOG (Apps Script does not expose Sales VS Cost yet).',
+  };
+}
+
+async function applyFinancial(parsed, overwrite, user) {
+  if (!parsed || parsed.ok === false) {
+    return { source: 'fmm_apps_script', target_table: 'financial_*', ok: false, error: parsed?.error || 'no data' };
+  }
+  const updated_by = user.username;
+  const updated_at = new Date().toISOString();
+
+  // 1. Balance sheet snapshot.
+  let bs_rows_upserted = 0, bs_failed = 0;
+  if (parsed.balance_sheet) {
+    const row = { ...parsed.balance_sheet, updated_by, updated_at };
+    const { error } = await sb().from('financial_balance_sheet')
+      .upsert([row], { onConflict: 'snap_date' });
+    if (error) { bs_failed = 1; console.error('[sync] financial_balance_sheet:', error.message); }
+    else bs_rows_upserted = 1;
+  }
+
+  // 2. Monthly P&L rows.
+  const monthlyInserts = (parsed.monthly || []).map(r => ({ ...r, updated_by, updated_at }));
+  let m_upserted = 0, m_failed = 0;
+  if (monthlyInserts.length) {
+    const res = await chunkInsert('financial_monthly', monthlyInserts, { onConflict: 'year_month,branch' });
+    m_upserted = res.ok; m_failed = res.err;
+  }
+
+  return {
+    source: 'fmm_apps_script', target_table: 'financial_*',
+    latest_ym:                parsed.latest_ym,
+    snap_date:                parsed.snap_date,
+    rows_appended:            bs_rows_upserted + m_upserted,
+    balance_sheet_upserted:   bs_rows_upserted,
+    monthly_upserted:         m_upserted,
+    rows_failed:              bs_failed + m_failed,
+    mode: 'upsert',
+  };
+}
+
 // CP2: customer_buy_lines apply.
 //   1. Filter rows by item_code FK (already filtered no-member at parse).
 //   2. UPSERT customers (member_code → customer_id, name, type, enrol_date)
@@ -1100,21 +1255,22 @@ export default async function handler(req, res) {
   //    (CP1) and customer_buy_lines (CP2) — one fetch, two transforms.
   //    Floatation = 6 stores' Sheet 1 fetched in parallel inside loadFloatation.
   let parsedSales = null, parsedCbl = null, parsedInv = null, parsedSm = null,
-      parsedFloat = null, parsedPoGrn = null;
+      parsedFloat = null, parsedPoGrn = null, parsedFin = null;
   try {
     const needCbv3 = onlyTargets.includes('sales') || onlyTargets.includes('customer_buy_lines');
-    const [a, b, c, d, e2] = await Promise.all([
+    const [a, b, c, d, e2, f] = await Promise.all([
       needCbv3 ? loadCbv3() : Promise.resolve(null),
       onlyTargets.includes('inventory_snapshots') ? loadRawCs()     : Promise.resolve(null),
       onlyTargets.includes('items')               ? loadSm()        : Promise.resolve(null),
       onlyTargets.includes('floatation')          ? loadFloatation(): Promise.resolve(null),
       onlyTargets.includes('po_grn')              ? loadPoGrn()     : Promise.resolve(null),
+      onlyTargets.includes('financial')           ? loadFinancial() : Promise.resolve(null),
     ]);
     if (a) {
       if (onlyTargets.includes('sales'))               parsedSales = a.sales;
       if (onlyTargets.includes('customer_buy_lines'))  parsedCbl   = a.cbl;
     }
-    parsedInv = b; parsedSm = c; parsedFloat = d; parsedPoGrn = e2;
+    parsedInv = b; parsedSm = c; parsedFloat = d; parsedPoGrn = e2; parsedFin = f;
   } catch (e) {
     return res.status(502).json({ ok: false, error: 'sheet fetch failed: ' + e.message });
   }
@@ -1130,6 +1286,7 @@ export default async function handler(req, res) {
     if (parsedCbl)   previews.push(await previewCbl(parsedCbl));
     if (parsedFloat) previews.push(await previewFloatation(parsedFloat));
     if (parsedPoGrn) previews.push(await previewPoGrn(parsedPoGrn));
+    if (parsedFin)   previews.push(await previewFinancial(parsedFin));
     let preview_log_id = null;
     try {
       const conflicts = {};
@@ -1224,10 +1381,23 @@ export default async function handler(req, res) {
     if (p.action === 'append' || (p.action === 'conflict' && confirmOverwrite.po_grn))
       targets.push({ table: 'po_grn', plan: p, overwrite: !!confirmOverwrite.po_grn });
   }
+  if (parsedFin) {
+    const p = await previewFinancial(parsedFin);
+    // Financial is pure UPSERT (always apply when called).
+    if (p.preview_rows_to_add > 0)
+      targets.push({ table: 'financial', plan: p, overwrite: false });
+  }
 
   // CBL apply UPSERTs customers as a side-effect → must also back up customers.
   const backupTables = new Set(targets.map(t => t.table));
   if (backupTables.has('customer_buy_lines')) backupTables.add('customers');
+  // Financial 'target' is a virtual fan-out → 2 real tables. Replace virtual
+  // 'financial' entry with the actual table names for backup purposes.
+  if (backupTables.has('financial')) {
+    backupTables.delete('financial');
+    backupTables.add('financial_balance_sheet');
+    backupTables.add('financial_monthly');
+  }
 
   if (targets.length === 0) {
     await sb().from('sync_log').update({
@@ -1279,6 +1449,7 @@ export default async function handler(req, res) {
       else if (t.table === 'customer_buy_lines')  r = await applyCbl(parsedCbl, t.overwrite, user);
       else if (t.table === 'floatation')          r = await applyFloatation(parsedFloat, t.overwrite, user);
       else if (t.table === 'po_grn')              r = await applyPoGrn(parsedPoGrn, t.overwrite, user);
+      else if (t.table === 'financial')           r = await applyFinancial(parsedFin, t.overwrite, user);
       results.push(r);
       appended[t.table] = r.rows_appended ?? r.rows_upserted ?? 0;
       if (r.rows_failed) failed[t.table] = r.rows_failed;
