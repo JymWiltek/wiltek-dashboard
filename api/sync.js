@@ -208,21 +208,24 @@ async function loadSm() {
   // SM columns per Notion: Open Date / Item Status / Main Group / Sub Group /
   //   Application / Capacity / Finishing / Shape / Brand / PRc range /
   //   Movement / Country / Manufacturer
+  // SM uses underscored headers (ITEM_CODE, ITEM_STATUS_DESC, …) — and
+  // one sheet typo (MOVEMONT, not MOVEMENT). Always try underscore form
+  // first; keep space-form fallbacks in case the sheet is ever re-headered.
   const I = {
-    CODE:     idx['ITEM CODE'] ?? idx['STOCK CODE'] ?? 0,
-    OPEN:     idx['OPEN DATE'] ?? null,
-    STATUS:   idx['ITEM STATUS'] ?? null,
-    MAIN:     idx['MAIN GROUP'] ?? null,
-    SUB:      idx['SUB GROUP']  ?? null,
-    APP:      idx['APPLICATION'] ?? null,
-    CAP:      idx['CAPACITY'] ?? null,
-    FIN:      idx['CLR FINISHING'] ?? idx['FINISHING'] ?? null,
-    SHAPE:    idx['SHAPE DESIGN'] ?? idx['SHAPE'] ?? null,
-    BRAND:    idx['BRAND'] ?? null,
-    PRC:      idx['PRC RANGE'] ?? idx['PRICE RANGE'] ?? null,
-    MOV:      idx['MOVEMENT'] ?? null,
-    COUNTRY:  idx['COUNTRY'] ?? null,
-    MFR:      idx['MANUFACTURER'] ?? null,
+    CODE:     idx['ITEM_CODE']         ?? idx['ITEM CODE']      ?? idx['STOCK CODE']  ?? 0,
+    OPEN:     idx['OPEN_DATE']         ?? idx['OPEN DATE']      ?? null,
+    STATUS:   idx['ITEM_STATUS_DESC']  ?? idx['ITEM_STATUS']    ?? idx['ITEM STATUS'] ?? null,
+    MAIN:     idx['MAIN_GROUP']        ?? idx['MAIN GROUP']     ?? null,
+    SUB:      idx['SUB_GROUP']         ?? idx['SUB GROUP']      ?? null,
+    APP:      idx['APPLICATION']       ?? null,
+    CAP:      idx['CAPACITY']          ?? null,
+    FIN:      idx['CLR_FINISHING']     ?? idx['CLR FINISHING']  ?? idx['FINISHING']   ?? null,
+    SHAPE:    idx['SHAPE_DESIGN']      ?? idx['SHAPE DESIGN']   ?? idx['SHAPE']       ?? null,
+    BRAND:    idx['BRAND']             ?? null,
+    PRC:      idx['PRC_RANGE']         ?? idx['PRC RANGE']      ?? idx['PRICE RANGE'] ?? null,
+    MOV:      idx['MOVEMONT']          ?? idx['MOVEMENT']       ?? null,                       // SM has typo "MOVEMONT"
+    COUNTRY:  idx['COUNTRY']           ?? null,
+    MFR:      idx['MANUFACTURER']      ?? null,
   };
   function parseOpenDate(s) {
     if (!s) return null;
@@ -323,8 +326,8 @@ function itemStatusFilter(status) {
 
 async function previewItems(parsed) {
   // Partition SM rows: existing (always UPSERT) vs new (filter by status).
-  const { data: existing } = await sb().from('items').select('item_code').limit(50000);
-  const existingCodes = new Set((existing || []).map(r => r.item_code));
+  const existing = await fetchAllItemCodes();
+  const existingCodes = new Set(existing.map(r => r.item_code));
   let existing_updated = 0, new_insert_proposed = 0, new_filtered_out = 0;
   const new_status_dist = { 'F-FAST': 0, 'N-NORMAL': 0, 'S-SLOW': 0, NULL: 0, OTHER: 0 };
   for (const r of parsed.rows) {
@@ -355,6 +358,25 @@ async function previewItems(parsed) {
 }
 
 // ── Apply helpers ─────────────────────────────────────────────────────
+
+// Supabase select() caps at 1000 rows by default regardless of .limit().
+// Use range() pagination to fetch everything. Used for items lookup
+// (Phase 0 has 2,399 rows; will grow past 1000 again after CP1 apply).
+async function fetchAllItemCodes() {
+  const out = [];
+  const step = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await sb().from('items').select('item_code')
+      .range(from, from + step - 1);
+    if (error) throw new Error('items lookup: ' + error.message);
+    out.push(...(data || []));
+    if (!data || data.length < step) break;
+    from += step;
+  }
+  return out;
+}
+
 async function chunkInsert(table, rows, opts = {}) {
   const size = opts.chunkSize || 1000;
   let ok = 0, err = 0;
@@ -392,8 +414,8 @@ async function applyInventory(parsed, overwrite) {
     await sb().from('inventory_snapshots').delete().eq('snapshot_date', parsed.snapshot_date);
   }
   // Filter to active branches + ensure item_code exists in items (FK).
-  const { data: items } = await sb().from('items').select('item_code').limit(50000);
-  const validCodes = new Set((items || []).map(r => r.item_code));
+  const items = await fetchAllItemCodes();
+  const validCodes = new Set(items.map(r => r.item_code));
   const rows = parsed.rows.filter(r => ACTIVE_BRANCHES.has(r.store) && validCodes.has(r.item_code));
   const dropped_no_item = parsed.rows.length - rows.length;
   const res = await chunkInsert('inventory_snapshots', rows, { onConflict: 'snapshot_date,store,item_code' });
@@ -410,8 +432,8 @@ async function applyItems(parsed) {
   //      from payload so they're preserved.
   //   2. new rows → filter by item_status, INSERT survivors (UPSERT
   //      semantically same since they don't exist yet).
-  const { data: existing } = await sb().from('items').select('item_code').limit(50000);
-  const existingCodes = new Set((existing || []).map(r => r.item_code));
+  const existing = await fetchAllItemCodes();
+  const existingCodes = new Set(existing.map(r => r.item_code));
 
   const MASTER_COLS = ['open_date','item_status','main_group','sub_group','application',
                        'capacity','clr_finishing','shape_design','brand','prc_range',
