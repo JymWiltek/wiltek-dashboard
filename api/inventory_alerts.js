@@ -1,4 +1,4 @@
-// Sprint 4 Track 1 — /api/inventory_alerts
+// Sprint 4 Track 1 (v2) — /api/inventory_alerts
 // 4 alert cards: PO calendar, transfer engine, liquidation, PO anomalies
 
 import { createClient } from '@supabase/supabase-js';
