@@ -266,16 +266,31 @@ async function loadRawCs() {
   if (!grid.length) return { rows: [], snapshot_date: null };
   const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
   const idx = {}; for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
-  // Raw CS columns per Notion: Stock Code / Branch / Qty / Unit Cost / On Hand (Qty × Cost)
+
+  // Sprint 4 fix: Raw CS Sheet now has an unlabelled STATUS column between
+  // BRANCH and QTY (header keeps old 5 names but data has 6 cols). Without
+  // this shift detection, qty was loading "N"/"D"/"F" status letters and
+  // parseNum returned 0 → 2026-04-30 snap had all qty=0.
+  //
+  // Detection: try parseNum on the first data row's "QTY"-positioned cell.
+  // If non-numeric → status column is there → shift QTY/UC/AMT one to the right.
+  const probeRow  = grid[1] || [];
+  const baseQty   = idx['QTY']       ?? 2;
+  const baseUc    = idx['UNIT COST'] ?? 3;
+  const baseAmt   = idx['ON HAND']   ?? idx['AMOUNT'] ?? 4;
+  const probeVal  = probeRow[baseQty];
+  const probeNumeric = probeVal != null && probeVal !== '' &&
+                       !isNaN(parseFloat(String(probeVal).trim()));
+  const shift     = probeNumeric ? 0 : 1;
   const I = {
     CODE: idx['STOCK CODE'] ?? idx['ITEM CODE'] ?? 0,
     BR:   idx['BRANCH']     ?? idx['BRANCHES'] ?? 1,
-    QTY:  idx['QTY']        ?? 2,
-    UC:   idx['UNIT COST']  ?? 3,
-    AMT:  idx['ON HAND']    ?? idx['AMOUNT']  ?? 4,
+    QTY:  baseQty + shift,
+    UC:   baseUc  + shift,
+    AMT:  baseAmt + shift,
+    shift_detected: shift,
   };
-  // Snapshot date: per Notion, the Raw CS tab is the previous month's
-  // closing stock. Inferred as last day of (current month - 1) at sync time.
+
   const today = new Date();
   const prev = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
   const snapshot_date = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth()+1).padStart(2,'0')}-${String(prev.getUTCDate()).padStart(2,'0')}`;
@@ -293,7 +308,7 @@ async function loadRawCs() {
       amount:    parseNum(r[I.AMT]),
     });
   }
-  return { rows, snapshot_date, total_rows: rows.length };
+  return { rows, snapshot_date, total_rows: rows.length, column_shift_detected: shift };
 }
 
 // ── Floatation: Sheet 1 (yearly summary, one row per month) ──────────
@@ -957,6 +972,10 @@ async function applyFloatation(parsed, overwrite, user) {
     resOver = await chunkInsert('floatation', overwriteRows, { onConflict: 'date,store' });
   }
 
+  const source_row_count = newInserts.length + overwriteRows.length;
+  const source_amt_sum   = parsed.rows.reduce((s, r) => s + (+r.amount_total || 0), 0);
+  const { count: db_actual } = await sb().from('floatation').select('*', { count: 'exact', head: true });
+  const assertion_failed = source_row_count > 0 && ((resInsert.ok + resOver.ok) / source_row_count) < 0.99;
   return {
     source: 'floatation_6stores', target_table: 'floatation',
     latest_ym: parsed.latest_ym,
@@ -964,6 +983,8 @@ async function applyFloatation(parsed, overwrite, user) {
     rows_overwritten:        resOver.ok,
     rows_failed:             resInsert.err + resOver.err,
     first_error:             resInsert.first_error || resOver.first_error || null,
+    source_row_count, source_amt_sum: +source_amt_sum.toFixed(2),
+    db_row_count_after: db_actual, assertion_failed,
     backfill_count:          newInserts.filter(r => r.date < startOfMonth).length,
     mode: overwrite ? 'overwrite_latest_plus_backfill' : 'append_plus_backfill',
   };
@@ -1070,6 +1091,12 @@ async function applyPoGrn(parsed, overwrite, user) {
   const inserts = deduped.map(r => ({ ...r, updated_by: user.username, updated_at: new Date().toISOString() }));
   const res = await chunkInsert('po_grn', inserts, { onConflict: 'po_date,item_code,branch' });
 
+  const source_row_count = deduped.length;
+  const source_amt_sum   = deduped.reduce((s, r) => s + (+r.po_amt || 0), 0);
+  const { count: db_actual } = await sb().from('po_grn')
+    .select('*', { count: 'exact', head: true })
+    .gte('po_date', startOfMonth).lt('po_date', startOfNext);
+  const assertion_failed = source_row_count > 0 && (res.ok / source_row_count) < 0.99;
   return {
     source: 'po_grn_raw_pivot', target_table: 'po_grn',
     latest_ym:                parsed.latest_ym,
@@ -1078,6 +1105,8 @@ async function applyPoGrn(parsed, overwrite, user) {
     first_error:              res.first_error || null,
     rows_dropped_unknown_item: dropped_unknown_item,
     rows_dropped_duplicates:  dropped_duplicates,
+    source_row_count, source_amt_sum: +source_amt_sum.toFixed(2),
+    db_row_count_after: db_actual, assertion_failed,
     mode: overwrite ? 'overwrite' : 'append',
   };
 }
@@ -1162,14 +1191,20 @@ async function applyFinancial(parsed, overwrite, user) {
     m_upserted = res.ok; m_failed = res.err;
   }
 
+  const source_row_count = (parsed.balance_sheet ? 1 : 0) + (parsed.monthly || []).length;
+  const ok_total = bs_rows_upserted + m_upserted;
+  const assertion_failed = source_row_count > 0 && (ok_total / source_row_count) < 0.99;
   return {
     source: 'fmm_apps_script', target_table: 'financial_*',
     latest_ym:                parsed.latest_ym,
     snap_date:                parsed.snap_date,
-    rows_appended:            bs_rows_upserted + m_upserted,
+    rows_appended:            ok_total,
     balance_sheet_upserted:   bs_rows_upserted,
     monthly_upserted:         m_upserted,
     rows_failed:              bs_failed + m_failed,
+    source_row_count, source_amt_sum: null,   // financial has no single amt field
+    db_row_count_after: null,                  // 2-table fan-out, omit
+    assertion_failed,
     mode: 'upsert',
   };
 }
@@ -1238,6 +1273,11 @@ async function applyCbl(parsed, overwrite, user) {
   const resCbl = await chunkInsert('customer_buy_lines', inserts,
     { onConflict: 'year_month,bill_no,item_code' });
 
+  const source_row_count = dedupedRows.length;
+  const source_amt_sum   = dedupedRows.reduce((s, r) => s + (+r.amt || 0), 0);
+  const { count: db_actual } = await sb().from('customer_buy_lines')
+    .select('*', { count: 'exact', head: true }).eq('year_month', parsed.latest_ym);
+  const assertion_failed = source_row_count > 0 && (resCbl.ok / source_row_count) < 0.99;
   return {
     source: 'customer_buy_v3_cbl', target_table: 'customer_buy_lines',
     latest_ym: parsed.latest_ym,
@@ -1247,6 +1287,8 @@ async function applyCbl(parsed, overwrite, user) {
     rows_dropped_unknown_item:   dropped_unknown_item,
     customers_upserted:          resCust.ok,
     customers_failed:            resCust.err,
+    source_row_count, source_amt_sum: +source_amt_sum.toFixed(2),
+    db_row_count_after: db_actual, assertion_failed,
     mode: overwrite ? 'overwrite' : 'append',
   };
 }
@@ -1296,15 +1338,22 @@ async function applyInventory(parsed, overwrite) {
   if (overwrite) {
     await sb().from('inventory_snapshots').delete().eq('snapshot_date', parsed.snapshot_date);
   }
-  // Filter to active branches + ensure item_code exists in items (FK).
   const items = await fetchAllItemCodes();
   const validCodes = new Set(items.map(r => r.item_code));
   const rows = parsed.rows.filter(r => ACTIVE_BRANCHES.has(r.store) && validCodes.has(r.item_code));
   const dropped_no_item = parsed.rows.length - rows.length;
+  const source_row_count = rows.length;
+  const source_amt_sum   = rows.reduce((s, r) => s + (+r.amount || 0), 0);
   const res = await chunkInsert('inventory_snapshots', rows, { onConflict: 'snapshot_date,store,item_code' });
+  const { count: db_actual } = await sb().from('inventory_snapshots')
+    .select('*', { count: 'exact', head: true }).eq('snapshot_date', parsed.snapshot_date);
+  const assertion_failed = source_row_count > 0 && (res.ok / source_row_count) < 0.99;
   return { source: 'raw_cs', target_table: 'inventory_snapshots',
            snapshot_date: parsed.snapshot_date,
            rows_appended: res.ok, rows_failed: res.err, rows_dropped_fk: dropped_no_item,
+           first_error: res.first_error || null,
+           source_row_count, source_amt_sum: +source_amt_sum.toFixed(2),
+           db_row_count_after: db_actual, assertion_failed,
            mode: overwrite ? 'overwrite' : 'append' };
 }
 
