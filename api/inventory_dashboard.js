@@ -1,14 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Wiltek Portal V2 Sprint 3 Track 2 — /api/inventory_dashboard
+// Wiltek Portal V2 Sprint 3 + Sprint 4 — /api/inventory_dashboard
 //
-// Top 4 KPIs for Inventory page (Stage 3, IA-doc spec):
-//   1. health       — 5-class breakdown + MoM compare
-//   2. order_gap    — PO vs sales + next-month projection + ABCD
-//   3. stockout     — OEM (China 51d) / Agency (Malaysia 8d) buckets
-//   4. oem_vs_agency— stock value / dead rate / turnover / lead
+// Two sections (sub-routed via ?section= query param):
+//   default                  → top 4 KPIs (Sprint 3): health/gap/stockout/OEM-vs-Agency
+//   ?section=alerts          → 4 alert cards (Sprint 4): PO calendar / transfer /
+//                              liquidation / PO anomalies
 //
-// Backed by inventory_dashboard_payload(p_branch) Postgres RPC.
-// Manager → p_branch = user.store; owner → null (all stores).
+// Merged to keep total Vercel serverless functions ≤ 12 (Hobby plan cap).
+// Backed by Postgres RPCs inventory_dashboard_payload + inventory_alerts_payload.
+// Owner = company-wide. Manager → p_branch = user.store.
 // ═══════════════════════════════════════════════════════════════════════
 
 import { createClient } from '@supabase/supabase-js';
@@ -45,16 +45,19 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ ok: false, error: 'no session' });
 
   const p_branch = (user.role === 'manager') ? user.store : null;
+  const section = String(req.query?.section || '').trim().toLowerCase();
+  const rpc = section === 'alerts' ? 'inventory_alerts_payload' : 'inventory_dashboard_payload';
 
   try {
-    const { data, error } = await sb().rpc('inventory_dashboard_payload', { p_branch });
+    const { data, error } = await sb().rpc(rpc, { p_branch });
     if (error) {
-      console.error('[/api/inventory_dashboard] RPC error:', error);
+      console.error(`[/api/inventory_dashboard ${section}] RPC error:`, error);
       res.status(500).json({ ok: false, error: error.message });
       return;
     }
     res.status(200).json({
       ok: true,
+      section: section || 'kpis',
       fetched_at: new Date().toISOString(),
       source: 'supabase:wiltek-portal',
       session_role: user.role,
