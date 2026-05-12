@@ -172,7 +172,12 @@ async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
   const PAGE = 1000;
   let from = 0;
   while (true) {
+    // Stable ORDER BY is REQUIRED for .range() pagination — without it,
+    // Supabase can re-return the same row in adjacent pages (Sprint 3
+    // hotfix v3 bug: 2026-04 qty was 2521 instead of 2242 due to dup'd
+    // rows being summed twice).
     let q = sb().from('v_sku_by_month_branch').select('ym, store, code, amount, qty')
+      .order('ym').order('store').order('code')
       .range(from, from + PAGE - 1);
     if (allowedBranches) q = q.in('store', allowedBranches);
     if (queryBranch)     q = q.eq('store', queryBranch);
