@@ -10880,7 +10880,7 @@ async function renderInventoryStage4Alerts() {
   el.innerHTML = '<div class="s3-kpi"><div class="label">⏳ Loading alerts</div></div>';
   let j;
   try {
-    const r = await fetch('/api/inventory_alerts', { headers: wpAuthHeaders() });
+    const r = await fetch('/api/inventory_dashboard?section=alerts', { headers: wpAuthHeaders() });
     j = await r.json();
     if (!j.ok) throw new Error(j.error || 'fetch failed');
   } catch (e) {
