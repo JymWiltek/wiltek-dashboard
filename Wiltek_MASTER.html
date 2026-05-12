@@ -1848,6 +1848,8 @@ footer.app-footer {
         <p class="page-sub" data-i18n="ds-inv-sub">库存健康度 · 订单缺口 · 断货预警 · OEM/Agency 对比 · 全在一页。</p>
         <!-- Sprint 3 Stage 3: top 4 IA-spec KPI cards (filled by renderInventoryStage3) -->
         <div class="s3-inv-kpis" id="dsInvStage3Cards"></div>
+        <!-- Sprint 4 Stage 3: 4 alert cards (filled by renderInventoryStage4Alerts) -->
+        <div class="s3-inv-alerts" id="dsInvStage4Alerts"></div>
         <div class="ds-cards" id="dsInvCards"></div>
         <!-- V1 第四刀: 4 alert cards (Inventory) -->
         <div class="ds-alert-grid" id="dsInvAlerts"></div>
@@ -1890,6 +1892,8 @@ footer.app-footer {
       <div class="view" id="view-products">
         <h1 class="page-title" data-i18n="ds-prod-title">Products</h1>
         <p class="page-sub" data-i18n="ds-prod-sub">单月 SKU 销售 · 价格带分布 · Top 品类 · Top 20 SKU · 全部支持 6M/12M 对比。</p>
+        <!-- Sprint 4 Stage 4: top 3 IA-spec KPI cards (filled by renderProductsStage4) -->
+        <div class="s3-inv-kpis" id="dsProductsStage4Cards"></div>
         <!-- KPIs: single-month with 3-line compare under each value -->
         <div class="ds-cards" id="dsProdCards"></div>
         <!-- 4 alert cards (Products) -->
@@ -3454,7 +3458,7 @@ function setLang(l) {
   else if (CUR_VIEW === 'stock')      renderStockDashboard();
   else if (CUR_VIEW === 'purchasing') renderPurchasingDashboard();
   else if (CUR_VIEW === 'customers')  renderCustomersDashboard();
-  else if (CUR_VIEW === 'products')   renderProductsDashboard();
+  else if (CUR_VIEW === 'products')   { renderProductsDashboard(); try { renderProductsStage4(); } catch(e){console.warn('s4 prod',e);} }
   else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
   else if (CUR_VIEW === 'hr')         renderHrDashboard();
   else if (CUR_VIEW === 'gtd')        renderGtd();
@@ -4141,9 +4145,9 @@ function setView(v) {
   // Render whichever leaf is active. New 7-domain dashboards have their
   // own renderers; existing leaf views keep their renderers unchanged.
   if (leaf === 'sales')           renderSalesDashboard();
-  else if (leaf === 'inventory')  { renderInventoryDashboard(); try { renderInventoryStage3(); } catch(e){console.warn('s3 inv',e);} }
+  else if (leaf === 'inventory')  { renderInventoryDashboard(); try { renderInventoryStage3(); } catch(e){console.warn('s3 inv',e);} try { renderInventoryStage4Alerts(); } catch(e){console.warn('s4 inv',e);} }
   else if (leaf === 'customers')  renderCustomersDashboard();
-  else if (leaf === 'products')   renderProductsDashboard();
+  else if (leaf === 'products')   { renderProductsDashboard(); try { renderProductsStage4(); } catch(e){console.warn('s4 prod',e);} }
   else if (leaf === 'finance')    renderFinanceDashboard();
   else if (leaf === 'hr')         renderHrDashboard();
   else if (leaf === 'gtd')        renderGtd();
@@ -4657,9 +4661,9 @@ function rerenderActiveView() {
   else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
   // 6-domain main dashboards re-render on period change too
   else if (CUR_VIEW === 'sales')      renderSalesDashboard();
-  else if (CUR_VIEW === 'inventory')  { renderInventoryDashboard(); try { renderInventoryStage3(); } catch(e){console.warn('s3 inv',e);} }
+  else if (CUR_VIEW === 'inventory')  { renderInventoryDashboard(); try { renderInventoryStage3(); } catch(e){console.warn('s3 inv',e);} try { renderInventoryStage4Alerts(); } catch(e){console.warn('s4 inv',e);} }
   else if (CUR_VIEW === 'customers')  renderCustomersDashboard();
-  else if (CUR_VIEW === 'products')   renderProductsDashboard();
+  else if (CUR_VIEW === 'products')   { renderProductsDashboard(); try { renderProductsStage4(); } catch(e){console.warn('s4 prod',e);} }
   else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
   else if (CUR_VIEW === 'hr')         renderHrDashboard();
   else if (CUR_VIEW === 'admin-sanity') renderAdminSanity();
@@ -10866,6 +10870,135 @@ async function renderInventoryStage3() {
   el.innerHTML = kpi1 + kpi2 + kpi3 + kpi4;
 }
 window.renderInventoryStage3 = renderInventoryStage3;
+
+/* ════════════════════════════════════════════════════════════════════
+   Sprint 4 Track 1 — Inventory Alerts (4 cards under Stage 3 KPIs)
+   ════════════════════════════════════════════════════════════════════ */
+async function renderInventoryStage4Alerts() {
+  const el = document.getElementById('dsInvStage4Alerts');
+  if (!el) return;
+  el.innerHTML = '<div class="s3-kpi"><div class="label">⏳ Loading alerts</div></div>';
+  let j;
+  try {
+    const r = await fetch('/api/inventory_alerts', { headers: wpAuthHeaders() });
+    j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'fetch failed');
+  } catch (e) {
+    el.innerHTML = '<div class="s3-kpi"><div class="label">❌ Alerts</div><div class="t2-missing">' + (e.message||'') + '</div></div>';
+    return;
+  }
+  const po = j.po_calendar || {};
+  const xfer = j.transfer_engine || {};
+  const liq = j.liquidation || {};
+  const anom = j.po_anomalies || {};
+  const fmt = n => n == null ? '—' : (Math.abs(n) >= 1e6 ? 'RM '+(+n/1e6).toFixed(1)+'M'
+                                    : Math.abs(n) >= 1e3 ? 'RM '+(+n/1e3).toFixed(0)+'k'
+                                    : 'RM '+(+n).toFixed(0));
+  // Card 1: OEM PO calendar
+  const c1Items = (po.by_eta_month || []).slice(0, 4).map(m =>
+    `<div class="cls-row"><span class="cls-name">${v2EscapeHtml(m.eta_ym)} (${v2EscapeHtml(m.source)})</span><span class="cls-val">${m.open_pos} POs · ${fmt(m.po_amt)}</span></div>`
+  ).join('');
+  const card1 = `<div class="s3-kpi">
+    <div class="label">① OEM PO 日历</div>
+    <div class="value">${po.open_total||0} open</div>
+    <div class="sub">${fmt(po.open_amt)} 未到货 · lead OEM=51d / Agency=8d</div>
+    ${c1Items || '<div class="cls-row"><span class="cls-name">没有未到货 PO</span></div>'}
+    <div class="as-of">snapshot ${j.snapshot_date||'—'}</div>
+  </div>`;
+  // Card 2: Transfer engine
+  const c2Items = (xfer.top20 || []).slice(0, 5).map(t =>
+    `<div class="cls-row"><span class="cls-name">${v2EscapeHtml(t.item_code)} ${t.from_store}→${t.to_store}</span><span class="cls-val">${t.transfer_qty_est} pcs · ${fmt(t.transfer_value_est)}</span></div>`
+  ).join('');
+  const c2Tone = xfer.total_opportunities > 0 ? 'green' : '';
+  const card2 = `<div class="s3-kpi">
+    <div class="label">② 调拨引擎 (Misplaced)</div>
+    <div class="value ${c2Tone}">${xfer.total_opportunities||0} 机会</div>
+    <div class="sub">释放估值 ${fmt(xfer.total_value_est)} · Top 5 ↓</div>
+    ${c2Items || '<div class="cls-row"><span class="cls-name">无 Misplaced 调拨机会</span></div>'}
+  </div>`;
+  // Card 3: Liquidation
+  const tier = liq.by_tier || {};
+  const tierLine =
+    `t365+: ${(tier.tier_365_plus||{n:0}).n} (${fmt((tier.tier_365_plus||{amt:0}).amt)}) · ` +
+    `t180-365: ${(tier.tier_180_365||{n:0}).n} · ` +
+    `t90-180: ${(tier.tier_90_180||{n:0}).n}`;
+  const c3Tone = liq.total_locked_value > 100000 ? 'red' : liq.total_locked_value > 10000 ? 'yellow' : '';
+  const card3 = `<div class="s3-kpi">
+    <div class="label">③ 清仓建议 (Dead/Disc)</div>
+    <div class="value ${c3Tone}">${liq.total_candidates||0} SKU</div>
+    <div class="sub">占款 ${fmt(liq.total_locked_value)} · 按 age tier:</div>
+    <div class="cls-row"><span style="font-size:11px;color:var(--text-meta)">${tierLine}</span></div>
+    <div class="as-of">折扣建议: 365d+ 50% off · 180-365 25% · 90-180 10%</div>
+  </div>`;
+  // Card 4: PO anomalies
+  const overd = anom.overdue_po || {}, deficit = anom.grn_deficit || {}, drift = anom.price_drift || {};
+  const anomTone = (overd.count + deficit.count + drift.count) > 0 ? 'yellow' : '';
+  const card4 = `<div class="s3-kpi">
+    <div class="label">④ 采购异常</div>
+    <div class="value ${anomTone}">${(overd.count||0)+(deficit.count||0)+(drift.count||0)} 异常</div>
+    <div class="cls-row"><span class="cls-name">逾期 PO (>60d)</span><span class="cls-val">${overd.count||0}</span></div>
+    <div class="cls-row"><span class="cls-name">GRN < PO</span><span class="cls-val">${deficit.count||0}</span></div>
+    <div class="cls-row"><span class="cls-name">单价漂移 >20%</span><span class="cls-val">${drift.count||0}</span></div>
+  </div>`;
+  el.innerHTML = card1 + card2 + card3 + card4;
+}
+window.renderInventoryStage4Alerts = renderInventoryStage4Alerts;
+
+/* ════════════════════════════════════════════════════════════════════
+   Sprint 4 Track 2 — Products top 3 KPIs (Velocity / Migrations / Push)
+   ════════════════════════════════════════════════════════════════════ */
+async function renderProductsStage4() {
+  const el = document.getElementById('dsProductsStage4Cards');
+  if (!el) return;
+  el.innerHTML = '<div class="s3-kpi"><div class="label">⏳ Loading</div></div>';
+  let j;
+  try {
+    const month = (typeof snapMonth === 'function' ? snapMonth() : '') || '';
+    const url = '/api/products' + (month ? '?month=' + encodeURIComponent(month) : '');
+    const r = await fetch(url, { headers: wpAuthHeaders() });
+    j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'fetch failed');
+  } catch (e) {
+    el.innerHTML = '<div class="s3-kpi"><div class="label">❌ Products</div><div class="t2-missing">' + (e.message||'') + '</div></div>';
+    return;
+  }
+  const v = j.velocity || {};
+  const m = j.migrations || {};
+  const sp = j.strategic_push || {};
+  const fmt = n => n == null ? '—' : (Math.abs(n) >= 1e6 ? 'RM '+(+n/1e6).toFixed(1)+'M' : Math.abs(n) >= 1e3 ? 'RM '+(+n/1e3).toFixed(0)+'k' : 'RM '+(+n).toFixed(0));
+  const cls = v.classes || {};
+  const clsRows = ['A','B','C','D'].map(k => {
+    const c = cls[k] || { n:0, amt:0, pct:0 };
+    return `<div class="cls-row"><span class="cls-name">${k} 级</span><span class="cls-val">${c.n} SKU · ${fmt(c.amt)} (${c.pct}%)</span></div>`;
+  }).join('');
+  const card1 = `<div class="s3-kpi">
+    <div class="label">① SKU Velocity (ABCD · 90d)</div>
+    <div class="value">${v.total_sku||0} SKU</div>
+    <div class="sub">${v.total_active||0} active · A=top10% / B=20% / C=40% / D=30%</div>
+    ${clsRows}
+    <div class="as-of">snapshot ${j.snapshot||'—'} (vs ${j.prev_snapshot||'—'})</div>
+  </div>`;
+  const migRows = (m.top20 || []).slice(0, 6).map(x =>
+    `<div class="cls-row"><span class="cls-name">${v2EscapeHtml(x.item_code)} · ${v2EscapeHtml(x.brand||'')}</span><span class="cls-val">${v2EscapeHtml(x.migration)} · ${fmt(x.amt_90d)}</span></div>`
+  ).join('');
+  const card2 = `<div class="s3-kpi">
+    <div class="label">② Top 20 异常迁徙</div>
+    <div class="value">${m.count||0}</div>
+    <div class="sub">A→C/D 警报 · D→A/B 机会 · C→A 出眼品 (Top 6 ↓)</div>
+    ${migRows || '<div class="cls-row"><span class="cls-name">无显著跨级迁徙</span></div>'}
+  </div>`;
+  const spRows = (sp.items || []).map(x =>
+    `<div class="cls-row"><span class="cls-name">${v2EscapeHtml(x.item_code)} · ${v2EscapeHtml(x.brand||'')}</span><span class="cls-val">opened ${x.days_since_open}d ago · ${fmt(x.amt_90d)}</span></div>`
+  ).join('');
+  const card3 = `<div class="s3-kpi">
+    <div class="label">③ Strategic Push (placeholder)</div>
+    <div class="value">${sp.count||0}</div>
+    <div class="sub">${v2EscapeHtml(sp.note||'')}</div>
+    ${spRows || '<div class="cls-row"><span class="cls-name">最近 60 天无新 A 级 SKU</span></div>'}
+  </div>`;
+  el.innerHTML = card1 + card2 + card3;
+}
+window.renderProductsStage4 = renderProductsStage4;
 
 async function renderTodayV2() {
   // Augment renderToday: fetch /api/today, overlay the 4 layers with
