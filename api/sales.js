@@ -163,13 +163,28 @@ async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
   const recent14 = months_seen.slice(-SKU_DETAIL_MONTHS);
   const recent14Set = new Set(recent14);
 
-  let q3 = sb().from('v_sku_by_month_branch').select('ym, store, code, amount, qty');
-  if (allowedBranches) q3 = q3.in('store', allowedBranches);
-  if (queryBranch)     q3 = q3.eq('store', queryBranch);
-  if (recent14.length) q3 = q3.in('ym', recent14);
-  q3 = q3.limit(50000);   // soft cap
-  const r3 = await q3;
-  if (r3.error) throw new Error('v_sku_by_month_branch: ' + r3.error.message);
+  // Paginate v_sku_by_month_branch: Supabase .select() default caps at
+  // 1000 rows regardless of .limit() — must use .range() chunks. 14 months
+  // × 5 stores × ~650 SKUs ≈ 45k rows → previous .limit(50000) silently
+  // returned only the first 1000 (caused Sprint 3 Sales bug: KPI 2 units
+  // total = 122 instead of 2,340 for 2026-04).
+  let allRows = [];
+  const PAGE = 1000;
+  let from = 0;
+  while (true) {
+    let q = sb().from('v_sku_by_month_branch').select('ym, store, code, amount, qty')
+      .range(from, from + PAGE - 1);
+    if (allowedBranches) q = q.in('store', allowedBranches);
+    if (queryBranch)     q = q.eq('store', queryBranch);
+    if (recent14.length) q = q.in('ym', recent14);
+    const r = await q;
+    if (r.error) throw new Error('v_sku_by_month_branch: ' + r.error.message);
+    allRows = allRows.concat(r.data || []);
+    if (!r.data || r.data.length < PAGE) break;
+    from += PAGE;
+    if (from > 200000) break;  // safety stop
+  }
+  const r3 = { data: allRows };
 
   const sku_amt_by_month        = {};
   const sku_qty_by_month        = {};
