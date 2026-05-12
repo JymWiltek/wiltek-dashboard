@@ -1458,6 +1458,38 @@ footer.app-footer {
 .v2-action-conflict { color:var(--danger);font-weight:600; }
 .v2-action-upsert   { color:var(--brand);font-weight:600; }
 .v2-action-backlog  { color:var(--text-meta);font-style:italic; }
+
+/* ── Sprint 3 Stage 3 Inventory KPI cards + Today v2 placeholders ── */
+.s3-inv-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+  gap: 12px; margin: 16px 0 20px;
+}
+.s3-kpi {
+  background: var(--card-bg, #fff); border: 1px solid var(--border, #eee);
+  border-radius: 10px; padding: 14px 16px;
+}
+.s3-kpi .label   { font-size: 12px; color: var(--text-meta); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.s3-kpi .value   { font-size: 22px; font-weight: 700; }
+.s3-kpi .value.green  { color: var(--ok, #1A8F5E); }
+.s3-kpi .value.yellow { color: #E8A93B; }
+.s3-kpi .value.red    { color: var(--danger, #C04848); }
+.s3-kpi .sub     { font-size: 11px; color: var(--text-meta); margin-top: 4px; }
+.s3-kpi .as-of   { font-size: 10px; color: var(--text-tertiary); margin-top: 8px; font-style: italic; }
+.s3-kpi .cls-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+.s3-kpi .cls-row .cls-name { color: var(--text-secondary); }
+.s3-kpi .cls-row .cls-val  { font-weight: 600; }
+.s3-kpi .cls-row .cls-mom  { font-size: 10px; margin-left: 6px; }
+.s3-kpi .cls-row .cls-mom.up   { color: var(--ok, #1A8F5E); }
+.s3-kpi .cls-row .cls-mom.down { color: var(--danger, #C04848); }
+.s3-kpi .cls-row .cls-mom.flat { color: var(--text-meta); }
+
+/* Today v2 status: missing-data placeholder */
+.t2-missing { color: var(--text-meta); font-style: italic; font-size: 13px; }
+.t2-light   { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+.t2-light.green   { background: var(--ok, #1A8F5E); }
+.t2-light.yellow  { background: #E8A93B; }
+.t2-light.red     { background: var(--danger, #C04848); }
+.t2-light.unknown { background: #999; opacity: .5; }
 .v2-backup-table code { font-family:ui-monospace,monospace;font-size:11px;background:rgba(31,95,74,0.06);padding:1px 5px;border-radius:3px; }
 .v2-conflict-confirm { display:flex;align-items:center;gap:8px;font-size:13px;color:var(--danger); }
 
@@ -1814,6 +1846,8 @@ footer.app-footer {
       <div class="view" id="view-inventory">
         <h1 class="page-title" data-i18n="ds-inv-title">Inventory</h1>
         <p class="page-sub" data-i18n="ds-inv-sub">库存健康度 · 订单缺口 · 断货预警 · OEM/Agency 对比 · 全在一页。</p>
+        <!-- Sprint 3 Stage 3: top 4 IA-spec KPI cards (filled by renderInventoryStage3) -->
+        <div class="s3-inv-kpis" id="dsInvStage3Cards"></div>
         <div class="ds-cards" id="dsInvCards"></div>
         <!-- V1 第四刀: 4 alert cards (Inventory) -->
         <div class="ds-alert-grid" id="dsInvAlerts"></div>
@@ -3411,7 +3445,7 @@ function setLang(l) {
   renderTable();
   if (CUR_VIEW === 'transfers') renderTransfers();
   else if (CUR_VIEW === 'warehouse') renderWarehouse();
-  else if (CUR_VIEW === 'today') renderToday();
+  else if (CUR_VIEW === 'today') { renderToday(); try { renderTodayV2(); } catch(e){console.warn('today v2',e);} }
   else if (CUR_VIEW === 'customer-churn') renderChurn();
   else if (CUR_VIEW === 'po-exceptions') renderPoExceptions();
   else if (CUR_VIEW === 'cust-insights') renderCustInsights();
@@ -4107,7 +4141,7 @@ function setView(v) {
   // Render whichever leaf is active. New 7-domain dashboards have their
   // own renderers; existing leaf views keep their renderers unchanged.
   if (leaf === 'sales')           renderSalesDashboard();
-  else if (leaf === 'inventory')  renderInventoryDashboard();
+  else if (leaf === 'inventory')  { renderInventoryDashboard(); try { renderInventoryStage3(); } catch(e){console.warn('s3 inv',e);} }
   else if (leaf === 'customers')  renderCustomersDashboard();
   else if (leaf === 'products')   renderProductsDashboard();
   else if (leaf === 'finance')    renderFinanceDashboard();
@@ -4118,7 +4152,7 @@ function setView(v) {
   else if (leaf === 'admin-sanity') renderAdminSanity();
   else if (leaf === 'transfers')  renderTransfers();
   else if (leaf === 'warehouse')  renderWarehouse();
-  else if (leaf === 'today')      renderToday();
+  else if (leaf === 'today')      { renderToday(); try { renderTodayV2(); } catch(e){console.warn('today v2',e);} }
   else if (leaf === 'customer-churn') renderChurn();
   else if (leaf === 'po-exceptions')  renderPoExceptions();
   else if (leaf === 'cust-insights')  renderCustInsights();
@@ -4623,7 +4657,7 @@ function rerenderActiveView() {
   else if (CUR_VIEW === 'financial-depth') renderFinancialDepth();
   // 6-domain main dashboards re-render on period change too
   else if (CUR_VIEW === 'sales')      renderSalesDashboard();
-  else if (CUR_VIEW === 'inventory')  renderInventoryDashboard();
+  else if (CUR_VIEW === 'inventory')  { renderInventoryDashboard(); try { renderInventoryStage3(); } catch(e){console.warn('s3 inv',e);} }
   else if (CUR_VIEW === 'customers')  renderCustomersDashboard();
   else if (CUR_VIEW === 'products')   renderProductsDashboard();
   else if (CUR_VIEW === 'finance')    renderFinanceDashboard();
@@ -10730,6 +10764,249 @@ function renderToday() {
     }).join('');
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   Sprint 3 Track 1 — Today V2 (read /api/today, render 4 layers)
+   Sprint 3 Track 2 — Inventory Stage 3 (read /api/inventory_dashboard)
+
+   Both swap legacy data sources for the new RPC-backed endpoints.
+   /api/today.status.light = 'unknown' + data_missing array → display
+   "数据缺失" placeholder (per Jym Option A).
+   ════════════════════════════════════════════════════════════════════ */
+
+function s3FmtMoney(n) {
+  if (n == null || isNaN(n)) return '—';
+  const v = +n;
+  if (Math.abs(v) >= 1e6) return 'RM ' + (v / 1e6).toFixed(1) + 'M';
+  if (Math.abs(v) >= 1e3) return 'RM ' + (v / 1e3).toFixed(0) + 'k';
+  return 'RM ' + v.toFixed(0);
+}
+function s3FmtPct(n) { return n == null || isNaN(n) ? '—' : (+n).toFixed(1) + '%'; }
+function s3MomBadge(mom_amount, mom_pct) {
+  if (mom_amount == null) return '';
+  const dir = mom_amount > 0 ? 'up' : (mom_amount < 0 ? 'down' : 'flat');
+  const sign = mom_amount > 0 ? '↑' : (mom_amount < 0 ? '↓' : '→');
+  const pctStr = mom_pct == null ? '—' : Math.abs(mom_pct).toFixed(1) + '%';
+  return `<span class="cls-mom ${dir}">${sign} ${pctStr}</span>`;
+}
+
+async function renderInventoryStage3() {
+  const el = document.getElementById('dsInvStage3Cards');
+  if (!el) return;
+  el.innerHTML = '<div class="s3-kpi"><div class="label">⏳ 加载中</div></div>';
+  let j;
+  try {
+    const r = await fetch('/api/inventory_dashboard', { headers: wpAuthHeaders() });
+    j = await r.json();
+    if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  } catch (e) {
+    el.innerHTML = `<div class="s3-kpi"><div class="label">❌ Inventory dashboard</div><div class="t2-missing">${(e && e.message) || e}</div></div>`;
+    return;
+  }
+  const h = j.health || { classes: {}, total_stock: 0 };
+  const g = j.order_gap || {};
+  const so = j.stockout || {};
+  const ova = j.oem_vs_agency || {};
+  const asOf = j.snapshot_date ? `截止 ${j.snapshot_date}` : '';
+
+  // KPI 1: 库存健康度
+  const clsOrder = ['Active','Slow','Misplaced','Dead','Discontinued'];
+  const clsRows = clsOrder.map(c => {
+    const r = (h.classes && h.classes[c]) || { amount: 0, pct: 0, mom_amount: 0, mom_pct: null };
+    return `<div class="cls-row">
+      <span class="cls-name">${c}</span>
+      <span class="cls-val">${s3FmtMoney(r.amount)} (${s3FmtPct(r.pct)}) ${s3MomBadge(r.mom_amount, r.mom_pct)}</span>
+    </div>`;
+  }).join('');
+  const kpi1 = `<div class="s3-kpi">
+    <div class="label">库存健康度</div>
+    <div class="value">${s3FmtMoney(h.total_stock || 0)}</div>
+    <div class="sub">5 类分布 (MoM vs ${j.ym_prev || '—'})</div>
+    ${clsRows}
+    <div class="as-of">${asOf}</div>
+  </div>`;
+
+  // KPI 2: 订单缺口预警
+  const gapCls = (g.gap||0) < 0 ? 'red' : 'green';
+  const gapAbs = Math.abs(g.gap||0);
+  const abcd = g.abcd_distribution || {};
+  const abcdStr = ['A','B','C','D'].map(k => `${k}=${abcd[k]||0}`).join(' / ');
+  const kpi2 = `<div class="s3-kpi">
+    <div class="label">订单缺口预警 (${j.ym_curr || '—'})</div>
+    <div class="value ${gapCls}">${(g.gap||0) >= 0 ? '+' : '-'}${s3FmtMoney(gapAbs)}</div>
+    <div class="sub">PO ${s3FmtMoney(g.po_curr_amt||0)} · Sales ${s3FmtMoney(g.sales_consumed_curr||0)}</div>
+    <div class="cls-row"><span class="cls-name">下月预测</span><span class="cls-val">${s3FmtMoney(g.next_month_projection||0)}</span></div>
+    <div class="cls-row"><span class="cls-name">ABCD</span><span class="cls-val">${abcdStr}</span></div>
+    <div class="as-of">基线: 上月销售 × 1.05</div>
+  </div>`;
+
+  // KPI 3: 断货 SKU 预警
+  const oemSo = so.OEM || { already_out:0, at_risk_14d:0, at_risk_30d:0, lead_days:51 };
+  const agcSo = so.Agency || { already_out:0, at_risk_14d:0, at_risk_30d:0, lead_days:8 };
+  const oemTone = oemSo.already_out > 0 ? 'red' : 'green';
+  const kpi3 = `<div class="s3-kpi">
+    <div class="label">断货 SKU 预警</div>
+    <div class="value ${oemTone}">${oemSo.already_out + agcSo.already_out} SKU 已断</div>
+    <div class="cls-row"><span class="cls-name">OEM (China · ${oemSo.lead_days}d lead)</span><span class="cls-val">${oemSo.already_out} 断 / ${oemSo.at_risk_14d} 14d / ${oemSo.at_risk_30d} 30d</span></div>
+    <div class="cls-row"><span class="cls-name">Agency (MY · ${agcSo.lead_days}d lead)</span><span class="cls-val">${agcSo.already_out} 断 / ${agcSo.at_risk_14d} 14d / ${agcSo.at_risk_30d} 30d</span></div>
+    <div class="as-of">${asOf}</div>
+  </div>`;
+
+  // KPI 4: OEM vs Agency 对比
+  const oem = ova.OEM || {}, agc = ova.Agency || {};
+  const kpi4 = `<div class="s3-kpi">
+    <div class="label">OEM vs Agency 对比</div>
+    <div class="value">${s3FmtMoney((oem.stock_value||0) + (agc.stock_value||0))}</div>
+    <div class="cls-row"><span class="cls-name">OEM 库存</span><span class="cls-val">${s3FmtMoney(oem.stock_value||0)} · 死货 ${s3FmtPct(oem.dead_rate_pct)}</span></div>
+    <div class="cls-row"><span class="cls-name">Agency 库存</span><span class="cls-val">${s3FmtMoney(agc.stock_value||0)} · 死货 ${s3FmtPct(agc.dead_rate_pct)}</span></div>
+    <div class="cls-row"><span class="cls-name">Lead time</span><span class="cls-val">OEM ${oem.lead_days || 51}d · Agency ${agc.lead_days || 8}d</span></div>
+    <div class="as-of">硬编码 lead · per-SKU 待 po_grn 多月历史</div>
+  </div>`;
+
+  el.innerHTML = kpi1 + kpi2 + kpi3 + kpi4;
+}
+window.renderInventoryStage3 = renderInventoryStage3;
+
+async function renderTodayV2() {
+  // Augment renderToday: fetch /api/today, overlay the 4 layers with
+  // payload-driven content. If payload fetch fails, leave legacy V1 in place.
+  let j;
+  try {
+    const r = await fetch('/api/today', { headers: wpAuthHeaders() });
+    j = await r.json();
+    if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    window.WP_TODAY_PAYLOAD = j;
+  } catch (e) {
+    console.warn('[Today v2] fetch failed, keeping legacy:', e);
+    return;
+  }
+
+  // Layer 1: status (preserve legacy if unknown lights but show missing flags)
+  const statusEl = document.getElementById('todayStatus');
+  if (statusEl && j.status) {
+    const s = j.status;
+    const lightCls = s.light || 'unknown';
+    const missing = Array.isArray(s.data_missing) ? s.data_missing : [];
+    const cashStr = s.cash_total != null ? s3FmtMoney(s.cash_total) : '<span class="t2-missing">数据缺失 · FMM Sheet 待更新</span>';
+    const profitStr = s.mtd_net_profit_inv != null
+      ? `<span class="${s.mtd_net_profit_inv >= 0 ? 'ok' : 'danger'}">${(s.mtd_net_profit_inv >= 0 ? '+' : '')}${s3FmtMoney(s.mtd_net_profit_inv)}</span>`
+      : '<span class="t2-missing">数据缺失</span>';
+    statusEl.innerHTML =
+      '<div class="tst-light"><span class="t2-light ' + lightCls + '"></span></div>' +
+      '<div class="tst-summary">' +
+        '<div class="tst-headline">今天的 Wiltek · 综合状态 <code>' + lightCls + '</code></div>' +
+        '<div class="tst-sub">' +
+          (missing.length ? `<span class="t2-missing">${missing.map(m => '⚠ ' + m).join(' · ')}</span>` : '所有数据源在线') +
+        '</div>' +
+      '</div>' +
+      '<div class="tst-runway">' +
+        '<div class="tst-r-label">现金</div>' +
+        '<div class="tst-r-value">' + cashStr + '</div>' +
+        '<div class="tst-r-sub">' + (s.financial_balance_sheet_as_of ? '快照 · 截止 ' + s.financial_balance_sheet_as_of : '—') + '</div>' +
+        '<div class="tst-r-label" style="margin-top:8px">MTD 净利</div>' +
+        '<div class="tst-r-value">' + profitStr + '</div>' +
+      '</div>';
+  }
+
+  // Layer 2: Action Plan
+  const cardsEl = document.getElementById('todayCards');
+  if (cardsEl && Array.isArray(j.action_plan)) {
+    if (!j.action_plan.length) {
+      cardsEl.innerHTML = '<div class="today-card empty">' + (typeof t === 'function' ? t('td-empty') : '今天没有要操心的事 ✅') + '</div>';
+    } else {
+      cardsEl.innerHTML = j.action_plan.map(c => {
+        const tone = c.severity === 'red' ? 'urg-high' : (c.severity === 'yellow' ? 'urg-mid' : 'urg-low');
+        const samples = Array.isArray(c.sample_items) ? c.sample_items : [];
+        const sampleStr = samples.slice(0,3).map(s => {
+          if (s.item_code) return s.item_code + (s.branch ? '@' + s.branch : '');
+          if (s.name) return s.name + ' (RM ' + (s.amt||0) + ')';
+          return JSON.stringify(s).slice(0,30);
+        }).join(' · ');
+        return '<div class="today-card ' + tone + '" data-jump="' + c.jump + '">' +
+          '<div class="td-icon">' + (c.severity === 'red' ? '🔴' : '🟡') + '</div>' +
+          '<div class="td-body">' +
+            '<div class="td-title">' + (c.title || c.kind) + ' (' + c.impact_count + ')</div>' +
+            '<div class="td-interp">' + (sampleStr || '—') + '</div>' +
+            '<div class="td-action-label">行动</div>' +
+            '<div class="td-action">' + (c.action || '查看详情') + '</div>' +
+          '</div>' +
+          '<div class="td-actions-col">' +
+            '<button class="td-jump" type="button" data-jump-btn="' + c.jump + '">→</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      cardsEl.querySelectorAll('[data-jump-btn]').forEach(b =>
+        b.addEventListener('click', () => setView(b.getAttribute('data-jump-btn'))));
+    }
+  }
+
+  // Layer 3: 5-store snapshot
+  const storesEl = document.getElementById('todayStores');
+  if (storesEl && Array.isArray(j.stores)) {
+    const head = '<div class="ts-row head">' +
+      '<div>店</div><div>店名</div>' +
+      '<div class="ts-num">MTD 销售</div>' +
+      '<div class="ts-num">本月单数</div>' +
+      '<div class="ts-num">走量</div>' +
+      '<div class="ts-num">成交率%</div>' +
+      '<div class="ts-num">异常</div></div>';
+    const rows = j.stores.map(s => {
+      const anomalies = [];
+      if (s.closing_rate != null && +s.closing_rate < 25) anomalies.push('CR<25%');
+      const anomCls = anomalies.length >= 2 ? 'high' : anomalies.length === 1 ? 'mid' : 'low';
+      return '<div class="ts-row">' +
+        '<div class="ts-id">' + s.store + '</div>' +
+        '<div class="ts-name">' + (s.name || s.store) + '</div>' +
+        '<div class="ts-num">RM ' + (s.mtd_amount || 0).toLocaleString() + '</div>' +
+        '<div class="ts-num">' + (s.mtd_invoices || 0) + '</div>' +
+        '<div class="ts-num">' + (s.walk_in_total != null ? s.walk_in_total : '—') + '</div>' +
+        '<div class="ts-num">' + (s.closing_rate != null ? (+s.closing_rate).toFixed(1) + '%' : '—') + '</div>' +
+        '<div class="ts-num ts-anom ' + anomCls + '">' + (anomalies.length ? '⚠ ' + anomalies.join(',') : '✓') + '</div>' +
+      '</div>';
+    }).join('');
+    storesEl.innerHTML = head + rows;
+  }
+
+  // Layer 4: 6 domains
+  const gridEl = document.getElementById('todayDomainGrid');
+  if (gridEl && j.domains) {
+    const isManager = j.session_role === 'manager';
+    const domLabels = {
+      sales: '📊 Sales', inventory: '📦 Inventory', customers: '👥 Customers',
+      products: '🏷️ Products', finance: '💰 Finance', hr: '👷 HR'
+    };
+    const order = ['sales','finance','products','customers','inventory','hr'];
+    gridEl.innerHTML = order.map(k => {
+      const d = j.domains[k] || {};
+      // RBAC: manager doesn't see finance/hr details — render as gated
+      const isGated = isManager && (k === 'finance' || k === 'hr');
+      const light = isGated ? 'gated' : (d.light || 'unknown');
+      const cls = light === 'green' ? 'h-ok' : light === 'yellow' ? 'h-warn' :
+                  light === 'red' ? 'h-bad' : light === 'gated' ? 'h-na' : 'h-na';
+      const missing = Array.isArray(d.data_missing) ? d.data_missing : [];
+      let statusText;
+      if (isGated)                            statusText = '🔒 owner only';
+      else if (missing.length)                statusText = '⚠ 数据缺失';
+      else if (k === 'sales' && d.mtd != null) statusText = 'MTD RM ' + (d.mtd).toLocaleString();
+      else if (k === 'inventory' && d.problem_pct != null) statusText = '问题占款 ' + d.problem_pct + '%';
+      else if (k === 'customers' && d.mtd_buyers != null) statusText = d.mtd_buyers + ' 买家';
+      else if (k === 'products' && d.top20_stockouts != null) statusText = d.top20_stockouts + ' SKU 断货';
+      else if (k === 'finance' && d.cash != null) statusText = '现金 RM ' + (+d.cash).toLocaleString();
+      else statusText = '—';
+      return '<div class="tdg-card ' + cls + '" data-domain-jump="' + (d.jump || k) + '">' +
+        '<div class="tdg-icon">' + (domLabels[k] || k).split(' ')[0] + '</div>' +
+        '<div class="tdg-name">' + (domLabels[k] || k).split(' ').slice(1).join(' ') + '</div>' +
+        '<div class="tdg-status">' + statusText + '</div>' +
+      '</div>';
+    }).join('');
+    gridEl.querySelectorAll('[data-domain-jump]').forEach(c =>
+      c.addEventListener('click', () => {
+        const jmp = c.getAttribute('data-domain-jump');
+        if (jmp && jmp !== 'hr') setView(jmp);
+      }));
+  }
+}
+window.renderTodayV2 = renderTodayV2;
 
 /* ── V1.6: Render Today for store managers ─────────────────────── */
 function renderTodayManager() {
