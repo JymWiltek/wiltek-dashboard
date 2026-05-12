@@ -1259,14 +1259,36 @@ async function applySales(parsed, overwrite, manifestId) {
     return m === 12 ? `${y+1}-01-01` : `${y}-${String(m+1).padStart(2,'0')}-01`;
   })();
   const monthRows = parsed.rows.filter(r => r.sale_date === startOfMonth);
+  const source_row_count = monthRows.length;
+  const source_amt_sum   = monthRows.reduce((s, r) => s + (+r.amount || 0), 0);
 
   if (overwrite) {
     await sb().from('sales').delete().gte('sale_date', startOfMonth).lt('sale_date', startOfNext);
   }
-  // INSERT (no UPSERT — sales has BIGSERIAL PK + no natural unique key)
   const res = await chunkInsert('sales', monthRows);
-  return { source: 'customer_buy_v3', target_table: 'sales', latest_ym: parsed.latest_ym,
-           rows_appended: res.ok, rows_failed: res.err, mode: overwrite ? 'overwrite' : 'append' };
+
+  // Hard rule (Decisions Log 2026-05-12): row-count assertion. If insert
+  // ok-count diverges from source row count by more than 1%, flag as
+  // failed regardless of PostgREST returning no error. Silent truncation
+  // is now caught at write time.
+  const ok_pct = source_row_count > 0 ? (res.ok / source_row_count) : 1;
+  const assertion_failed = ok_pct < 0.99;
+
+  // Cross-check the actual DB row count for the month after write.
+  const { count: db_actual } = await sb().from('sales')
+    .select('*', { count: 'exact', head: true })
+    .gte('sale_date', startOfMonth).lt('sale_date', startOfNext);
+
+  return {
+    source: 'customer_buy_v3', target_table: 'sales', latest_ym: parsed.latest_ym,
+    rows_appended: res.ok, rows_failed: res.err,
+    first_error: res.first_error || null,
+    source_row_count,
+    source_amt_sum: +source_amt_sum.toFixed(2),
+    db_row_count_after: db_actual,
+    assertion_failed,
+    mode: overwrite ? 'overwrite' : 'append',
+  };
 }
 
 async function applyInventory(parsed, overwrite) {
