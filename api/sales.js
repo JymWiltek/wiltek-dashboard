@@ -190,13 +190,20 @@ async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
   const sku_qty_by_month        = {};
   const sku_amt_by_month_branch = {};
   const sku_qty_by_month_branch = {};
+  // sku_*_by_month is "company total" for the front-end Sales KPI 2 (units).
+  // Company total = 5 active stores. W11 history + WCO warehouse stay in the
+  // per-branch breakdown but NOT in the company-wide aggregates.
+  const ACTIVE_SET = new Set(ACTIVE_BRANCHES);
   for (const row of r3.data) {
     if (!recent14Set.has(row.ym)) continue;
-    if (!sku_amt_by_month[row.ym]) sku_amt_by_month[row.ym] = {};
-    if (!sku_qty_by_month[row.ym]) sku_qty_by_month[row.ym] = {};
-    sku_amt_by_month[row.ym][row.code] = (sku_amt_by_month[row.ym][row.code] || 0) + +row.amount;
-    sku_qty_by_month[row.ym][row.code] = (sku_qty_by_month[row.ym][row.code] || 0) + +row.qty;
-
+    // Company-wide aggregation: 5 active stores only
+    if (ACTIVE_SET.has(row.store)) {
+      if (!sku_amt_by_month[row.ym]) sku_amt_by_month[row.ym] = {};
+      if (!sku_qty_by_month[row.ym]) sku_qty_by_month[row.ym] = {};
+      sku_amt_by_month[row.ym][row.code] = (sku_amt_by_month[row.ym][row.code] || 0) + +row.amount;
+      sku_qty_by_month[row.ym][row.code] = (sku_qty_by_month[row.ym][row.code] || 0) + +row.qty;
+    }
+    // Per-branch breakdown: all stores (incl W11 history + WCO)
     if (!sku_amt_by_month_branch[row.ym])              sku_amt_by_month_branch[row.ym] = {};
     if (!sku_amt_by_month_branch[row.ym][row.store])   sku_amt_by_month_branch[row.ym][row.store] = {};
     if (!sku_qty_by_month_branch[row.ym])              sku_qty_by_month_branch[row.ym] = {};
