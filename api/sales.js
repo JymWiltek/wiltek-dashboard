@@ -195,20 +195,17 @@ async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
   const sku_qty_by_month        = {};
   const sku_amt_by_month_branch = {};
   const sku_qty_by_month_branch = {};
-  // sku_*_by_month is "company total" for the front-end Sales KPI 2 (units).
-  // Company total = 5 active stores. W11 history + WCO warehouse stay in the
-  // per-branch breakdown but NOT in the company-wide aggregates.
-  const ACTIVE_SET = new Set(ACTIVE_BRANCHES);
+  // Sprint 3 hotfix v4 (revert v2): Wiltek company total = SUM across ALL
+  // stores. W11 is hidden in UI dropdown BUT W11 sales DO count toward
+  // company sales (Jym 2026-05-12 拍板). Same for WCO/W12/W10/WEX.
+  // Per-branch breakdown still has per-store dim for drill-down.
   for (const row of r3.data) {
     if (!recent14Set.has(row.ym)) continue;
-    // Company-wide aggregation: 5 active stores only
-    if (ACTIVE_SET.has(row.store)) {
-      if (!sku_amt_by_month[row.ym]) sku_amt_by_month[row.ym] = {};
-      if (!sku_qty_by_month[row.ym]) sku_qty_by_month[row.ym] = {};
-      sku_amt_by_month[row.ym][row.code] = (sku_amt_by_month[row.ym][row.code] || 0) + +row.amount;
-      sku_qty_by_month[row.ym][row.code] = (sku_qty_by_month[row.ym][row.code] || 0) + +row.qty;
-    }
-    // Per-branch breakdown: all stores (incl W11 history + WCO)
+    if (!sku_amt_by_month[row.ym]) sku_amt_by_month[row.ym] = {};
+    if (!sku_qty_by_month[row.ym]) sku_qty_by_month[row.ym] = {};
+    sku_amt_by_month[row.ym][row.code] = (sku_amt_by_month[row.ym][row.code] || 0) + +row.amount;
+    sku_qty_by_month[row.ym][row.code] = (sku_qty_by_month[row.ym][row.code] || 0) + +row.qty;
+    // Per-branch breakdown
     if (!sku_amt_by_month_branch[row.ym])              sku_amt_by_month_branch[row.ym] = {};
     if (!sku_amt_by_month_branch[row.ym][row.store])   sku_amt_by_month_branch[row.ym][row.store] = {};
     if (!sku_qty_by_month_branch[row.ym])              sku_qty_by_month_branch[row.ym] = {};
@@ -254,7 +251,11 @@ export default async function handler(req, res) {
   let allowedBranches = null;
   if (user) {
     if (user.role === 'owner') {
-      allowedBranches = queryBranch ? [queryBranch] : ACTIVE_BRANCHES.concat(['W11', 'WCO']);
+      // Sprint 3 hotfix v4: owner sees ALL stores (no white-list). Company
+      // sales = SUM across every store in `sales` table (W01-W07 + W11 +
+      // W12 + WCO + W10 + WEX). UI dropdown still only lists 5 active +
+      // WCO; W11 history is hidden in dropdown but its sales DO count.
+      allowedBranches = queryBranch ? [queryBranch] : null;  // null = no .in() filter → all stores
     } else {
       // manager — pinned to their own store regardless of query.
       if (queryBranch && queryBranch !== user.store) {
@@ -264,8 +265,8 @@ export default async function handler(req, res) {
       allowedBranches = [user.store];
     }
   } else {
-    // No session — return owner-equivalent shape (legacy compat).
-    allowedBranches = ACTIVE_BRANCHES.concat(['W11', 'WCO']);
+    // No session — return owner-equivalent shape (legacy compat, all stores).
+    allowedBranches = null;
   }
 
   try {
