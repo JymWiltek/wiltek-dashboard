@@ -4728,11 +4728,12 @@ async function setSnapshot(ym, opts) {
   // Initial render with cached/stale data so user sees the month label
   // change instantly while fetch resolves.
   try { rerenderActiveView(); } catch(_) {}
-  // Now fire the real fetch. refreshLiveData() awaits all live endpoints
-  // (sales/customers/inventory/floatation), re-assigns WP_* globals,
-  // then re-renders. Network panel will show the new fetches.
+  // Now fire the real fetch with the NEW month — every /api/* URL
+  // must include ?month=${ym} so backend returns this month's data.
+  // (Sprint 5 P0 final fix: previously refreshLiveData was called without
+  // month → all fetches used default snapshot regardless of dropdown.)
   if (typeof refreshLiveData === 'function') {
-    try { await refreshLiveData({ silent: true }); } catch(_) {}
+    try { await refreshLiveData({ silent: true, month: ym }); } catch(_) {}
   }
   try { rerenderActiveView(); } catch(_) {}
 }
@@ -9876,8 +9877,10 @@ function v18AnnounceUpdate(ts) {
   );
 }
 
-async function fetchFloatationLive(ts) {
-  const url = '/api/floatation?t=' + (ts || Date.now());
+async function fetchFloatationLive(ts, month) {
+  const m = month || window.SNAPSHOT || '';
+  const qs = m ? '&month=' + encodeURIComponent(m) : '';
+  const url = '/api/floatation?t=' + (ts || Date.now()) + qs;
   try {
     const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
     if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
@@ -9926,8 +9929,10 @@ function wpAuthHeaders() {
   } catch (_) { return {}; }
 }
 
-async function fetchSalesLive(ts) {
-  const url = '/api/sales?t=' + (ts || Date.now());
+async function fetchSalesLive(ts, month) {
+  const m = month || window.SNAPSHOT || '';
+  const qs = m ? '&month=' + encodeURIComponent(m) : '';
+  const url = '/api/sales?t=' + (ts || Date.now()) + qs;
   try {
     const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
     if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
@@ -9951,8 +9956,10 @@ window.fetchSalesLive = fetchSalesLive;
 // inventory_snapshots + items + 90d sales). Replaces the
 // assets/deadstock-data.js static asset on every refresh. Same shape
 // (WP_DEADSTOCK) so V1.6 clsV16 + renderInventoryDashboard untouched.
-async function fetchInventoryLive(ts) {
-  const url = '/api/inventory?t=' + (ts || Date.now());
+async function fetchInventoryLive(ts, month) {
+  const m = month || window.SNAPSHOT || '';
+  const qs = m ? '&month=' + encodeURIComponent(m) : '';
+  const url = '/api/inventory?t=' + (ts || Date.now()) + qs;
   try {
     const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
     if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
@@ -9976,9 +9983,9 @@ window.fetchInventoryLive = fetchInventoryLive;
    On success → mutate window.WP_CUSTOMERS.* and window.WP_TODAY.churn in place,
    so every dashboard that reads those globals gets fresh numbers on next render.
    Also feeds the month picker on first reply (months_seen → populateMonthPicker). */
-async function fetchCustomersLive(ts) {
-  const month = window.SNAPSHOT;
-  const qs = month ? ('&month=' + encodeURIComponent(month)) : '';
+async function fetchCustomersLive(ts, month) {
+  const m = month || window.SNAPSHOT;
+  const qs = m ? ('&month=' + encodeURIComponent(m)) : '';
   const url = '/api/customers?t=' + (ts || Date.now()) + qs;
   try {
     const r = await fetch(url, { cache: 'no-store', headers: wpAuthHeaders() });
@@ -10086,6 +10093,12 @@ window.fingerprintLiveState = fingerprintLiveState;
    doesn't get a toast on every dropdown change, and on page-load auto-fetch). */
 async function refreshLiveData(opts) {
   const silent = !!(opts && opts.silent);
+  // Sprint 5 P0 fix #N: month MUST be plumbed through every fetch.
+  // Without this, month dropdown changed window.SNAPSHOT but every
+  // /api/* request still loaded the default (latest) month → identical
+  // numbers across months. caller passes opts.month=ym; fall back to
+  // current window.SNAPSHOT.
+  const month = (opts && opts.month) || window.SNAPSHOT || null;
   const btn = document.getElementById('refreshBtn');
   if (btn && btn.classList.contains('loading')) return { ok: false, error: 'in-flight' };
   if (btn) { btn.classList.add('loading'); btn.setAttribute('aria-busy', 'true'); btn.disabled = true; }
@@ -10102,10 +10115,10 @@ async function refreshLiveData(opts) {
   ));
 
   const [salesR, custR, floR, invR, proxyResults] = await Promise.all([
-    Promise.resolve().then(() => fetchSalesLive(ts)).catch(e => ({ ok: false, error: e.message })),
-    Promise.resolve().then(() => fetchCustomersLive(ts)).catch(e => ({ ok: false, error: e.message })),
-    Promise.resolve().then(() => fetchFloatationLive(ts)).catch(e => ({ ok: false, error: e.message })),
-    Promise.resolve().then(() => (typeof fetchInventoryLive === 'function' ? fetchInventoryLive(ts) : { ok: false, skipped: true }))
+    Promise.resolve().then(() => fetchSalesLive(ts, month)).catch(e => ({ ok: false, error: e.message })),
+    Promise.resolve().then(() => fetchCustomersLive(ts, month)).catch(e => ({ ok: false, error: e.message })),
+    Promise.resolve().then(() => fetchFloatationLive(ts, month)).catch(e => ({ ok: false, error: e.message })),
+    Promise.resolve().then(() => (typeof fetchInventoryLive === 'function' ? fetchInventoryLive(ts, month) : { ok: false, skipped: true }))
       .catch(e => ({ ok: false, error: e.message })),
     proxyP,
   ]);
@@ -10818,7 +10831,8 @@ async function renderInventoryStage3() {
   el.innerHTML = '<div class="s3-kpi"><div class="label">⏳ 加载中</div></div>';
   let j;
   try {
-    const r = await fetch('/api/inventory_dashboard', { headers: wpAuthHeaders() });
+    const _m = (typeof snapMonth === 'function' ? snapMonth() : '') || '';
+    const r = await fetch('/api/inventory_dashboard' + (_m ? '?month=' + encodeURIComponent(_m) : ''), { headers: wpAuthHeaders() });
     j = await r.json();
     if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
   } catch (e) {
@@ -10898,7 +10912,8 @@ async function renderInventoryStage4Alerts() {
   el.innerHTML = '<div class="s3-kpi"><div class="label">⏳ Loading alerts</div></div>';
   let j;
   try {
-    const r = await fetch('/api/inventory_dashboard?section=alerts', { headers: wpAuthHeaders() });
+    const _m = (typeof snapMonth === 'function' ? snapMonth() : '') || '';
+    const r = await fetch('/api/inventory_dashboard?section=alerts' + (_m ? '&month=' + encodeURIComponent(_m) : ''), { headers: wpAuthHeaders() });
     j = await r.json();
     if (!j.ok) throw new Error(j.error || 'fetch failed');
   } catch (e) {
@@ -11023,7 +11038,8 @@ async function renderTodayV2() {
   // payload-driven content. If payload fetch fails, leave legacy V1 in place.
   let j;
   try {
-    const r = await fetch('/api/today', { headers: wpAuthHeaders() });
+    const _m = (typeof snapMonth === 'function' ? snapMonth() : '') || '';
+    const r = await fetch('/api/today' + (_m ? '?month=' + encodeURIComponent(_m) : ''), { headers: wpAuthHeaders() });
     j = await r.json();
     if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
     window.WP_TODAY_PAYLOAD = j;
