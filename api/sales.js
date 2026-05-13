@@ -279,22 +279,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // PO/GRN fetched in parallel with Supabase aggregates.
-    const [poGrnText, sbAgg] = await Promise.all([
-      (async () => {
-        const r = await fetch(CSV_URL, { redirect: 'follow' });
-        if (!r.ok) return null;
-        const txt = await r.text();
-        if (txt.startsWith('<')) return null;
-        return txt;
-      })(),
-      buildSupabaseSalesPayload(allowedBranches, queryBranch || null).catch(e => {
-        console.error('[/api/sales] Supabase agg error:', e.message);
-        return null;
-      }),
-    ]);
-
-    const poGrn = poGrnText ? buildPoGrnPayload(poGrnText) : null;
+    // Sprint 5 P0 fix: cut PO/GRN CSV fetch from /api/sales (was 10s
+    // bottleneck). Sales endpoint shouldn't aggregate PO/GRN — that's
+    // Inventory's concern. Consumers needing PO/GRN: use po_grn table
+    // (Sprint 1) or /api/proxy?type=stock. Backward-compat: keep the
+    // shape with empty arrays so legacy renderers don't crash.
+    const sbAgg = await buildSupabaseSalesPayload(allowedBranches, queryBranch || null).catch(e => {
+      console.error('[/api/sales] Supabase agg error:', e.message);
+      return null;
+    });
 
     if (!sbAgg) {
       res.status(500).json({ ok: false, error: 'sales aggregates unavailable' });
@@ -307,19 +300,13 @@ export default async function handler(req, res) {
       source: 'supabase:wiltek-portal',
       session_role: user?.role || null,
       session_store: user?.store || null,
-      // Sales aggregates (Supabase)
       ...sbAgg,
       active_branches: ACTIVE_BRANCHES,
-      // PO/GRN aggregates (still from Sheet) — null if Sheet fetch failed.
-      ...(poGrn ? {
-        months: poGrn.months,
-        groups: poGrn.groups,
-        matrix: poGrn.matrix,
-        by_month: poGrn.by_month,
-        by_group: poGrn.by_group,
-        latest_month: poGrn.latest_month,
-        po_grn_rows: poGrn.rows_n,
-      } : { po_grn_unavailable: true }),
+      // PO/GRN cut from /api/sales (Sprint 5 P0). Shape kept empty for
+      // back-compat. Use /api/proxy?type=stock for PO/GRN matrix.
+      months: [], groups: [], matrix: [], by_month: {}, by_group: {},
+      latest_month: null, po_grn_rows: 0,
+      po_grn_unavailable: 'cut_in_sprint5_use_proxy_or_po_grn_table',
     });
   } catch (e) {
     console.error('[/api/sales] error:', e);
