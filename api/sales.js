@@ -29,7 +29,11 @@ import { createClient } from '@supabase/supabase-js';
 const SHEET_ID = '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II';
 const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
 const ACTIVE_BRANCHES = ['W01', 'W02', 'W03', 'W05', 'W07'];
-const SKU_DETAIL_MONTHS = 14;   // keep last 14 months of per-SKU detail
+// Sprint 5 P0 v3: SKU detail window reduced from 14 → 3 months. v_sku_by_month_branch
+// pagination (45k+ rows for 14 mo) was the new bottleneck after PO/GRN cut.
+// 3-mo window = ~10k rows = ~1-2 paginated rounds = <500ms response.
+// Older per-SKU detail (>3mo back) loadable via separate query if needed.
+const SKU_DETAIL_MONTHS = 3;
 
 // ── Supabase client (service-role; bypasses RLS) ─────────────────────
 const URL = process.env.WILTEK_SUPABASE_URL;
