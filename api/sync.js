@@ -1407,17 +1407,31 @@ async function applyItems(parsed) {
 // ── Handler ───────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-wp-user');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-wp-user, x-cron-secret');
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
-  if (req.method !== 'POST')    { res.status(405).json({ ok: false, error: 'POST only' }); return; }
+  // Vercel cron sends GET. Owner UI sends POST. Other methods → 405.
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.status(405).json({ ok: false, error: 'GET or POST only' });
+    return;
+  }
 
-  // Owner-only middleware.
-  const sessionUserName = String(req.headers['x-wp-user'] || '').trim().toLowerCase();
-  const user = await loadSessionUser(sessionUserName);
-  if (!user) return res.status(401).json({ ok: false, error: 'no session' });
-  if (user.role !== 'owner') return res.status(403).json({ ok: false, error: 'owner only' });
+  // Auth — owner session (x-wp-user) OR Vercel cron (Authorization: Bearer $CRON_SECRET).
+  // Vercel auto-attaches the Bearer header from CRON_SECRET env var for
+  // scheduled cron jobs; we never see the secret in the repo. Sprint 5:
+  // daily 02:00 KL auto-sync per Jym hard rule (Decisions Log 2026-05-13).
+  let user;
+  const authHeader = String(req.headers['authorization'] || '').trim();
+  const cronExpected = process.env.CRON_SECRET ? 'Bearer ' + process.env.CRON_SECRET : null;
+  if (cronExpected && authHeader === cronExpected) {
+    user = { username: 'cron_daily', role: 'owner', store: null, is_active: true };
+  } else {
+    const sessionUserName = String(req.headers['x-wp-user'] || '').trim().toLowerCase();
+    user = await loadSessionUser(sessionUserName);
+    if (!user) return res.status(401).json({ ok: false, error: 'no session' });
+    if (user.role !== 'owner') return res.status(403).json({ ok: false, error: 'owner only' });
+  }
 
   // JS-side timestamp captured once at handler start, used for BOTH
   // started_at + finished_at on every sync_log INSERT/UPDATE — keeps
@@ -1429,7 +1443,11 @@ export default async function handler(req, res) {
     try { body = JSON.parse(body); }
     catch { return res.status(400).json({ ok: false, error: 'invalid JSON' }); }
   }
-  const mode             = body?.mode || 'preview';
+  // Cron path (GET) defaults to apply mode. Owner UI (POST) defaults to preview.
+  // Cron passes mode via query string (?mode=apply); UI via JSON body.
+  const isCronRun = user.username === 'cron_daily';
+  const qMode  = String(req.query?.mode || '').trim().toLowerCase();
+  const mode             = body?.mode || qMode || (isCronRun ? 'apply' : 'preview');
   const confirmOverwrite = body?.confirm_overwrite || {};
   const onlyTargets      = body?.tables || ALL_TARGETS;
 

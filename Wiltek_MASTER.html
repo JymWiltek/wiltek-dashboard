@@ -4705,32 +4705,35 @@ function persistSnapshotToUrl() {
     history.replaceState(null, '', u.toString());
   } catch(_) {}
 }
-function setSnapshot(ym, opts) {
+async function setSnapshot(ym, opts) {
   if (!ym) return;
   if (!SNAPSHOT_RX.test(ym)) return;
-  if (window.SNAPSHOT === ym) return;
+  if (window.SNAPSHOT === ym && !(opts && opts.force)) return;
   window.SNAPSHOT = ym;
   try { localStorage.setItem('wp_snapshot', ym); } catch(_) {}
   persistSnapshotToUrl();
-  // Reflect in picker
   const sel = document.getElementById('monthPicker');
   if (sel) sel.value = ym;
-  // Update dynamic Snapshot label immediately
   try { updateDataDateLabel(); } catch(_) {}
   try { updateFooterSnapshot(); } catch(_) {}
-  // V1 第三刀 (2026-05-06 night): NO RE-FETCH on month change.
-  // All months are pre-loaded into WP_SALES_LIVE.sales_by_branch_month +
-  // WP_CUSTOMERS.summary_by_month on first entry; switching the snapshot
-  // is a pure-frontend re-render from cache. Refresh button is the only
-  // path that hits the network. Acceptance: <100ms switch, no spinner.
-  // Customer dashboard's per-snapshot windows still depend on a server
-  // recompute (raw-row scan), so opts.refetch=true still works for
-  // power-users who want fresh customer windows on snapshot change.
-  if (opts && opts.refetch) {
-    if (typeof refreshLiveData === 'function') refreshLiveData({ silent: true });
-    return;
+
+  // Sprint 5 P0 fix: month change MUST fire a real fetch (red-line rule).
+  // V1 第三刀's "pure cache-driven" optimization caused stale data on
+  // every shape-changing deploy (Sprint 3 v4 → renderer kept old 5-active
+  // sums). Now: invalidate cache + re-fetch + re-render. Each month
+  // switch = guaranteed fresh data, byte-match SQL truth.
+  try {
+    if (window.wpCache && wpCache.clear) wpCache.clear();
+  } catch(_) {}
+  // Initial render with cached/stale data so user sees the month label
+  // change instantly while fetch resolves.
+  try { rerenderActiveView(); } catch(_) {}
+  // Now fire the real fetch. refreshLiveData() awaits all live endpoints
+  // (sales/customers/inventory/floatation), re-assigns WP_* globals,
+  // then re-renders. Network panel will show the new fetches.
+  if (typeof refreshLiveData === 'function') {
+    try { await refreshLiveData({ silent: true }); } catch(_) {}
   }
-  // Pure cache-driven re-render
   try { rerenderActiveView(); } catch(_) {}
 }
 window.setSnapshot = setSnapshot;
@@ -5222,15 +5225,22 @@ function renderSalesDashboard() {
   }
   const cmpSales = buildMonthlyCompare(salesByMonth, snap);
 
-  // ── KPI 2: 该月销售件数 (qty units sold this month, scoped). Use
-  // sku_qty_by_month — it's the per-SKU per-month qty from Raw sale tab.
-  // For branch-scoped, we don't have per-branch per-SKU per-month qty — use
-  // the per-branch sales-RM / company AOV proxy. Honest fallback: '—'.
+  // ── KPI 2: 该月销售件数 (qty units sold this month, scoped).
+  // Sprint 5 P0: prefer units_by_branch_month from v_sales_kpi_monthly view
+  // (covers ALL months, all stores). Falls back to sku_qty_by_month if the
+  // older payload shape is in cache (which has the 14-month truncation).
+  const ubm = sl.units_by_branch_month || null;
   const skuQtyByMonth = sl.sku_qty_by_month || {};
   const qtyByMonth = {};
-  if (isBranchScoped()) {
-    // No per-branch per-SKU monthly qty available — fall back to scaling
-    // the company-wide qty by this branch's share of company sales.
+  if (ubm) {
+    // New path: per-(store,ym) units from the view → company-wide or branch
+    const stores = isBranchScoped() ? [BRANCH_VIEW] : Object.keys(ubm);
+    for (const b of stores) {
+      const m = ubm[b] || {};
+      for (const ym of Object.keys(m)) qtyByMonth[ym] = (qtyByMonth[ym] || 0) + (+m[ym] || 0);
+    }
+  } else if (isBranchScoped()) {
+    // Legacy fallback: scale company qty by branch share
     const sharePerMonth = {};
     Object.keys(sbm[BRANCH_VIEW] || {}).forEach(ym => {
       let companyTotal = 0;
@@ -9741,10 +9751,10 @@ window.updateDataDateLabel = updateDataDateLabel;
    cache + background fetch keeps them current without any extra UI.
    Owner keeps the button + can force a fresh fetch.
    ════════════════════════════════════════════════════════════════════ */
-// v19 = Sprint 3 hotfix v4 (revert 5-store white-list) + 2026-03 sales resync
-// + Sprint 4 inv 2026-04 column-shift fix. Old v18 cache is stale → must
-// invalidate to force a clean fetch.
-const WP_CACHE_PREFIX = 'wp_cache_v19_';
+// v20 = Sprint 5 P0 fix (units_by_branch_month + invoices_by_branch_month
+// added to /api/sales response shape; setSnapshot now re-fetches on month
+// change instead of pure cache-render).
+const WP_CACHE_PREFIX = 'wp_cache_v20_';
 const wpCache = {
   get(key) {
     try {

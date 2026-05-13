@@ -123,20 +123,27 @@ async function loadSessionUser(username) {
 
 // ── Build sales aggregates from Supabase views ────────────────────────
 async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
-  // Determine the YM cutoff for per-SKU detail (last 14 months from latest).
-  // Pull the full month list once to know "latest" reliably.
-  let q1 = sb().from('v_sales_by_branch_month').select('store, ym, amount');
+  // Sprint 5 P0: use v_sales_kpi_monthly (sales + units + invoices in one
+  // pre-aggregated view) instead of separate v_sales_by_branch_month
+  // calls. ~280 rows total vs 60,410 raw → p50 < 300ms target.
+  let q1 = sb().from('v_sales_kpi_monthly').select('store, ym, sales, units, invoices');
   if (allowedBranches) q1 = q1.in('store', allowedBranches);
   if (queryBranch)     q1 = q1.eq('store', queryBranch);
   const r1 = await q1;
-  if (r1.error) throw new Error('v_sales_by_branch_month: ' + r1.error.message);
+  if (r1.error) throw new Error('v_sales_kpi_monthly: ' + r1.error.message);
 
   const sales_by_branch_month = {};
+  const units_by_branch_month = {};
+  const invoices_by_branch_month = {};
   const monthsSet = new Set();
   const branchesSet = new Set();
   for (const row of r1.data) {
-    if (!sales_by_branch_month[row.store]) sales_by_branch_month[row.store] = {};
-    sales_by_branch_month[row.store][row.ym] = +row.amount;
+    if (!sales_by_branch_month[row.store])    sales_by_branch_month[row.store]    = {};
+    if (!units_by_branch_month[row.store])    units_by_branch_month[row.store]    = {};
+    if (!invoices_by_branch_month[row.store]) invoices_by_branch_month[row.store] = {};
+    sales_by_branch_month[row.store][row.ym]    = +row.sales;
+    units_by_branch_month[row.store][row.ym]    = +row.units;
+    invoices_by_branch_month[row.store][row.ym] = +row.invoices || 0;
     monthsSet.add(row.ym);
     branchesSet.add(row.store);
   }
@@ -216,6 +223,8 @@ async function buildSupabaseSalesPayload(allowedBranches, queryBranch) {
 
   return {
     sales_by_branch_month,
+    units_by_branch_month,           // Sprint 5 NEW: per-branch units from view
+    invoices_by_branch_month,        // Sprint 5 NEW: per-branch invoice count
     sku_amt_by_month,
     sku_qty_by_month,
     sku_amt_by_month_branch,
