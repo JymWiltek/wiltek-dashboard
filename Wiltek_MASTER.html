@@ -5194,10 +5194,15 @@ function renderSalesDashboard() {
     || cd.sales_by_branch_month
     || {};
   const snap = snapMonth();
-  const ACTIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
+  // Sprint 3 hotfix v4 + Sprint 4 P0 fix: company total = SUM across ALL
+  // stores (no white-list). W11/W12/WCO/W10/WEX all count toward company
+  // sales — UI dropdown lists 5 active, but aggregation is total.
+  // ACTIVE_5 only used for the 5-card chart row + branch scoping.
+  const ACTIVE_5 = ['W01', 'W02', 'W03', 'W05', 'W07'];
+  const ALL_BRANCHES_IN_DATA = Object.keys(sbm);
   const branchSet = isBranchScoped()
-    ? (ACTIVE.includes(BRANCH_VIEW) ? [BRANCH_VIEW] : [])
-    : ACTIVE;
+    ? (sbm[BRANCH_VIEW] ? [BRANCH_VIEW] : [])
+    : ACTIVE_5;   // chart row stays 5-active for UI consistency
   const chartBranches = branchSet.filter(b => sbm[b]);
   const scopeKey = isBranchScoped() ? BRANCH_VIEW : 'all';
 
@@ -5209,8 +5214,8 @@ function renderSalesDashboard() {
       salesByMonth[ym] = +sbm[BRANCH_VIEW][ym] || 0;
     });
   } else {
-    // Sum across active branches (5 stores) per month
-    for (const b of ACTIVE) {
+    // Company total: SUM ALL stores (no white-list, per Sprint 3 v4 rule)
+    for (const b of ALL_BRANCHES_IN_DATA) {
       const m = sbm[b] || {};
       for (const ym of Object.keys(m)) salesByMonth[ym] = (salesByMonth[ym] || 0) + (+m[ym] || 0);
     }
@@ -5229,7 +5234,7 @@ function renderSalesDashboard() {
     const sharePerMonth = {};
     Object.keys(sbm[BRANCH_VIEW] || {}).forEach(ym => {
       let companyTotal = 0;
-      for (const b of ACTIVE) companyTotal += +(sbm[b] || {})[ym] || 0;
+      for (const b of ALL_BRANCHES_IN_DATA) companyTotal += +(sbm[b] || {})[ym] || 0;
       sharePerMonth[ym] = companyTotal > 0 ? (+sbm[BRANCH_VIEW][ym] || 0) / companyTotal : 0;
     });
     Object.keys(skuQtyByMonth).forEach(ym => {
@@ -5256,7 +5261,7 @@ function renderSalesDashboard() {
   }
   const cmpAov = buildMonthlyCompare(aovByMonth, snap);
 
-  const scopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全部 5 家分行' : 'all 5 stores');
+  const scopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全公司' : 'company total');
   const k1Val = cmpSales.single ? 'RM ' + fmtMoney(cmpSales.single) : '—';
   const k1Cls = cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -10 ? 'danger'
              : cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -5  ? 'warn' : '';
@@ -9736,7 +9741,10 @@ window.updateDataDateLabel = updateDataDateLabel;
    cache + background fetch keeps them current without any extra UI.
    Owner keeps the button + can force a fresh fetch.
    ════════════════════════════════════════════════════════════════════ */
-const WP_CACHE_PREFIX = 'wp_cache_v18_';
+// v19 = Sprint 3 hotfix v4 (revert 5-store white-list) + 2026-03 sales resync
+// + Sprint 4 inv 2026-04 column-shift fix. Old v18 cache is stale → must
+// invalidate to force a clean fetch.
+const WP_CACHE_PREFIX = 'wp_cache_v19_';
 const wpCache = {
   get(key) {
     try {
