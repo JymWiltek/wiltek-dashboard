@@ -9751,10 +9751,10 @@ window.updateDataDateLabel = updateDataDateLabel;
    cache + background fetch keeps them current without any extra UI.
    Owner keeps the button + can force a fresh fetch.
    ════════════════════════════════════════════════════════════════════ */
-// v20 = Sprint 5 P0 fix (units_by_branch_month + invoices_by_branch_month
-// added to /api/sales response shape; setSnapshot now re-fetches on month
-// change instead of pure cache-render).
-const WP_CACHE_PREFIX = 'wp_cache_v20_';
+// v21 = Sprint 5 P0 final: PO/GRN CSV cut from /api/sales (10s → <500ms).
+// Previous v20 may have stuck "Loading…" rendering on first paint because
+// 10s fetch overlapped with user nav. v21 = fresh state + fast fetch.
+const WP_CACHE_PREFIX = 'wp_cache_v21_';
 const wpCache = {
   get(key) {
     try {
