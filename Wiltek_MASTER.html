@@ -4717,35 +4717,17 @@ async function setSnapshot(ym, opts) {
   try { updateDataDateLabel(); } catch(_) {}
   try { updateFooterSnapshot(); } catch(_) {}
 
-  // Sprint 5 P0 fix: month change MUST fire a real fetch (red-line rule).
-  // V1 第三刀's "pure cache-driven" optimization caused stale data on
-  // every shape-changing deploy (Sprint 3 v4 → renderer kept old 5-active
-  // sums). Now: invalidate cache + re-fetch + re-render. Each month
-  // switch = guaranteed fresh data, byte-match SQL truth.
-  try {
-    if (window.wpCache && wpCache.clear) wpCache.clear();
-  } catch(_) {}
-  // Initial render with cached/stale data so user sees the month label
-  // change instantly while fetch resolves.
-  try { rerenderActiveView(); } catch(_) {}
-  // Sprint 5 P0 final fix (Playwright diagnosis): bypass refreshLiveData
-  // — it has an in-flight guard (line ~10090) that returns 'in-flight'
-  // immediately if a previous refresh hasn't finished. When user switches
-  // months while boot fetch is still in-flight, await refreshLiveData
-  // resolved instantly with no NEW month fetch firing. KPIs stayed at
-  // boot snapshot.
-  // Fix: call the per-endpoint fetchers DIRECTLY with the new month,
-  // skipping refreshLiveData's guard. Each fetcher overwrites its own
-  // WP_* global. Then rerender.
-  const ts = Date.now();
-  try {
-    await Promise.all([
-      typeof fetchSalesLive       === 'function' ? fetchSalesLive(ts, ym).catch(_=>{})       : null,
-      typeof fetchCustomersLive   === 'function' ? fetchCustomersLive(ts, ym).catch(_=>{})   : null,
-      typeof fetchInventoryLive   === 'function' ? fetchInventoryLive(ts, ym).catch(_=>{})   : null,
-      typeof fetchFloatationLive  === 'function' ? fetchFloatationLive(ts, ym).catch(_=>{})  : null,
-    ].filter(Boolean));
-  } catch(_) {}
+  // Sprint 5 P0 Stage 3: month switch = ONLY redraw from globals + loadKpi.
+  // No /api/sales /api/customers /api/inventory /api/floatation refetch.
+  // The boot fetch loaded multi-month globals (WP_SALES_LIVE.sales_by_branch
+  // _month covers ALL months, same for sku_amt_by_month etc.) so charts /
+  // alerts / drill sections rerender from cache. KPI cards re-fetch fresh
+  // via loadKpi (fired inside renderXxxDashboard).
+  //   - Stage 2 (PR #31) cut KPI cards' WP_SALES_LIVE dependency.
+  //   - Stage 3 cuts the now-unnecessary parallel fetch chain that was
+  //     adding 3-5s to every month switch and racing with loadKpi.
+  // wpCache.clear() also removed: KPI doesn't use wpCache; other globals
+  // are multi-month so clearing only causes a refetch we don't need.
   try { rerenderActiveView(); } catch(_) {}
 }
 window.setSnapshot = setSnapshot;
@@ -5200,6 +5182,13 @@ function drillTile(viewKey, labelKey, subKey, icon, disabled) {
    ════════════════════════════════════════════════════════════════════ */
 
 window.WP_KPI = window.WP_KPI || {};   // { sales: {data, ym, branch}, ... }
+// Sprint 5 P0 Stage 3: in-flight guard — dedupe rapid identical loadKpi
+// calls. rerenderActiveView can fire from multiple paths (URL change,
+// language toggle, init, etc.); without this guard each fire triggered a
+// duplicate /api/kpi request for the same (view, ym, branch) key. Guard
+// only suppresses if a request with the EXACT same key is already inflight
+// — different months / branches / views still fetch.
+window._kpiInflight = window._kpiInflight || {};
 
 function _kpiCmp(curr, lastMo, lastYr, sixM) {
   // Build a buildMonthlyCompare-shaped object so dsCardCompare can consume it.
@@ -5227,6 +5216,9 @@ async function loadKpi(view, ym, branch) {
   if (!view || !ym) return null;
   const containerId = { sales: 'dsSalesCards', customers: 'dsCustCards', products: 'dsProdCards' }[view];
   if (!containerId) return null;
+  const key = view + '|' + ym + '|' + (branch || '');
+  if (window._kpiInflight[key]) return null;   // dedupe identical in-flight
+  window._kpiInflight[key] = true;
   const area = document.getElementById(containerId);
   try {
     const qs = new URLSearchParams({ view, month: ym });
@@ -5255,6 +5247,8 @@ async function loadKpi(view, ym, branch) {
         '</div></div>';
     }
     return null;
+  } finally {
+    delete window._kpiInflight[key];
   }
 }
 window.loadKpi = loadKpi;
