@@ -5181,6 +5181,165 @@ function drillTile(viewKey, labelKey, subKey, icon, disabled) {
   '</div>';
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   Sprint 5 P0 Stage 2 — KPI loader (/api/kpi)
+   Replaces 14 hours of race-condition patching on the KPI render layer.
+   Reads PRE-AGGREGATED monthly KPI from the materialized-view-backed
+   /api/kpi endpoint. Cuts out the entire sbm / WP_SALES_LIVE / wpCache
+   / refreshLiveData / setSnapshot in-flight-guard chain for KPI cards.
+
+   Contract:
+   - loadKpi(view, ym, branch) does fresh fetch (no-store), no cache, no
+     localStorage. Writes innerHTML into dsXxxCards on success.
+   - On failure, writes a single "Failed to load" cell + console.error.
+   - Each view's renderer builds a `cmp`-shaped compare object that
+     existing dsCardCompare() can consume — so visual styling matches
+     the current 3-line layout without changing card CSS.
+   - Manager RBAC: server forces own branch via x-wp-user header.
+     Owner viewing as branch: pass BRANCH_VIEW explicitly.
+   ════════════════════════════════════════════════════════════════════ */
+
+window.WP_KPI = window.WP_KPI || {};   // { sales: {data, ym, branch}, ... }
+
+function _kpiCmp(curr, lastMo, lastYr, sixM) {
+  // Build a buildMonthlyCompare-shaped object so dsCardCompare can consume it.
+  const c = (cur, prior) => {
+    const cur_n = +cur || 0, p_n = +prior || 0;
+    if (!p_n) return { amt: cur_n - p_n, pct: null, dir: 'flat', has: false };
+    const pct = (cur_n - p_n) / p_n * 100;
+    return { amt: cur_n - p_n, pct, dir: pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat', has: true };
+  };
+  return {
+    single: +curr || 0,
+    lastMonth: +lastMo || 0,
+    lastYearMonth: +lastYr || 0,
+    sixMonthAvg: +sixM || 0,
+    trail12: 0,
+    vs: {
+      lm:  c(curr, lastMo),
+      lyr: c(curr, lastYr),
+      m6:  c(curr, sixM),
+    },
+  };
+}
+
+async function loadKpi(view, ym, branch) {
+  if (!view || !ym) return null;
+  const containerId = { sales: 'dsSalesCards', customers: 'dsCustCards', products: 'dsProdCards' }[view];
+  if (!containerId) return null;
+  const area = document.getElementById(containerId);
+  try {
+    const qs = new URLSearchParams({ view, month: ym });
+    if (branch) qs.append('branch', branch);
+    const r = await fetch('/api/kpi?' + qs.toString(), {
+      cache: 'no-store',
+      headers: wpAuthHeaders(),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (!j.ok || !j.data) throw new Error('payload not ok');
+    // Cache last successful response per view (in-memory only; no localStorage).
+    window.WP_KPI[view] = { data: j.data, ym, branch: branch || null, fetched_at: j.fetched_at };
+    if (area) {
+      if (view === 'sales')      area.innerHTML = renderSalesKpiCards(j.data);
+      else if (view === 'customers') area.innerHTML = renderCustomersKpiCards(j.data);
+      else if (view === 'products')  area.innerHTML = renderProductsKpiCards(j.data);
+    }
+    return j.data;
+  } catch (e) {
+    console.error('[loadKpi] view=' + view + ' month=' + ym + ' branch=' + (branch || 'all') + ' failed:', e);
+    if (area) {
+      area.innerHTML = '<div class="ds-card"><div class="label">KPI</div>' +
+        '<div class="value danger">—</div>' +
+        '<div class="sub">' + (LANG === 'zh' ? '加载失败 · 切月份再试' : 'Failed to load — switch month to retry') +
+        '</div></div>';
+    }
+    return null;
+  }
+}
+window.loadKpi = loadKpi;
+
+function renderSalesKpiCards(d) {
+  const ym = d.ym;
+  const scopeLbl = (d.branch_scope && d.branch_scope !== 'all')
+    ? d.branch_scope
+    : (LANG === 'zh' ? '全公司' : 'company total');
+  const cmpSales = _kpiCmp(d.sales, d.last_month_sales, d.last_year_sales, d.six_m_avg_sales);
+  const cmpUnits = _kpiCmp(d.units, d.last_month_units, d.last_year_units, d.six_m_avg_units);
+  const cmpAov   = _kpiCmp(
+    d.aov,
+    d.last_month_units ? (d.last_month_sales / d.last_month_units) : 0,
+    d.last_year_units ? (d.last_year_sales / d.last_year_units) : 0,
+    d.six_m_avg_units ? (d.six_m_avg_sales / d.six_m_avg_units) : 0
+  );
+  const k1Val = cmpSales.single ? 'RM ' + fmtMoney(cmpSales.single) : '—';
+  const k1Cls = cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -10 ? 'danger'
+             : cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -5  ? 'warn' : '';
+  const k1Sub = (ym || '—') + ' · ' + scopeLbl;
+  const k2Val = cmpUnits.single ? fmt(Math.round(cmpUnits.single)) + (LANG === 'zh' ? ' 件' : ' units') : '—';
+  const k2Sub = (ym || '—') + ' · ' + (LANG === 'zh' ? '该月销售件数' : 'units sold');
+  const k3Val = cmpAov.single ? 'RM ' + fmtMoney(cmpAov.single) : '—';
+  const k3Sub = (ym || '—') + ' · ' + (LANG === 'zh' ? '客单价(销售 ÷ 件数)' : 'AOV (sales ÷ units)');
+  return dsCardCompare(t('ds-sales-month'), k1Val, cmpSales,
+            { sub: k1Sub, valueClass: k1Cls, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
+         dsCardCompare(t('ds-sales-units'), k2Val, cmpUnits,
+            { sub: k2Sub, fmtVal: (n) => fmt(Math.round(n)) }) +
+         dsCardCompare(t('ds-sales-aov'),   k3Val, cmpAov,
+            { sub: k3Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+}
+
+function renderCustomersKpiCards(d) {
+  const ym = d.ym;
+  const scopeLbl = (d.branch_scope && d.branch_scope !== 'all')
+    ? d.branch_scope
+    : (LANG === 'zh' ? '全公司' : 'company total');
+  const cmpMembers = _kpiCmp(d.members,
+    /* no member_count history in mview yet — leave compares hidden by 0 priors */
+    0, 0, 0);
+  const cmpMemberSales = _kpiCmp(d.member_sales,
+    d.last_month_member_sales, d.last_year_member_sales, d.six_m_avg_member_sales);
+  const cmpWalkIn = _kpiCmp(d.walk_in_sales,
+    d.last_month_walk_in_sales, d.last_year_walk_in_sales, d.six_m_avg_walk_in_sales);
+  const k1Val = cmpMembers.single ? fmt(cmpMembers.single) + (LANG === 'zh' ? ' 人' : '') : '—';
+  const k1Sub = (ym || '—') + ' · ' + scopeLbl + ' · ' + (LANG === 'zh' ? '该月活跃会员' : 'active members');
+  const k2Val = cmpMemberSales.single ? 'RM ' + fmtMoney(cmpMemberSales.single) : '—';
+  const k2Sub = (ym || '—') + ' · ' + (LANG === 'zh' ? '该月会员销售' : 'member sales');
+  const k3Val = cmpWalkIn.single ? 'RM ' + fmtMoney(cmpWalkIn.single) : '—';
+  const k3Sub = (ym || '—') + ' · ' + (LANG === 'zh' ? '该月散客/无 ID 销售' : 'walk-in / no-id sales');
+  return dsCardCompare(t('ds-cust-kpi-mix'), k1Val, cmpMembers,
+            { sub: k1Sub, fmtVal: (n) => fmt(Math.round(n)) + (LANG === 'zh' ? ' 人' : '') }) +
+         dsCardCompare(t('ds-cust-kpi-repeat'), k2Val, cmpMemberSales,
+            { sub: k2Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
+         dsCardCompare(LANG === 'zh' ? '散客销售' : 'Walk-in Sales', k3Val, cmpWalkIn,
+            { sub: k3Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+}
+
+function renderProductsKpiCards(d) {
+  const ym = d.ym;
+  const scopeLbl = (d.branch_scope && d.branch_scope !== 'all')
+    ? d.branch_scope
+    : (LANG === 'zh' ? '全分行' : 'all-branch');
+  const cmpSales = _kpiCmp(d.sales, d.last_month_sales, d.last_year_sales, d.six_m_avg_sales);
+  const cmpSkus  = _kpiCmp(d.skus_sold, d.last_month_skus_sold, d.last_year_skus_sold, d.six_m_avg_skus_sold);
+  const top = d.top_sku || {};
+  const k1Val = cmpSales.single ? 'RM ' + fmtMoney(cmpSales.single) : '—';
+  const k1Cls = cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -10 ? 'danger'
+             : cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -5  ? 'warn' : '';
+  const k1Sub = (ym || '—') + ' · ' + scopeLbl + (LANG === 'zh' ? ' 总销售' : ' total');
+  const k2Val = cmpSkus.single ? fmt(Math.round(cmpSkus.single)) + (LANG === 'zh' ? ' 颗' : ' SKUs') : '—';
+  const k2Sub = (ym || '—') + ' · ' + scopeLbl + (LANG === 'zh' ? ' 该月有销售的 SKU 数' : ' SKUs with sales');
+  const k3Val = top.item_code || '—';
+  const k3Sub = top.item_code
+    ? `${top.item_code} · RM ${fmtMoney(top.sales || 0)} · ${scopeLbl}`
+    : (LANG === 'zh' ? scopeLbl + ' 该月销售冠军 SKU' : scopeLbl + ' best-seller this month');
+  // Top SKU has no series-comparison; show value + sub only (use dsCard, not dsCardCompare).
+  return dsCardCompare(t('ds-prod-kpi-month-sales'), k1Val, cmpSales,
+            { sub: k1Sub, valueClass: k1Cls, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
+         dsCardCompare(t('ds-prod-kpi-month-skus'),  k2Val, cmpSkus,
+            { sub: k2Sub, fmtVal: (n) => fmt(Math.round(n)) }) +
+         dsCard(t('ds-prod-kpi-month-top'), k3Val, k3Sub, '');
+}
+
 /* ── Sales dashboard ───────────────────────────────────────────────
    V1 第三刀 (2026-05-06 night): SOURCE-OF-TRUTH FIX.
    Now reads WP_SALES_LIVE.sales_by_branch_month — derived from the Sales
@@ -5199,9 +5358,11 @@ function drillTile(viewKey, labelKey, subKey, icon, disabled) {
    Chart: 5 active retail branches only.
    No rolling logic. */
 function renderSalesDashboard() {
-  // V1.5 Sales dashboard: top 3 KPIs (单月销售 / 单月件数 / 单月客单价),
-  // each with 3-line compare. Branch-scoped when VIEW_AS='branch' (store
-  // manager's auto-locked view).
+  // Sprint 5 P0 Stage 2: KPI cards now come from /api/kpi (fire-and-forget
+  // loadKpi fills dsSalesCards async). Everything below this point is the
+  // non-KPI rest of the dashboard (per-branch chart + action + drills),
+  // which still reads from WP_SALES_LIVE because it isn't covered by the
+  // /api/kpi shape yet. See Stage 3 backlog for full migration.
   const sl = window.WP_SALES_LIVE || {};
   const cd = window.WP_CUSTOMERS || {};
   const sbm = (sl._raw_ok && sl.sales_by_branch_month)
@@ -5209,99 +5370,14 @@ function renderSalesDashboard() {
     || cd.sales_by_branch_month
     || {};
   const snap = snapMonth();
-  // Sprint 3 hotfix v4 + Sprint 4 P0 fix: company total = SUM across ALL
-  // stores (no white-list). W11/W12/WCO/W10/WEX all count toward company
-  // sales — UI dropdown lists 5 active, but aggregation is total.
-  // ACTIVE_5 only used for the 5-card chart row + branch scoping.
   const ACTIVE_5 = ['W01', 'W02', 'W03', 'W05', 'W07'];
-  const ALL_BRANCHES_IN_DATA = Object.keys(sbm);
   const branchSet = isBranchScoped()
     ? (sbm[BRANCH_VIEW] ? [BRANCH_VIEW] : [])
-    : ACTIVE_5;   // chart row stays 5-active for UI consistency
+    : ACTIVE_5;
   const chartBranches = branchSet.filter(b => sbm[b]);
-  const scopeKey = isBranchScoped() ? BRANCH_VIEW : 'all';
 
-  // ── KPI 1: 该月销售总额 (single-month, branch-scoped) — series across months
-  // for the compare lines.
-  const salesByMonth = {};
-  if (isBranchScoped()) {
-    Object.keys(sbm[BRANCH_VIEW] || {}).forEach(ym => {
-      salesByMonth[ym] = +sbm[BRANCH_VIEW][ym] || 0;
-    });
-  } else {
-    // Company total: SUM ALL stores (no white-list, per Sprint 3 v4 rule)
-    for (const b of ALL_BRANCHES_IN_DATA) {
-      const m = sbm[b] || {};
-      for (const ym of Object.keys(m)) salesByMonth[ym] = (salesByMonth[ym] || 0) + (+m[ym] || 0);
-    }
-  }
-  const cmpSales = buildMonthlyCompare(salesByMonth, snap);
-
-  // ── KPI 2: 该月销售件数 (qty units sold this month, scoped).
-  // Sprint 5 P0: prefer units_by_branch_month from v_sales_kpi_monthly view
-  // (covers ALL months, all stores). Falls back to sku_qty_by_month if the
-  // older payload shape is in cache (which has the 14-month truncation).
-  const ubm = sl.units_by_branch_month || null;
-  const skuQtyByMonth = sl.sku_qty_by_month || {};
-  const qtyByMonth = {};
-  if (ubm) {
-    // New path: per-(store,ym) units from the view → company-wide or branch
-    const stores = isBranchScoped() ? [BRANCH_VIEW] : Object.keys(ubm);
-    for (const b of stores) {
-      const m = ubm[b] || {};
-      for (const ym of Object.keys(m)) qtyByMonth[ym] = (qtyByMonth[ym] || 0) + (+m[ym] || 0);
-    }
-  } else if (isBranchScoped()) {
-    // Legacy fallback: scale company qty by branch share
-    const sharePerMonth = {};
-    Object.keys(sbm[BRANCH_VIEW] || {}).forEach(ym => {
-      let companyTotal = 0;
-      for (const b of ALL_BRANCHES_IN_DATA) companyTotal += +(sbm[b] || {})[ym] || 0;
-      sharePerMonth[ym] = companyTotal > 0 ? (+sbm[BRANCH_VIEW][ym] || 0) / companyTotal : 0;
-    });
-    Object.keys(skuQtyByMonth).forEach(ym => {
-      const m = skuQtyByMonth[ym] || {};
-      let totalQty = 0;
-      for (const c of Object.keys(m)) totalQty += +m[c] || 0;
-      qtyByMonth[ym] = Math.round(totalQty * (sharePerMonth[ym] || 0));
-    });
-  } else {
-    Object.keys(skuQtyByMonth).forEach(ym => {
-      const m = skuQtyByMonth[ym] || {};
-      let totalQty = 0;
-      for (const c of Object.keys(m)) totalQty += +m[c] || 0;
-      qtyByMonth[ym] = totalQty;
-    });
-  }
-  const cmpQty = buildMonthlyCompare(qtyByMonth, snap);
-
-  // ── KPI 3: 该月客单价 — RM / unit sold, derived from KPIs 1 and 2.
-  const aovByMonth = {};
-  for (const ym of Object.keys(salesByMonth)) {
-    const q = qtyByMonth[ym] || 0;
-    aovByMonth[ym] = q > 0 ? salesByMonth[ym] / q : 0;
-  }
-  const cmpAov = buildMonthlyCompare(aovByMonth, snap);
-
-  const scopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全公司' : 'company total');
-  const k1Val = cmpSales.single ? 'RM ' + fmtMoney(cmpSales.single) : '—';
-  const k1Cls = cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -10 ? 'danger'
-             : cmpSales.vs.lm.has && cmpSales.vs.lm.pct < -5  ? 'warn' : '';
-  const k1Sub = (snap || '—') + ' · ' + scopeLbl;
-
-  const k2Val = cmpQty.single ? fmt(Math.round(cmpQty.single)) + (LANG === 'zh' ? ' 件' : ' units') : '—';
-  const k2Sub = (snap || '—') + ' · ' + (LANG === 'zh' ? '该月销售件数' : 'units sold');
-
-  const k3Val = cmpAov.single ? 'RM ' + fmtMoney(cmpAov.single) : '—';
-  const k3Sub = (snap || '—') + ' · ' + (LANG === 'zh' ? '客单价(销售 ÷ 件数)' : 'AOV (sales ÷ units)');
-
-  document.getElementById('dsSalesCards').innerHTML =
-    dsCardCompare(t('ds-sales-month'),  k1Val, cmpSales,
-                  { sub: k1Sub, valueClass: k1Cls, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
-    dsCardCompare(t('ds-sales-units'),  k2Val, cmpQty,
-                  { sub: k2Sub, fmtVal: (n) => fmt(Math.round(n)) }) +
-    dsCardCompare(t('ds-sales-aov'),    k3Val, cmpAov,
-                  { sub: k3Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+  // Fire KPI loader (async; overwrites dsSalesCards when /api/kpi resolves)
+  try { loadKpi('sales', snap, isBranchScoped() ? BRANCH_VIEW : null); } catch (e) { console.warn('loadKpi sales failed:', e); }
 
   // Per-branch month sales (used by chart + best/worst)
   const monthSales = {};
@@ -5757,10 +5833,10 @@ function renderCustomersDashboard() {
   }
   // V1.6: Action Plan (3 cards) moved to Customers top for store managers.
   try { renderV16CustomerActionPlan(); } catch(_){}
-  // V1 第四刀: top 3 KPIs are now (1) cust type mix (2) repeat rate +
-  // new vs old AOV (3) race walk-in CR. Existing 4 KPIs (members /
-  // active / vet share / lapsed) preserved as the legacy chart context
-  // below the new alerts so the page still tells a complete story.
+  // Sprint 5 P0 Stage 2: Top 3 KPI cards now come from /api/kpi
+  // (member / member_sales / walk_in_sales). Old race-CR card moved to
+  // Sprint 6 (Customer page floatation integration). Alert cards + race
+  // section below this block still use legacy WP_CUSTOMERS / WP_FLOATATION.
   const period = window.PERIOD || '1m';
   const mix    = computeCustTypeMix(period);
   const repeat = computeRepeatRate();
@@ -5768,60 +5844,10 @@ function renderCustomersDashboard() {
   const race   = computeRaceConversion();
   const sleeping = computeSleepingTop();
   const churnAlert = computeChurnAlerts();
-
-  // V1.5: Customers top 3 KPIs are TRULY month-shifting. They read
-  // summary_by_month[snap] (n_active, amt_total) which is per-month, not
-  // window-relative. Race CR comes from /api/floatation latest-month scalar.
-  const cd_local = window.WP_CUSTOMERS || {};
-  const sbmonth  = cd_local.summary_by_month || {};
   const snapForCmp = snapMonth();
-  const activeSeries = {}, amtSeries = {};
-  for (const ym of Object.keys(sbmonth)) {
-    activeSeries[ym] = +(sbmonth[ym] || {}).n_active || 0;
-    amtSeries[ym]    = +(sbmonth[ym] || {}).amt_total || 0;
-  }
-  const cmpActive = buildMonthlyCompare(activeSeries, snapForCmp);
-  const cmpAmt    = buildMonthlyCompare(amtSeries, snapForCmp);
 
-  // KPI 1 — 该月活跃会员数 (real per-month from summary_by_month)
-  const kpi1Val = cmpActive.single ? fmt(cmpActive.single) + (LANG === 'zh' ? ' 人' : '') : '—';
-  const kpi1Sub = LANG === 'zh' ? `${snapForCmp || '—'} · 该月活跃会员` : `${snapForCmp || '—'} · active members`;
-  const kpi1Cls = '';
-
-  // KPI 2 — 该月会员销售 RM (real per-month from summary_by_month.amt_total)
-  const kpi2Val = cmpAmt.single ? 'RM ' + fmtMoney(cmpAmt.single) : '—';
-  const kpi2Sub = LANG === 'zh' ? `${snapForCmp || '—'} · 该月会员销售` : `${snapForCmp || '—'} · member sales`;
-  const kpi2Cls = '';
-
-  // KPI 3 — Race walk-in CR. V1.5 fix: per-month from /api/floatation.
-  // If snap is OUTSIDE the floatation feed range (Sheet only has recent
-  // months), show '—' rather than misleading latest-month value.
-  let kpi3Val = '—', kpi3Sub = t('ds-cust-race-pending'), kpi3Cls = '';
-  if (race.ok && race.hasMonth) {
-    const best = race.best;
-    const bestLabel = LANG === 'zh' ? (best.label_zh || best.key) : (best.label_en || best.key);
-    kpi3Val = (best.cr * 100).toFixed(1) + '%';
-    kpi3Sub = (LANG === 'zh'
-      ? `${bestLabel} CR 最高 · ${race.monthLabel}`
-      : `${bestLabel} highest CR · ${race.monthLabel}`);
-    if (best.cr < 0.5) kpi3Cls = 'warn';
-  } else if (race.ok && !race.hasMonth) {
-    // Snap month not in race feed — honest empty state with what IS available
-    kpi3Val = '—';
-    const avail = (race.monthsAvail || []).slice(-3).join(', ');
-    kpi3Sub = LANG === 'zh'
-      ? `${snapForCmp || '—'} · race feed 仅有 ${avail || '—'}`
-      : `${snapForCmp || '—'} · race feed only has ${avail || '—'}`;
-  }
-
-  document.getElementById('dsCustCards').innerHTML =
-    dsCardCompare(t('ds-cust-kpi-mix'),  kpi1Val, cmpActive,
-                  { sub: kpi1Sub, valueClass: kpi1Cls,
-                    fmtVal: (n) => fmt(Math.round(n)) + (LANG === 'zh' ? ' 人' : '') }) +
-    dsCardCompare(t('ds-cust-kpi-repeat'), kpi2Val, cmpAmt,
-                  { sub: kpi2Sub, valueClass: kpi2Cls,
-                    fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
-    dsCard(t('ds-cust-kpi-race'),    kpi3Val, kpi3Sub, kpi3Cls);
+  // Fire KPI loader (async; overwrites dsCustCards when /api/kpi resolves)
+  try { loadKpi('customers', snapForCmp, isBranchScoped() ? BRANCH_VIEW : null); } catch (e) { console.warn('loadKpi customers failed:', e); }
 
   // ── 4 alert cards ─────────────────────────────────────────────────
   const alerts = [];
@@ -6004,86 +6030,17 @@ function renderProductsDashboard() {
   const brands = fd.brands || [];
   const snap = snapMonth();
 
-  // V1 第四刀 返工: top 3 KPIs are SINGLE-MONTH + 3-line compare.
-  //   ① 该月销售总额  (single-month total RM)
-  //   ② 该月活跃 SKU 数 (unique SKUs that sold that month)
-  //   ③ 该月 Top SKU 销售冠军 (highest-selling SKU this month + amt)
-  // ABCD / velocity / stockout / strategic push remain as ALERT-CARD content
-  // (those are structure metrics, not single-month metrics).
+  // Sprint 5 P0 Stage 2: top 3 KPI cards come from /api/kpi
+  // (sales / skus_sold / top_sku). Price-band, Top-10 cats, Top-20 SKUs,
+  // ABCD/velocity/stockout alerts below still read from WP_SALES_LIVE.
   const abcd      = computeABCD();
   const velocity  = computeSkuVelocityIndex(abcd);
   const stockout  = computeStockoutRisks(abcd);
   const strategic = computeStrategicPushPlaceholder(abcd);
   const drain     = computeSlowMoverDrain(abcd);
-  const skuAmtByMonth = sl.sku_amt_by_month || {};
-  const totalAmtByMonth = sl.total_amt_by_month || {};
 
-  // KPI 1 — 该月销售总额 (RM) + 3-line compare. V1.5: branch-scoped when
-  // logged in as a store manager — sums ONLY their branch's monthly sales
-  // from sales_by_branch_month[BRANCH_VIEW]. Owner sees all-5-store sum.
-  let totalSeries = {};
-  if (isBranchScoped() && sl.sales_by_branch_month && sl.sales_by_branch_month[BRANCH_VIEW]) {
-    const m = sl.sales_by_branch_month[BRANCH_VIEW];
-    for (const ym of Object.keys(m)) totalSeries[ym] = (+m[ym] || 0);
-  } else if (Object.keys(totalAmtByMonth).length) {
-    totalSeries = totalAmtByMonth;
-  } else if (sl.sales_by_branch_month) {
-    for (const br of Object.keys(sl.sales_by_branch_month)) {
-      const m = sl.sales_by_branch_month[br] || {};
-      for (const ym of Object.keys(m)) totalSeries[ym] = (totalSeries[ym] || 0) + (+m[ym] || 0);
-    }
-  }
-  const cmpTotal = buildMonthlyCompare(totalSeries, snap);
-  const k1Val = cmpTotal.single ? 'RM ' + fmtMoney(cmpTotal.single) : '—';
-  const k1ScopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全分行' : 'all-branch');
-  const k1Sub = LANG === 'zh' ? `${snap || '—'} · ${k1ScopeLbl}总销售` : `${snap || '—'} · ${k1ScopeLbl} total`;
-  const k1Cls = cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -10 ? 'danger'
-               : cmpTotal.vs.lm.has && cmpTotal.vs.lm.pct < -5 ? 'warn' : '';
-
-  // V1.5 fix: KPI 2 + 3 are now BRANCH-SCOPED via sku_amt_by_month_branch.
-  // When isBranchScoped(), pick that branch's per-SKU per-month aggregate.
-  // Owner mode: company-wide (sum across all branches' per-month dictionaries).
-  const skuAmtByMonthBranch = sl.sku_amt_by_month_branch || {};
-  const skuAmtForView = (ym) => {
-    if (isBranchScoped()) {
-      return (skuAmtByMonthBranch[ym] && skuAmtByMonthBranch[ym][BRANCH_VIEW]) || {};
-    }
-    return skuAmtByMonth[ym] || {};
-  };
-
-  // KPI 2 — 该月活跃 SKU 数 (per-branch when scoped, company-wide otherwise)
-  const skuCountSeries = {};
-  for (const ym of Object.keys(skuAmtByMonth)) {
-    skuCountSeries[ym] = Object.keys(skuAmtForView(ym)).length;
-  }
-  const cmpCount = buildMonthlyCompare(skuCountSeries, snap);
-  const k2Val = cmpCount.single ? fmt(cmpCount.single) + (LANG === 'zh' ? ' 颗' : ' SKUs') : '—';
-  const prodScopeLbl = isBranchScoped() ? BRANCH_VIEW : (LANG === 'zh' ? '全分行' : 'all-branch');
-  const k2Sub = (LANG === 'zh' ? `${snap || '—'} · ${prodScopeLbl} 该月有销售的 SKU 数` : `${snap || '—'} · ${prodScopeLbl} SKUs with sales`);
-
-  // KPI 3 — 该月 Top SKU (best-seller this month, branch-scoped if applicable)
-  const skuMonth = skuAmtForView(snap);
-  const topThisMonth = Object.entries(skuMonth).sort((a, b) => b[1] - a[1])[0];
-  const k3Val = topThisMonth ? topThisMonth[0] : '—';
-  let k3Sub = (LANG === 'zh' ? `${prodScopeLbl} 该月销售冠军 SKU` : `${prodScopeLbl} best-seller this month`);
-  let cmpTop3 = null;
-  if (topThisMonth) {
-    const code = topThisMonth[0];
-    const topSeries = {};
-    for (const ym of Object.keys(skuAmtByMonth)) {
-      topSeries[ym] = +(skuAmtForView(ym) || {})[code] || 0;
-    }
-    cmpTop3 = buildMonthlyCompare(topSeries, snap);
-    k3Sub = `${code} · RM ${fmtMoney(topThisMonth[1])} · ${prodScopeLbl}`;
-  }
-
-  document.getElementById('dsProdCards').innerHTML =
-    dsCardCompare(t('ds-prod-kpi-month-sales'), k1Val, cmpTotal,
-                  { sub: k1Sub, valueClass: k1Cls, fmtVal: (n) => 'RM ' + fmtMoney(n) }) +
-    dsCardCompare(t('ds-prod-kpi-month-skus'),  k2Val, cmpCount,
-                  { sub: k2Sub, fmtVal: (n) => fmt(Math.round(n)) }) +
-    dsCardCompare(t('ds-prod-kpi-month-top'),   k3Val, cmpTop3,
-                  { sub: k3Sub, fmtVal: (n) => 'RM ' + fmtMoney(n) });
+  // Fire KPI loader (async; overwrites dsProdCards when /api/kpi resolves)
+  try { loadKpi('products', snap, isBranchScoped() ? BRANCH_VIEW : null); } catch (e) { console.warn('loadKpi products failed:', e); }
 
   // ── V1 第四刀 返工: render Price-band, Top 10 categories, Top 20 SKU
   // sections at the TOP of the dashboard (per Jym: 价格带 important).
