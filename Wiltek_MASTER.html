@@ -4706,9 +4706,11 @@ function persistSnapshotToUrl() {
   } catch(_) {}
 }
 async function setSnapshot(ym, opts) {
-  if (!ym) return;
-  if (!SNAPSHOT_RX.test(ym)) return;
-  if (window.SNAPSHOT === ym && !(opts && opts.force)) return;
+  console.log('=== setSnapshot CALLED ym=', JSON.stringify(ym), 'current SNAPSHOT=', window.SNAPSHOT, 'opts=', opts);
+  if (!ym) { console.log('=== setSnapshot RETURN: ym empty'); return; }
+  if (!SNAPSHOT_RX.test(ym)) { console.log('=== setSnapshot RETURN: regex fail'); return; }
+  if (window.SNAPSHOT === ym && !(opts && opts.force)) { console.log('=== setSnapshot RETURN: SNAPSHOT already', ym); return; }
+  console.log('=== setSnapshot PASS guards, setting SNAPSHOT to', ym);
   window.SNAPSHOT = ym;
   try { localStorage.setItem('wp_snapshot', ym); } catch(_) {}
   persistSnapshotToUrl();
@@ -4716,19 +4718,9 @@ async function setSnapshot(ym, opts) {
   if (sel) sel.value = ym;
   try { updateDataDateLabel(); } catch(_) {}
   try { updateFooterSnapshot(); } catch(_) {}
-
-  // Sprint 5 P0 Stage 3: month switch = ONLY redraw from globals + loadKpi.
-  // No /api/sales /api/customers /api/inventory /api/floatation refetch.
-  // The boot fetch loaded multi-month globals (WP_SALES_LIVE.sales_by_branch
-  // _month covers ALL months, same for sku_amt_by_month etc.) so charts /
-  // alerts / drill sections rerender from cache. KPI cards re-fetch fresh
-  // via loadKpi (fired inside renderXxxDashboard).
-  //   - Stage 2 (PR #31) cut KPI cards' WP_SALES_LIVE dependency.
-  //   - Stage 3 cuts the now-unnecessary parallel fetch chain that was
-  //     adding 3-5s to every month switch and racing with loadKpi.
-  // wpCache.clear() also removed: KPI doesn't use wpCache; other globals
-  // are multi-month so clearing only causes a refetch we don't need.
-  try { rerenderActiveView(); } catch(_) {}
+  console.log('=== setSnapshot calling rerenderActiveView, CUR_VIEW=', window.CUR_VIEW);
+  try { rerenderActiveView(); } catch(e) { console.error('=== rerenderActiveView THREW:', e); }
+  console.log('=== setSnapshot DONE');
 }
 window.setSnapshot = setSnapshot;
 // Bootstrap default: URL > localStorage > <empty until first /api/customers reply>
@@ -5213,6 +5205,7 @@ function _kpiCmp(curr, lastMo, lastYr, sixM) {
 }
 
 async function loadKpi(view, ym, branch) {
+  console.log('=== loadKpi CALLED view=', view, 'ym=', ym, 'branch=', branch);
   if (!view || !ym) return null;
   const containerId = { sales: 'dsSalesCards', customers: 'dsCustCards', products: 'dsProdCards' }[view];
   if (!containerId) return null;
