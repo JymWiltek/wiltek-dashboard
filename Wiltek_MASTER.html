@@ -4728,13 +4728,24 @@ async function setSnapshot(ym, opts) {
   // Initial render with cached/stale data so user sees the month label
   // change instantly while fetch resolves.
   try { rerenderActiveView(); } catch(_) {}
-  // Now fire the real fetch with the NEW month — every /api/* URL
-  // must include ?month=${ym} so backend returns this month's data.
-  // (Sprint 5 P0 final fix: previously refreshLiveData was called without
-  // month → all fetches used default snapshot regardless of dropdown.)
-  if (typeof refreshLiveData === 'function') {
-    try { await refreshLiveData({ silent: true, month: ym }); } catch(_) {}
-  }
+  // Sprint 5 P0 final fix (Playwright diagnosis): bypass refreshLiveData
+  // — it has an in-flight guard (line ~10090) that returns 'in-flight'
+  // immediately if a previous refresh hasn't finished. When user switches
+  // months while boot fetch is still in-flight, await refreshLiveData
+  // resolved instantly with no NEW month fetch firing. KPIs stayed at
+  // boot snapshot.
+  // Fix: call the per-endpoint fetchers DIRECTLY with the new month,
+  // skipping refreshLiveData's guard. Each fetcher overwrites its own
+  // WP_* global. Then rerender.
+  const ts = Date.now();
+  try {
+    await Promise.all([
+      typeof fetchSalesLive       === 'function' ? fetchSalesLive(ts, ym).catch(_=>{})       : null,
+      typeof fetchCustomersLive   === 'function' ? fetchCustomersLive(ts, ym).catch(_=>{})   : null,
+      typeof fetchInventoryLive   === 'function' ? fetchInventoryLive(ts, ym).catch(_=>{})   : null,
+      typeof fetchFloatationLive  === 'function' ? fetchFloatationLive(ts, ym).catch(_=>{})  : null,
+    ].filter(Boolean));
+  } catch(_) {}
   try { rerenderActiveView(); } catch(_) {}
 }
 window.setSnapshot = setSnapshot;
