@@ -4,5 +4,11 @@
       "path": "/api/sync?mode=apply",
       "schedule": "0 18 * * *"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/inventory_dashboard",
+      "destination": "/api/inventory?mode=dashboard"
+    }
   ]
 }

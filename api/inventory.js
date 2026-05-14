@@ -9,6 +9,14 @@
 //
 // Response shape preserved exactly (renderInventoryDashboard / Today /
 // V1.6 4-state classifier on frontend continue to work without changes).
+//
+// Sprint 5 P0 Stage 1: absorbed /api/inventory_dashboard to free a Vercel
+// Hobby function slot (12-cap) for the new /api/kpi endpoint. Dispatch:
+//   ?mode= (default) → inventory_payload (full row-level dashboard)
+//   ?mode=dashboard            → inventory_dashboard_payload (top 4 KPIs)
+//   ?mode=dashboard&section=alerts → inventory_alerts_payload (4 alert cards)
+// vercel.json rewrites /api/inventory_dashboard → /api/inventory?mode=dashboard
+// to keep existing frontend callsites in Wiltek_MASTER.html unchanged.
 // ═══════════════════════════════════════════════════════════════════════
 
 import { createClient } from '@supabase/supabase-js';
@@ -43,6 +51,39 @@ export default async function handler(req, res) {
   const sessionUserName = String(req.headers['x-wp-user'] || '').trim().toLowerCase();
   const user = await loadSessionUser(sessionUserName);
 
+  const mode    = String(req.query?.mode || '').trim().toLowerCase();
+  const section = String(req.query?.section || '').trim().toLowerCase();
+
+  // Sprint 5 P0 Stage 1 — dashboard mode (was /api/inventory_dashboard).
+  // Requires session (was 401 in the old handler); keep that contract.
+  if (mode === 'dashboard') {
+    if (!user) return res.status(401).json({ ok: false, error: 'no session' });
+    const p_branch = (user.role === 'manager') ? user.store : null;
+    const rpc = section === 'alerts' ? 'inventory_alerts_payload' : 'inventory_dashboard_payload';
+    try {
+      const { data, error } = await sb().rpc(rpc, { p_branch });
+      if (error) {
+        console.error(`[/api/inventory mode=dashboard section=${section}] RPC error:`, error);
+        res.status(500).json({ ok: false, error: error.message });
+        return;
+      }
+      res.status(200).json({
+        ok: true,
+        section: section || 'kpis',
+        fetched_at: new Date().toISOString(),
+        source: 'supabase:wiltek-portal',
+        session_role: user.role,
+        session_store: user.store,
+        ...data,
+      });
+    } catch (e) {
+      console.error('[/api/inventory mode=dashboard] error:', e);
+      res.status(500).json({ ok: false, error: e.message });
+    }
+    return;
+  }
+
+  // Default mode — full inventory payload (row-level + classifier).
   // Manager → scope rows[] to own store. Aggregates stay company-wide
   // because the V1.6 4-state classifier needs cross-store sales signal.
   // The RPC enforces this: p_branch only filters rows[], totals/by_branch
