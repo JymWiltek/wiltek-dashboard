@@ -215,6 +215,128 @@ table.branch-table .mini-bar-fill {
   display: block; height: 100%; background: var(--brand);
 }
 
+/* ── KPI card with detail rows (inventory/products/customers) ─────── */
+.kpi-rows {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
+  font-size: 12px;
+}
+.kpi-rows .kpi-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 3px 0; color: var(--text-meta);
+}
+.kpi-rows .kpi-row .name { color: var(--text-meta); }
+.kpi-rows .kpi-row .val  { color: var(--text-primary); font-family: 'SF Mono', Menlo, monospace; font-size: 11px; }
+.kpi-rows .kpi-row .val .pos { color: var(--ok); }
+.kpi-rows .kpi-row .val .neg { color: var(--danger); }
+.kpi-rows .kpi-row .val .flat { color: var(--text-light); }
+.card .as-of { font-size: 10px; color: var(--text-light); margin-top: 8px; font-style: italic; }
+.card .value.danger { color: var(--danger); }
+.card .value.warn   { color: var(--warn); }
+.card .value.ok     { color: var(--ok); }
+
+/* ── Alert cards (smaller, tonal border) ─────────────────────────── */
+.alert-card {
+  background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--text-light);
+  border-radius: var(--radius); padding: 14px 16px;
+}
+.alert-card.tone-ok   { border-left-color: var(--ok); }
+.alert-card.tone-warn { border-left-color: var(--warn); }
+.alert-card.tone-bad  { border-left-color: var(--danger); }
+.alert-card.tone-na   { border-left-color: var(--text-light); background: var(--surface); }
+.alert-card .a-title { font-size: 13px; color: var(--text-primary); font-weight: 600; margin-bottom: 4px; }
+.alert-card .a-value { font-size: 20px; font-weight: 500; line-height: 1.2; font-family: 'SF Mono', Menlo, monospace; }
+.alert-card .a-sub   { font-size: 12px; color: var(--text-meta); margin-top: 4px; }
+.alert-card .a-rows  { margin-top: 8px; font-size: 11px; }
+.alert-card .a-rows .a-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.alert-card .a-rows .name { color: var(--text-meta); }
+.alert-card .a-rows .val  { color: var(--text-primary); font-family: 'SF Mono', Menlo, monospace; }
+.alert-card.tone-na .a-value { color: var(--text-light); font-style: italic; font-size: 13px; }
+
+/* ── Today: status light + cash runway + sections ─────────────────── */
+.today-banner {
+  display: grid; gap: 16px; margin-bottom: 24px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 22px;
+}
+.today-light {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.today-light.tone-ok   { background: rgba(46,125,91,0.12); }
+.today-light.tone-warn { background: rgba(184,134,11,0.12); }
+.today-light.tone-bad  { background: rgba(160,48,48,0.12); }
+.today-light.tone-unknown { background: var(--surface); }
+.today-summary .headline { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.today-summary .headline.ok   { color: var(--ok); }
+.today-summary .headline.warn { color: var(--warn); }
+.today-summary .headline.bad  { color: var(--danger); }
+.today-summary .sub { font-size: 12px; color: var(--text-meta); margin-top: 4px; }
+.today-runway { text-align: right; }
+.today-runway .r-label { font-size: 11px; color: var(--text-meta); text-transform: uppercase; letter-spacing: 0.04em; }
+.today-runway .r-value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.today-runway .r-value.ok   { color: var(--ok); }
+.today-runway .r-value.warn { color: var(--warn); }
+.today-runway .r-value.bad  { color: var(--danger); }
+.today-runway .r-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+
+.section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-light); margin: 24px 0 10px;
+}
+
+/* Today: store table */
+table.store-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden;
+}
+table.store-table th, table.store-table td {
+  text-align: right; padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+table.store-table th:first-child, table.store-table th:nth-child(2),
+table.store-table td:first-child, table.store-table td:nth-child(2) {
+  text-align: left;
+}
+table.store-table tr:last-child td { border-bottom: 0; }
+table.store-table th {
+  font-size: 11px; color: var(--text-meta); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  background: var(--surface);
+}
+table.store-table .anom-ok   { color: var(--ok); }
+table.store-table .anom-mid  { color: var(--warn); }
+table.store-table .anom-bad  { color: var(--danger); }
+
+/* Today: 6-domain grid */
+.domain-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.domain-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; text-align: center;
+}
+.domain-card.tone-ok   { border-left: 3px solid var(--ok); }
+.domain-card.tone-warn { border-left: 3px solid var(--warn); }
+.domain-card.tone-bad  { border-left: 3px solid var(--danger); }
+.domain-card.tone-na   { border-left: 3px solid var(--text-light); background: var(--surface); }
+.domain-card .d-icon { font-size: 24px; line-height: 1; }
+.domain-card .d-name { font-size: 13px; font-weight: 600; margin-top: 4px; color: var(--text-primary); }
+.domain-card .d-sub  { font-size: 11px; color: var(--text-meta); margin-top: 2px; }
+.domain-card.tone-na .d-sub { font-style: italic; color: var(--text-light); }
+
+/* Today: Action Plan empty / placeholder */
+.action-plan {
+  background: var(--surface); border: 1px dashed var(--border);
+  border-radius: var(--radius); padding: 18px 22px;
+  color: var(--text-meta); font-size: 13px;
+}
+.action-plan strong { color: var(--text-primary); }
+
 /* ── Skeleton (loading) ───────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200px 0; }
@@ -305,10 +427,10 @@ table.branch-table .mini-bar-fill {
     <nav class="menu">
       <div class="menu-section">Dashboards</div>
       <a href="#" data-view="sales"     onclick="return onViewChange('sales')"><span class="icon">📊</span>Sales</a>
-      <a href="#" data-view="inventory" onclick="return onViewChange('inventory')"><span class="icon">📦</span>Inventory<span class="stub">B</span></a>
-      <a href="#" data-view="customers" onclick="return onViewChange('customers')"><span class="icon">👥</span>Customers<span class="stub">B</span></a>
-      <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products<span class="stub">B</span></a>
-      <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today<span class="stub">C</span></a>
+      <a href="#" data-view="inventory" onclick="return onViewChange('inventory')"><span class="icon">📦</span>Inventory</a>
+      <a href="#" data-view="customers" onclick="return onViewChange('customers')"><span class="icon">👥</span>Customers</a>
+      <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products</a>
+      <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today</a>
       <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance<span class="stub">…</span></a>
     </nav>
     <section class="app-content" id="main"></section>
@@ -409,11 +531,71 @@ function authHeaders() {
   return u && u.username ? { 'x-wp-user': u.username } : {};
 }
 
+/* ── Per-view fetchers (each returns the renderer's expected shape) ─ */
+async function getJSON(url, signal) {
+  const r = await fetch(url, { signal, cache: 'no-store', headers: authHeaders() });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error('HTTP ' + r.status + ' ' + t.slice(0, 200));
+  }
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'API returned ok:false');
+  return j;
+}
+
+function kpiQuery() {
+  const p = new URLSearchParams({ view: state.view, month: state.month });
+  if (state.branch) p.set('branch', state.branch);
+  return p.toString();
+}
+function monthQuery() {
+  return state.month ? '?month=' + encodeURIComponent(state.month) : '';
+}
+
+async function fetchSales(signal) {
+  const j = await getJSON('/api/kpi?' + kpiQuery(), signal);
+  state.role = j.session_role || state.role;
+  return j.data;
+}
+async function fetchCustomers(signal) {
+  const j = await getJSON('/api/kpi?' + kpiQuery(), signal);
+  state.role = j.session_role || state.role;
+  return j.data;
+}
+async function fetchProducts(signal) {
+  const j = await getJSON('/api/products' + monthQuery(), signal);
+  state.role = j.session_role || state.role;
+  return j;
+}
+async function fetchToday(signal) {
+  const j = await getJSON('/api/today' + monthQuery(), signal);
+  state.role = j.session_role || state.role;
+  return j;
+}
+async function fetchInventory(signal) {
+  // 2 calls in parallel — /api/inventory_dashboard KPIs + alerts.
+  const q = state.month ? '&month=' + encodeURIComponent(state.month) : '';
+  const [k, a] = await Promise.all([
+    getJSON('/api/inventory_dashboard?_=k' + q, signal),
+    getJSON('/api/inventory_dashboard?section=alerts' + q, signal),
+  ]);
+  state.role = k.session_role || state.role;
+  return { kpis: k, alerts: a };
+}
+
+const FETCHERS = {
+  sales:     fetchSales,
+  inventory: fetchInventory,
+  customers: fetchCustomers,
+  products:  fetchProducts,
+  today:     fetchToday,
+  finance:   null, // backlog: waits on multi-month financial sync
+};
+
 /* ── Single fetch (AbortController, no in-flight flag) ──────────── */
 let activeFetch = null;
 
 async function loadView() {
-  // Cancel any in-flight previous fetch — month switch always wins.
   if (activeFetch) { try { activeFetch.abort(); } catch (_) {} }
   activeFetch = new AbortController();
   const myCtl = activeFetch;
@@ -423,38 +605,18 @@ async function loadView() {
   state.data = null;
   renderView();
 
-  // Views without API yet: just render placeholder (Stage A/B unbuilt).
-  if (state.view === 'today' || state.view === 'finance') {
+  const fn = FETCHERS[state.view];
+  if (!fn) {
     state.loading = false;
     renderView();
     return;
   }
 
-  const params = new URLSearchParams();
-  params.set('view', state.view);
-  params.set('month', state.month);
-  if (state.branch) params.set('branch', state.branch);
-
-  const url = '/api/kpi?' + params.toString();
   const t0 = performance.now();
-
   try {
-    const r = await fetch(url, {
-      signal: myCtl.signal,
-      cache: 'no-store',
-      headers: authHeaders(),
-    });
-    if (myCtl.signal.aborted) return; // belt + suspenders
-    if (!r.ok) {
-      const text = await r.text().catch(() => '');
-      throw new Error('HTTP ' + r.status + ' ' + text.slice(0, 200));
-    }
-    const j = await r.json();
+    const data = await fn(myCtl.signal);
     if (myCtl.signal.aborted) return;
-    if (!j.ok) throw new Error(j.error || 'API returned ok:false');
-
-    state.data = j.data;
-    state.role = j.session_role || state.role;
+    state.data = data;
     state.loading = false;
     state.error = null;
 
@@ -467,10 +629,7 @@ async function loadView() {
       console.log('[V2] loadView aborted (superseded)');
       return;
     }
-    state.error = {
-      message: e.message || String(e),
-      retry: () => loadView(),
-    };
+    state.error = { message: e.message || String(e), retry: () => loadView() };
     state.loading = false;
     state.data = null;
     console.error('[V2] loadView error:', e);
@@ -526,10 +685,10 @@ function renderView() {
 
   const renderers = {
     sales:     renderSales,
-    inventory: renderStubView,
-    customers: renderStubView,
-    products:  renderStubView,
-    today:     renderStubView,
+    inventory: renderInventory,
+    customers: renderCustomers,
+    products:  renderProducts,
+    today:     renderToday,
     finance:   renderStubView,
   };
   const main = document.getElementById('main');
@@ -806,7 +965,514 @@ function renderBranchTable(d) {
     + '</div>';
 }
 
-/* ── Stub view (Inventory/Customers/Products/Today/Finance) ─────── */
+/* ── Shared helpers for KPI cards with sub-rows ───────────────── */
+function fmtMoneyShort(n) {
+  if (n == null || isNaN(n)) return '—';
+  const v = +n;
+  if (Math.abs(v) >= 1e6) return 'RM ' + (v / 1e6).toFixed(1) + 'M';
+  if (Math.abs(v) >= 1e3) return 'RM ' + (v / 1e3).toFixed(0) + 'k';
+  return 'RM ' + v.toFixed(0);
+}
+function fmtPctSign(n, digits) {
+  if (n == null || isNaN(n)) return '—';
+  digits = digits == null ? 1 : digits;
+  return (+n).toFixed(digits) + '%';
+}
+function momBadge(amt, pct) {
+  if (amt == null) return '';
+  const dir = amt > 0 ? 'pos' : (amt < 0 ? 'neg' : 'flat');
+  const sign = amt > 0 ? '↑' : (amt < 0 ? '↓' : '→');
+  const pctStr = pct == null ? '—' : Math.abs(pct).toFixed(1) + '%';
+  return ' <span class="' + dir + '">' + sign + ' ' + pctStr + '</span>';
+}
+function kpiRow(name, val) {
+  return '<div class="kpi-row"><span class="name">' + name + '</span><span class="val">' + val + '</span></div>';
+}
+function kpiCard(label, value, sub, rows, asOf, valueClass) {
+  return ''
+    + '<div class="card">'
+    +   '<div class="label">' + label + '</div>'
+    +   '<div class="value num' + (valueClass ? ' ' + valueClass : '') + '">' + value + '</div>'
+    +   (sub ? '<div class="month-tag">' + sub + '</div>' : '')
+    +   (rows ? '<div class="kpi-rows">' + rows + '</div>' : '')
+    +   (asOf ? '<div class="as-of">' + asOf + '</div>' : '')
+    + '</div>';
+}
+function alertCard(title, value, sub, tone, rows) {
+  const t = tone || 'na';
+  return ''
+    + '<div class="alert-card tone-' + t + '">'
+    +   '<div class="a-title">' + title + '</div>'
+    +   '<div class="a-value">' + (value || (t === 'na' ? 'pending' : '—')) + '</div>'
+    +   (sub ? '<div class="a-sub">' + sub + '</div>' : '')
+    +   (rows ? '<div class="a-rows">' + rows + '</div>' : '')
+    + '</div>';
+}
+function aRow(name, val) {
+  return '<div class="a-row"><span class="name">' + name + '</span><span class="val">' + val + '</span></div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER · INVENTORY  (Stage B)
+   8 cards = 4 KPI (health/order_gap/stockout/oem-vs-agency)
+            + 4 alerts (po_calendar/transfer/liquidation/po_anomalies).
+   Data: /api/inventory_dashboard (kpis + alerts in parallel).
+   byte-match V1 Stage 3 + Stage 4 — same endpoint, same numbers.
+═══════════════════════════════════════════════════════════════════ */
+function renderInventory(s) {
+  const title = '<h1 class="page-title">Inventory</h1>'
+              + '<p class="page-sub">Snapshot ' + s.month
+              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · Company-wide')
+              + ' · 4 KPI + 4 alerts · /api/inventory_dashboard</p>';
+
+  if (s.loading || !s.data) {
+    return title + '<div class="cards-grid">'
+      + skeletonCard('① Inventory health')
+      + skeletonCard('② Order gap')
+      + skeletonCard('③ Stockout risk')
+      + skeletonCard('④ OEM vs Agency')
+      + '</div>'
+      + '<div class="section-title">Action alerts</div>'
+      + '<div class="cards-grid">'
+      + skeletonCard('① OEM PO calendar')
+      + skeletonCard('② Transfer engine')
+      + skeletonCard('③ Liquidation')
+      + skeletonCard('④ PO anomalies')
+      + '</div>';
+  }
+
+  const k = s.data.kpis || {};
+  const a = s.data.alerts || {};
+  const asOf = k.snapshot_date ? 'snapshot ' + k.snapshot_date : '';
+  const ymPrev = k.ym_prev || '—';
+
+  // ── KPI 1: Inventory health (5-class breakdown + MoM) ─────────
+  const h = k.health || {};
+  const hClasses = h.classes || {};
+  const order = ['Active', 'Slow', 'Misplaced', 'Dead', 'Discontinued'];
+  const hRows = order.map(cls => {
+    const r = hClasses[cls] || { amount: 0, pct: 0, mom_amount: 0, mom_pct: null };
+    return kpiRow(cls,
+      fmtMoneyShort(r.amount) + ' (' + fmtPctSign(r.pct) + ')' + momBadge(r.mom_amount, r.mom_pct));
+  }).join('');
+  const deadAmt = ((hClasses.Dead && hClasses.Dead.amount) || 0) + ((hClasses.Discontinued && hClasses.Discontinued.amount) || 0);
+  const deadPct = h.total_stock ? (deadAmt / h.total_stock * 100) : 0;
+  const k1Class = deadPct > 30 ? 'danger' : deadPct > 20 ? 'warn' : '';
+  const c1 = kpiCard('① Inventory health',
+    fmtMoneyShort(h.total_stock || 0),
+    '5-class distribution (MoM vs ' + ymPrev + ')',
+    hRows, asOf, k1Class);
+
+  // ── KPI 2: Order gap (PO vs Sales consumed) ───────────────────
+  const og = k.order_gap || {};
+  const gapNum = +(og.gap || 0);
+  const gapStr = (gapNum >= 0 ? '+' : '-') + fmtMoneyShort(Math.abs(gapNum));
+  const gapClass = gapNum < 0 ? 'danger' : 'ok';
+  const abcd = og.abcd_distribution || {};
+  const abcdStr = ['A', 'B', 'C', 'D'].map(g => g + '=' + (abcd[g] || 0)).join(' / ');
+  const c2 = kpiCard('② Order gap (' + (k.ym_curr || '—') + ')',
+    gapStr,
+    'PO ' + fmtMoneyShort(og.po_curr_amt) + ' · Sales ' + fmtMoneyShort(og.sales_consumed_curr),
+    kpiRow('Next-month projection', fmtMoneyShort(og.next_month_projection)) +
+    kpiRow('ABCD distribution', abcdStr),
+    'baseline: last-month sales × 1.05',
+    gapClass);
+
+  // ── KPI 3: Stockout SKU alert (OEM/Agency split) ──────────────
+  const so = k.stockout || {};
+  const oemSo = so.OEM || { already_out: 0, at_risk_14d: 0, at_risk_30d: 0, lead_days: 51 };
+  const agcSo = so.Agency || { already_out: 0, at_risk_14d: 0, at_risk_30d: 0, lead_days: 8 };
+  const soTotal = (oemSo.already_out || 0) + (agcSo.already_out || 0);
+  const soClass = soTotal > 0 ? 'danger' : '';
+  const c3 = kpiCard('③ Stockout SKU alert',
+    soTotal + ' SKU out',
+    'split by source · lead-time differs OEM/Agency',
+    kpiRow('OEM (China · ' + oemSo.lead_days + 'd)',
+      oemSo.already_out + ' out / ' + oemSo.at_risk_14d + ' 14d / ' + oemSo.at_risk_30d + ' 30d') +
+    kpiRow('Agency (MY · ' + agcSo.lead_days + 'd)',
+      agcSo.already_out + ' out / ' + agcSo.at_risk_14d + ' 14d / ' + agcSo.at_risk_30d + ' 30d'),
+    asOf, soClass);
+
+  // ── KPI 4: OEM vs Agency ──────────────────────────────────────
+  const ova = k.oem_vs_agency || {};
+  const oem = ova.OEM || {};
+  const agc = ova.Agency || {};
+  const totVal = (oem.stock_value || 0) + (agc.stock_value || 0);
+  const c4 = kpiCard('④ OEM vs Agency',
+    fmtMoneyShort(totVal),
+    'Stock value + dead-rate by source',
+    kpiRow('OEM stock', fmtMoneyShort(oem.stock_value) + ' · dead ' + fmtPctSign(oem.dead_rate_pct)) +
+    kpiRow('Agency stock', fmtMoneyShort(agc.stock_value) + ' · dead ' + fmtPctSign(agc.dead_rate_pct)) +
+    kpiRow('Lead time', 'OEM ' + (oem.lead_days || 51) + 'd · Agency ' + (agc.lead_days || 8) + 'd'),
+    'hard-coded lead · per-SKU pending po_grn multi-mo history');
+
+  // ── Alert 1: OEM PO calendar ──────────────────────────────────
+  const po = a.po_calendar || {};
+  const poRows = (po.by_eta_month || []).slice(0, 4).map(m =>
+    aRow(escapeHtml(m.eta_ym) + ' (' + escapeHtml(m.source || '—') + ')',
+      (m.open_pos || 0) + ' POs · ' + fmtMoneyShort(m.po_amt))
+  ).join('') || aRow('No open POs', '');
+  const a1Tone = (po.open_total || 0) > 0 ? 'warn' : 'ok';
+  const al1 = alertCard('① OEM PO calendar',
+    (po.open_total || 0) + ' open',
+    fmtMoneyShort(po.open_amt) + ' in-transit · lead OEM=51d / Agency=8d',
+    a1Tone, poRows);
+
+  // ── Alert 2: Transfer engine (Misplaced) ──────────────────────
+  const xfer = a.transfer_engine || {};
+  const xferRows = (xfer.top20 || []).slice(0, 5).map(t =>
+    aRow(escapeHtml(t.item_code) + ' ' + t.from_store + '→' + t.to_store,
+      (t.transfer_qty_est || 0) + ' pcs · ' + fmtMoneyShort(t.transfer_value_est))
+  ).join('') || aRow('No transfer opportunities', '');
+  const a2Tone = (xfer.total_opportunities || 0) > 0 ? 'ok' : 'na';
+  const al2 = alertCard('② Transfer engine (Misplaced)',
+    (xfer.total_opportunities || 0) + ' opps',
+    'Release est. ' + fmtMoneyShort(xfer.total_value_est) + ' · top 5 ↓',
+    a2Tone, xferRows);
+
+  // ── Alert 3: Liquidation ──────────────────────────────────────
+  const liq = a.liquidation || {};
+  const tier = liq.by_tier || {};
+  const tier365 = tier.tier_365_plus || { n: 0, amt: 0 };
+  const tier180 = tier.tier_180_365 || { n: 0 };
+  const tier90 = tier.tier_90_180 || { n: 0 };
+  const a3Tone = (liq.total_locked_value || 0) > 100000 ? 'bad'
+              : (liq.total_locked_value || 0) > 10000  ? 'warn' : 'ok';
+  const al3 = alertCard('③ Liquidation candidates (Dead/Disc)',
+    (liq.total_candidates || 0) + ' SKU',
+    'Capital locked ' + fmtMoneyShort(liq.total_locked_value),
+    a3Tone,
+    aRow('365d+', tier365.n + ' (' + fmtMoneyShort(tier365.amt) + ')') +
+    aRow('180-365d', tier180.n + '') +
+    aRow('90-180d', tier90.n + '') +
+    aRow('Discount rec.', '365d+ 50% · 180-365 25% · 90-180 10%'));
+
+  // ── Alert 4: PO anomalies ─────────────────────────────────────
+  const anom = a.po_anomalies || {};
+  const overd = anom.overdue_po || { count: 0 };
+  const deficit = anom.grn_deficit || { count: 0 };
+  const drift = anom.price_drift || { count: 0 };
+  const anomTotal = (overd.count || 0) + (deficit.count || 0) + (drift.count || 0);
+  const a4Tone = anomTotal > 0 ? 'warn' : 'ok';
+  const al4 = alertCard('④ Purchase anomalies',
+    anomTotal + ' issues',
+    null, a4Tone,
+    aRow('Overdue PO (>60d)', overd.count || 0) +
+    aRow('GRN < PO', deficit.count || 0) +
+    aRow('Unit price drift >20%', drift.count || 0));
+
+  return title
+    + '<div class="cards-grid">' + c1 + c2 + c3 + c4 + '</div>'
+    + '<div class="section-title">Action alerts · ' + (a.snapshot_date || asOf) + '</div>'
+    + '<div class="cards-grid">' + al1 + al2 + al3 + al4 + '</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER · CUSTOMERS  (Stage B)
+   3 KPI from /api/kpi?view=customers (members / member_sales / walk_in_sales)
+   + 4 alerts as placeholders (V1 also pending for most; data not in /api/kpi).
+═══════════════════════════════════════════════════════════════════ */
+function renderCustomers(s) {
+  const title = '<h1 class="page-title">Customers</h1>'
+              + '<p class="page-sub">Snapshot ' + s.month
+              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · All stores')
+              + ' · 3 KPI + 4 alerts · /api/kpi?view=customers</p>';
+
+  if (s.loading || !s.data) {
+    return title + '<div class="cards-grid">'
+      + skeletonCard('① Members')
+      + skeletonCard('② Member sales')
+      + skeletonCard('③ Walk-in sales')
+      + '</div>'
+      + '<div class="section-title">Action alerts</div>'
+      + '<div class="cards-grid">'
+      + skeletonCard('① Sleeping Top 50')
+      + skeletonCard('② Pro segments')
+      + skeletonCard('③ Churn risk')
+      + skeletonCard('④ Race cross-tab')
+      + '</div>';
+  }
+
+  const d = s.data;
+  const ymPrev = ymLastMonth(s.month);
+  const ymYr   = ymLastYear(s.month);
+
+  // ── KPI 1: Members (count) ─────────────────────────────────────
+  const c1 = ''
+    + '<div class="card">'
+    +   '<div class="label">① Active members</div>'
+    +   '<div class="value num">' + fmtInt(d.members || 0) + ' <span class="unit">people</span></div>'
+    +   '<div class="month-tag">distinct member customers in ' + s.month + '</div>'
+    +   '<div class="compare"><div class="row"><span>distinct_customers (sales table)</span><span class="delta-flat">' + fmtInt(d.members) + '</span></div></div>'
+    + '</div>';
+
+  // ── KPI 2: Member sales ────────────────────────────────────────
+  const c2 = ''
+    + '<div class="card">'
+    +   '<div class="label">② Member sales</div>'
+    +   '<div class="value num">' + fmtRM(d.member_sales) + '</div>'
+    +   '<div class="month-tag">RM through enrolled members</div>'
+    +   '<div class="compare">'
+    +     deltaCell(d.member_sales, d.last_month_member_sales, 'vs ' + ymPrev,  fmtRM)
+    +     deltaCell(d.member_sales, d.last_year_member_sales,  'vs ' + ymYr,    fmtRM)
+    +     deltaCell(d.member_sales, d.six_m_avg_member_sales,  'vs 6-mo avg',   fmtRM)
+    +   '</div>'
+    + '</div>';
+
+  // ── KPI 3: Walk-in sales (data fact: 2026-04 has 0 walk-ins) ──
+  const c3 = ''
+    + '<div class="card">'
+    +   '<div class="label">③ Walk-in sales</div>'
+    +   '<div class="value num">' + fmtRM(d.walk_in_sales) + '</div>'
+    +   '<div class="month-tag">' + fmtInt(d.walk_in_invoices || 0) + ' invoices · non-member</div>'
+    +   '<div class="compare">'
+    +     deltaCell(d.walk_in_sales, d.last_month_walk_in_sales, 'vs ' + ymPrev,  fmtRM)
+    +     deltaCell(d.walk_in_sales, d.last_year_walk_in_sales,  'vs ' + ymYr,    fmtRM)
+    +     deltaCell(d.walk_in_sales, d.six_m_avg_walk_in_sales,  'vs 6-mo avg',   fmtRM)
+    +   '</div>'
+    + '</div>';
+
+  // ── Alerts (V1 mostly placeholder — data lives in /api/customers WP_CUSTOMERS rows) ─
+  const al1 = alertCard('① Sleeping high-value Top 50',  null,
+    'Members with 0 invoices in 3m · needs /api/customers full member rows', 'na', null);
+  const al2 = alertCard('② Designer / Contractor / Builders',  null,
+    'Pro segment counts + AOV · needs cust_type field on /api/customers', 'na', null);
+  const al3 = alertCard('③ Churn risk', null,
+    'Active in 6m, silent this month · needs member 6m timeline', 'na', null);
+  const al4 = alertCard('④ Race × category cross-tab', null,
+    'Customer_Buy_v3 has no race field · Customer Floatation aggregate only', 'na', null);
+
+  return title
+    + '<div class="cards-grid">' + c1 + c2 + c3 + '</div>'
+    + '<div class="section-title">Action alerts</div>'
+    + '<div class="cards-grid">' + al1 + al2 + al3 + al4 + '</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER · PRODUCTS  (Stage B)
+   3 KPI from /api/products (Velocity ABCD / Top 20 migrations / Strategic Push)
+   + 4 alerts (mostly placeholder — V1 same; need stock context).
+═══════════════════════════════════════════════════════════════════ */
+function renderProducts(s) {
+  const title = '<h1 class="page-title">Products</h1>'
+              + '<p class="page-sub">Snapshot ' + s.month
+              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · Company-wide')
+              + ' · 3 KPI + 4 alerts · /api/products</p>';
+
+  if (s.loading || !s.data) {
+    return title + '<div class="cards-grid">'
+      + skeletonCard('① SKU Velocity')
+      + skeletonCard('② Top 20 migrations')
+      + skeletonCard('③ Strategic Push')
+      + '</div>'
+      + '<div class="section-title">Action alerts</div>'
+      + '<div class="cards-grid">'
+      + skeletonCard('① Stockout risk')
+      + skeletonCard('② Slow-mover drain')
+      + skeletonCard('③ SKU tier migration')
+      + skeletonCard('④ Designer/Contractor pref')
+      + '</div>';
+  }
+
+  const j = s.data;
+  const v = j.velocity || {};
+  const mig = j.migrations || {};
+  const sp = j.strategic_push || {};
+  const cls = v.classes || {};
+  const asOf = 'snapshot ' + (j.snapshot || '—') + (j.prev_snapshot ? ' (vs ' + j.prev_snapshot + ')' : '');
+
+  // ── KPI 1: SKU Velocity (ABCD 90d) ────────────────────────────
+  const abcdRows = ['A', 'B', 'C', 'D'].map(t => {
+    const c = cls[t] || { n: 0, amt: 0, pct: 0 };
+    return kpiRow(t + ' tier', c.n + ' SKU · ' + fmtMoneyShort(c.amt) + ' (' + (c.pct || 0) + '%)');
+  }).join('');
+  const c1 = kpiCard('① SKU Velocity (ABCD · 90d)',
+    (v.total_sku || 0) + ' SKU',
+    (v.total_active || 0) + ' active · A=top10% / B=20% / C=40% / D=30%',
+    abcdRows, asOf);
+
+  // ── KPI 2: Top 20 migrations ──────────────────────────────────
+  const migRows = (mig.top20 || []).slice(0, 6).map(x =>
+    kpiRow(escapeHtml(x.item_code) + ' · ' + escapeHtml(x.brand || '—'),
+      escapeHtml(x.migration || '') + ' · ' + fmtMoneyShort(x.amt_90d))
+  ).join('') || kpiRow('No significant cross-tier migrations', '');
+  const c2 = kpiCard('② Top 20 anomaly migrations',
+    (mig.count || 0) + '',
+    'A→C/D warning · D→A/B opportunity · C→A breakout (top 6 ↓)',
+    migRows);
+
+  // ── KPI 3: Strategic Push ─────────────────────────────────────
+  const spRows = (sp.items || []).map(x =>
+    kpiRow(escapeHtml(x.item_code) + ' · ' + escapeHtml(x.brand || '—'),
+      'opened ' + (x.days_since_open || 0) + 'd ago · ' + fmtMoneyShort(x.amt_90d))
+  ).join('') || kpiRow('No new A-tier SKUs in last 60 days', '');
+  const c3 = kpiCard('③ Strategic Push (placeholder)',
+    (sp.count || 0) + '',
+    escapeHtml(sp.note || 'Strategic_Push field pending in Item Master'),
+    spRows);
+
+  // ── Alerts (V1 same — most pending) ───────────────────────────
+  const al1 = alertCard('① Stockout risk', null,
+    '<14d SKUs · split by OEM/Agency lead time · in /api/inventory_dashboard', 'na', null);
+  const al2 = alertCard('② Slow-mover capital drain', null,
+    'Locked-up SKUs by tier · merges into /api/inventory_dashboard liquidation', 'na', null);
+  const al3Rows = (mig.top20 || []).filter(x =>
+    (x.migration || '').includes('A→') || (x.migration || '').includes('→D')
+  ).slice(0, 4).map(x =>
+    aRow(escapeHtml(x.item_code), escapeHtml(x.migration))
+  ).join('');
+  const al3 = alertCard('③ SKU tier migration',
+    al3Rows ? (mig.top20 || []).filter(x =>
+      (x.migration || '').includes('A→') || (x.migration || '').includes('→D')).length + ' moves' : null,
+    al3Rows ? 'Top 4 A-tier drops or D-tier rises' : 'No critical tier moves vs ' + (j.prev_snapshot || '—'),
+    al3Rows ? 'warn' : 'ok', al3Rows);
+  const al4 = alertCard('④ Designer / Contractor SKU pref', null,
+    'Per-cust-type per-SKU map pending · cust_type on /api/customers', 'na', null);
+
+  return title
+    + '<div class="cards-grid">' + c1 + c2 + c3 + '</div>'
+    + '<div class="section-title">Action alerts</div>'
+    + '<div class="cards-grid">' + al1 + al2 + al3 + al4 + '</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER · TODAY  (Stage B — 4-layer briefing)
+   Layer 1: status light + Cash Runway
+   Layer 2: Action Plan (placeholder until Stage C cross-view integration)
+   Layer 3: 5-store snapshot table (mtd_amount / closing_rate / walk-in / basket)
+   Layer 4: 6-domain health grid (placeholder — needs cross-view aggregation)
+   Data: /api/today (status + stores).
+═══════════════════════════════════════════════════════════════════ */
+function renderToday(s) {
+  const title = '<h1 class="page-title">Today</h1>'
+              + '<p class="page-sub">Snapshot ' + s.month + ' · 4-layer briefing · /api/today</p>';
+
+  if (s.loading || !s.data) {
+    return title
+      + '<div class="today-banner"><div class="today-light tone-unknown">…</div>'
+      + '<div class="today-summary"><div class="skeleton h-line"></div><div class="skeleton h-line"></div></div>'
+      + '<div class="today-runway"><div class="skeleton h-value"></div></div></div>'
+      + '<div class="section-title">5-store snapshot</div>'
+      + '<div class="card"><div class="skeleton h-row"></div><div class="skeleton h-row"></div><div class="skeleton h-row"></div></div>';
+  }
+
+  const j = s.data;
+  const st = j.status || {};
+  const stores = Array.isArray(j.stores) ? j.stores : [];
+  const lightCls = st.light || 'unknown';
+  const missing = Array.isArray(st.data_missing) ? st.data_missing : [];
+
+  // ── Layer 1: Status light + Cash Runway ──────────────────────────
+  const lightIcon = { ok: '🟢', warn: '🟡', bad: '🔴', unknown: '⚪' }[lightCls] || '⚪';
+  const headlineMap = {
+    ok:     ['Wiltek today: healthy', 'ok'],
+    warn:   ['Wiltek today: heads up', 'warn'],
+    bad:    ['Wiltek today: critical', 'bad'],
+    unknown:['Wiltek today: data partial', ''],
+  };
+  const [headline, headlineCls] = headlineMap[lightCls] || headlineMap.unknown;
+  const summarySub = missing.length
+    ? 'Missing data: ' + missing.map(escapeHtml).join(', ')
+    : 'All sources synced · status from /api/today';
+
+  let runwayVal = 'pending', runwaySub = 'FMM cash data not yet loaded', runwayCls = '';
+  if (st.cash_runway_months != null) {
+    const m = +st.cash_runway_months;
+    runwayVal = m.toFixed(1) + ' months';
+    runwayCls = m > 6 ? 'ok' : m > 3 ? 'warn' : 'bad';
+    runwaySub = 'Cash ' + fmtMoneyShort(st.cash_total) +
+      (st.financial_balance_sheet_as_of ? ' · as of ' + st.financial_balance_sheet_as_of.slice(0, 10) : '');
+  } else if (st.cash_total != null) {
+    runwayVal = fmtMoneyShort(st.cash_total);
+    runwaySub = 'Cash on hand · monthly burn pending';
+  }
+
+  const banner = ''
+    + '<div class="today-banner">'
+    +   '<div class="today-light tone-' + lightCls + '">' + lightIcon + '</div>'
+    +   '<div class="today-summary">'
+    +     '<div class="headline ' + headlineCls + '">' + headline + '</div>'
+    +     '<div class="sub">' + summarySub + '</div>'
+    +   '</div>'
+    +   '<div class="today-runway">'
+    +     '<div class="r-label">Cash runway</div>'
+    +     '<div class="r-value ' + runwayCls + '">' + runwayVal + '</div>'
+    +     '<div class="r-sub">' + runwaySub + '</div>'
+    +   '</div>'
+    + '</div>';
+
+  // ── Layer 2: Action Plan (placeholder — needs cross-view aggregation) ─
+  const actionPlan = ''
+    + '<div class="section-title">Action Plan · top 3 today</div>'
+    + '<div class="action-plan">'
+    +   '<strong>Stage C feature.</strong> '
+    +   'Action Plan derives the top 3 actions today from cross-view aggregation '
+    +   '(receivables aging · stockout list · slow-mover spikes · ABCD migrations · churn risk). '
+    +   'Each card needs problem + impact + jump-link. '
+    +   'Skeleton lives here once the cross-view selector lands.'
+    + '</div>';
+
+  // ── Layer 3: 5-store snapshot ────────────────────────────────────
+  const sortedStores = stores.slice().sort((a, b) => (a.store || '').localeCompare(b.store || ''));
+  let storeRows = sortedStores.map(b => {
+    const cr = b.closing_rate != null ? (+b.closing_rate).toFixed(1) + '%' : '—';
+    const walk = b.walk_in_total != null ? fmtInt(b.walk_in_total) : '—';
+    const basket = b.basket_estimate != null ? fmtRM(b.basket_estimate) : '—';
+    const mtd = b.mtd_amount != null ? fmtRM(b.mtd_amount) : '—';
+    const inv = b.mtd_invoices != null ? fmtInt(b.mtd_invoices) : '—';
+    const anomCls = (b.closing_rate != null && b.closing_rate < 25) ? 'anom-bad'
+                  : (b.closing_rate != null && b.closing_rate < 50) ? 'anom-mid' : 'anom-ok';
+    const anomLbl = (b.closing_rate != null && b.closing_rate < 25) ? '🔴 low CR'
+                  : (b.closing_rate != null && b.closing_rate < 50) ? '🟡 CR' : '✓';
+    return '<tr>'
+      + '<td><strong>' + escapeHtml(b.store || '') + '</strong></td>'
+      + '<td>' + escapeHtml(b.name || '') + '</td>'
+      + '<td class="num">' + mtd + '</td>'
+      + '<td class="num">' + inv + '</td>'
+      + '<td class="num">' + walk + '</td>'
+      + '<td class="num">' + cr + '</td>'
+      + '<td class="num">' + basket + '</td>'
+      + '<td class="' + anomCls + '">' + anomLbl + '</td>'
+      + '</tr>';
+  }).join('');
+  if (!storeRows) storeRows = '<tr><td colspan="8" class="muted" style="text-align:center;padding:14px">No store data in /api/today response</td></tr>';
+
+  const storeTable = ''
+    + '<div class="section-title">5-store snapshot · ' + s.month + (stores[0]?.floatation_as_of ? ' · floatation ' + stores[0].floatation_as_of : '') + '</div>'
+    + '<table class="store-table">'
+    +   '<thead><tr>'
+    +     '<th>Store</th><th>Name</th>'
+    +     '<th>MTD sales</th><th>Invoices</th>'
+    +     '<th>Walk-in</th><th>Closing rate</th><th>Basket est.</th>'
+    +     '<th>Anom</th>'
+    +   '</tr></thead>'
+    +   '<tbody>' + storeRows + '</tbody>'
+    + '</table>';
+
+  // ── Layer 4: 6-domain health (placeholder) ─────────────────────
+  const domains = [
+    { key: 'sales',     icon: '📊', name: 'Sales',     status: 'unknown', sub: 'Stage C: pull from /api/kpi sales' },
+    { key: 'inventory', icon: '📦', name: 'Inventory', status: 'unknown', sub: 'Stage C: dead% from /api/inventory_dashboard' },
+    { key: 'customers', icon: '👥', name: 'Customers', status: 'unknown', sub: 'Stage C: member churn from /api/kpi customers' },
+    { key: 'products',  icon: '🏷️', name: 'Products',  status: 'unknown', sub: 'Stage C: ABCD migrations from /api/products' },
+    { key: 'finance',   icon: '💰', name: 'Finance',   status: 'unknown', sub: 'Stage C: GP% from /api/today.status' },
+    { key: 'hr',        icon: '👷', name: 'HR',        status: 'unknown', sub: 'Backlog: HR payroll sync pending' },
+  ];
+  const domainGrid = ''
+    + '<div class="section-title">6-domain health (placeholder · Stage C)</div>'
+    + '<div class="domain-grid">'
+    +   domains.map(d => ''
+        + '<div class="domain-card tone-na">'
+        +   '<div class="d-icon">' + d.icon + '</div>'
+        +   '<div class="d-name">' + d.name + '</div>'
+        +   '<div class="d-sub">' + d.sub + '</div>'
+        + '</div>').join('')
+    + '</div>';
+
+  return title + banner + actionPlan + storeTable + domainGrid;
+}
+
+/* ── Stub view (Finance) ─────────────────────────────────────────── */
 function renderStubView(s) {
   return ''
     + '<h1 class="page-title">' + viewTitle(s.view) + '</h1>'
