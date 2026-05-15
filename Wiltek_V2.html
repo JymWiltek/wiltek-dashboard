@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<title>Wiltek Portal V2</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   Wiltek V2 — Stage A
+   Single state object · single fetch (AbortController) · single render entry.
+   V1 残留 (SNAPSHOT/wpCache/WP_SALES_LIVE/sbm/refreshLiveData/_kpiInflight/
+   setSnapshot/rerenderActiveView/v18HydrateFromCache) 全部禁用。
+═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg:           #FFFFFF;
+  --surface:      #FAFAFA;
+  --border:       #E5E5E5;
+  --text-primary: #1A1A1A;
+  --text-meta:    #6B6B6B;
+  --text-light:   #9B9B9B;
+  --brand:        #1F5F4A;
+  --brand-soft:   #E8F0EC;
+  --ok:           #2E7D5B;
+  --warn:         #B8860B;
+  --warn-soft:    #D4A845;
+  --danger:       #A03030;
+  --shadow-sm:    0 1px 2px rgba(0,0,0,0.04);
+  --radius:       8px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-size: 14px; line-height: 1.6;
+  color: var(--text-primary); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+.num { font-family: 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+button { font: inherit; cursor: pointer; }
+input, select { font: inherit; color: inherit; }
+
+/* ── Login overlay ────────────────────────────────────────────────── */
+#login {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+#login .card {
+  width: 360px; max-width: calc(100% - 32px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px 28px;
+}
+#login h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--brand); }
+#login .sub { color: var(--text-meta); font-size: 13px; margin-bottom: 24px; }
+#login label { display: block; font-size: 12px; color: var(--text-meta); margin: 12px 0 6px; }
+#login input {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
+}
+#login input:focus { outline: none; border-color: var(--brand); }
+#login button {
+  width: 100%; margin-top: 20px; padding: 11px 14px;
+  background: var(--brand); color: #fff; border: 0; border-radius: 6px;
+  font-weight: 500; font-size: 14px;
+}
+#login button:hover { background: #19503e; }
+#login .err { color: var(--danger); font-size: 12px; min-height: 18px; margin-top: 10px; }
+
+/* ── App shell ────────────────────────────────────────────────────── */
+#app { display: none; }
+#app.ready { display: block; }
+
+header.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 32px; border-bottom: 1px solid var(--border);
+  background: var(--bg); position: sticky; top: 0; z-index: 50;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .logo {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--brand); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px;
+}
+.brand-name { font-weight: 600; font-size: 16px; }
+.brand-tag {
+  font-size: 11px; color: var(--brand); background: var(--brand-soft);
+  padding: 2px 8px; border-radius: 10px; margin-left: 4px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.header-right { display: flex; align-items: center; gap: 18px; }
+.role-chip { font-size: 13px; color: var(--text-meta); }
+.role-chip strong { color: var(--text-primary); font-weight: 600; }
+.picker {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text-primary); font-size: 13px;
+}
+.picker:focus { outline: none; border-color: var(--brand); }
+.logout-btn {
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 12px; color: var(--text-meta); font-size: 13px;
+}
+.logout-btn:hover { color: var(--brand); border-color: var(--brand); }
+
+/* ── Layout: sidebar + main ───────────────────────────────────────── */
+main.app-main {
+  display: grid; grid-template-columns: 220px 1fr;
+  min-height: calc(100vh - 65px);
+}
+nav.menu {
+  border-right: 1px solid var(--border); padding: 24px 16px;
+  background: var(--bg);
+}
+nav.menu .menu-section {
+  font-size: 11px; color: var(--text-light);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin: 0 8px 8px;
+}
+nav.menu a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 6px;
+  color: var(--text-meta); text-decoration: none;
+  font-size: 14px; margin-bottom: 2px;
+}
+nav.menu a:hover { background: var(--surface); color: var(--text-primary); }
+nav.menu a.active {
+  background: var(--brand-soft); color: var(--brand); font-weight: 600;
+}
+nav.menu a .icon { font-size: 16px; }
+nav.menu a .stub {
+  margin-left: auto; font-size: 10px; color: var(--text-light);
+  background: var(--surface); padding: 1px 6px; border-radius: 8px;
+}
+
+section.app-content { padding: 32px 36px; min-width: 0; }
+
+/* ── Page header ──────────────────────────────────────────────────── */
+.page-title { font-size: 28px; font-weight: 600; margin: 0 0 4px; }
+.page-sub { color: var(--text-meta); font-size: 14px; margin: 0 0 24px; }
+
+/* ── Cards grid ───────────────────────────────────────────────────── */
+.cards-grid {
+  display: grid; gap: 16px; margin-bottom: 28px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.card .label { font-size: 13px; color: var(--text-meta); margin-bottom: 8px; }
+.card .value { font-size: 28px; font-weight: 500; line-height: 1.2; }
+.card .value .unit { font-size: 16px; color: var(--text-meta); margin-left: 4px; }
+.card .month-tag {
+  font-size: 12px; color: var(--text-light); margin-top: 4px;
+}
+.card .compare {
+  margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);
+  font-size: 12px; color: var(--text-meta); line-height: 1.7;
+}
+.card .compare .row { display: flex; justify-content: space-between; gap: 8px; }
+.card .compare .delta-pos { color: var(--ok); }
+.card .compare .delta-neg { color: var(--danger); }
+.card .compare .delta-flat { color: var(--text-light); }
+.card.wide { grid-column: 1 / -1; }
+.card.placeholder {
+  background: var(--surface); color: var(--text-light); font-style: italic;
+}
+.card.placeholder .value { color: var(--text-light); font-size: 18px; }
+
+/* progress bar */
+.progress-bar {
+  margin-top: 12px; height: 6px; background: var(--surface);
+  border-radius: 3px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--brand); transition: width .25s ease;
+}
+.progress-fill.over { background: var(--ok); }
+.progress-fill.under { background: var(--warn-soft); }
+.progress-meta {
+  font-size: 11px; color: var(--text-meta); margin-top: 6px;
+  display: flex; justify-content: space-between;
+}
+
+/* branch table */
+table.branch-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+table.branch-table th, table.branch-table td {
+  text-align: right; padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+table.branch-table th:first-child, table.branch-table td:first-child {
+  text-align: left;
+}
+table.branch-table th {
+  font-weight: 600; color: var(--text-meta);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+table.branch-table tr.total-row {
+  font-weight: 600; background: var(--brand-soft);
+}
+table.branch-table tr.total-row td { border-bottom: 0; }
+table.branch-table .progress-cell {
+  width: 100px;
+}
+table.branch-table .mini-bar {
+  display: inline-block; width: 60px; height: 6px;
+  background: var(--surface); border-radius: 3px; overflow: hidden;
+  vertical-align: middle; margin-right: 6px;
+}
+table.branch-table .mini-bar-fill {
+  display: block; height: 100%; background: var(--brand);
+}
+
+/* ── Skeleton (loading) ───────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 0px, #f0f0f0 40px, var(--surface) 80px);
+  background-size: 200px 100%; background-repeat: no-repeat;
+  animation: shimmer 1.2s linear infinite;
+  border-radius: 4px; display: inline-block;
+}
+.skeleton.h-value { height: 32px; width: 60%; margin: 4px 0; }
+.skeleton.h-line  { height: 12px; width: 100%; margin: 4px 0; }
+.skeleton.h-row   { height: 28px; width: 100%; margin: 4px 0; }
+
+/* ── Error + Retry ────────────────────────────────────────────────── */
+.error-panel {
+  background: #fdf3f3; border: 1px solid #f0c8c8;
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius); padding: 16px 20px;
+  color: var(--danger); display: flex; align-items: center; gap: 16px;
+}
+.error-panel .msg { flex: 1; }
+.error-panel .retry-btn {
+  background: var(--danger); color: #fff; border: 0; border-radius: 6px;
+  padding: 8px 14px; font-size: 13px;
+}
+.error-panel .retry-btn:hover { background: #842525; }
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+.flex { display: flex; align-items: center; gap: 12px; }
+.muted { color: var(--text-light); font-size: 12px; }
+.tag-warn { background: #fff8e1; color: var(--warn); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+
+/* dev byte-match badge */
+.dev-badge {
+  position: fixed; bottom: 12px; right: 12px;
+  background: var(--brand); color: #fff; font-size: 11px;
+  padding: 4px 10px; border-radius: 4px; opacity: 0.85;
+  font-family: 'SF Mono', Menlo, monospace; z-index: 999;
+}
+.dev-badge.fail { background: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- ─── Login ─── -->
+<div id="login">
+  <form class="card" autocomplete="off" onsubmit="return doLogin(event)">
+    <h1>Wiltek Portal <span class="brand-tag">V2</span></h1>
+    <div class="sub">Sign in to continue</div>
+    <label for="loginUser">Username</label>
+    <input id="loginUser" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" required>
+    <label for="loginPw">Password</label>
+    <input id="loginPw" type="password" autocomplete="current-password" required>
+    <button type="submit" id="loginBtn">Sign in</button>
+    <div class="err" id="loginErr">&nbsp;</div>
+  </form>
+</div>
+
+<!-- ─── App shell ─── -->
+<div id="app" aria-hidden="true">
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">W</span>
+      <span class="brand-name">Wiltek Portal</span>
+      <span class="brand-tag">V2</span>
+    </div>
+    <div class="header-right">
+      <div class="role-chip"><strong id="userName">—</strong> · <span id="userRole">—</span></div>
+      <select id="branchPicker" class="picker" title="Branch (owner only)">
+        <option value="">All stores</option>
+        <option value="W01">W01 · Pandan Indah</option>
+        <option value="W02">W02 · Ampang</option>
+        <option value="W03">W03 · Wangsa Maju</option>
+        <option value="W05">W05 · Bangi</option>
+        <option value="W07">W07 · Pandan Jaya</option>
+        <option value="W11">W11 · (historical)</option>
+        <option value="WCO">WCO · Warehouse</option>
+      </select>
+      <select id="monthPicker" class="picker" title="Snapshot month"></select>
+      <button class="logout-btn" type="button" onclick="doLogout()">Sign out</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <nav class="menu">
+      <div class="menu-section">Dashboards</div>
+      <a href="#" data-view="sales"     onclick="return onViewChange('sales')"><span class="icon">📊</span>Sales</a>
+      <a href="#" data-view="inventory" onclick="return onViewChange('inventory')"><span class="icon">📦</span>Inventory<span class="stub">B</span></a>
+      <a href="#" data-view="customers" onclick="return onViewChange('customers')"><span class="icon">👥</span>Customers<span class="stub">B</span></a>
+      <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products<span class="stub">B</span></a>
+      <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today<span class="stub">C</span></a>
+      <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance<span class="stub">…</span></a>
+    </nav>
+    <section class="app-content" id="main"></section>
+  </main>
+</div>
+
+<div id="devBadge" class="dev-badge hidden"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Wiltek V2 — single source of truth.
+
+   NO V1 残留:
+     - 不用 window.SNAPSHOT / WP_SALES_LIVE / WP_DEADSTOCK / sbm
+     - 不用 wpCache / localStorage cache (除 wp_session_v2)
+     - 不用 refreshLiveData / fetchSalesLive / setSnapshot / rerenderActiveView
+     - 不用 _kpiInflight flag (用 AbortController)
+     - 不用 v18HydrateFromCache
+═══════════════════════════════════════════════════════════════════ */
+
+'use strict';
+
+/* ── State (single source of truth) ─────────────────────────────── */
+const state = {
+  month:   '2026-04',
+  branch:  null,        // null = all stores (owner only)
+  view:    'sales',
+  role:    'owner',     // 'owner' | 'manager' | 'warehouse'
+  user:    null,        // { username, display_name, role, store }
+  loading: false,
+  error:   null,        // { message, retry: () => void }
+  data:    null,
+};
+
+/* ── Constants ──────────────────────────────────────────────────── */
+const ALLOWED_VIEWS = ['sales', 'inventory', 'customers', 'products', 'today', 'finance'];
+
+/* Generate 28 months 2024-01..2026-04 — matches sales table range.
+   When sync extends the table, append new months here. */
+function buildMonthList() {
+  const months = [];
+  for (let y = 2024; y <= 2026; y++) {
+    const maxM = (y === 2026) ? 4 : 12;
+    for (let m = 1; m <= maxM; m++) {
+      months.push(y + '-' + String(m).padStart(2, '0'));
+    }
+  }
+  return months.reverse(); // newest first
+}
+const ALL_MONTHS = buildMonthList();
+
+/* SQL truth for byte-match assertion (DEV mode).
+   These come from Sprint 5 Stage 1 PR #30 byte-match verification. */
+const BYTE_MATCH_TRUTH = {
+  '2026-04': { sales: 425108.92, units: 2340, aov: 181.67 },
+  '2026-03': { sales: 372608.31, units: 2236, aov: 167   },
+  '2025-11': { sales: 410343.71, units: 2623, aov: 156   },
+  '2024-11': { sales: 504012.13, units: 2965, aov: 170   },
+};
+
+/* ── Session (sessionStorage, V2-namespaced) ────────────────────── */
+const SESSION_KEY = 'wp_session_v2';
+function readSession() {
+  try { const s = sessionStorage.getItem(SESSION_KEY); return s ? JSON.parse(s) : null; }
+  catch (_) { return null; }
+}
+function writeSession(u) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); } catch (_) {}
+}
+function clearSession() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
+}
+
+/* ── URL sync ───────────────────────────────────────────────────── */
+function readUrlState() {
+  const p = new URL(window.location.href).searchParams;
+  const v = p.get('view');
+  const m = p.get('month');
+  const b = p.get('branch');
+  return {
+    view:   ALLOWED_VIEWS.includes(v) ? v : null,
+    month:  /^\d{4}-(0[1-9]|1[0-2])$/.test(m || '') ? m : null,
+    branch: b && /^[Ww][A-Za-z0-9]{1,3}$/.test(b) ? b.toUpperCase() : null,
+  };
+}
+function syncUrl() {
+  const u = new URL(window.location.href);
+  u.searchParams.set('view', state.view);
+  u.searchParams.set('month', state.month);
+  if (state.branch) u.searchParams.set('branch', state.branch);
+  else              u.searchParams.delete('branch');
+  history.replaceState(null, '', u.toString());
+}
+
+/* ── Auth header (V2 trusted header — same as V1 /api/sales pattern) */
+function authHeaders() {
+  const u = state.user || readSession();
+  return u && u.username ? { 'x-wp-user': u.username } : {};
+}
+
+/* ── Single fetch (AbortController, no in-flight flag) ──────────── */
+let activeFetch = null;
+
+async function loadView() {
+  // Cancel any in-flight previous fetch — month switch always wins.
+  if (activeFetch) { try { activeFetch.abort(); } catch (_) {} }
+  activeFetch = new AbortController();
+  const myCtl = activeFetch;
+
+  state.loading = true;
+  state.error = null;
+  state.data = null;
+  renderView();
+
+  // Views without API yet: just render placeholder (Stage A/B unbuilt).
+  if (state.view === 'today' || state.view === 'finance') {
+    state.loading = false;
+    renderView();
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set('view', state.view);
+  params.set('month', state.month);
+  if (state.branch) params.set('branch', state.branch);
+
+  const url = '/api/kpi?' + params.toString();
+  const t0 = performance.now();
+
+  try {
+    const r = await fetch(url, {
+      signal: myCtl.signal,
+      cache: 'no-store',
+      headers: authHeaders(),
+    });
+    if (myCtl.signal.aborted) return; // belt + suspenders
+    if (!r.ok) {
+      const text = await r.text().catch(() => '');
+      throw new Error('HTTP ' + r.status + ' ' + text.slice(0, 200));
+    }
+    const j = await r.json();
+    if (myCtl.signal.aborted) return;
+    if (!j.ok) throw new Error(j.error || 'API returned ok:false');
+
+    state.data = j.data;
+    state.role = j.session_role || state.role;
+    state.loading = false;
+    state.error = null;
+
+    const dur = Math.round(performance.now() - t0);
+    console.log('[V2] loadView ' + state.view + ' ' + state.month + (state.branch || '') + ' OK ' + dur + 'ms');
+    runByteMatchAssertion();
+    renderView();
+  } catch (e) {
+    if (e.name === 'AbortError' || myCtl.signal.aborted) {
+      console.log('[V2] loadView aborted (superseded)');
+      return;
+    }
+    state.error = {
+      message: e.message || String(e),
+      retry: () => loadView(),
+    };
+    state.loading = false;
+    state.data = null;
+    console.error('[V2] loadView error:', e);
+    renderView();
+  }
+}
+
+/* ── DEV byte-match assertion ──────────────────────────────────── */
+function runByteMatchAssertion() {
+  if (state.view !== 'sales' || state.branch) return;
+  const expect = BYTE_MATCH_TRUTH[state.month];
+  if (!expect || !state.data) return;
+  const got = {
+    sales: round2(state.data.sales),
+    units: state.data.units,
+    aov:   round2(state.data.aov),
+  };
+  const ok = (got.sales === round2(expect.sales))
+          && (got.units === expect.units)
+          && (Math.abs(got.aov - expect.aov) < 1);
+  const badge = document.getElementById('devBadge');
+  if (badge) {
+    badge.classList.remove('hidden', 'fail');
+    if (ok) {
+      badge.textContent = '✓ byte-match ' + state.month;
+    } else {
+      badge.classList.add('fail');
+      badge.textContent = '✗ byte-match ' + state.month + ' got ' + got.sales + '/' + got.units;
+    }
+  }
+  if (ok) {
+    console.log('%c[V2 byte-match] ' + state.month + ' PASS', 'color:#2E7D5B;font-weight:600', got);
+  } else {
+    console.warn('[V2 byte-match] ' + state.month + ' FAIL — expected', expect, 'got', got);
+  }
+}
+
+/* ── Single render entry ────────────────────────────────────────── */
+function renderView() {
+  // sidebar active state
+  document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('data-view') === state.view);
+  });
+  // branch picker visible only for owner
+  const bp = document.getElementById('branchPicker');
+  if (bp) {
+    bp.value = state.branch || '';
+    bp.disabled = (state.role !== 'owner');
+  }
+  // month picker keeps state in sync
+  const mp = document.getElementById('monthPicker');
+  if (mp && mp.value !== state.month) mp.value = state.month;
+
+  const renderers = {
+    sales:     renderSales,
+    inventory: renderStubView,
+    customers: renderStubView,
+    products:  renderStubView,
+    today:     renderStubView,
+    finance:   renderStubView,
+  };
+  const main = document.getElementById('main');
+  if (!main) return;
+
+  if (state.error) {
+    main.innerHTML = renderError(state.error);
+    // wire retry
+    const btn = main.querySelector('.retry-btn');
+    if (btn) btn.onclick = () => { if (state.error) state.error.retry(); };
+    return;
+  }
+
+  main.innerHTML = (renderers[state.view] || renderStubView)(state);
+}
+
+/* ── User actions ───────────────────────────────────────────────── */
+function onMonthChange(ym) {
+  if (!ym || ym === state.month) return;
+  state.month = ym;
+  syncUrl();
+  loadView();
+}
+function onViewChange(v) {
+  if (!ALLOWED_VIEWS.includes(v) || v === state.view) return false;
+  state.view = v;
+  syncUrl();
+  loadView();
+  return false; // anchor onclick swallow
+}
+function onBranchChange(b) {
+  const next = b || null;
+  if (next === state.branch) return;
+  state.branch = next;
+  syncUrl();
+  loadView();
+}
+
+/* ── Formatters ─────────────────────────────────────────────────── */
+function round2(n) { return Math.round(Number(n) * 100) / 100; }
+function fmtRM(n) {
+  if (n == null || isNaN(n)) return '—';
+  return 'RM ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function fmtRMpr(n) {
+  if (n == null || isNaN(n)) return '—';
+  return 'RM ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtInt(n) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-US');
+}
+function fmtPct(n, digits = 1) {
+  if (n == null || isNaN(n)) return '—';
+  return (Number(n) * 100).toFixed(digits) + '%';
+}
+function deltaPct(curr, base) {
+  if (curr == null || base == null || base === 0) return null;
+  return (curr - base) / base;
+}
+function deltaCell(curr, base, label, formatter) {
+  const fmt = formatter || fmtRM;
+  if (base == null || base === 0) {
+    return '<div class="row"><span>' + label + '</span><span class="delta-flat">— no data</span></div>';
+  }
+  const pct = deltaPct(curr, base);
+  const arrow = pct > 0.005 ? '↑' : (pct < -0.005 ? '↓' : '→');
+  const cls   = pct > 0.005 ? 'delta-pos' : (pct < -0.005 ? 'delta-neg' : 'delta-flat');
+  return '<div class="row"><span>' + label + ' ' + fmt(base) + '</span>'
+       + '<span class="' + cls + '">' + arrow + ' ' + (pct * 100).toFixed(1) + '%</span></div>';
+}
+function ymLastMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  if (m === 1) return (y - 1) + '-12';
+  return y + '-' + String(m - 1).padStart(2, '0');
+}
+function ymLastYear(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return (y - 1) + '-' + String(m).padStart(2, '0');
+}
+
+/* ── Render: Loading skeleton for cards ─────────────────────────── */
+function skeletonCard(label) {
+  return ''
+    + '<div class="card">'
+    +   '<div class="label">' + label + '</div>'
+    +   '<div class="skeleton h-value"></div>'
+    +   '<div class="muted">loading…</div>'
+    +   '<div class="compare">'
+    +     '<div class="skeleton h-line"></div>'
+    +     '<div class="skeleton h-line"></div>'
+    +     '<div class="skeleton h-line"></div>'
+    +   '</div>'
+    + '</div>';
+}
+
+/* ── Render: Error panel ────────────────────────────────────────── */
+function renderError(err) {
+  return ''
+    + '<h1 class="page-title">' + viewTitle(state.view) + '</h1>'
+    + '<p class="page-sub">' + state.month + (state.branch ? ' · ' + state.branch : ' · All stores') + '</p>'
+    + '<div class="error-panel">'
+    +   '<div class="msg"><strong>Failed to load.</strong><br><span class="muted">'
+    +     escapeHtml(err.message)
+    +   '</span></div>'
+    +   '<button class="retry-btn" type="button">Retry</button>'
+    + '</div>';
+}
+
+function viewTitle(v) {
+  return {
+    sales:     'Sales',
+    inventory: 'Inventory',
+    customers: 'Customers',
+    products:  'Products',
+    today:     'Today',
+    finance:   'Finance',
+  }[v] || v;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER · SALES (Stage A)
+   5 张卡 per Notion 设计 (2026-05-12 修正):
+     1. 本月销售 vs 目标
+     2. 单数 + AOV
+     3. 今日销售 + 5 店分布   ← /api/kpi 只给月, 暂占位 (Stage B/C 补 daily endpoint)
+     4. 本周进度 vs 周目标     ← 同上占位
+     5. 5 店月进度对照表
+═══════════════════════════════════════════════════════════════════ */
+function renderSales(s) {
+  const title = '<h1 class="page-title">Sales</h1>'
+              + '<p class="page-sub">'
+              +   'Snapshot ' + s.month
+              +   (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · All stores')
+              +   ' · KPI vs last-month / last-year / 6-month avg'
+              + '</p>';
+
+  if (s.loading || !s.data) {
+    return title
+      + '<div class="cards-grid">'
+      +   skeletonCard('Sales vs target')
+      +   skeletonCard('Invoices · AOV')
+      +   skeletonCard('Today · 5 stores')
+      +   skeletonCard('Week-to-date')
+      +   '<div class="card wide"><div class="label">5-store progress</div><div class="skeleton h-row"></div><div class="skeleton h-row"></div><div class="skeleton h-row"></div></div>'
+      + '</div>';
+  }
+
+  const d = s.data;
+  const target = (d.last_month_sales != null) ? d.last_month_sales * 1.05 : null;
+  const progressPct = (target && target > 0) ? (d.sales / target) : null;
+  const ymPrev = ymLastMonth(s.month);
+  const ymPrevYr = ymLastYear(s.month);
+
+  // Card 1 — Sales vs target
+  const c1 = ''
+    + '<div class="card">'
+    +   '<div class="label">📈 Sales vs target</div>'
+    +   '<div class="value num">' + fmtRM(d.sales) + '</div>'
+    +   '<div class="month-tag">in ' + s.month + (s.branch ? ' · ' + s.branch : '') + '</div>'
+    +   (target != null ? (
+          '<div class="progress-bar"><div class="progress-fill ' + ((progressPct||0) >= 1 ? 'over' : (progressPct < 0.85 ? 'under' : '')) + '" style="width:' + Math.min(100, (progressPct || 0) * 100) + '%"></div></div>'
+        + '<div class="progress-meta"><span>vs implied target ' + fmtRM(target) + '</span><span>' + fmtPct(progressPct) + '</span></div>'
+        + '<div class="muted" style="font-size:10px;margin-top:4px">target = last-month × 1.05 (no GTD yet)</div>'
+        ) : '')
+    +   '<div class="compare">'
+    +     deltaCell(d.sales, d.last_month_sales,  'vs ' + ymPrev,    fmtRM)
+    +     deltaCell(d.sales, d.last_year_sales,   'vs ' + ymPrevYr,  fmtRM)
+    +     deltaCell(d.sales, d.six_m_avg_sales,   'vs 6-mo avg',     fmtRM)
+    +   '</div>'
+    + '</div>';
+
+  // Card 2 — Invoices + AOV
+  const c2 = ''
+    + '<div class="card">'
+    +   '<div class="label">🧾 Invoices · AOV</div>'
+    +   '<div class="value num">' + fmtInt(d.invoices) + ' <span class="unit">invoices</span></div>'
+    +   '<div class="month-tag">' + fmtInt(d.units) + ' units sold · AOV ' + fmtRMpr(d.aov) + '</div>'
+    +   '<div class="compare">'
+    +     deltaCell(d.units, d.last_month_units, 'units vs ' + ymPrev,   fmtInt)
+    +     deltaCell(d.units, d.last_year_units,  'units vs ' + ymPrevYr, fmtInt)
+    +     deltaCell(d.units, d.six_m_avg_units,  'units vs 6-mo avg',    fmtInt)
+    +   '</div>'
+    + '</div>';
+
+  // Card 3 — Today + 5 stores (placeholder, no daily endpoint yet)
+  const c3 = ''
+    + '<div class="card placeholder">'
+    +   '<div class="label">🌅 Today · 5 stores</div>'
+    +   '<div class="value">Daily endpoint pending</div>'
+    +   '<div class="month-tag">Stage A: /api/kpi only returns monthly aggregates.<br>Stage B/C will add /api/today daily breakdown.</div>'
+    + '</div>';
+
+  // Card 4 — WTD (placeholder)
+  const c4 = ''
+    + '<div class="card placeholder">'
+    +   '<div class="label">📅 Week-to-date vs weekly target</div>'
+    +   '<div class="value">Weekly endpoint pending</div>'
+    +   '<div class="month-tag">Stage B will compute WTD from daily sales + (monthly_target ÷ 4).</div>'
+    + '</div>';
+
+  // Card 5 — 5-store table (wide)
+  const c5 = renderBranchTable(d);
+
+  return title + '<div class="cards-grid">' + c1 + c2 + c3 + c4 + c5 + '</div>';
+}
+
+function renderBranchTable(d) {
+  const ALL_BRANCHES = ['W01','W02','W03','W05','W07','W11','WCO'];
+  const byBranch = d.by_branch || {};
+  const totalSales = d.sales || 0;
+
+  // Use last-month total × 1.05 as implied company target, then distribute by share
+  // of branch in current month. (Per Notion: "no real GTD yet, last-month × 1.05".)
+  const implTargetCompany = (d.last_month_sales || 0) * 1.05;
+
+  const rows = ALL_BRANCHES.map(b => {
+    const row = byBranch[b];
+    if (!row) return null;
+    const share = totalSales > 0 ? (row.sales / totalSales) : 0;
+    const targetForBranch = implTargetCompany * share || 0;
+    const progress = targetForBranch > 0 ? (row.sales / targetForBranch) : null;
+    const progressClass = progress == null ? 'delta-flat'
+                        : (progress >= 1 ? 'delta-pos'
+                        : (progress < 0.85 ? 'delta-neg' : 'delta-flat'));
+    const barWidth = Math.min(100, (progress || 0) * 100);
+    return ''
+      + '<tr>'
+      +   '<td><strong>' + b + '</strong></td>'
+      +   '<td class="num">' + fmtRM(row.sales) + '</td>'
+      +   '<td class="num">' + fmtInt(row.invoices) + '</td>'
+      +   '<td class="num">' + fmtInt(row.units) + '</td>'
+      +   '<td class="num">' + fmtInt(row.distinct_customers) + '</td>'
+      +   '<td class="num">' + fmtRM(targetForBranch) + '</td>'
+      +   '<td class="progress-cell"><span class="mini-bar"><span class="mini-bar-fill" style="width:' + barWidth + '%"></span></span><span class="' + progressClass + '">' + (progress != null ? fmtPct(progress) : '—') + '</span></td>'
+      + '</tr>';
+  }).filter(Boolean).join('');
+
+  const totalRow = ''
+    + '<tr class="total-row">'
+    +   '<td>Total</td>'
+    +   '<td class="num">' + fmtRM(d.sales) + '</td>'
+    +   '<td class="num">' + fmtInt(d.invoices) + '</td>'
+    +   '<td class="num">' + fmtInt(d.units) + '</td>'
+    +   '<td class="num">' + fmtInt(d.distinct_customers) + '</td>'
+    +   '<td class="num">' + fmtRM(implTargetCompany) + '</td>'
+    +   '<td class="progress-cell">' + (implTargetCompany > 0 ? fmtPct(d.sales / implTargetCompany) : '—') + '</td>'
+    + '</tr>';
+
+  return ''
+    + '<div class="card wide">'
+    +   '<div class="label">🏪 5-store monthly progress</div>'
+    +   '<table class="branch-table">'
+    +     '<thead><tr>'
+    +       '<th>Store</th>'
+    +       '<th>Sales</th>'
+    +       '<th>Invoices</th>'
+    +       '<th>Units</th>'
+    +       '<th>Customers</th>'
+    +       '<th>Implied target</th>'
+    +       '<th>Progress</th>'
+    +     '</tr></thead>'
+    +     '<tbody>' + rows + totalRow + '</tbody>'
+    +   '</table>'
+    +   '<div class="muted" style="margin-top:8px;font-size:11px">'
+    +     'Implied target = last-month company total × 1.05, distributed by this month\'s branch share. Real GTD planned Sprint 6.'
+    +   '</div>'
+    + '</div>';
+}
+
+/* ── Stub view (Inventory/Customers/Products/Today/Finance) ─────── */
+function renderStubView(s) {
+  return ''
+    + '<h1 class="page-title">' + viewTitle(s.view) + '</h1>'
+    + '<p class="page-sub">' + s.month + (s.branch ? ' · ' + s.branch : ' · All stores') + '</p>'
+    + '<div class="error-panel" style="background:var(--surface);color:var(--text-meta);border-color:var(--border);border-left-color:var(--warn-soft)">'
+    +   '<div class="msg"><strong>Stage A only ships Sales.</strong><br>'
+    +     '<span class="muted">' + viewTitle(s.view) + ' lands in Stage B (Inventory/Customers/Products) or Stage C (Today). Finance waits on multi-month financial_monthly sync.</span></div>'
+    + '</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Login flow — talks to /api/login (same endpoint V1 uses)
+═══════════════════════════════════════════════════════════════════ */
+async function doLogin(ev) {
+  ev.preventDefault();
+  const userEl = document.getElementById('loginUser');
+  const pwEl   = document.getElementById('loginPw');
+  const errEl  = document.getElementById('loginErr');
+  const btnEl  = document.getElementById('loginBtn');
+  const username = (userEl.value || '').trim().toLowerCase();
+  const password = pwEl.value || '';
+  if (!username || !password) { errEl.textContent = 'Username and password required.'; return false; }
+
+  errEl.textContent = '';
+  btnEl.disabled = true; btnEl.textContent = 'Signing in…';
+
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ username, password }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !j.user) {
+      errEl.textContent = (j && j.error === 'inactive')
+        ? 'Account inactive — contact admin.'
+        : 'Invalid username or password.';
+      return false;
+    }
+    state.user = {
+      username:     j.user.username,
+      display_name: j.user.display_name || j.user.username,
+      role:         j.user.role,
+      store:        j.user.store,
+    };
+    state.role = (j.user.role === 'owner') ? 'owner'
+              : (/_mgr$/.test(j.user.role) ? 'manager' : (j.user.role || 'manager'));
+    if (state.role !== 'owner' && j.user.store) state.branch = j.user.store;
+    writeSession(state.user);
+    enterApp();
+    return false;
+  } catch (e) {
+    console.error('[V2] login error:', e);
+    errEl.textContent = 'Network error — retry.';
+    return false;
+  } finally {
+    btnEl.disabled = false; btnEl.textContent = 'Sign in';
+  }
+}
+
+function doLogout() {
+  clearSession();
+  state.user = null;
+  document.getElementById('app').classList.remove('ready');
+  document.getElementById('app').setAttribute('aria-hidden', 'true');
+  document.getElementById('login').style.display = 'flex';
+}
+
+function enterApp() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+  document.getElementById('app').setAttribute('aria-hidden', 'false');
+  document.getElementById('userName').textContent = state.user.display_name;
+  document.getElementById('userRole').textContent = state.user.role;
+  // hide branch picker for non-owners
+  document.getElementById('branchPicker').style.display = (state.role === 'owner') ? '' : 'none';
+  populateMonthPicker();
+  syncUrl();
+  loadView();
+}
+
+/* ── Month picker ───────────────────────────────────────────────── */
+function populateMonthPicker() {
+  const sel = document.getElementById('monthPicker');
+  if (!sel) return;
+  sel.innerHTML = ALL_MONTHS.map(m => '<option value="' + m + '">' + m + '</option>').join('');
+  if (!ALL_MONTHS.includes(state.month)) state.month = ALL_MONTHS[0];
+  sel.value = state.month;
+  sel.onchange = () => onMonthChange(sel.value);
+}
+
+/* ── Boot ──────────────────────────────────────────────────────── */
+function boot() {
+  // Wire branch picker
+  const bp = document.getElementById('branchPicker');
+  if (bp) bp.onchange = () => onBranchChange(bp.value);
+
+  // Hydrate state from URL (overrides defaults)
+  const u = readUrlState();
+  if (u.view)   state.view   = u.view;
+  if (u.month)  state.month  = u.month;
+  if (u.branch) state.branch = u.branch;
+
+  // Resume session if present
+  const sess = readSession();
+  if (sess && sess.username) {
+    state.user = sess;
+    state.role = (sess.role === 'owner') ? 'owner'
+              : (/_mgr$/.test(sess.role || '') ? 'manager' : (sess.role || 'manager'));
+    if (state.role !== 'owner' && sess.store) state.branch = sess.store;
+    enterApp();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+</script>
+</body>
+</html>
