@@ -1460,6 +1460,92 @@ export default async function handler(req, res) {
   const confirmOverwrite = body?.confirm_overwrite || {};
   const onlyTargets      = body?.tables || ALL_TARGETS;
 
+  // ───────────────────────────────────────────────────────────────────────
+  // Stage C-tail (2026-05-15 — one-shot recovery): the live Google Sheet
+  // 'Raw CS' tab only contains WLO snapshot (517 rows, ~RM 287k); the
+  // 12-store full inventory exists only in assets/deadstock-data.js, which
+  // was Phase 0's migration source. After Stage C's overwrite sync wiped
+  // the pre-existing 5-store W01-W07 rows, we need a recovery path to
+  // restore the 12-store snapshot into inventory_snapshots until upstream
+  // Sheet is fixed.
+  //
+  // POST /api/sync  { mode: 'restore_inventory_from_assets',
+  //                   snapshot_date: 'YYYY-MM-DD' (default = month-end of
+  //                                  deadstock-data.js meta.snapshot) }
+  //
+  // Owner only (handler already enforces it). Idempotent: upsert on
+  // (snapshot_date, store, item_code). Item codes not in items master are
+  // dropped (FK guard).
+  if (mode === 'restore_inventory_from_assets') {
+    try {
+      // Fetch the static asset from same origin. Vercel serves
+      // /assets/* directly from the static layer.
+      const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'wiltek-dashboard.vercel.app';
+      const proto = req.headers['x-forwarded-proto'] || 'https';
+      const assetUrl = `${proto}://${host}/assets/deadstock-data.js`;
+      const r = await fetch(assetUrl, { cache: 'no-store' });
+      if (!r.ok) throw new Error('deadstock-data.js HTTP ' + r.status);
+      const js = await r.text();
+      // File shape: 'window.WP_DEADSTOCK = { ... };'
+      const m = js.match(/=\s*({[\s\S]+})\s*;?\s*$/);
+      if (!m) throw new Error('cannot parse deadstock-data.js (no JSON object)');
+      const ds = JSON.parse(m[1]);
+      const dsRows = Array.isArray(ds.rows) ? ds.rows : [];
+      const dsSnap = (ds.meta && ds.meta.snapshot) || '';
+      // Determine snapshot_date.
+      let snap = String(body?.snapshot_date || '').trim();
+      if (!snap) {
+        // default to month-end of ds.meta.snapshot ('YYYY-MM')
+        if (!/^\d{4}-\d{2}$/.test(dsSnap)) throw new Error('cannot derive snapshot_date');
+        const [y, mo] = dsSnap.split('-').map(Number);
+        const last = new Date(Date.UTC(y, mo, 0));
+        snap = `${last.getUTCFullYear()}-${String(last.getUTCMonth()+1).padStart(2,'0')}-${String(last.getUTCDate()).padStart(2,'0')}`;
+      }
+      // Items FK guard.
+      const items = await fetchAllItemCodes();
+      const validCodes = new Set(items.map(r => r.item_code));
+      const rows = [];
+      const byBranch = {};
+      let droppedFk = 0;
+      for (const r of dsRows) {
+        if (!r.code || !r.branch) continue;
+        if (!validCodes.has(r.code)) { droppedFk++; continue; }
+        rows.push({
+          snapshot_date: snap,
+          store:         r.branch,
+          item_code:     r.code,
+          qty:           r.qty || 0,
+          cost:          r.unit_cost || null,
+          amount:        r.amount || ((r.qty || 0) * (r.unit_cost || 0)) || 0,
+        });
+        byBranch[r.branch] = (byBranch[r.branch] || 0) + (r.amount || 0);
+      }
+      // Wipe target snapshot first (caller asked for restore, idempotent).
+      await sb().from('inventory_snapshots').delete().eq('snapshot_date', snap);
+      const res = await chunkInsert('inventory_snapshots', rows, { onConflict: 'snapshot_date,store,item_code' });
+      const total = rows.reduce((s, r) => s + (+r.amount || 0), 0);
+      // Refresh the materialised view so dashboards see the new data.
+      try { await sb().rpc('refresh_all_mviews'); } catch (e) {
+        console.error('[sync restore] mview refresh failed:', e.message);
+      }
+      return res.status(200).json({
+        ok: true,
+        mode: 'restore_inventory_from_assets',
+        snapshot_date: snap,
+        source_snapshot: dsSnap,
+        rows_inserted: res.ok,
+        rows_failed:   res.err,
+        rows_dropped_fk: droppedFk,
+        by_branch_amount: byBranch,
+        total_amount: +total.toFixed(2),
+        note: 'Best-available data: deadstock-data.js was Phase 0 migration source (Excel 202604 - SALES VS STOCK VS PO VS GRN.V2.xlsx). Upstream Google Sheet "Raw CS" tab currently only contains WLO snapshot — fixing that is on Jym.',
+      });
+    } catch (e) {
+      console.error('[sync restore] failed:', e);
+      return res.status(500).json({ ok: false, error: e.message, where: 'restore_inventory_from_assets' });
+    }
+  }
+
   // 1. Read sources in parallel (network bound). CBv3 feeds BOTH sales
   //    (CP1) and customer_buy_lines (CP2) — one fetch, two transforms.
   //    Floatation = 6 stores' Sheet 1 fetched in parallel inside loadFloatation.
