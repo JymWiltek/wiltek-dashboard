@@ -408,15 +408,13 @@ table.store-table .anom-bad  { color: var(--danger); }
     </div>
     <div class="header-right">
       <div class="role-chip"><strong id="userName">—</strong> · <span id="userRole">—</span></div>
+      <!-- Branch picker — options injected by populateBranchPicker().
+           Wiltek has 13 stores (5 active + WLO + WCO/WEX/WL1 + W10/W11/W12).
+           List built dynamically from API by_branch keys; metadata
+           (name + category) comes from STORE_META. No hard-coded
+           white-list per Notion 3610a2d3110081d89059df97099213a5 -->
       <select id="branchPicker" class="picker" title="Branch (owner only)">
         <option value="">All stores</option>
-        <option value="W01">W01 · Pandan Indah</option>
-        <option value="W02">W02 · Ampang</option>
-        <option value="W03">W03 · Wangsa Maju</option>
-        <option value="W05">W05 · Bangi</option>
-        <option value="W07">W07 · Pandan Jaya</option>
-        <option value="W11">W11 · (historical)</option>
-        <option value="WCO">WCO · Warehouse</option>
       </select>
       <select id="monthPicker" class="picker" title="Snapshot month"></select>
       <button class="logout-btn" type="button" onclick="doLogout()">Sign out</button>
@@ -463,7 +461,112 @@ const state = {
   loading: false,
   error:   null,        // { message, retry: () => void }
   data:    null,
+  // Bug 2 fix (2026-05-15): store list NOT hard-coded. Union of store codes
+  // seen across loadView responses (by_branch keys). Picker rebuilt from this.
+  knownStores: new Set(),
 };
+
+// STORE_META — descriptive metadata, NOT a gatekeeper / white-list.
+// A store code not in this map still works: it shows with code as name
+// and group='other'. Per Notion 3610a2d3110081d89059df97099213a5 the
+// list of stores comes from data (sales / inventory_snapshots / floatation
+// distinct values), not from this constant.
+//   group order = pickup display order: active → warehouse → cust-order → closed
+const STORE_META = {
+  // Active retail (5)
+  W01: { name: 'W01 · Pandan Indah',         group: 'active' },
+  W02: { name: 'W02 · Ampang Waterfront',    group: 'active' },
+  W03: { name: 'W03 · Wangsa Maju',          group: 'active' },
+  W05: { name: 'W05 · Bangi Seksyen 7',      group: 'active' },
+  W07: { name: 'W07 · Pandan Jaya',          group: 'active' },
+  // Warehouse (1) — all POs flow through here
+  WLO: { name: 'WLO · Warehouse',            group: 'warehouse' },
+  // Customer-order holds (3) — inventory + some sales
+  WCO: { name: 'WCO · Customer Order',       group: 'custord' },
+  WEX: { name: 'WEX · Customer Order Extra', group: 'custord' },
+  WL1: { name: 'WL1 · Customer Order L1',    group: 'custord' },
+  // Closed historical (3) — still have sales history; Jym can still view
+  W10: { name: 'W10 · (closed)',             group: 'closed' },
+  W11: { name: 'W11 · (closed)',             group: 'closed' },
+  W12: { name: 'W12 · (closed)',             group: 'closed' },
+  // Reserved fallback name for any other code that appears in API by_branch
+  // (e.g. WSR). Picker renders them under group='other'.
+};
+const STORE_GROUP_LABEL = {
+  active:    'Active retail',
+  warehouse: 'Warehouse',
+  custord:   'Customer order',
+  closed:    'Closed historical',
+  other:     'Other',
+};
+const STORE_GROUP_ORDER = ['active', 'warehouse', 'custord', 'closed', 'other'];
+
+/* Add codes from a response (by_branch keys / stores[].store) to knownStores.
+   Returns true if anything new appeared. */
+function harvestStores(view, data) {
+  if (!data) return false;
+  let added = 0;
+  const add = (code) => {
+    if (!code) return;
+    const up = String(code).toUpperCase();
+    if (!state.knownStores.has(up)) { state.knownStores.add(up); added++; }
+  };
+  // /api/kpi (sales / inventory / customers / products) → data.by_branch
+  if (data.by_branch && typeof data.by_branch === 'object') {
+    Object.keys(data.by_branch).forEach(add);
+  }
+  // /api/inventory_dashboard → kpis.{health,stockout,oem_vs_agency}.by_branch?
+  // — these aggregates don't expose stores; only the sync side does.
+  if (data.kpis && data.kpis.by_branch) Object.keys(data.kpis.by_branch).forEach(add);
+  // /api/today → stores[].store
+  if (Array.isArray(data.stores)) {
+    data.stores.forEach(s => add(s && s.store));
+  }
+  // /api/products → no by_branch by default. Skip.
+  return added > 0;
+}
+
+/* Build the branch <select> options grouped by category, preserving the
+   current state.branch selection. Uses STORE_META for names + group; any
+   code in knownStores without STORE_META entry falls under group='other'. */
+function populateBranchPicker() {
+  const sel = document.getElementById('branchPicker');
+  if (!sel) return;
+  // Union: every known store from API responses + every store in STORE_META
+  // (so picker is populated immediately on boot before any fetch resolves).
+  const all = new Set([...state.knownStores, ...Object.keys(STORE_META)]);
+  if (!all.size) return;
+
+  const buckets = {};
+  STORE_GROUP_ORDER.forEach(g => buckets[g] = []);
+  for (const code of all) {
+    const meta = STORE_META[code] || { name: code, group: 'other' };
+    (buckets[meta.group] || buckets.other).push({ code, name: meta.name });
+  }
+  for (const g of STORE_GROUP_ORDER) buckets[g].sort((a, b) => a.code.localeCompare(b.code));
+
+  let html = '<option value="">All stores</option>';
+  for (const g of STORE_GROUP_ORDER) {
+    if (!buckets[g].length) continue;
+    html += '<optgroup label="' + STORE_GROUP_LABEL[g] + '">';
+    for (const s of buckets[g]) {
+      html += '<option value="' + s.code + '">' + escapeHtml(s.name) + '</option>';
+    }
+    html += '</optgroup>';
+  }
+  // Preserve selection (state.branch); fall back to empty (all stores).
+  const want = state.branch || '';
+  sel.innerHTML = html;
+  // The selected option may now live inside an <optgroup> — set value
+  // explicitly so the browser shows the right label.
+  sel.value = want;
+  if (sel.value !== want) {
+    // selection not in list — likely a manager whose store got hidden. Add it.
+    const opt = document.createElement('option');
+    opt.value = want; opt.textContent = want; opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
 
 /* ── Constants ──────────────────────────────────────────────────── */
 const ALLOWED_VIEWS = ['sales', 'inventory', 'customers', 'products', 'today', 'finance'];
@@ -548,6 +651,17 @@ function kpiQuery() {
   if (state.branch) p.set('branch', state.branch);
   return p.toString();
 }
+// monthBranchQuery — '?month=YYYY-MM[&branch=W0X]' for the non-/api/kpi
+// endpoints (inventory_dashboard / products / today). Bug 3 fix
+// (2026-05-15): threading state.branch through every fetcher so the
+// owner branch picker scopes ALL views, not just Sales/Customers.
+function monthBranchQuery() {
+  const p = new URLSearchParams();
+  if (state.month)  p.set('month', state.month);
+  if (state.branch) p.set('branch', state.branch);
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
 function monthQuery() {
   return state.month ? '?month=' + encodeURIComponent(state.month) : '';
 }
@@ -563,21 +677,26 @@ async function fetchCustomers(signal) {
   return j.data;
 }
 async function fetchProducts(signal) {
-  const j = await getJSON('/api/products' + monthQuery(), signal);
+  const j = await getJSON('/api/products' + monthBranchQuery(), signal);
   state.role = j.session_role || state.role;
   return j;
 }
 async function fetchToday(signal) {
-  const j = await getJSON('/api/today' + monthQuery(), signal);
+  const j = await getJSON('/api/today' + monthBranchQuery(), signal);
   state.role = j.session_role || state.role;
   return j;
 }
 async function fetchInventory(signal) {
   // 2 calls in parallel — /api/inventory_dashboard KPIs + alerts.
-  const q = state.month ? '&month=' + encodeURIComponent(state.month) : '';
+  // Bug 3 fix (2026-05-15): branch threaded so owner picker scopes Inventory.
+  const baseQ = new URLSearchParams();
+  if (state.month)  baseQ.set('month', state.month);
+  if (state.branch) baseQ.set('branch', state.branch);
+  const base = baseQ.toString();
+  const sep = base ? '&' : '';
   const [k, a] = await Promise.all([
-    getJSON('/api/inventory_dashboard?_=k' + q, signal),
-    getJSON('/api/inventory_dashboard?section=alerts' + q, signal),
+    getJSON('/api/inventory_dashboard?' + base + sep + '_=k', signal),
+    getJSON('/api/inventory_dashboard?' + base + sep + 'section=alerts', signal),
   ]);
   state.role = k.session_role || state.role;
   return { kpis: k, alerts: a };
@@ -622,6 +741,9 @@ async function loadView() {
 
     const dur = Math.round(performance.now() - t0);
     console.log('[V2] loadView ' + state.view + ' ' + state.month + (state.branch || '') + ' OK ' + dur + 'ms');
+    // Bug 2 fix: pick up any new store codes from the response and refresh
+    // the branch picker if anything was added. Picker stays sorted/grouped.
+    if (harvestStores(state.view, data)) populateBranchPicker();
     runByteMatchAssertion();
     renderView();
   } catch (e) {
@@ -1551,6 +1673,9 @@ function enterApp() {
   // hide branch picker for non-owners
   document.getElementById('branchPicker').style.display = (state.role === 'owner') ? '' : 'none';
   populateMonthPicker();
+  // Bug 2 fix: populate branch picker immediately (from STORE_META + any
+  // seeded codes) so it's visible before the first fetch resolves.
+  populateBranchPicker();
   syncUrl();
   loadView();
 }

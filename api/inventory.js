@@ -58,7 +58,18 @@ export default async function handler(req, res) {
   // Requires session (was 401 in the old handler); keep that contract.
   if (mode === 'dashboard') {
     if (!user) return res.status(401).json({ ok: false, error: 'no session' });
-    const p_branch = (user.role === 'manager') ? user.store : null;
+    // Bug 3 fix (2026-05-15): owner can pass ?branch=<X> to scope the
+    // dashboard; manager pinned to own store regardless. Mirrors /api/kpi.
+    const queryBranch = String(req.query?.branch || '').trim().toUpperCase();
+    let p_branch;
+    if (user.role === 'owner') {
+      p_branch = queryBranch || null;
+    } else {
+      if (queryBranch && queryBranch !== user.store) {
+        return res.status(403).json({ ok: false, error: 'branch not allowed for this user' });
+      }
+      p_branch = user.store;
+    }
     const rpc = section === 'alerts' ? 'inventory_alerts_payload' : 'inventory_dashboard_payload';
     try {
       const { data, error } = await sb().rpc(rpc, { p_branch });
@@ -74,6 +85,7 @@ export default async function handler(req, res) {
         source: 'supabase:wiltek-portal',
         session_role: user.role,
         session_store: user.store,
+        effective_branch: p_branch,
         ...data,
       });
     } catch (e) {
