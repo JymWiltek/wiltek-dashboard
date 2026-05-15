@@ -48,8 +48,17 @@ export default async function handler(req, res) {
   const user = await loadSessionUser(sessionUserName);
   if (!user) return res.status(401).json({ ok: false, error: 'no session' });
 
-  // Manager → lock branch; owner/other → null (all branches).
-  const p_branch = (user.role === 'manager') ? user.store : null;
+  // Bug 3 fix (2026-05-15): owner can ?branch=, manager pinned. Same as /api/kpi.
+  const queryBranch = String(req.query?.branch || '').trim().toUpperCase();
+  let p_branch;
+  if (user.role === 'owner') {
+    p_branch = queryBranch || null;
+  } else {
+    if (queryBranch && queryBranch !== user.store) {
+      return res.status(403).json({ ok: false, error: 'branch not allowed for this user' });
+    }
+    p_branch = user.store;
+  }
   const p_month  = String(req.query?.month || '').trim() || null;
 
   try {
@@ -65,6 +74,7 @@ export default async function handler(req, res) {
       source: 'supabase:wiltek-portal',
       session_role: user.role,
       session_store: user.store,
+      effective_branch: p_branch,
       ...data,
     });
   } catch (e) {

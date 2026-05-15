@@ -53,7 +53,13 @@ const SHEETS = {
   sm_item_master:     { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'SM',       target: 'items' },
   po_grn_raw_pivot:   { id: '1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II', tab: 'Raw Pivot',target: 'po_grn' },
 };
-const ACTIVE_BRANCHES = new Set(['W01','W02','W03','W05','W07']);
+// 2026-05-15 (Bug 1): white-list removed. Sheet BRANCH column is the
+// source of truth — Wiltek has 13 stores (5 active + WLO warehouse +
+// WCO/WEX/WL1 customer-order holds + W10/W11/W12 closed/historical).
+// Any sync filter dropping a store breaks Inventory / Sales / Customer
+// dashboards. Hard-rule per Notion 3610a2d3110081d89059df97099213a5.
+// The constant is kept (commented out) so future readers see the gotcha:
+// const ACTIVE_BRANCHES = new Set(['W01','W02','W03','W05','W07']);
 
 // CP2 Step 2: 6 Floatation Sheets (W11 INCLUDED — historical preserved
 // per Jym's hard rule; UI hides W11, code never if-skips it).
@@ -1340,7 +1346,10 @@ async function applyInventory(parsed, overwrite) {
   }
   const items = await fetchAllItemCodes();
   const validCodes = new Set(items.map(r => r.item_code));
-  const rows = parsed.rows.filter(r => ACTIVE_BRANCHES.has(r.store) && validCodes.has(r.item_code));
+  // Bug 1 fix (2026-05-15): no branch white-list. Drop only rows whose
+  // item_code is missing from items master (FK guard). Stores W10/W11/W12
+  // (closed) / WCO/WEX/WL1 (customer-order) / WLO (warehouse) all sync.
+  const rows = parsed.rows.filter(r => r.store && validCodes.has(r.item_code));
   const dropped_no_item = parsed.rows.length - rows.length;
   const source_row_count = rows.length;
   const source_amt_sum   = rows.reduce((s, r) => s + (+r.amount || 0), 0);
