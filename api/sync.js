@@ -1461,6 +1461,111 @@ export default async function handler(req, res) {
   const onlyTargets      = body?.tables || ALL_TARGETS;
 
   // ───────────────────────────────────────────────────────────────────────
+  // Stage C-hard-reset (2026-05-16 17:00): Claude (chat) SQL run damaged
+  // W01-W07 rows at snapshot_date='2026-04-30' (W02 missing RM 66k etc).
+  // Jym明示 YES (chat 2026-05-16): direct authorization to DELETE the 5
+  // active stores' rows and re-INSERT from Sheet so DB byte-matches truth.
+  //
+  // POST /api/sync { mode: 'hard_reset_5_active_from_sheet',
+  //                  confirm_jym: 'YES_5_ACTIVE_HARD_RESET',
+  //                  snapshot_date: 'YYYY-MM-DD' (default 2026-04-30) }
+  //
+  // Strict guards:
+  //   - confirm_jym must equal exactly 'YES_5_ACTIVE_HARD_RESET' (no Code
+  //     auto-decide; explicit token in body)
+  //   - stores hard-coded to ['W01','W02','W03','W05','W07'] — the 7
+  //     others (WLO/W11/W12/WCO/WEX/WL1/WSR) are byte-matched, NOT touched
+  //   - snapshot_date default 2026-04-30 only; 2026-03-31 baseline NEVER
+  //     touched (Jym red line)
+  if (mode === 'hard_reset_5_active_from_sheet') {
+    try {
+      if (body?.confirm_jym !== 'YES_5_ACTIVE_HARD_RESET') {
+        return res.status(400).json({ ok: false,
+          error: 'confirm_jym must equal "YES_5_ACTIVE_HARD_RESET"' });
+      }
+      const targetDate = String(body?.snapshot_date || '2026-04-30').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        return res.status(400).json({ ok: false, error: 'bad snapshot_date' });
+      }
+      if (targetDate === '2026-03-31') {
+        return res.status(400).json({ ok: false,
+          error: '2026-03-31 baseline is frozen per Notion SOP — refusing' });
+      }
+      const FIVE_ACTIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
+      // Step 1: DELETE only the 5 active stores' rows at this snapshot_date.
+      const { error: delErr, count: deletedCount } = await sb()
+        .from('inventory_snapshots')
+        .delete({ count: 'exact' })
+        .eq('snapshot_date', targetDate)
+        .in('store', FIVE_ACTIVE);
+      if (delErr) {
+        return res.status(500).json({ ok: false, error: 'DELETE failed: ' + delErr.message });
+      }
+      // Step 2: Load Sheet + filter to 5 active stores only.
+      const parsed = await loadRawCs();
+      const items = await fetchAllItemCodes();
+      const validCodes = new Set(items.map(r => r.item_code));
+      const activeSet  = new Set(FIVE_ACTIVE);
+      const rowsAll = parsed.rows || [];
+      const rows = [];
+      const byBranch = {};
+      let droppedFk = 0, droppedNotActive = 0;
+      for (const r of rowsAll) {
+        if (!r.store) continue;
+        if (!activeSet.has(r.store)) { droppedNotActive++; continue; }
+        if (!validCodes.has(r.item_code)) { droppedFk++; continue; }
+        rows.push({
+          snapshot_date: targetDate,
+          store:         r.store,
+          item_code:     r.item_code,
+          qty:           r.qty,
+          cost:          r.cost,
+          amount:        r.amount,
+          is_synthetic:  true,
+        });
+        if (!byBranch[r.store]) byBranch[r.store] = { rows: 0, amount: 0 };
+        byBranch[r.store].rows   += 1;
+        byBranch[r.store].amount += (+r.amount || 0);
+      }
+      // Step 3: INSERT (rows are guaranteed unique post-DELETE; onConflict
+      // is belt-and-suspenders in case of races).
+      const res2 = await chunkInsert('inventory_snapshots', rows,
+        { onConflict: 'snapshot_date,store,item_code' });
+      // Step 4: mview refresh.
+      let mviewErr = null;
+      try { await sb().rpc('refresh_all_mviews'); }
+      catch (e) { mviewErr = e.message; }
+      const total = rows.reduce((s, r) => s + (+r.amount || 0), 0);
+      const by_branch_report = {};
+      for (const b of FIVE_ACTIVE) {
+        const v = byBranch[b] || { rows: 0, amount: 0 };
+        by_branch_report[b] = { rows: v.rows, amount: +v.amount.toFixed(2) };
+      }
+      return res.status(200).json({
+        ok: true,
+        mode: 'hard_reset_5_active_from_sheet',
+        snapshot_date: targetDate,
+        stores_reset: FIVE_ACTIVE,
+        confirm_jym_received: 'YES_5_ACTIVE_HARD_RESET',
+        rows_deleted: deletedCount,
+        rows_inserted: res2.ok,
+        rows_failed:   res2.err,
+        rows_dropped_fk: droppedFk,
+        rows_dropped_not_active: droppedNotActive,
+        sheet_total_rows: rowsAll.length,
+        by_branch:    by_branch_report,
+        total_amount: +total.toFixed(2),
+        mview_refresh_error: mviewErr,
+        first_error: res2.first_error || null,
+      });
+    } catch (e) {
+      console.error('[hard reset 5 active] failed:', e);
+      return res.status(500).json({ ok: false, error: e.message,
+        where: 'hard_reset_5_active_from_sheet' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Stage C-sheet-sync (2026-05-16): Sheet 'Raw CS' now has full 12-store
   // data (4,853 rows, F-col SUM RM 1,105,510.75 — byte-matches Jym truth).
   // UPSERT it into inventory_snapshots at snapshot_date='2026-04-30' with
