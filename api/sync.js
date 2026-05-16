@@ -1460,6 +1460,83 @@ export default async function handler(req, res) {
   const confirmOverwrite = body?.confirm_overwrite || {};
   const onlyTargets      = body?.tables || ALL_TARGETS;
 
+  // ───────────────────────────────────────────────────────────────────────
+  // Stage C-sheet-sync (2026-05-16): Sheet 'Raw CS' now has full 12-store
+  // data (4,853 rows, F-col SUM RM 1,105,510.75 — byte-matches Jym truth).
+  // UPSERT it into inventory_snapshots at snapshot_date='2026-04-30' with
+  // is_synthetic=TRUE (still a back-fill, not a real month-end — first
+  // real snapshot per Notion SOP 3620a2d3110081bc8deef3944a4b8fe4 is
+  // 2026-05-31). NO DELETE. WLO included in UPSERT per Jym 2026-05-16
+  // re-pin ("全部 12 store 都 UPSERT, 包括 WLO, 统一就是真").
+  //
+  // POST /api/sync { mode: 'sync_inventory_from_sheet_synthetic',
+  //                  snapshot_date: 'YYYY-MM-DD' (default 2026-04-30) }
+  if (mode === 'sync_inventory_from_sheet_synthetic') {
+    try {
+      const targetDate = String(body?.snapshot_date || '2026-04-30').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        return res.status(400).json({ ok: false, error: 'bad snapshot_date' });
+      }
+      // Reuse loadRawCs (column-shift detector handles the QTY status
+      // letter column between BRANCH and QTY). Override snapshot_date —
+      // parser uses last_day_of_prev_month, we want a fixed back-fill date.
+      const parsed = await loadRawCs();
+      const items = await fetchAllItemCodes();
+      const validCodes = new Set(items.map(r => r.item_code));
+      const rowsAll = parsed.rows || [];
+      const rows = [];
+      const byBranch = {};
+      let droppedFk = 0;
+      for (const r of rowsAll) {
+        if (!r.store) continue;
+        if (!validCodes.has(r.item_code)) { droppedFk++; continue; }
+        rows.push({
+          snapshot_date: targetDate,
+          store:         r.store,
+          item_code:     r.item_code,
+          qty:           r.qty,
+          cost:          r.cost,
+          amount:        r.amount,
+          is_synthetic:  true,
+        });
+        if (!byBranch[r.store]) byBranch[r.store] = { rows: 0, amount: 0 };
+        byBranch[r.store].rows   += 1;
+        byBranch[r.store].amount += (+r.amount || 0);
+      }
+      // UPSERT (chunkInsert does onConflict); NO prior DELETE.
+      const res2 = await chunkInsert('inventory_snapshots', rows,
+        { onConflict: 'snapshot_date,store,item_code' });
+      let mviewErr = null;
+      try { await sb().rpc('refresh_all_mviews'); }
+      catch (e) { mviewErr = e.message; }
+      const total = rows.reduce((s, r) => s + (+r.amount || 0), 0);
+      const by_branch_report = {};
+      for (const [s, v] of Object.entries(byBranch)) {
+        by_branch_report[s] = { rows: v.rows, amount: +v.amount.toFixed(2) };
+      }
+      return res.status(200).json({
+        ok: true,
+        mode: 'sync_inventory_from_sheet_synthetic',
+        snapshot_date: targetDate,
+        is_synthetic: true,
+        source_sheet: 'SALES VS STOCK VS PO VS GRN.V2 · Raw CS',
+        column_shift_detected: parsed.column_shift_detected,
+        sheet_total_rows:    rowsAll.length,
+        rows_inserted:       res2.ok,
+        rows_failed:         res2.err,
+        rows_dropped_fk:     droppedFk,
+        by_branch:           by_branch_report,
+        total_amount:        +total.toFixed(2),
+        mview_refresh_error: mviewErr,
+        first_error:         res2.first_error || null,
+      });
+    } catch (e) {
+      console.error('[sync sheet synthetic] failed:', e);
+      return res.status(500).json({ ok: false, error: e.message,
+        where: 'sync_inventory_from_sheet_synthetic' });
+    }
+  }
+
   // 1. Read sources in parallel (network bound). CBv3 feeds BOTH sales
   //    (CP1) and customer_buy_lines (CP2) — one fetch, two transforms.
   //    Floatation = 6 stores' Sheet 1 fetched in parallel inside loadFloatation.
