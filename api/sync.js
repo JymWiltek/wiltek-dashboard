@@ -1727,19 +1727,25 @@ export default async function handler(req, res) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
         return res.status(400).json({ ok: false, error: 'bad snapshot_date' });
       }
-      // Reuse loadRawCs (column-shift detector handles the QTY status
-      // letter column between BRANCH and QTY). Override snapshot_date —
-      // parser uses last_day_of_prev_month, we want a fixed back-fill date.
+      // Reuse loadRawCs (column-shift detector handles QTY status letter).
+      // Override snapshot_date — parser uses last_day_of_prev_month.
+      // Stage C-orphan (2026-05-16): NEVER silent-drop. When Sheet has
+      // item_code missing from items master, UPSERT placeholder with
+      // needs_jym_review=true (ignoreDuplicates so existing real items
+      // are never overwritten), then INSERT all rows. Per Notion red rule
+      // 3620a2d3110081c7a7a0c0173eab6780 — orphans must alert Jym, not
+      // silently disappear.
       const parsed = await loadRawCs();
       const items = await fetchAllItemCodes();
-      const validCodes = new Set(items.map(r => r.item_code));
+      const existingItemCodes = new Set(items.map(r => r.item_code));
       const rowsAll = parsed.rows || [];
       const rows = [];
+      const orphanCodes = new Set();
       const byBranch = {};
-      let droppedFk = 0;
       for (const r of rowsAll) {
         if (!r.store) continue;
-        if (!validCodes.has(r.item_code)) { droppedFk++; continue; }
+        if (!r.item_code) continue;
+        if (!existingItemCodes.has(r.item_code)) orphanCodes.add(r.item_code);
         rows.push({
           snapshot_date: targetDate,
           store:         r.store,
@@ -1753,7 +1759,27 @@ export default async function handler(req, res) {
         byBranch[r.store].rows   += 1;
         byBranch[r.store].amount += (+r.amount || 0);
       }
-      // UPSERT (chunkInsert does onConflict); NO prior DELETE.
+      // UPSERT orphan placeholders FIRST so FK passes for every Sheet row.
+      let orphan_items_added = 0;
+      let orphan_items_err = null;
+      if (orphanCodes.size > 0) {
+        const placeholders = Array.from(orphanCodes).map(code => ({
+          item_code: code, needs_jym_review: true,
+        }));
+        const { error: upErr, data: upData } = await sb()
+          .from('items')
+          .upsert(placeholders, { onConflict: 'item_code', ignoreDuplicates: true })
+          .select('item_code');
+        if (upErr) {
+          orphan_items_err = upErr.message;
+          return res.status(500).json({ ok: false,
+            error: 'orphan items upsert failed: ' + upErr.message,
+            orphan_codes: Array.from(orphanCodes),
+          });
+        }
+        orphan_items_added = Array.isArray(upData) ? upData.length : 0;
+      }
+      // UPSERT all rows (NO DELETE) — chunkInsert does onConflict.
       const res2 = await chunkInsert('inventory_snapshots', rows,
         { onConflict: 'snapshot_date,store,item_code' });
       let mviewErr = null;
@@ -1774,11 +1800,14 @@ export default async function handler(req, res) {
         sheet_total_rows:    rowsAll.length,
         rows_inserted:       res2.ok,
         rows_failed:         res2.err,
-        rows_dropped_fk:     droppedFk,
-        by_branch:           by_branch_report,
-        total_amount:        +total.toFixed(2),
-        mview_refresh_error: mviewErr,
-        first_error:         res2.first_error || null,
+        orphan_items_detected:        orphanCodes.size,
+        orphan_items_added_to_master: orphan_items_added,
+        orphan_codes:                 Array.from(orphanCodes).sort(),
+        orphan_items_err:             orphan_items_err,
+        by_branch:                    by_branch_report,
+        total_amount:                 +total.toFixed(2),
+        mview_refresh_error:          mviewErr,
+        first_error:                  res2.first_error || null,
       });
     } catch (e) {
       console.error('[sync sheet synthetic] failed:', e);
