@@ -78,6 +78,31 @@ export default async function handler(req, res) {
         res.status(500).json({ ok: false, error: error.message });
         return;
       }
+      // Stage C-synth (2026-05-16): surface inventory_snapshots.is_synthetic
+      // so the frontend can flag the displayed snapshot as a synthetic
+      // baseline (per Notion SOP 3620a2d3110081bc8deef3944a4b8fe4). The
+      // mview / RPC don't carry the flag, so query the raw table for the
+      // displayed snapshot_date (one row enough: a snapshot is whole-table
+      // synthetic-or-not, never mixed). Cost: ~1ms additional select.
+      let is_synthetic = false;
+      let synthetic_snapshot_date = null;
+      try {
+        const snapDate = (data && data.snapshot_date) || (data && data.health && data.health.snap_date) || null;
+        if (snapDate) {
+          const { data: synRow } = await sb()
+            .from('inventory_snapshots')
+            .select('is_synthetic')
+            .eq('snapshot_date', snapDate)
+            .limit(1)
+            .maybeSingle();
+          if (synRow) {
+            is_synthetic = !!synRow.is_synthetic;
+            synthetic_snapshot_date = snapDate;
+          }
+        }
+      } catch (e) {
+        console.error('[/api/inventory] is_synthetic lookup failed:', e.message);
+      }
       res.status(200).json({
         ok: true,
         section: section || 'kpis',
@@ -86,6 +111,8 @@ export default async function handler(req, res) {
         session_role: user.role,
         session_store: user.store,
         effective_branch: p_branch,
+        is_synthetic,
+        synthetic_snapshot_date,
         ...data,
       });
     } catch (e) {
