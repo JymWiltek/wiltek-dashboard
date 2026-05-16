@@ -230,6 +230,16 @@ table.branch-table .mini-bar-fill {
 .kpi-rows .kpi-row .val .neg { color: var(--danger); }
 .kpi-rows .kpi-row .val .flat { color: var(--text-light); }
 .card .as-of { font-size: 10px; color: var(--text-light); margin-top: 8px; font-style: italic; }
+/* Honest "this is not a real month-end snapshot" notice. Stage C-synth
+   2026-05-16 — kept deliberately gray + plain so it reads as a caveat,
+   not a status badge. Never use ok/warn/bad tones here. */
+.synthetic-banner {
+  margin-top: 6px; padding: 6px 10px;
+  background: #F2F2F2; color: var(--text-meta);
+  border-left: 2px solid var(--text-light);
+  border-radius: 4px;
+  font-size: 11px; line-height: 1.4;
+}
 .card .value.danger { color: var(--danger); }
 .card .value.warn   { color: var(--warn); }
 .card .value.ok     { color: var(--ok); }
@@ -1167,23 +1177,45 @@ function renderInventory(s) {
   const a = s.data.alerts || {};
   const asOf = k.snapshot_date ? 'snapshot ' + k.snapshot_date : '';
   const ymPrev = k.ym_prev || '—';
+  // Stage C-synth (2026-05-16): when the snapshot is flagged synthetic in
+  // inventory_snapshots.is_synthetic, hide MoM comparisons (no real prior
+  // month to compare against) and surface a clear honest label per Notion
+  // SOP 3620a2d3110081bc8deef3944a4b8fe4. First real month-end snapshot
+  // expected 2026-05-31; until then the 2026-03-31 / 2026-04-30 rows are
+  // synthetic baselines.
+  const isSynthetic = !!k.is_synthetic;
 
   // ── KPI 1: Inventory health (5-class breakdown + MoM) ─────────
   const h = k.health || {};
   const hClasses = h.classes || {};
   const order = ['Active', 'Slow', 'Misplaced', 'Dead', 'Discontinued'];
+  // Class rows: hide MoM badge when synthetic (no comparable prior month).
   const hRows = order.map(cls => {
     const r = hClasses[cls] || { amount: 0, pct: 0, mom_amount: 0, mom_pct: null };
+    const trailer = isSynthetic ? '' : momBadge(r.mom_amount, r.mom_pct);
     return kpiRow(cls,
-      fmtMoneyShort(r.amount) + ' (' + fmtPctSign(r.pct) + ')' + momBadge(r.mom_amount, r.mom_pct));
+      fmtMoneyShort(r.amount) + ' (' + fmtPctSign(r.pct) + ')' + trailer);
   }).join('');
   const deadAmt = ((hClasses.Dead && hClasses.Dead.amount) || 0) + ((hClasses.Discontinued && hClasses.Discontinued.amount) || 0);
   const deadPct = h.total_stock ? (deadAmt / h.total_stock * 100) : 0;
   const k1Class = deadPct > 30 ? 'danger' : deadPct > 20 ? 'warn' : '';
-  const c1 = kpiCard('① Inventory health',
-    fmtMoneyShort(h.total_stock || 0),
-    '5-class distribution (MoM vs ' + ymPrev + ')',
-    hRows, asOf, k1Class);
+  const k1Sub = isSynthetic
+    ? '5-class distribution · MoM hidden (synthetic baseline)'
+    : '5-class distribution (MoM vs ' + ymPrev + ')';
+  // K1 wrapper — when synthetic, append a gray honest banner directly
+  // below the headline number, before the 5-class breakdown.
+  const syntheticBanner = isSynthetic
+    ? '<div class="synthetic-banner">⚠️ synthetic baseline · 真月底快照从 2026-05-31 起</div>'
+    : '';
+  const c1 = ''
+    + '<div class="card">'
+    +   '<div class="label">① Inventory health</div>'
+    +   '<div class="value num' + (k1Class ? ' ' + k1Class : '') + '">' + fmtMoneyShort(h.total_stock || 0) + '</div>'
+    +   syntheticBanner
+    +   '<div class="month-tag">' + k1Sub + '</div>'
+    +   '<div class="kpi-rows">' + hRows + '</div>'
+    +   (asOf ? '<div class="as-of">' + asOf + '</div>' : '')
+    + '</div>';
 
   // ── KPI 2: Order gap (PO vs Sales consumed) ───────────────────
   const og = k.order_gap || {};
