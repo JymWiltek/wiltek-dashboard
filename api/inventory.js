@@ -80,15 +80,20 @@ export default async function handler(req, res) {
       }
       // Stage C-synth (2026-05-16): surface inventory_snapshots.is_synthetic
       // so the frontend can flag the displayed snapshot as a synthetic
-      // baseline (per Notion SOP 3620a2d3110081bc8deef3944a4b8fe4). The
-      // mview / RPC don't carry the flag, so query the raw table for the
-      // displayed snapshot_date (one row enough: a snapshot is whole-table
-      // synthetic-or-not, never mixed). Cost: ~1ms additional select.
+      // baseline (Notion SOP 3620a2d3110081bc8deef3944a4b8fe4). RPC doesn't
+      // carry the flag — quick side select. Same query also yields the
+      // 12-store total + by_branch sums (Stage C-12store fix: the legacy
+      // inventory_dashboard_payload RPC only includes 5 active branches; we
+      // override health.total_stock + add by_branch from the raw table so
+      // the Inventory K1 card matches Sheet truth (~RM 1,105k for all 12).
       let is_synthetic = false;
       let synthetic_snapshot_date = null;
+      let twelve_store_total = null;
+      let twelve_store_by_branch = null;
       try {
         const snapDate = (data && data.snapshot_date) || (data && data.health && data.health.snap_date) || null;
         if (snapDate) {
+          // is_synthetic probe (1 row, whole-table all-or-none).
           const { data: synRow } = await sb()
             .from('inventory_snapshots')
             .select('is_synthetic')
@@ -99,9 +104,52 @@ export default async function handler(req, res) {
             is_synthetic = !!synRow.is_synthetic;
             synthetic_snapshot_date = snapDate;
           }
+          // 12-store totals: pull (store, amount) for the displayed snap
+          // (and respecting p_branch when set). Paginated by .range() per
+          // MEGAJOB Decisions Log 2026-05-12 (.limit alone caps at 1000).
+          const allRows = [];
+          let from = 0; const step = 1000;
+          while (true) {
+            let q = sb().from('inventory_snapshots')
+              .select('store,amount')
+              .eq('snapshot_date', snapDate)
+              .order('store', { ascending: true })
+              .range(from, from + step - 1);
+            if (p_branch) q = q.eq('store', p_branch);
+            const { data: chunk, error: cErr } = await q;
+            if (cErr) throw cErr;
+            if (!chunk || !chunk.length) break;
+            allRows.push(...chunk);
+            if (chunk.length < step) break;
+            from += step;
+          }
+          twelve_store_by_branch = {};
+          let total = 0;
+          for (const r of allRows) {
+            const s = r.store || '';
+            const a = +r.amount || 0;
+            twelve_store_by_branch[s] = (twelve_store_by_branch[s] || 0) + a;
+            total += a;
+          }
+          twelve_store_total = +total.toFixed(2);
+          for (const k of Object.keys(twelve_store_by_branch)) {
+            twelve_store_by_branch[k] = +twelve_store_by_branch[k].toFixed(2);
+          }
         }
       } catch (e) {
-        console.error('[/api/inventory] is_synthetic lookup failed:', e.message);
+        console.error('[/api/inventory] is_synthetic/totals lookup failed:', e.message);
+      }
+      // Override health.total_stock so the K1 card reflects ALL 12 stores
+      // (not just the legacy 5-active filtered RPC result). Class breakdown
+      // / order_gap / OEM-vs-Agency continue to come from the RPC (still
+      // 5-active because the classifier needs sales signal that only those
+      // stores have — acceptable; the surface label says so).
+      const patchedData = { ...data };
+      if (twelve_store_total != null) {
+        patchedData.health = { ...(patchedData.health || {}), total_stock: twelve_store_total };
+      }
+      if (twelve_store_by_branch) {
+        patchedData.by_branch = twelve_store_by_branch;
       }
       res.status(200).json({
         ok: true,
@@ -113,7 +161,7 @@ export default async function handler(req, res) {
         effective_branch: p_branch,
         is_synthetic,
         synthetic_snapshot_date,
-        ...data,
+        ...patchedData,
       });
     } catch (e) {
       console.error('[/api/inventory mode=dashboard] error:', e);
