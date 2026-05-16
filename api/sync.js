@@ -1461,6 +1461,151 @@ export default async function handler(req, res) {
   const onlyTargets      = body?.tables || ALL_TARGETS;
 
   // ───────────────────────────────────────────────────────────────────────
+  // Stage C-orphan-alert (2026-05-16 18:00): Jym hard rule per Notion
+  // 3620a2d3110081c7a7a0c0173eab6780 — orphan SKUs (in Sheet Raw CS, not
+  // in Sheet SM master) NEVER silent-dropped. UPSERT minimal placeholder
+  // into items with needs_jym_review=true so FK passes; Portal Inventory
+  // top banner alerts Jym. Jym then adds the codes to Sheet SM master and
+  // the daily cron sync UPSERTs real metadata, clearing the flag.
+  //
+  // POST /api/sync { mode: 'hard_reset_5_active_v2',
+  //                  confirm_jym: 'YES_5_ACTIVE_HARD_RESET',
+  //                  snapshot_date: 'YYYY-MM-DD' (default 2026-04-30) }
+  //
+  // Same guards as the v1 hard-reset mode. v2 difference: when Sheet has
+  // an item_code not in items master, we UPSERT a needs_jym_review=true
+  // placeholder into items (only NEW codes — existing items NEVER
+  // overwritten — via ignoreDuplicates), then INSERT all inventory rows.
+  // Zero FK drops by design — Sheet truth is sacrosanct.
+  if (mode === 'hard_reset_5_active_v2') {
+    try {
+      if (body?.confirm_jym !== 'YES_5_ACTIVE_HARD_RESET') {
+        return res.status(400).json({ ok: false,
+          error: 'confirm_jym must equal "YES_5_ACTIVE_HARD_RESET"' });
+      }
+      const targetDate = String(body?.snapshot_date || '2026-04-30').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        return res.status(400).json({ ok: false, error: 'bad snapshot_date' });
+      }
+      if (targetDate === '2026-03-31') {
+        return res.status(400).json({ ok: false,
+          error: '2026-03-31 baseline is frozen per Notion SOP — refusing' });
+      }
+      const FIVE_ACTIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
+
+      // Step 1: DELETE only the 5 active stores' rows at this snapshot_date.
+      const { error: delErr, count: deletedCount } = await sb()
+        .from('inventory_snapshots')
+        .delete({ count: 'exact' })
+        .eq('snapshot_date', targetDate)
+        .in('store', FIVE_ACTIVE);
+      if (delErr) {
+        return res.status(500).json({ ok: false, error: 'DELETE failed: ' + delErr.message });
+      }
+
+      // Step 2: Load Sheet + filter to 5 active + detect orphan item_codes
+      // (Sheet has but items master doesn't).
+      const parsed = await loadRawCs();
+      const items = await fetchAllItemCodes();
+      const existingItemCodes = new Set(items.map(r => r.item_code));
+      const activeSet = new Set(FIVE_ACTIVE);
+      const rowsAll = parsed.rows || [];
+      const inventoryRows = [];
+      const orphanCodes = new Set();
+      const byBranch = {};
+      let droppedNotActive = 0;
+      for (const r of rowsAll) {
+        if (!r.store) continue;
+        if (!activeSet.has(r.store)) { droppedNotActive++; continue; }
+        if (!r.item_code) continue;
+        if (!existingItemCodes.has(r.item_code)) orphanCodes.add(r.item_code);
+        inventoryRows.push({
+          snapshot_date: targetDate,
+          store:         r.store,
+          item_code:     r.item_code,
+          qty:           r.qty,
+          cost:          r.cost,
+          amount:        r.amount,
+          is_synthetic:  true,
+        });
+        if (!byBranch[r.store]) byBranch[r.store] = { rows: 0, amount: 0 };
+        byBranch[r.store].rows   += 1;
+        byBranch[r.store].amount += (+r.amount || 0);
+      }
+
+      // Step 3: UPSERT orphan placeholders into items (ignoreDuplicates=true
+      // so existing real items are NEVER overwritten). Only the orphan
+      // codes — confirmed missing from items master — get inserted with
+      // needs_jym_review=true. Other columns NULL (Jym's hard rule: don't
+      // self-decide metadata).
+      let orphan_items_added = 0;
+      let orphan_items_err = null;
+      if (orphanCodes.size > 0) {
+        const placeholders = Array.from(orphanCodes).map(code => ({
+          item_code: code,
+          needs_jym_review: true,
+        }));
+        const { error: upErr, data: upData } = await sb()
+          .from('items')
+          .upsert(placeholders, { onConflict: 'item_code', ignoreDuplicates: true })
+          .select('item_code');
+        if (upErr) {
+          orphan_items_err = upErr.message;
+          // Bail — without orphans in items master, inventory INSERT will
+          // still fail FK. Surface the error to Jym, no partial commit.
+          return res.status(500).json({ ok: false,
+            error: 'orphan items upsert failed: ' + upErr.message,
+            hint: 'Likely missing needs_jym_review column or NOT-NULL constraint on other items cols',
+            orphan_codes: Array.from(orphanCodes),
+          });
+        }
+        orphan_items_added = Array.isArray(upData) ? upData.length : 0;
+      }
+
+      // Step 4: INSERT inventory rows. With orphans now in items, FK passes
+      // for every Sheet row.
+      const invRes = await chunkInsert('inventory_snapshots', inventoryRows,
+        { onConflict: 'snapshot_date,store,item_code' });
+
+      // Step 5: mview refresh.
+      let mviewErr = null;
+      try { await sb().rpc('refresh_all_mviews'); }
+      catch (e) { mviewErr = e.message; }
+
+      const total = inventoryRows.reduce((s, r) => s + (+r.amount || 0), 0);
+      const by_branch_report = {};
+      for (const b of FIVE_ACTIVE) {
+        const v = byBranch[b] || { rows: 0, amount: 0 };
+        by_branch_report[b] = { rows: v.rows, amount: +v.amount.toFixed(2) };
+      }
+      return res.status(200).json({
+        ok: true,
+        mode: 'hard_reset_5_active_v2',
+        snapshot_date: targetDate,
+        stores_reset: FIVE_ACTIVE,
+        confirm_jym_received: 'YES_5_ACTIVE_HARD_RESET',
+        rows_deleted: deletedCount,
+        rows_inserted: invRes.ok,
+        rows_failed:   invRes.err,
+        orphan_items_detected:        orphanCodes.size,
+        orphan_items_added_to_master: orphan_items_added,
+        orphan_codes:                 Array.from(orphanCodes).sort(),
+        orphan_items_err:             orphan_items_err,
+        sheet_total_rows:             rowsAll.length,
+        rows_dropped_not_active:      droppedNotActive,
+        by_branch:    by_branch_report,
+        total_amount: +total.toFixed(2),
+        mview_refresh_error: mviewErr,
+        first_error: invRes.first_error || null,
+      });
+    } catch (e) {
+      console.error('[hard reset v2] failed:', e);
+      return res.status(500).json({ ok: false, error: e.message,
+        where: 'hard_reset_5_active_v2' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Stage C-hard-reset (2026-05-16 17:00): Claude (chat) SQL run damaged
   // W01-W07 rows at snapshot_date='2026-04-30' (W02 missing RM 66k etc).
   // Jym明示 YES (chat 2026-05-16): direct authorization to DELETE the 5

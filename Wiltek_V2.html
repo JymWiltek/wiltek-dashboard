@@ -240,6 +240,86 @@ table.branch-table .mini-bar-fill {
   border-radius: 4px;
   font-size: 11px; line-height: 1.4;
 }
+
+/* Orphan SKU alert — amber/warn tone, NOT gray. This demands Jym action
+   (add the codes to Sheet SM master), unlike the synthetic baseline
+   notice which is passive. Click → opens drill-down modal. Stage C-orphan
+   2026-05-16 per Notion 3620a2d3110081c7a7a0c0173eab6780. */
+.orphan-banner {
+  margin: 0 0 18px; padding: 12px 18px;
+  background: #FFF7E0;
+  border: 1px solid var(--warn-soft);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.orphan-banner:hover { background: #FFEFB8; }
+.orphan-banner .ob-icon { font-size: 20px; flex-shrink: 0; }
+.orphan-banner .ob-text { flex: 1; font-size: 13px; line-height: 1.5; }
+.orphan-banner .ob-text strong { color: var(--warn); font-weight: 600; }
+.orphan-banner .ob-cta {
+  font-size: 12px; color: var(--warn); font-weight: 600;
+  border: 1px solid var(--warn); padding: 4px 10px; border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Modal — shown when orphan banner clicked or other drill-downs land. */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: none; align-items: center; justify-content: center; z-index: 2000;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg); border-radius: var(--radius);
+  width: min(720px, 92vw); max-height: 86vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+}
+.modal-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+.modal-head .modal-close {
+  background: transparent; border: 0; font-size: 22px; line-height: 1;
+  color: var(--text-meta); cursor: pointer; padding: 0 4px;
+}
+.modal-head .modal-close:hover { color: var(--text-primary); }
+.modal-body { padding: 16px 20px; overflow: auto; flex: 1; }
+.modal-body .modal-sub { font-size: 13px; color: var(--text-meta); margin: 0 0 12px; }
+.modal-body .modal-sub a {
+  color: var(--brand); text-decoration: none; font-weight: 500;
+}
+.modal-body .modal-sub a:hover { text-decoration: underline; }
+.modal-body table.orphan-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.modal-body table.orphan-table th, .modal-body table.orphan-table td {
+  text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border);
+}
+.modal-body table.orphan-table th {
+  font-size: 11px; color: var(--text-meta); font-weight: 600;
+  text-transform: uppercase; background: var(--surface);
+}
+.modal-body table.orphan-table td.num {
+  text-align: right; font-family: 'SF Mono', Menlo, monospace;
+}
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 12px 20px; border-top: 1px solid var(--border);
+}
+.modal-foot button {
+  background: var(--brand); color: #fff; border: 0; border-radius: 6px;
+  padding: 8px 14px; font-size: 13px; font-weight: 500;
+}
+.modal-foot button.secondary {
+  background: transparent; color: var(--text-meta); border: 1px solid var(--border);
+}
+.modal-foot button:hover { background: #19503e; }
+.modal-foot button.secondary:hover { color: var(--text-primary); }
 .card .value.danger { color: var(--danger); }
 .card .value.warn   { color: var(--warn); }
 .card .value.ok     { color: var(--ok); }
@@ -446,6 +526,22 @@ table.store-table .anom-bad  { color: var(--danger); }
 </div>
 
 <div id="devBadge" class="dev-badge hidden"></div>
+
+<!-- Orphan SKU modal — populated by openOrphanModal() when banner clicked.
+     Stage C-orphan (2026-05-16) per Notion 3620a2d3110081c7a7a0c0173eab6780. -->
+<div id="orphanModal" class="modal-overlay" role="dialog" aria-labelledby="orphanModalTitle" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="orphanModalTitle">⚠️ Orphan SKUs — missing master metadata</h2>
+      <button type="button" class="modal-close" onclick="closeOrphanModal()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body" id="orphanModalBody"></div>
+    <div class="modal-foot">
+      <button type="button" class="secondary" onclick="closeOrphanModal()">Close</button>
+      <button type="button" onclick="exportOrphanCSV()">Export CSV</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
@@ -1152,7 +1248,26 @@ function aRow(name, val) {
    byte-match V1 Stage 3 + Stage 4 — same endpoint, same numbers.
 ═══════════════════════════════════════════════════════════════════ */
 function renderInventory(s) {
-  const title = '<h1 class="page-title">Inventory</h1>'
+  // Stage C-orphan (2026-05-16): top-of-page banner when Sheet has SKUs
+  // missing from items master. Click → modal with full list + CSV export.
+  // Per Notion 3620a2d3110081c7a7a0c0173eab6780 — never silent, always
+  // amber tone (not gray — this is an action item, not a passive caveat).
+  const orphan = (s.data && s.data.kpis && s.data.kpis.orphan_alert) || null;
+  const orphanBanner = (orphan && orphan.count > 0)
+    ? '<div class="orphan-banner" onclick="openOrphanModal()" role="button" tabindex="0">'
+    +   '<div class="ob-icon">⚠️</div>'
+    +   '<div class="ob-text">'
+    +     '<strong>' + orphan.count + ' SKU</strong> missing master data'
+    +     ' · 影响 RM ' + (orphan.value_rm || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
+    +     ' · Sheet Raw CS 有这些 code 但 SM master 没有, items 表已 placeholder'
+    +     ' · 添加到 Sheet SM tab 后 cron 自动 propagate'
+    +   '</div>'
+    +   '<div class="ob-cta">查看明细 →</div>'
+    + '</div>'
+    : '';
+
+  const title = orphanBanner
+              + '<h1 class="page-title">Inventory</h1>'
               + '<p class="page-sub">Snapshot ' + s.month
               + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · Company-wide')
               + ' · 4 KPI + 4 alerts · /api/inventory_dashboard</p>';
@@ -1636,6 +1751,99 @@ function renderStubView(s) {
     +     '<span class="muted">' + viewTitle(s.view) + ' lands in Stage B (Inventory/Customers/Products) or Stage C (Today). Finance waits on multi-month financial_monthly sync.</span></div>'
     + '</div>';
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Orphan SKU modal — Stage C-orphan (2026-05-16)
+   Click banner → list items + provide Sheet SM tab link + CSV export.
+═══════════════════════════════════════════════════════════════════ */
+const SHEET_SM_URL = 'https://docs.google.com/spreadsheets/d/1jzLdcCrckXjSrmyrYKQxjhyvq1v5zTp6hf9zUJDo5II/edit#gid=871820188';
+
+function openOrphanModal() {
+  const orphan = state.data && state.data.kpis && state.data.kpis.orphan_alert;
+  if (!orphan || !Array.isArray(orphan.items)) return;
+  const body = document.getElementById('orphanModalBody');
+  const overlay = document.getElementById('orphanModal');
+  if (!body || !overlay) return;
+  const rows = orphan.items.map(it =>
+    '<tr>'
+    + '<td><code>' + escapeHtml(it.code || '') + '</code></td>'
+    + '<td>' + escapeHtml(it.store || '') + '</td>'
+    + '<td class="num">' + (it.qty != null ? fmtInt(it.qty) : '—') + '</td>'
+    + '<td class="num">' + (it.cost != null ? fmtRMpr(it.cost) : '—') + '</td>'
+    + '<td class="num"><strong>' + fmtRMpr(it.amount) + '</strong></td>'
+    + '</tr>'
+  ).join('');
+  body.innerHTML = ''
+    + '<p class="modal-sub">'
+    +   '<strong>' + orphan.count + ' distinct SKU</strong> · '
+    +   orphan.rows + ' inventory row' + (orphan.rows === 1 ? '' : 's') + ' · '
+    +   '影响 <strong>RM ' + (orphan.value_rm || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</strong>'
+    +   '<br>添加这些 code 到 '
+    +   '<a href="' + SHEET_SM_URL + '" target="_blank" rel="noopener">Sheet SM tab ↗</a>'
+    +   ' 后, 下次 cron sync 自动 propagate metadata, alert 清除.'
+    + '</p>'
+    + '<table class="orphan-table">'
+    +   '<thead><tr>'
+    +     '<th>Item code</th>'
+    +     '<th>Store</th>'
+    +     '<th class="num">Qty</th>'
+    +     '<th class="num">Unit cost</th>'
+    +     '<th class="num">Amount</th>'
+    +   '</tr></thead>'
+    +   '<tbody>' + rows + '</tbody>'
+    + '</table>';
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+}
+
+function closeOrphanModal() {
+  const overlay = document.getElementById('orphanModal');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function exportOrphanCSV() {
+  const orphan = state.data && state.data.kpis && state.data.kpis.orphan_alert;
+  if (!orphan || !Array.isArray(orphan.items) || orphan.items.length === 0) return;
+  const esc = (s) => {
+    if (s == null) return '';
+    const str = String(s);
+    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  };
+  const lines = ['item_code,store,qty,unit_cost,amount,snapshot_date'];
+  const snap = (state.data.kpis.snapshot_date || state.data.kpis.synthetic_snapshot_date || state.month + '-end');
+  for (const it of orphan.items) {
+    lines.push([
+      esc(it.code), esc(it.store),
+      it.qty != null ? it.qty : '',
+      it.cost != null ? it.cost : '',
+      it.amount != null ? it.amount : '',
+      esc(snap),
+    ].join(','));
+  }
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'wiltek-orphan-skus-' + snap + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+// Close modal on Esc + click outside.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeOrphanModal();
+});
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('orphanModal');
+  if (overlay && overlay.classList.contains('open') && e.target === overlay) {
+    closeOrphanModal();
+  }
+});
 
 /* ═══════════════════════════════════════════════════════════════════
    Login flow — talks to /api/login (same endpoint V1 uses)

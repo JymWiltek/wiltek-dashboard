@@ -139,6 +139,54 @@ export default async function handler(req, res) {
       } catch (e) {
         console.error('[/api/inventory] is_synthetic/totals lookup failed:', e.message);
       }
+      // Stage C-orphan-alert (2026-05-16): when items.needs_jym_review = TRUE
+      // exists for SKUs that show up in the displayed snapshot, surface a
+      // top-of-page alert via orphan_alert. Two-step query (PostgREST
+      // embedding doesn't let us filter on the joined table cleanly):
+      //   1. SELECT item_code FROM items WHERE needs_jym_review = TRUE
+      //   2. SELECT inventory_snapshots rows at snapshot_date with
+      //      item_code IN (orphans), optionally filtered by p_branch
+      let orphan_alert = { count: 0, rows: 0, value_rm: 0, items: [] };
+      try {
+        const snapDate2 = (data && data.snapshot_date) || (data && data.health && data.health.snap_date) || null;
+        if (snapDate2) {
+          const { data: orphans } = await sb()
+            .from('items').select('item_code').eq('needs_jym_review', true);
+          const orphanList = (orphans || []).map(r => r.item_code).filter(Boolean);
+          if (orphanList.length > 0) {
+            // Chunk in case orphan list is huge (>200 hits PostgREST IN limit)
+            const allInvRows = [];
+            for (let i = 0; i < orphanList.length; i += 200) {
+              const chunk = orphanList.slice(i, i + 200);
+              let q = sb().from('inventory_snapshots')
+                .select('item_code,store,amount,qty,cost')
+                .eq('snapshot_date', snapDate2)
+                .in('item_code', chunk);
+              if (p_branch) q = q.eq('store', p_branch);
+              const { data: chunkRows } = await q;
+              if (chunkRows) allInvRows.push(...chunkRows);
+            }
+            const distinctCodes = new Set(allInvRows.map(r => r.item_code));
+            const totalVal = allInvRows.reduce((s, r) => s + (+r.amount || 0), 0);
+            // Sort top items by amount DESC for the modal — Jym scans biggest first.
+            const sorted = allInvRows.slice().sort((a, b) => (+b.amount || 0) - (+a.amount || 0));
+            orphan_alert = {
+              count: distinctCodes.size,
+              rows: allInvRows.length,
+              value_rm: +totalVal.toFixed(2),
+              items: sorted.slice(0, 100).map(r => ({
+                code:   r.item_code,
+                store:  r.store,
+                amount: +(+r.amount || 0).toFixed(2),
+                qty:    +r.qty || 0,
+                cost:   r.cost == null ? null : +r.cost,
+              })),
+            };
+          }
+        }
+      } catch (e) {
+        console.error('[/api/inventory] orphan_alert lookup failed:', e.message);
+      }
       // Override health.total_stock so the K1 card reflects ALL 12 stores
       // (not just the legacy 5-active filtered RPC result). Class breakdown
       // / order_gap / OEM-vs-Agency continue to come from the RPC (still
@@ -161,6 +209,7 @@ export default async function handler(req, res) {
         effective_branch: p_branch,
         is_synthetic,
         synthetic_snapshot_date,
+        orphan_alert,
         ...patchedData,
       });
     } catch (e) {
