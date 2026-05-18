@@ -9,6 +9,14 @@
     {
       "source": "/api/inventory_dashboard",
       "destination": "/api/inventory?mode=dashboard"
+    },
+    {
+      "source": "/api/targets/upsert",
+      "destination": "/api/sync?mode=targets_upsert"
+    },
+    {
+      "source": "/api/targets",
+      "destination": "/api/kpi?view=targets"
     }
   ]
 }
