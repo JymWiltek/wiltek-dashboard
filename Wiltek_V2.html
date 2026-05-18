@@ -427,6 +427,178 @@ table.store-table .anom-bad  { color: var(--danger); }
 }
 .action-plan strong { color: var(--text-primary); }
 
+/* ═════════════════════════════════════════════════════════════════════
+   Phase 2 Sales Optimization (2026-05-16)
+   - Sales Layer 1 expanded cards · Layer 2 alerts · Layer 3 charts ·
+     Layer 4 Action Plan
+   - ⚙️ Targets page (owner-only)
+═══════════════════════════════════════════════════════════════════════ */
+
+/* Targets editor grid */
+.targets-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.targets-toolbar button {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text-primary); border-radius: 6px;
+  padding: 7px 12px; font-size: 13px;
+}
+.targets-toolbar button:hover { border-color: var(--brand); color: var(--brand); }
+.targets-toolbar button.primary {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+.targets-toolbar button.primary:hover { background: #19503e; }
+.targets-toolbar button.primary:disabled {
+  background: var(--text-light); border-color: var(--text-light); cursor: not-allowed;
+}
+.targets-toolbar .group-label {
+  font-size: 12px; color: var(--text-meta); margin-right: 6px;
+}
+.targets-fallback-note {
+  background: var(--surface); border-left: 3px solid var(--warn-soft);
+  padding: 8px 12px; border-radius: 4px; font-size: 12px;
+  color: var(--text-meta); margin-bottom: 14px;
+}
+table.targets-grid {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+table.targets-grid th, table.targets-grid td {
+  padding: 9px 12px; border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+table.targets-grid tr:last-child td { border-bottom: 0; }
+table.targets-grid th {
+  font-size: 11px; color: var(--text-meta); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  background: var(--surface);
+}
+table.targets-grid td.store-cell { font-weight: 600; width: 200px; }
+table.targets-grid tr.historical td.store-cell { color: var(--text-light); }
+table.targets-grid tr.historical { background: rgba(0,0,0,0.015); }
+table.targets-grid input.target-input {
+  width: 130px; padding: 5px 8px;
+  border: 1px solid var(--border); border-radius: 4px;
+  font-family: 'SF Mono', Menlo, monospace; font-size: 13px;
+  text-align: right; background: var(--bg);
+}
+table.targets-grid input.target-input:focus { outline: none; border-color: var(--brand); }
+table.targets-grid input.target-input.dirty { border-color: var(--warn); background: #FFFCEC; }
+table.targets-grid td.note { font-size: 11px; color: var(--text-light); }
+.targets-summary {
+  display: grid; gap: 10px; margin-top: 18px;
+  grid-template-columns: 1fr 1fr;
+}
+.targets-summary .summary-cell {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.targets-summary .summary-cell .label { font-size: 12px; color: var(--text-meta); }
+.targets-summary .summary-cell .value { font-size: 22px; font-weight: 500; margin-top: 2px; }
+.targets-save-status {
+  font-size: 12px; color: var(--text-meta); margin-left: auto;
+}
+.targets-save-status.ok   { color: var(--ok); }
+.targets-save-status.bad  { color: var(--danger); }
+
+/* "Targets missing" banner inside Sales Layer 1 cards */
+.no-target-banner {
+  background: #FFF8E1; border-left: 3px solid var(--warn-soft);
+  border-radius: 4px; padding: 8px 10px; margin: 8px 0;
+  font-size: 11px; color: var(--text-meta); line-height: 1.4;
+}
+.no-target-banner a { color: var(--brand); text-decoration: none; font-weight: 500; cursor: pointer; }
+.no-target-banner a:hover { text-decoration: underline; }
+
+/* Layer 1 store progress table (extends existing branch-table) */
+table.branch-table tr.progress-over    .progress-cell { color: var(--ok); }
+table.branch-table tr.progress-under   .progress-cell { color: var(--warn); }
+table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
+
+/* Layer 2 + sales-specific data-gap banner */
+.data-gap-banner {
+  background: #FFF8E1; border-left: 3px solid var(--warn);
+  padding: 10px 14px; border-radius: 4px; margin: 14px 0;
+  font-size: 13px; color: var(--text-meta);
+}
+.data-gap-banner strong { color: var(--text-primary); }
+
+/* Layer 3 charts */
+.charts-grid {
+  display: grid; gap: 16px; margin-top: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+.chart-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.chart-card.wide { grid-column: 1 / -1; }
+.chart-card .label { font-size: 13px; color: var(--text-meta); margin-bottom: 8px; }
+.chart-card .meta  { font-size: 11px; color: var(--text-light); margin-top: 6px; }
+.chart-card svg { display: block; width: 100%; height: auto; }
+
+/* Chart axes + gridlines */
+.chart-svg .grid-line { stroke: #EEE; stroke-width: 1; }
+.chart-svg .axis-text { font-size: 10px; fill: var(--text-meta); font-family: 'SF Mono', Menlo, monospace; }
+.chart-svg .axis-line { stroke: var(--border); stroke-width: 1; }
+.chart-svg .data-line { fill: none; stroke-width: 2; }
+.chart-svg .data-dot  { fill: var(--brand); }
+.chart-svg .data-area { fill-opacity: 0.08; }
+.chart-svg .data-bar  { fill: var(--brand); }
+.chart-svg .legend-text { font-size: 11px; fill: var(--text-meta); }
+
+/* Heatmap */
+.heatmap-cell { stroke: #fff; stroke-width: 1; }
+.heatmap-tooltip {
+  position: absolute; pointer-events: none;
+  background: rgba(0,0,0,0.85); color: #fff;
+  font-size: 11px; padding: 4px 8px; border-radius: 4px;
+  z-index: 10; transform: translate(-50%, -120%);
+  white-space: nowrap; display: none;
+}
+
+/* Layer 4 — Action Plan */
+.action-plan-list {
+  display: grid; gap: 12px; margin-top: 8px;
+}
+.action-plan-card {
+  display: grid; grid-template-columns: 48px 1fr auto; gap: 14px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  align-items: start;
+}
+.action-plan-card.severity-red    { border-left: 4px solid var(--danger); background: #fdf3f3; }
+.action-plan-card.severity-amber  { border-left: 4px solid var(--warn); background: #FFFCEC; }
+.action-plan-card.severity-green  { border-left: 4px solid var(--ok); }
+.action-plan-card.done {
+  opacity: 0.5; text-decoration: line-through;
+}
+.action-plan-card .icon  { font-size: 28px; line-height: 1; }
+.action-plan-card .title { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.action-plan-card .desc  { color: var(--text-meta); font-size: 12px; margin-top: 4px; }
+.action-plan-card .action-text {
+  font-size: 12px; color: var(--text-primary); margin-top: 6px;
+  background: rgba(0,0,0,0.04); padding: 4px 8px; border-radius: 4px; display: inline-block;
+}
+.action-plan-card .controls { display: flex; flex-direction: column; gap: 6px; }
+.action-plan-card .controls button {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 5px 10px; font-size: 12px; color: var(--text-meta);
+  white-space: nowrap;
+}
+.action-plan-card .controls button:hover { color: var(--brand); border-color: var(--brand); }
+.action-plan-card .controls .bubble-flag {
+  font-size: 10px; color: var(--text-light); text-align: center;
+}
+.action-plan-empty {
+  background: var(--surface); border: 1px dashed var(--border);
+  border-radius: var(--radius); padding: 16px 22px;
+  text-align: center; color: var(--text-meta); font-size: 13px;
+}
+
 /* ── Skeleton (loading) ───────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200px 0; }
@@ -520,6 +692,10 @@ table.store-table .anom-bad  { color: var(--danger); }
       <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products</a>
       <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today</a>
       <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance<span class="stub">…</span></a>
+      <!-- Phase 2 (2026-05-16) ⚙️ Targets page — owner only.
+           hidden by default; populateMenu() shows it after enterApp() if role==='owner'. -->
+      <a href="#" data-view="targets" id="navTargets" style="display:none"
+         onclick="return onViewChange('targets')"><span class="icon">⚙️</span>目标设定</a>
     </nav>
     <section class="app-content" id="main"></section>
   </main>
@@ -675,7 +851,29 @@ function populateBranchPicker() {
 }
 
 /* ── Constants ──────────────────────────────────────────────────── */
-const ALLOWED_VIEWS = ['sales', 'inventory', 'customers', 'products', 'today', 'finance'];
+const ALLOWED_VIEWS = ['sales', 'inventory', 'customers', 'products', 'today', 'finance', 'targets'];
+const OWNER_ONLY_VIEWS = new Set(['targets']);
+
+// Phase 2: monthly_targets store list (10 stores per Notion + schema CHECK).
+// Active 5 + WCO can be set; W10/W11/W12/WEX shown but greyed (historical).
+const TARGET_STORES = {
+  W01: { name: 'W01 · Pandan Indah',         group: 'active' },
+  W02: { name: 'W02 · Ampang Water Front',   group: 'active' },
+  W03: { name: 'W03 · Wangsa Maju',          group: 'active' },
+  W05: { name: 'W05 · Bangi Seksyen 7',      group: 'active' },
+  W07: { name: 'W07 · Pandan Jaya',          group: 'active' },
+  WCO: { name: 'WCO · HQ 开单',              group: 'active' },
+  W10: { name: 'W10 · (closed/historical)',  group: 'historical' },
+  W11: { name: 'W11 · Taman Midah Cheras (closed)', group: 'historical' },
+  W12: { name: 'W12 · Bandar Seri Putra (closed)',  group: 'historical' },
+  WEX: { name: 'WEX · 展览/特殊',             group: 'historical' },
+};
+const TARGET_STORE_ORDER = ['W01','W02','W03','W05','W07','WCO','W10','W11','W12','WEX'];
+
+// Phase 2 Sales: store list used by the Layer-1 5-store progress table.
+// (Targets are tracked for active+WCO; we display non-target stores too if
+// they have sales in by_branch, but mark them "no target".)
+const SALES_PROGRESS_STORES = ['W01','W02','W03','W05','W07','WCO'];
 
 /* Generate 28 months 2024-01..2026-04 — matches sales table range.
    When sync extends the table, append new months here. */
@@ -773,9 +971,40 @@ function monthQuery() {
 }
 
 async function fetchSales(signal) {
-  const j = await getJSON('/api/kpi?' + kpiQuery(), signal);
+  // Phase 2 (2026-05-16): Sales view now needs 4 data sources in parallel —
+  // monthly KPI, this month's daily breakdown, 12M trend (for Layer-3
+  // charts), and monthly_targets (for Layer-1 progress + Action Plan).
+  // Hard-rule § "切月份 < 0.5s": KPI/targets/daily resolve fast (~300ms
+  // total via mview + small selects); 12M trend is the slow leg (~1-2s
+  // — full sales table scan paginated). We Promise.all all four so the
+  // first paint can use kpi/targets/daily; trend renders into Layer 3
+  // when it lands.
+  const baseQ  = kpiQuery();
+  const trendQ = baseQ.replace('view=sales', 'view=sales-trend');
+  const dailyQ = baseQ.replace('view=sales', 'view=sales-daily');
+  const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
+  const [kpi, targets, daily, trend] = await Promise.all([
+    getJSON('/api/kpi?' + baseQ,     signal),
+    getJSON('/api/kpi?' + targetsQ,  signal),
+    getJSON('/api/kpi?' + dailyQ,    signal),
+    getJSON('/api/kpi?' + trendQ,    signal).catch(e => ({ ok: false, error: e.message, series: [], branch_series: {} })),
+  ]);
+  state.role = kpi.session_role || state.role;
+  return {
+    kpi:     kpi.data,
+    targets: targets,
+    daily:   daily,
+    trend:   trend,
+  };
+}
+
+async function fetchTargets(signal) {
+  // ⚙️ Targets page is owner-only; the API also enforces. Manager
+  // landing on this view will see a 403 banner via the error path.
+  const q = new URLSearchParams({ view: 'targets', month: state.month }).toString();
+  const j = await getJSON('/api/kpi?' + q, signal);
   state.role = j.session_role || state.role;
-  return j.data;
+  return j;
 }
 async function fetchCustomers(signal) {
   const j = await getJSON('/api/kpi?' + kpiQuery(), signal);
@@ -815,6 +1044,7 @@ const FETCHERS = {
   products:  fetchProducts,
   today:     fetchToday,
   finance:   null, // backlog: waits on multi-month financial sync
+  targets:   fetchTargets,
 };
 
 /* ── Single fetch (AbortController, no in-flight flag) ──────────── */
@@ -918,6 +1148,7 @@ function renderView() {
     products:  renderProducts,
     today:     renderToday,
     finance:   renderStubView,
+    targets:   renderTargets,
   };
   const main = document.getElementById('main');
   if (!main) return;
@@ -942,6 +1173,8 @@ function onMonthChange(ym) {
 }
 function onViewChange(v) {
   if (!ALLOWED_VIEWS.includes(v) || v === state.view) return false;
+  // Phase 2: owner-only views (e.g. ⚙️ targets) — silently block.
+  if (OWNER_ONLY_VIEWS.has(v) && state.role !== 'owner') return false;
   state.view = v;
   syncUrl();
   loadView();
@@ -1044,50 +1277,113 @@ function escapeHtml(s) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   RENDER · SALES (Stage A)
-   5 张卡 per Notion 设计 (2026-05-12 修正):
-     1. 本月销售 vs 目标
-     2. 单数 + AOV
-     3. 今日销售 + 5 店分布   ← /api/kpi 只给月, 暂占位 (Stage B/C 补 daily endpoint)
-     4. 本周进度 vs 周目标     ← 同上占位
-     5. 5 店月进度对照表
+   RENDER · SALES — Phase 2 Optimization (2026-05-16)
+   Notion 5/12 4-layer spec:
+     Layer 1: 5 顶部 KPI 卡 (本月 vs 目标 / 单数+AOV / 今日 / WTD / 5店表)
+     Layer 2: 4 预警卡
+     Layer 3: 5 趋势图 (12M line / 每周热力图 / 单数+AOV 双坐标 / 月内爬坡 /
+              品类×门市矩阵)
+     Layer 4: Action Plan · 本周 3-5 件事 (severity-sorted, bubble_to_today)
+   术语锁定 (Notion brief): 单数 = invoices, 件数 = units, AOV = sales/invoices
 ═══════════════════════════════════════════════════════════════════ */
 function renderSales(s) {
   const title = '<h1 class="page-title">Sales</h1>'
               + '<p class="page-sub">'
               +   'Snapshot ' + s.month
-              +   (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · All stores')
-              +   ' · KPI vs last-month / last-year / 6-month avg'
+              +   (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · 全公司')
+              +   ' · KPI 默认单月 + 3 行对比 · 12M 趋势 · Action Plan'
               + '</p>';
 
   if (s.loading || !s.data) {
     return title
+      + '<div class="section-title">Layer 1 · 顶部 KPI</div>'
       + '<div class="cards-grid">'
-      +   skeletonCard('Sales vs target')
-      +   skeletonCard('Invoices · AOV')
-      +   skeletonCard('Today · 5 stores')
-      +   skeletonCard('Week-to-date')
-      +   '<div class="card wide"><div class="label">5-store progress</div><div class="skeleton h-row"></div><div class="skeleton h-row"></div><div class="skeleton h-row"></div></div>'
+      +   skeletonCard('① 本月销售 vs 目标')
+      +   skeletonCard('② 本月单数 · AOV')
+      +   skeletonCard('③ 今日销售 · 5 店分布')
+      +   skeletonCard('④ 本周进度 vs 周目标')
+      +   '<div class="card wide"><div class="label">⑤ 5 店月进度对照表</div><div class="skeleton h-row"></div><div class="skeleton h-row"></div><div class="skeleton h-row"></div></div>'
       + '</div>';
   }
 
-  const d = s.data;
-  const target = (d.last_month_sales != null) ? d.last_month_sales * 1.05 : null;
-  const progressPct = (target && target > 0) ? (d.sales / target) : null;
-  const ymPrev = ymLastMonth(s.month);
-  const ymPrevYr = ymLastYear(s.month);
+  const d           = s.data.kpi     || {};
+  const targetsResp = s.data.targets || {};
+  const daily       = s.data.daily   || {};
+  const trend       = s.data.trend   || {};
 
-  // Card 1 — Sales vs target
+  return title
+    + '<div class="section-title">Layer 1 · 顶部 KPI</div>'
+    + renderSalesLayer1(s, d, targetsResp, daily, trend)
+    + '<div class="section-title">Layer 2 · 预警 (alerts)</div>'
+    + renderSalesLayer2(s, d, daily)
+    + '<div class="section-title">Layer 3 · 趋势图</div>'
+    + renderSalesLayer3(s, d, daily, trend)
+    + '<div class="section-title">Layer 4 · Action Plan · 本周该做的事</div>'
+    + renderSalesLayer4(s, d, targetsResp, daily);
+}
+
+/* ── Sales target helpers ─────────────────────────────────────────── */
+function salesTargetTotal(targetsResp, branch) {
+  // Returns the sales target for the requested scope:
+  //   branch == null  → sum of all sales-type targets in monthly_targets
+  //   branch == 'W0X' → that single store's sales target
+  if (!targetsResp || !Array.isArray(targetsResp.targets)) return null;
+  if (branch) {
+    const row = targetsResp.targets.find(t => t.store === branch && t.target_type === 'sales');
+    return row ? +row.target_value : null;
+  }
+  // company-wide = sum of all sales-type entries (rows with target_value > 0)
+  let total = 0; let any = false;
+  for (const t of targetsResp.targets) {
+    if (t.target_type === 'sales' && +t.target_value > 0) {
+      total += +t.target_value; any = true;
+    }
+  }
+  return any ? total : null;
+}
+function targetsLink() {
+  // Returns the <a> markup for "go to ⚙️ Targets" link in no-target banners.
+  return '<a onclick="onViewChange(\'targets\');return false">⚙️ 目标设定 →</a>';
+}
+function noTargetBanner() {
+  return '<div class="no-target-banner">'
+       +   '<strong>目标未设定</strong> · 在 ' + targetsLink() + ' 填本月销售目标后此卡会显进度条 + RM 差距。'
+       + '</div>';
+}
+
+/* ── Layer 1: 5 顶部 KPI 卡 ───────────────────────────────────────── */
+function renderSalesLayer1(s, d, targetsResp, daily, trend) {
+  const ymPrev   = ymLastMonth(s.month);
+  const ymPrevYr = ymLastYear(s.month);
+  // /api/kpi sales doesn't return last_month_invoices; derive it (and
+  // 6-month avg invoices) from trend.series so we can show AOV-by-invoice
+  // comparisons honestly without proxying via units.
+  const series = Array.isArray(trend?.series) ? trend.series : [];
+  const prev   = series.length >= 2 ? series[series.length - 2] : null;
+  const last_month_invoices = prev ? prev.invoices : null;
+  const last_month_aov_inv  = (prev && prev.invoices > 0) ? prev.sales / prev.invoices : null;
+  const six_m = series.slice(-6);
+  const six_m_invoices_avg = six_m.length > 0
+    ? six_m.reduce((a, p) => a + (p.invoices || 0), 0) / six_m.length : null;
+
+  // Card 1: 本月销售 vs 目标 (real target if set)
+  const tgtTotal = salesTargetTotal(targetsResp, s.branch);
+  const progPct  = (tgtTotal && tgtTotal > 0) ? (d.sales / tgtTotal) : null;
+  const gap      = (tgtTotal != null) ? (d.sales - tgtTotal) : null;
   const c1 = ''
     + '<div class="card">'
-    +   '<div class="label">📈 Sales vs target</div>'
+    +   '<div class="label">① 本月销售 vs 目标</div>'
     +   '<div class="value num">' + fmtRM(d.sales) + '</div>'
     +   '<div class="month-tag">in ' + s.month + (s.branch ? ' · ' + s.branch : '') + '</div>'
-    +   (target != null ? (
-          '<div class="progress-bar"><div class="progress-fill ' + ((progressPct||0) >= 1 ? 'over' : (progressPct < 0.85 ? 'under' : '')) + '" style="width:' + Math.min(100, (progressPct || 0) * 100) + '%"></div></div>'
-        + '<div class="progress-meta"><span>vs implied target ' + fmtRM(target) + '</span><span>' + fmtPct(progressPct) + '</span></div>'
-        + '<div class="muted" style="font-size:10px;margin-top:4px">target = last-month × 1.05 (no GTD yet)</div>'
-        ) : '')
+    +   (tgtTotal != null ? (
+          '<div class="progress-bar"><div class="progress-fill '
+            + ((progPct||0) >= 1 ? 'over' : ((progPct||0) < 0.85 ? 'under' : ''))
+            + '" style="width:' + Math.min(100, (progPct || 0) * 100) + '%"></div></div>'
+        + '<div class="progress-meta"><span>vs target ' + fmtRM(tgtTotal) + '</span><span>' + fmtPct(progPct) + '</span></div>'
+        + (targetsResp.fallback_used
+            ? '<div class="muted" style="font-size:10px;margin-top:4px">目标延用 ' + targetsResp.fallback_from + ' (本月未设)</div>'
+            : '<div class="muted" style="font-size:10px;margin-top:4px">差距: ' + (gap >= 0 ? '+' : '') + fmtRM(gap) + '</div>')
+        ) : noTargetBanner())
     +   '<div class="compare">'
     +     deltaCell(d.sales, d.last_month_sales,  'vs ' + ymPrev,    fmtRM)
     +     deltaCell(d.sales, d.last_year_sales,   'vs ' + ymPrevYr,  fmtRM)
@@ -1095,103 +1391,474 @@ function renderSales(s) {
     +   '</div>'
     + '</div>';
 
-  // Card 2 — Invoices + AOV
+  // Card 2: 本月单数 + AOV (AOV = sales / invoices, BY INVOICE per Notion)
+  const aov_per_invoice = (d.invoices > 0) ? (d.sales / d.invoices) : null;
   const c2 = ''
     + '<div class="card">'
-    +   '<div class="label">🧾 Invoices · AOV</div>'
-    +   '<div class="value num">' + fmtInt(d.invoices) + ' <span class="unit">invoices</span></div>'
-    +   '<div class="month-tag">' + fmtInt(d.units) + ' units sold · AOV ' + fmtRMpr(d.aov) + '</div>'
+    +   '<div class="label">② 本月单数 · AOV (按单)</div>'
+    +   '<div class="value num">' + fmtInt(d.invoices) + ' <span class="unit">单</span></div>'
+    +   '<div class="month-tag">' + fmtInt(d.units) + ' 件 · AOV ' + fmtRMpr(aov_per_invoice) + ' / 单</div>'
     +   '<div class="compare">'
-    +     deltaCell(d.units, d.last_month_units, 'units vs ' + ymPrev,   fmtInt)
-    +     deltaCell(d.units, d.last_year_units,  'units vs ' + ymPrevYr, fmtInt)
-    +     deltaCell(d.units, d.six_m_avg_units,  'units vs 6-mo avg',    fmtInt)
+    +     deltaCell(d.invoices, last_month_invoices, '单数 vs ' + ymPrev,   fmtInt)
+    +     deltaCell(d.invoices, six_m_invoices_avg, '单数 vs 6-mo avg',   fmtInt)
+    +     '<div class="row"><span>AOV (按单) vs ' + ymPrev + '</span>'
+    +       '<span class="' + (last_month_aov_inv != null && aov_per_invoice >= last_month_aov_inv ? 'delta-pos' : 'delta-neg') + '">'
+    +       (last_month_aov_inv != null ? fmtRMpr(last_month_aov_inv) : '—')
+    +       '</span></div>'
     +   '</div>'
     + '</div>';
 
-  // Card 3 — Today + 5 stores (placeholder, no daily endpoint yet)
-  const c3 = ''
-    + '<div class="card placeholder">'
-    +   '<div class="label">🌅 Today · 5 stores</div>'
-    +   '<div class="value">Daily endpoint pending</div>'
-    +   '<div class="month-tag">Stage A: /api/kpi only returns monthly aggregates.<br>Stage B/C will add /api/today daily breakdown.</div>'
-    + '</div>';
+  // Card 3: 今日销售 + 5 店分布 — from daily.today
+  const today = daily.today || null;
+  let c3;
+  if (today && today.sales != null) {
+    const stores = Object.entries(today.by_branch || {}).map(([st, v]) => ({ st, sales: v.sales || 0 }))
+      .sort((a, b) => b.sales - a.sales).slice(0, 6);
+    const storeRows = stores.length === 0
+      ? '<div class="muted" style="font-size:11px">该日无销售</div>'
+      : stores.map(b => '<div class="kpi-row"><span class="name">' + b.st + '</span><span class="val">' + fmtRM(b.sales) + '</span></div>').join('');
+    c3 = ''
+      + '<div class="card">'
+      +   '<div class="label">③ 今日销售 · 5 店分布</div>'
+      +   '<div class="value num">' + fmtRM(today.sales) + '</div>'
+      +   '<div class="month-tag">' + today.date + ' · ' + fmtInt(today.invoices) + ' 单 · ' + fmtInt(today.units) + ' 件</div>'
+      +   '<div class="kpi-rows">' + storeRows + '</div>'
+      + '</div>';
+  } else {
+    c3 = ''
+      + '<div class="card placeholder">'
+      +   '<div class="label">③ 今日销售 · 5 店分布</div>'
+      +   '<div class="value">该月暂无数据</div>'
+      +   '<div class="month-tag">/api/kpi?view=sales-daily 返空 — sales 表该月份无 row</div>'
+      + '</div>';
+  }
 
-  // Card 4 — WTD (placeholder)
-  const c4 = ''
-    + '<div class="card placeholder">'
-    +   '<div class="label">📅 Week-to-date vs weekly target</div>'
-    +   '<div class="value">Weekly endpoint pending</div>'
-    +   '<div class="month-tag">Stage B will compute WTD from daily sales + (monthly_target ÷ 4).</div>'
-    + '</div>';
+  // Card 4: 本周进度 vs 周目标 = (月目标 / 4)
+  const weekTarget = (tgtTotal != null) ? (tgtTotal / 4) : null;
+  const wtd = daily.wtd || null;
+  let c4;
+  if (wtd && weekTarget != null) {
+    const wtdProgPct = weekTarget > 0 ? (wtd.sales / weekTarget) : null;
+    c4 = ''
+      + '<div class="card">'
+      +   '<div class="label">④ 本周进度 vs 周目标</div>'
+      +   '<div class="value num">' + fmtRM(wtd.sales) + '</div>'
+      +   '<div class="month-tag">WTD ' + wtd.week_start + '..' + wtd.week_end + ' · ' + fmtInt(wtd.invoices) + ' 单</div>'
+      +   '<div class="progress-bar"><div class="progress-fill '
+      +       ((wtdProgPct||0) >= 1 ? 'over' : ((wtdProgPct||0) < 0.7 ? 'under' : ''))
+      +       '" style="width:' + Math.min(100, (wtdProgPct || 0) * 100) + '%"></div></div>'
+      +   '<div class="progress-meta"><span>周目标 ' + fmtRM(weekTarget) + ' (月 ÷ 4)</span><span>' + fmtPct(wtdProgPct) + '</span></div>'
+      + '</div>';
+  } else if (wtd) {
+    c4 = ''
+      + '<div class="card">'
+      +   '<div class="label">④ 本周进度 vs 周目标</div>'
+      +   '<div class="value num">' + fmtRM(wtd.sales) + '</div>'
+      +   '<div class="month-tag">WTD ' + wtd.week_start + '..' + wtd.week_end + ' · ' + fmtInt(wtd.invoices) + ' 单</div>'
+      +   noTargetBanner()
+      + '</div>';
+  } else {
+    c4 = ''
+      + '<div class="card placeholder">'
+      +   '<div class="label">④ 本周进度 vs 周目标</div>'
+      +   '<div class="value">无 WTD 数据</div>'
+      +   '<div class="month-tag">/api/kpi?view=sales-daily 该月空</div>'
+      + '</div>';
+  }
 
-  // Card 5 — 5-store table (wide)
-  const c5 = renderBranchTable(d);
+  // Card 5: wide 5-store progress table
+  const c5 = renderSalesProgressTable(s, d, targetsResp);
 
-  return title + '<div class="cards-grid">' + c1 + c2 + c3 + c4 + c5 + '</div>';
+  return '<div class="cards-grid">' + c1 + c2 + c3 + c4 + c5 + '</div>';
 }
 
-function renderBranchTable(d) {
-  const ALL_BRANCHES = ['W01','W02','W03','W05','W07','W11','WCO'];
+/* Wide 5-store progress table with real targets from monthly_targets. */
+function renderSalesProgressTable(s, d, targetsResp) {
   const byBranch = d.by_branch || {};
-  const totalSales = d.sales || 0;
+  const summaryByStore = (targetsResp && targetsResp.summary && targetsResp.summary.by_store) || {};
 
-  // Use last-month total × 1.05 as implied company target, then distribute by share
-  // of branch in current month. (Per Notion: "no real GTD yet, last-month × 1.05".)
-  const implTargetCompany = (d.last_month_sales || 0) * 1.05;
-
-  const rows = ALL_BRANCHES.map(b => {
-    const row = byBranch[b];
-    if (!row) return null;
-    const share = totalSales > 0 ? (row.sales / totalSales) : 0;
-    const targetForBranch = implTargetCompany * share || 0;
-    const progress = targetForBranch > 0 ? (row.sales / targetForBranch) : null;
-    const progressClass = progress == null ? 'delta-flat'
-                        : (progress >= 1 ? 'delta-pos'
-                        : (progress < 0.85 ? 'delta-neg' : 'delta-flat'));
+  const rows = SALES_PROGRESS_STORES.map(b => {
+    const row = byBranch[b] || { sales: 0, invoices: 0, units: 0, distinct_customers: 0 };
+    const tgt = (summaryByStore[b] && summaryByStore[b].sales) || null;
+    const progress = (tgt && tgt > 0) ? (row.sales / tgt) : null;
+    const progressClass = progress == null ? ''
+                        : (progress >= 1 ? 'progress-over'
+                        : (progress < 0.7 ? 'progress-far' : 'progress-under'));
     const barWidth = Math.min(100, (progress || 0) * 100);
+    const progressInner = (progress == null)
+      ? '<span class="muted">未设</span>'
+      : ('<span class="mini-bar"><span class="mini-bar-fill" style="width:' + barWidth + '%"></span></span>' + fmtPct(progress));
+    const aov_inv = row.invoices > 0 ? (row.sales / row.invoices) : 0;
     return ''
-      + '<tr>'
+      + '<tr class="' + progressClass + '">'
       +   '<td><strong>' + b + '</strong></td>'
       +   '<td class="num">' + fmtRM(row.sales) + '</td>'
       +   '<td class="num">' + fmtInt(row.invoices) + '</td>'
+      +   '<td class="num">' + fmtRMpr(aov_inv) + '</td>'
       +   '<td class="num">' + fmtInt(row.units) + '</td>'
-      +   '<td class="num">' + fmtInt(row.distinct_customers) + '</td>'
-      +   '<td class="num">' + fmtRM(targetForBranch) + '</td>'
-      +   '<td class="progress-cell"><span class="mini-bar"><span class="mini-bar-fill" style="width:' + barWidth + '%"></span></span><span class="' + progressClass + '">' + (progress != null ? fmtPct(progress) : '—') + '</span></td>'
+      +   '<td class="num">' + (tgt != null ? fmtRM(tgt) : '<span class="muted">未设</span>') + '</td>'
+      +   '<td class="progress-cell">' + progressInner + '</td>'
       + '</tr>';
-  }).filter(Boolean).join('');
+  }).join('');
+
+  const totalSales = SALES_PROGRESS_STORES.reduce((a, b) => a + ((byBranch[b]?.sales) || 0), 0);
+  const totalInv   = SALES_PROGRESS_STORES.reduce((a, b) => a + ((byBranch[b]?.invoices) || 0), 0);
+  const totalUnits = SALES_PROGRESS_STORES.reduce((a, b) => a + ((byBranch[b]?.units) || 0), 0);
+  const totalTgt   = SALES_PROGRESS_STORES.reduce((a, b) => a + ((summaryByStore[b]?.sales) || 0), 0);
+  const totalProg  = totalTgt > 0 ? (totalSales / totalTgt) : null;
+  const totalAov   = totalInv > 0 ? (totalSales / totalInv) : 0;
 
   const totalRow = ''
     + '<tr class="total-row">'
-    +   '<td>Total</td>'
-    +   '<td class="num">' + fmtRM(d.sales) + '</td>'
-    +   '<td class="num">' + fmtInt(d.invoices) + '</td>'
-    +   '<td class="num">' + fmtInt(d.units) + '</td>'
-    +   '<td class="num">' + fmtInt(d.distinct_customers) + '</td>'
-    +   '<td class="num">' + fmtRM(implTargetCompany) + '</td>'
-    +   '<td class="progress-cell">' + (implTargetCompany > 0 ? fmtPct(d.sales / implTargetCompany) : '—') + '</td>'
+    +   '<td>5 店合计</td>'
+    +   '<td class="num">' + fmtRM(totalSales) + '</td>'
+    +   '<td class="num">' + fmtInt(totalInv) + '</td>'
+    +   '<td class="num">' + fmtRMpr(totalAov) + '</td>'
+    +   '<td class="num">' + fmtInt(totalUnits) + '</td>'
+    +   '<td class="num">' + (totalTgt > 0 ? fmtRM(totalTgt) : '<span class="muted">未设</span>') + '</td>'
+    +   '<td class="progress-cell">' + (totalProg != null ? fmtPct(totalProg) : '—') + '</td>'
     + '</tr>';
+
+  const note = (targetsResp && targetsResp.fallback_used)
+    ? '目标延用 ' + targetsResp.fallback_from + ' (本月未设)'
+    : ((targetsResp && targetsResp.targets && targetsResp.targets.length > 0)
+        ? '目标来自 monthly_targets (本月)'
+        : '目标未设 · ' + targetsLink());
 
   return ''
     + '<div class="card wide">'
-    +   '<div class="label">🏪 5-store monthly progress</div>'
+    +   '<div class="label">⑤ 5 店月进度对照表 · 实际 / 目标 / 进度%</div>'
     +   '<table class="branch-table">'
     +     '<thead><tr>'
-    +       '<th>Store</th>'
-    +       '<th>Sales</th>'
-    +       '<th>Invoices</th>'
-    +       '<th>Units</th>'
-    +       '<th>Customers</th>'
-    +       '<th>Implied target</th>'
-    +       '<th>Progress</th>'
+    +       '<th>店</th>'
+    +       '<th>本月销售</th>'
+    +       '<th>本月单数</th>'
+    +       '<th>AOV (按单)</th>'
+    +       '<th>本月件数</th>'
+    +       '<th>月目标</th>'
+    +       '<th>进度</th>'
     +     '</tr></thead>'
     +     '<tbody>' + rows + totalRow + '</tbody>'
     +   '</table>'
-    +   '<div class="muted" style="margin-top:8px;font-size:11px">'
-    +     'Implied target = last-month company total × 1.05, distributed by this month\'s branch share. Real GTD planned Sprint 6.'
-    +   '</div>'
+    +   '<div class="muted" style="margin-top:8px;font-size:11px">' + note + '</div>'
     + '</div>';
 }
+
+/* ── Layer 2: 4 预警卡 ────────────────────────────────────────────── */
+function renderSalesLayer2(s, d, daily) {
+  const cards = [];
+  // (1) 5 家店今日 vs 月日均 — anomaly detection on today's sales per store
+  const today = daily.today;
+  if (today && d.by_branch) {
+    // Compute month-to-date day index (today.date day-of-month vs days seen so far)
+    const daysSeen = Array.isArray(daily.days) ? daily.days.length : 1;
+    const rows = SALES_PROGRESS_STORES.map(b => {
+      const monthSales = (d.by_branch[b]?.sales) || 0;
+      const monthAvg   = daysSeen > 0 ? monthSales / daysSeen : 0;
+      const todaySales = (today.by_branch && today.by_branch[b]?.sales) || 0;
+      const ratio      = monthAvg > 0 ? todaySales / monthAvg : null;
+      const tone = (ratio != null && ratio < 0.7) ? 'bad'
+                 : (ratio != null && ratio < 0.85) ? 'warn' : 'ok';
+      const arrow = (ratio == null) ? '—' : (ratio >= 1 ? '↑' : '↓');
+      return aRow(b + ' · 今日 ' + fmtRM(todaySales),
+        arrow + ' 月日均 ' + fmtRM(monthAvg) + (ratio != null ? ' (' + (ratio*100).toFixed(0) + '%)' : ''));
+    }).join('');
+    const anomCount = SALES_PROGRESS_STORES.filter(b => {
+      const ma = ((d.by_branch[b]?.sales) || 0) / Math.max(1, daysSeen);
+      const ts = (today.by_branch && today.by_branch[b]?.sales) || 0;
+      return ma > 0 && ts < ma * 0.85;
+    }).length;
+    cards.push(alertCard('① 5 家店今日 vs 月日均',
+      anomCount + ' 家偏低',
+      '今日 ' + today.date + ' · ' + daysSeen + ' 天月日均参照',
+      anomCount > 2 ? 'bad' : anomCount > 0 ? 'warn' : 'ok',
+      rows));
+  } else {
+    cards.push(alertCard('① 5 家店今日 vs 月日均', null,
+      'sales-daily 该月无数据', 'na', null));
+  }
+
+  // (2) 每家店成交单数 + AOV (按单) — 第 3 个 alert per Notion spec
+  if (d.by_branch) {
+    const lastMo = d.last_month_invoices || 0;
+    const rows = SALES_PROGRESS_STORES.map(b => {
+      const inv  = (d.by_branch[b]?.invoices) || 0;
+      const sales = (d.by_branch[b]?.sales) || 0;
+      const aov  = inv > 0 ? sales / inv : 0;
+      return aRow(b, fmtInt(inv) + ' 单 · AOV ' + fmtRMpr(aov));
+    }).join('');
+    cards.push(alertCard('② 每店单数 · AOV (按单)',
+      fmtInt(d.invoices || 0) + ' 单合计',
+      '量 (单数) 与 价 (AOV) 关系',
+      'ok', rows));
+  } else {
+    cards.push(alertCard('② 每店单数 · AOV', null, '无 by_branch', 'na', null));
+  }
+
+  // (3) 每家店 Top 3 SKU 当月 — needs sales × items category. /api/kpi
+  // doesn't return SKU-per-store. Data-gap banner per hard rule #13.
+  cards.push(alertCard('③ 每店 Top 3 SKU (当月)', null,
+    'SKU-per-store breakdown needs a join we don\'t expose yet · backlog',
+    'na', null));
+
+  // (4) 退货/取消订单率 — sales table has no return_flag. Data gap banner.
+  cards.push(alertCard('④ 退货 / 取消订单率', null,
+    'sales 表无 return_flag · 等 POS 字段接入 (Sheet 26 / Notion 数据源 backlog)',
+    'na', null));
+
+  return '<div class="cards-grid">' + cards.join('') + '</div>';
+}
+
+/* ── Layer 3: 5 趋势图 (inline SVG) ───────────────────────────────── */
+function renderSalesLayer3(s, d, daily, trend) {
+  // Chart 1 — 12M 5 店销售线图 (multi-series)
+  let chart1;
+  if (Array.isArray(trend.series) && trend.series.length > 0) {
+    const series = [{
+      name: '全公司',
+      color: '#1F5F4A',
+      points: trend.series.map(p => ({ x: p.ym, y: p.sales })),
+    }];
+    if (trend.branch_series && !s.branch) {
+      const colors = ['#3B82F6','#F59E0B','#EF4444','#A855F7','#10B981','#8B5CF6'];
+      let i = 0;
+      for (const st of ['W01','W02','W03','W05','W07','WCO']) {
+        if (trend.branch_series[st]) {
+          series.push({
+            name: st, color: colors[i++ % colors.length],
+            points: trend.branch_series[st].map(p => ({ x: p.ym, y: p.sales })),
+          });
+        }
+      }
+    }
+    chart1 = '<div class="chart-card wide"><div class="label">① 12M 销售线图 · 全公司 + 5 店</div>'
+           + svgLineChart({ series, width: 880, height: 240, yFmt: fmtMoneyShort })
+           + '<div class="meta">数据源 /api/kpi?view=sales-trend</div></div>';
+  } else {
+    chart1 = '<div class="chart-card wide"><div class="label">① 12M 销售线图</div>'
+           + '<div class="data-gap-banner">/api/kpi?view=sales-trend 返空 · 可能 sales 表月份范围内无 row</div></div>';
+  }
+
+  // Chart 2 — 每店每周热力图 (current month, per-week × per-store)
+  let chart2;
+  if (Array.isArray(daily.days) && daily.days.length > 0) {
+    const weeks = {}; // weekIdx -> store -> sum
+    for (const day of daily.days) {
+      const d2 = new Date(day.date + 'T00:00:00Z');
+      const dayOfMo = d2.getUTCDate();
+      const weekIdx = Math.floor((dayOfMo - 1) / 7); // 0..4
+      for (const [st, v] of Object.entries(day.by_branch || {})) {
+        if (!weeks[weekIdx]) weeks[weekIdx] = {};
+        weeks[weekIdx][st] = (weeks[weekIdx][st] || 0) + (v.sales || 0);
+      }
+    }
+    const weekLabels = Object.keys(weeks).map(Number).sort((a, b) => a - b).map(w => 'Week ' + (w + 1));
+    const stores = SALES_PROGRESS_STORES;
+    const matrix = weekLabels.map((_, wi) =>
+      stores.map(st => (weeks[wi] && weeks[wi][st]) || 0));
+    chart2 = '<div class="chart-card"><div class="label">② 每店每周热力图 · ' + s.month + '</div>'
+           + svgHeatmap({ rowLabels: weekLabels, colLabels: stores, matrix, width: 430, height: 220 })
+           + '<div class="meta">深绿 = 高销售周 · 浅 = 低</div></div>';
+  } else {
+    chart2 = '<div class="chart-card"><div class="label">② 每店每周热力图</div>'
+           + '<div class="data-gap-banner">sales-daily 该月无 row</div></div>';
+  }
+
+  // Chart 3 — 每店每月单数 (bar) + AOV (line) 双坐标 — uses trend series totals,
+  // limited to last 6 months for legibility
+  let chart3;
+  if (Array.isArray(trend.series) && trend.series.length > 0) {
+    const last6 = trend.series.slice(-6);
+    chart3 = '<div class="chart-card"><div class="label">③ 单数 + AOV (按单) 双坐标 · 近 6 月</div>'
+           + svgBarLine({
+               labels:  last6.map(p => p.ym),
+               bars:    last6.map(p => p.invoices),
+               line:    last6.map(p => p.invoices > 0 ? p.sales / p.invoices : 0),
+               barLabel: '单数', lineLabel: 'AOV (按单)',
+               width: 430, height: 220,
+             })
+           + '<div class="meta">柱 = 单数 / 折线 = AOV (RM)</div></div>';
+  } else {
+    chart3 = '<div class="chart-card"><div class="label">③ 单数 + AOV 双坐标</div>'
+           + '<div class="data-gap-banner">trend series 空</div></div>';
+  }
+
+  // Chart 4 — 当月每天销售爬坡线 + 月日均参照
+  let chart4;
+  if (Array.isArray(daily.days) && daily.days.length > 0) {
+    let cum = 0;
+    const points = daily.days.map(d2 => { cum += d2.sales; return { x: d2.date.slice(-2), y: cum }; });
+    const finalSales = (d.sales || 0);
+    chart4 = '<div class="chart-card"><div class="label">④ 当月每天销售爬坡线 · ' + s.month + '</div>'
+           + svgLineChart({
+               series: [{ name: 'cumulative', color: '#1F5F4A',
+                 points }],
+               width: 430, height: 220, yFmt: fmtMoneyShort,
+             })
+           + '<div class="meta">累计销售 (RM) · 月底 = ' + fmtRM(finalSales) + '</div></div>';
+  } else {
+    chart4 = '<div class="chart-card"><div class="label">④ 当月爬坡线</div>'
+           + '<div class="data-gap-banner">该月无 daily 数据</div></div>';
+  }
+
+  // Chart 5 — 品类 × 门市矩阵 — needs items.main_group JOIN. Data-gap banner.
+  const chart5 = '<div class="chart-card wide"><div class="label">⑤ 品类 × 门市矩阵</div>'
+       + '<div class="data-gap-banner">品类拆分 (items.main_group JOIN sales) · backlog: 需 mview cross-tab (per Sprint 6+). 当前 endpoint 不返 SKU-per-store-per-category.</div></div>';
+
+  return '<div class="charts-grid">' + chart1 + chart2 + chart3 + chart4 + chart5 + '</div>';
+}
+
+/* ── Layer 4: Action Plan · 自动 severity 排序 ────────────────────── */
+function renderSalesLayer4(s, d, targetsResp, daily) {
+  const actions = computeSalesActions(s, d, targetsResp, daily);
+  if (!actions.length) {
+    return '<div class="action-plan-empty">本周 Sales 暂无 high-severity 异常 ✓</div>';
+  }
+  const cards = actions.map(a => {
+    const done = isActionDone(a.id);
+    const cls  = 'action-plan-card severity-' + a.severity + (done ? ' done' : '');
+    const icon = a.severity === 'red' ? '🔴' : a.severity === 'amber' ? '🟡' : '🟢';
+    return ''
+      + '<div class="' + cls + '" data-action-id="' + escapeHtml(a.id) + '">'
+      +   '<div class="icon">' + icon + '</div>'
+      +   '<div>'
+      +     '<div class="title">' + escapeHtml(a.title) + '</div>'
+      +     '<div class="desc">' + escapeHtml(a.description) + '</div>'
+      +     '<div class="action-text">👉 ' + escapeHtml(a.action) + '</div>'
+      +   '</div>'
+      +   '<div class="controls">'
+      +     '<button type="button" onclick="markSalesActionDone(\'' + escapeHtml(a.id) + '\', ' + (!done) + ')">'
+      +       (done ? 'Restore' : 'Mark done') + '</button>'
+      +     (a.bubble_to_today ? '<div class="bubble-flag">↑ Today</div>' : '')
+      +   '</div>'
+      + '</div>';
+  }).join('');
+  return '<div class="action-plan-list">' + cards + '</div>';
+}
+
+function computeSalesActions(s, d, targetsResp, daily) {
+  const actions = [];
+  const summaryByStore = (targetsResp && targetsResp.summary && targetsResp.summary.by_store) || {};
+  const daysSeen   = Array.isArray(daily?.days) ? daily.days.length : 0;
+  const today      = daily?.today;
+
+  // Heuristic: month_progress = days seen / 30 (rough). Use a softer
+  // benchmark "store at-pace" = target × month_progress.
+  const monthProgress = daysSeen > 0 ? Math.min(1, daysSeen / 30) : 0;
+
+  // 1. 进度落后店: actual < target × monthProgress × 0.85
+  for (const b of SALES_PROGRESS_STORES) {
+    const tgt = (summaryByStore[b] && summaryByStore[b].sales) || 0;
+    if (tgt <= 0) continue;
+    const actual = (d.by_branch && d.by_branch[b] && d.by_branch[b].sales) || 0;
+    const expected = tgt * monthProgress;
+    if (expected <= 0) continue;
+    const ratio = actual / expected;
+    if (ratio < 0.85) {
+      actions.push({
+        id: 'sales-lag-' + b + '-' + s.month,
+        severity: ratio < 0.7 ? 'red' : 'amber',
+        title: b + ' 月进度落后 (' + (ratio * 100).toFixed(0) + '% of pace)',
+        description: '实际 RM ' + fmtMoneyShort(actual) + ' · 应至 RM ' + fmtMoneyShort(expected)
+                     + ' · 月目标 RM ' + fmtMoneyShort(tgt),
+        action: '本周对 ' + b + ' 加大推广 / 检视价格 / 联系老客',
+        link:   '?view=sales&month=' + s.month + '&branch=' + b,
+        bubble_to_today: ratio < 0.7,
+        mark_done_ts: null,
+      });
+    }
+  }
+
+  // 2. 异常单数店: invoices vs last_month_invoices < -25% — derive
+  // last_month_invoices from trend.series (kpi response doesn't carry it).
+  const trendSeries = Array.isArray(s.data?.trend?.series) ? s.data.trend.series : [];
+  const prevTrend = trendSeries.length >= 2 ? trendSeries[trendSeries.length - 2] : null;
+  if (prevTrend && prevTrend.invoices > 0) {
+    const companyDropPct = (d.invoices - prevTrend.invoices) / prevTrend.invoices;
+    if (companyDropPct < -0.25) {
+      actions.push({
+        id: 'sales-invoice-drop-' + s.month,
+        severity: 'amber',
+        title: '全公司单数环比 ' + (companyDropPct * 100).toFixed(0) + '%',
+        description: '本月 ' + fmtInt(d.invoices) + ' 单 · 上月 ' + fmtInt(prevTrend.invoices) + ' 单',
+        action: '排查是哪几个店流失客户 (Layer 2 alert #2 单数列表)',
+        link:   '?view=sales&month=' + s.month,
+        bubble_to_today: true,
+        mark_done_ts: null,
+      });
+    }
+  }
+
+  // 3. 急跌品类 — data gap action (no category data yet)
+  if (d.sales > 0 && d.last_month_sales > 0 && (d.sales - d.last_month_sales) / d.last_month_sales < -0.10) {
+    actions.push({
+      id: 'sales-month-drop-' + s.month,
+      severity: 'red',
+      title: '本月销售环比 -' + ((d.last_month_sales - d.sales) / d.last_month_sales * 100).toFixed(0) + '%',
+      description: '本月 ' + fmtRM(d.sales) + ' · 上月 ' + fmtRM(d.last_month_sales) + ' · 6M avg ' + fmtRM(d.six_m_avg_sales),
+      action: '与上月比对 — 品类拆分待 backlog (Layer 3 chart 5)',
+      link:   '?view=sales&month=' + s.month,
+      bubble_to_today: true,
+      mark_done_ts: null,
+    });
+  }
+
+  // 4. 今日全公司销售 vs 月日均
+  if (today && daysSeen > 0) {
+    const ma = (d.sales || 0) / daysSeen;
+    const ratio = ma > 0 ? today.sales / ma : null;
+    if (ratio != null && ratio < 0.7) {
+      actions.push({
+        id: 'sales-today-low-' + today.date,
+        severity: 'amber',
+        title: '今日销售低于月日均 (' + (ratio * 100).toFixed(0) + '%)',
+        description: '今日 ' + fmtRM(today.sales) + ' · 月日均 ' + fmtRM(ma),
+        action: '检视今天人流 / 排班 / 突发情况',
+        link:   '?view=sales&month=' + s.month,
+        bubble_to_today: false,
+        mark_done_ts: null,
+      });
+    }
+  }
+
+  // Sort by severity (red > amber > green) then by title
+  const order = { red: 0, amber: 1, green: 2 };
+  actions.sort((a, b) => (order[a.severity] - order[b.severity]) || a.title.localeCompare(b.title));
+  // Filter done from view but keep in DOM if user wants restore — show all,
+  // CSS strikes done out. Cap at 5 visible.
+  return actions.slice(0, 5);
+}
+
+/* Action Plan persistence via localStorage. Best-effort sync to
+   /api/sync mode=action_done is fire-and-forget so the user gets instant UI. */
+const ACTION_DONE_KEY = 'wp_action_done_v2';
+function readActionDone() {
+  try { return JSON.parse(localStorage.getItem(ACTION_DONE_KEY) || '{}'); }
+  catch (_) { return {}; }
+}
+function writeActionDone(map) {
+  try { localStorage.setItem(ACTION_DONE_KEY, JSON.stringify(map)); } catch (_) {}
+}
+function isActionDone(id) {
+  const m = readActionDone();
+  return !!m[id];
+}
+function markSalesActionDone(id, done) {
+  const m = readActionDone();
+  if (done) m[id] = new Date().toISOString();
+  else delete m[id];
+  writeActionDone(m);
+  // Fire-and-forget backend sync (table may not exist; degrades gracefully)
+  try {
+    fetch('/api/sync', {
+      method: 'POST', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ mode: 'action_done', action_id: id, done }),
+    }).catch(() => {});
+  } catch (_) {}
+  renderView();
+}
+window.markSalesActionDone = markSalesActionDone;
 
 /* ── Shared helpers for KPI cards with sub-rows ───────────────── */
 function fmtMoneyShort(n) {
@@ -1239,6 +1906,388 @@ function alertCard(title, value, sub, tone, rows) {
 function aRow(name, val) {
   return '<div class="a-row"><span class="name">' + name + '</span><span class="val">' + val + '</span></div>';
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 2 Sales: inline SVG chart helpers (no external lib)
+   All charts are responsive — width is set by .chart-card grid, but the
+   SVG uses fixed internal viewBox so labels stay sharp.
+═══════════════════════════════════════════════════════════════════ */
+
+function svgEscape(s) { return String(s).replace(/[<>&"']/g, c => ({
+  '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function svgLineChart(opts) {
+  // opts: { series: [{name, color, points:[{x,y}]}, ...], width, height, yFmt }
+  const W = opts.width || 600, H = opts.height || 200;
+  const padL = 50, padR = 80, padT = 14, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const series = (opts.series || []).filter(s => s.points && s.points.length > 0);
+  if (series.length === 0) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  // Collect all x labels (use first series' x as canonical)
+  const xs = series[0].points.map(p => p.x);
+  // y-range across all series
+  let yMin = Infinity, yMax = -Infinity;
+  for (const s of series) for (const p of s.points) {
+    if (p.y < yMin) yMin = p.y;
+    if (p.y > yMax) yMax = p.y;
+  }
+  if (yMin === Infinity) { yMin = 0; yMax = 1; }
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  // Pad y-range slightly
+  const range = yMax - yMin;
+  yMin = Math.max(0, yMin - range * 0.05);
+  yMax = yMax + range * 0.05;
+
+  const xToPx = i => padL + (xs.length > 1 ? (i / (xs.length - 1)) * plotW : plotW / 2);
+  const yToPx = y => padT + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
+
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  // y-axis gridlines (5 steps)
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (plotH / 4) * i;
+    const v = yMax - ((yMax - yMin) * i / 4);
+    svg += '<line class="grid-line" x1="' + padL + '" x2="' + (padL + plotW) + '" y1="' + y + '" y2="' + y + '"/>';
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + (opts.yFmt ? opts.yFmt(v) : Math.round(v)) + '</text>';
+  }
+  // x-axis labels (every 2nd or so to avoid overlap)
+  const step = Math.max(1, Math.ceil(xs.length / 8));
+  for (let i = 0; i < xs.length; i++) {
+    if (i % step !== 0 && i !== xs.length - 1) continue;
+    const x = xToPx(i);
+    svg += '<text class="axis-text" x="' + x + '" y="' + (H - 8) + '" text-anchor="middle">' + svgEscape(xs[i]) + '</text>';
+  }
+  // axis lines
+  svg += '<line class="axis-line" x1="' + padL + '" x2="' + (padL + plotW) + '" y1="' + (padT + plotH) + '" y2="' + (padT + plotH) + '"/>';
+
+  // data lines
+  for (const s of series) {
+    const pts = s.points.map((p, i) => xToPx(i) + ',' + yToPx(p.y)).join(' ');
+    svg += '<polyline class="data-line" points="' + pts + '" stroke="' + s.color + '"/>';
+    for (let i = 0; i < s.points.length; i++) {
+      svg += '<circle class="data-dot" cx="' + xToPx(i) + '" cy="' + yToPx(s.points[i].y) + '" r="2.5" fill="' + s.color + '"/>';
+    }
+  }
+  // legend (right side stacked)
+  for (let i = 0; i < series.length; i++) {
+    const y = padT + 10 + i * 16;
+    svg += '<rect x="' + (padL + plotW + 6) + '" y="' + (y - 7) + '" width="10" height="3" fill="' + series[i].color + '"/>';
+    svg += '<text class="legend-text" x="' + (padL + plotW + 20) + '" y="' + (y - 2) + '">' + svgEscape(series[i].name) + '</text>';
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+function svgHeatmap(opts) {
+  // opts: { rowLabels, colLabels, matrix:[[..]], width, height }
+  const W = opts.width || 400, H = opts.height || 200;
+  const padL = 70, padR = 10, padT = 14, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const rows = opts.rowLabels || [];
+  const cols = opts.colLabels || [];
+  const m    = opts.matrix    || [];
+  if (rows.length === 0 || cols.length === 0) {
+    return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  }
+  let vMax = 0;
+  for (const r of m) for (const v of r) if (v > vMax) vMax = v;
+  if (vMax === 0) vMax = 1;
+  const cellW = plotW / cols.length;
+  const cellH = plotH / rows.length;
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  for (let ri = 0; ri < rows.length; ri++) {
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (padT + cellH * ri + cellH / 2 + 3) + '" text-anchor="end">' + svgEscape(rows[ri]) + '</text>';
+    for (let ci = 0; ci < cols.length; ci++) {
+      const v = (m[ri] && m[ri][ci]) || 0;
+      const ratio = v / vMax;
+      // green ramp: light → brand
+      const r = Math.round(232 - ratio * (232 - 31));
+      const g = Math.round(240 - ratio * (240 - 95));
+      const b2 = Math.round(236 - ratio * (236 - 74));
+      const fill = 'rgb(' + r + ',' + g + ',' + b2 + ')';
+      svg += '<rect class="heatmap-cell" x="' + (padL + ci * cellW) + '" y="' + (padT + ri * cellH) + '" width="' + cellW + '" height="' + cellH + '" fill="' + fill + '"><title>' + svgEscape(rows[ri]) + ' × ' + svgEscape(cols[ci]) + ': ' + (opts.cellFmt ? opts.cellFmt(v) : Math.round(v)) + '</title></rect>';
+    }
+  }
+  for (let ci = 0; ci < cols.length; ci++) {
+    svg += '<text class="axis-text" x="' + (padL + cellW * ci + cellW / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + svgEscape(cols[ci]) + '</text>';
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+function svgBarLine(opts) {
+  // opts: { labels:[], bars:[], line:[], barLabel, lineLabel, width, height }
+  const W = opts.width || 400, H = opts.height || 200;
+  const padL = 50, padR = 60, padT = 14, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const labels = opts.labels || [];
+  const bars   = opts.bars   || [];
+  const line   = opts.line   || [];
+  if (labels.length === 0) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  const barMax  = Math.max(1, ...bars);
+  const lineMax = Math.max(1, ...line);
+  const cellW = plotW / labels.length;
+  const yBar  = v => padT + plotH - (v / barMax)  * plotH;
+  const yLine = v => padT + plotH - (v / lineMax) * plotH;
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  // gridlines (4 steps on left axis)
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (plotH / 4) * i;
+    const v = barMax - (barMax * i / 4);
+    svg += '<line class="grid-line" x1="' + padL + '" x2="' + (padL + plotW) + '" y1="' + y + '" y2="' + y + '"/>';
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + Math.round(v) + '</text>';
+    // right axis label
+    const v2 = lineMax - (lineMax * i / 4);
+    svg += '<text class="axis-text" x="' + (padL + plotW + 6) + '" y="' + (y + 3) + '" text-anchor="start">' + (Math.abs(v2) >= 1000 ? (v2/1000).toFixed(1)+'k' : Math.round(v2)) + '</text>';
+  }
+  // bars
+  for (let i = 0; i < labels.length; i++) {
+    const bx = padL + i * cellW + cellW * 0.2;
+    const bw = cellW * 0.6;
+    const by = yBar(bars[i] || 0);
+    svg += '<rect class="data-bar" x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + ((padT + plotH) - by) + '"/>';
+    svg += '<text class="axis-text" x="' + (padL + i * cellW + cellW / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + svgEscape(labels[i]) + '</text>';
+  }
+  // line
+  const linePts = line.map((v, i) => (padL + i * cellW + cellW / 2) + ',' + yLine(v)).join(' ');
+  svg += '<polyline class="data-line" points="' + linePts + '" stroke="#F59E0B"/>';
+  for (let i = 0; i < line.length; i++) {
+    svg += '<circle cx="' + (padL + i * cellW + cellW / 2) + '" cy="' + yLine(line[i]) + '" r="3" fill="#F59E0B"/>';
+  }
+  // legend
+  svg += '<rect x="' + (padL + 6) + '" y="' + (padT - 4) + '" width="10" height="3" fill="#1F5F4A"/>';
+  svg += '<text class="legend-text" x="' + (padL + 20) + '" y="' + (padT + 0) + '">' + svgEscape(opts.barLabel || 'bar') + '</text>';
+  svg += '<rect x="' + (padL + 90) + '" y="' + (padT - 4) + '" width="10" height="3" fill="#F59E0B"/>';
+  svg += '<text class="legend-text" x="' + (padL + 104) + '" y="' + (padT + 0) + '">' + svgEscape(opts.lineLabel || 'line') + '</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER · TARGETS · ⚙️ 目标设定 (owner only)
+   - month picker (uses global state.month, updated via header picker)
+   - 10 × 2 grid: store × (sales / footfall) target_value editable
+   - auto-fill buttons: copy last month / last × 1.05
+   - save → POST /api/targets/upsert (sync.js mode=targets_upsert, owner)
+═══════════════════════════════════════════════════════════════════ */
+
+// Editor state — mutable in-memory until save. Resets on data load.
+const targetsEditor = {
+  ymLoaded: null,
+  dirty: false,
+  byStore: {},  // store -> { sales: number|null, footfall: number|null }
+  saving: false,
+  lastSaveStatus: null, // { ok: bool, message: string }
+};
+
+function loadTargetsIntoEditor(targetsResp) {
+  targetsEditor.ymLoaded = targetsResp.ym;
+  targetsEditor.dirty = false;
+  targetsEditor.byStore = {};
+  for (const code of TARGET_STORE_ORDER) {
+    targetsEditor.byStore[code] = { sales: null, footfall: null };
+  }
+  const summary = (targetsResp && targetsResp.summary && targetsResp.summary.by_store) || {};
+  for (const code of Object.keys(summary)) {
+    if (!targetsEditor.byStore[code]) targetsEditor.byStore[code] = { sales: null, footfall: null };
+    if (summary[code].sales    != null) targetsEditor.byStore[code].sales    = +summary[code].sales || 0;
+    if (summary[code].footfall != null) targetsEditor.byStore[code].footfall = +summary[code].footfall || 0;
+  }
+}
+
+function renderTargets(s) {
+  // Owner-only gate (also enforced backend-side; UI hides the link from non-owners).
+  if (s.role !== 'owner') {
+    return '<h1 class="page-title">⚙️ 目标设定</h1>'
+         + '<div class="error-panel"><div class="msg"><strong>店长无权限</strong>。owner only.</div></div>';
+  }
+  if (s.loading || !s.data) {
+    return '<h1 class="page-title">⚙️ 目标设定</h1>'
+         + '<p class="page-sub">' + s.month + ' · 加载中…</p>'
+         + '<div class="skeleton h-row"></div><div class="skeleton h-row"></div>';
+  }
+  // Sync editor with loaded data (if we've switched months or first load)
+  if (targetsEditor.ymLoaded !== s.data.ym) {
+    loadTargetsIntoEditor(s.data);
+  }
+
+  const fallback = s.data.fallback_used
+    ? '<div class="targets-fallback-note">本月 (' + s.data.ym + ') 未设目标 · 表中显 <strong>' + s.data.fallback_from + '</strong> 的目标作为参照 · 编辑保存后会建立 ' + s.data.ym + ' 自己的目标</div>'
+    : (s.data.targets.length === 0
+       ? '<div class="targets-fallback-note">本月 (' + s.data.ym + ') 未设目标 · 上月也未设 · 表全空, 填入数字后保存</div>'
+       : '');
+
+  // Build grid rows
+  const rows = TARGET_STORE_ORDER.map(code => {
+    const meta = TARGET_STORES[code];
+    const cur  = targetsEditor.byStore[code] || { sales: null, footfall: null };
+    const histClass = meta.group === 'historical' ? 'historical' : '';
+    const note = meta.group === 'historical'
+      ? '历史店 — 通常填 0' : (code === 'WCO' ? 'HQ 开单' : '主力店');
+    return ''
+      + '<tr class="' + histClass + '">'
+      +   '<td class="store-cell">' + escapeHtml(meta.name) + '</td>'
+      +   '<td><input type="number" min="0" step="100" class="target-input" '
+      +       'data-store="' + code + '" data-type="sales" '
+      +       'value="' + (cur.sales != null ? cur.sales : '') + '" '
+      +       'oninput="onTargetEdit(this)" /></td>'
+      +   '<td><input type="number" min="0" step="1" class="target-input" '
+      +       'data-store="' + code + '" data-type="footfall" '
+      +       'value="' + (cur.footfall != null ? cur.footfall : '') + '" '
+      +       'oninput="onTargetEdit(this)" /></td>'
+      +   '<td class="note">' + note + '</td>'
+      + '</tr>';
+  }).join('');
+
+  // Summary computations
+  const salesTot = Object.values(targetsEditor.byStore)
+    .reduce((a, v) => a + (+v.sales || 0), 0);
+  const footTot = Object.values(targetsEditor.byStore)
+    .reduce((a, v) => a + (+v.footfall || 0), 0);
+
+  const saveLabel = targetsEditor.saving ? 'Saving…' : (targetsEditor.dirty ? 'Save changes' : 'No unsaved changes');
+  const saveStatus = targetsEditor.lastSaveStatus
+    ? '<span class="targets-save-status ' + (targetsEditor.lastSaveStatus.ok ? 'ok' : 'bad') + '">'
+        + escapeHtml(targetsEditor.lastSaveStatus.message) + '</span>'
+    : '';
+
+  return ''
+    + '<h1 class="page-title">⚙️ 目标设定</h1>'
+    + '<p class="page-sub">月份 ' + s.data.ym
+    + ' · 10 店 × 2 类型 (销售 / 客流) · 默认 (没设) 自动延用上月</p>'
+    + fallback
+    + '<div class="targets-toolbar">'
+    +   '<span class="group-label">快速填充:</span>'
+    +   '<button type="button" onclick="applyTargetsTemplate(\'copy_last\')">复制上月目标</button>'
+    +   '<button type="button" onclick="applyTargetsTemplate(\'last_x_105\')">上月 × 1.05</button>'
+    +   '<button type="button" onclick="applyTargetsTemplate(\'clear\')">清空</button>'
+    +   '<button type="button" class="primary" '
+    +     'onclick="saveTargets()" '
+    +     (targetsEditor.dirty && !targetsEditor.saving ? '' : 'disabled')
+    +     '>' + saveLabel + '</button>'
+    +   saveStatus
+    + '</div>'
+    + '<table class="targets-grid">'
+    +   '<thead><tr><th>店</th><th>销售目标 (RM)</th><th>客流目标 (人)</th><th>备注</th></tr></thead>'
+    +   '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + '<div class="targets-summary">'
+    +   '<div class="summary-cell"><div class="label">销售目标合计 (10 店)</div>'
+    +     '<div class="value">' + fmtRM(salesTot) + '</div></div>'
+    +   '<div class="summary-cell"><div class="label">客流目标合计 (10 店)</div>'
+    +     '<div class="value">' + fmtInt(footTot) + ' 人</div></div>'
+    + '</div>';
+}
+
+function onTargetEdit(input) {
+  const store = input.getAttribute('data-store');
+  const type  = input.getAttribute('data-type');
+  const val   = input.value === '' ? null : Number(input.value);
+  if (!targetsEditor.byStore[store]) targetsEditor.byStore[store] = { sales: null, footfall: null };
+  targetsEditor.byStore[store][type] = (val == null || isNaN(val)) ? null : val;
+  if (!input.classList.contains('dirty')) input.classList.add('dirty');
+  if (!targetsEditor.dirty) {
+    targetsEditor.dirty = true;
+    targetsEditor.lastSaveStatus = null;
+    // Re-enable save button without full re-render (cheap toggle)
+    const btn = document.querySelector('.targets-toolbar button.primary');
+    if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
+  }
+  // Update summary values inline (cheap reach)
+  const summaryCells = document.querySelectorAll('.targets-summary .summary-cell .value');
+  if (summaryCells.length >= 2) {
+    const salesTot = Object.values(targetsEditor.byStore).reduce((a, v) => a + (+v.sales || 0), 0);
+    const footTot  = Object.values(targetsEditor.byStore).reduce((a, v) => a + (+v.footfall || 0), 0);
+    summaryCells[0].textContent = fmtRM(salesTot);
+    summaryCells[1].textContent = fmtInt(footTot) + ' 人';
+  }
+}
+window.onTargetEdit = onTargetEdit;
+
+function applyTargetsTemplate(kind) {
+  // Need last-month targets for "copy_last" / "last_x_105". We have them
+  // either as s.data.targets (when fallback_used=true) or via a fresh fetch.
+  // Simpler: always re-fetch last month's targets via /api/kpi?view=targets.
+  const ymPrev = ymLastMonth(state.month);
+  if (kind === 'clear') {
+    for (const code of TARGET_STORE_ORDER) {
+      targetsEditor.byStore[code] = { sales: null, footfall: null };
+    }
+    targetsEditor.dirty = true;
+    renderView();
+    return;
+  }
+  fetch('/api/kpi?' + new URLSearchParams({ view: 'targets', month: ymPrev }).toString(), {
+    cache: 'no-store', headers: authHeaders(),
+  })
+    .then(r => r.json())
+    .then(j => {
+      const by = (j && j.summary && j.summary.by_store) || {};
+      const factor = (kind === 'last_x_105') ? 1.05 : 1.0;
+      for (const code of TARGET_STORE_ORDER) {
+        const meta = TARGET_STORES[code];
+        if (!targetsEditor.byStore[code]) targetsEditor.byStore[code] = { sales: null, footfall: null };
+        const src = by[code] || {};
+        // Historical stores stay 0 if Jym originally set 0 last month.
+        targetsEditor.byStore[code].sales    = (src.sales    != null) ? Math.round(src.sales    * factor) : (meta.group === 'historical' ? 0 : null);
+        targetsEditor.byStore[code].footfall = (src.footfall != null) ? Math.round(src.footfall * factor) : (meta.group === 'historical' ? 0 : null);
+      }
+      targetsEditor.dirty = true;
+      renderView();
+    })
+    .catch(e => {
+      targetsEditor.lastSaveStatus = { ok: false, message: '上月目标载入失败: ' + e.message };
+      renderView();
+    });
+}
+window.applyTargetsTemplate = applyTargetsTemplate;
+
+async function saveTargets() {
+  if (targetsEditor.saving) return;
+  targetsEditor.saving = true;
+  targetsEditor.lastSaveStatus = { ok: true, message: 'Saving…' };
+  renderView();
+  // Build payload — skip nulls (don't write blank rows).
+  const targets = [];
+  for (const code of TARGET_STORE_ORDER) {
+    const v = targetsEditor.byStore[code] || {};
+    if (v.sales    != null) targets.push({ store: code, target_type: 'sales',    target_value: +v.sales });
+    if (v.footfall != null) targets.push({ store: code, target_type: 'footfall', target_value: +v.footfall });
+  }
+  if (targets.length === 0) {
+    targetsEditor.saving = false;
+    targetsEditor.lastSaveStatus = { ok: false, message: '没数字可保存 — 至少填一格' };
+    renderView();
+    return;
+  }
+  try {
+    const r = await fetch('/api/sync', {
+      method: 'POST', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        mode: 'targets_upsert',
+        ym: state.month,
+        targets,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      throw new Error(j.error || ('HTTP ' + r.status));
+    }
+    targetsEditor.saving = false;
+    targetsEditor.dirty  = false;
+    targetsEditor.lastSaveStatus = {
+      ok: true,
+      message: 'Saved ' + j.rows_upserted + ' rows' + (j.rows_skipped ? ' · ' + j.rows_skipped + ' skipped' : ''),
+    };
+    // Reload from server to confirm.
+    loadView();
+  } catch (e) {
+    targetsEditor.saving = false;
+    targetsEditor.lastSaveStatus = { ok: false, message: 'Save failed: ' + e.message };
+    renderView();
+  }
+}
+window.saveTargets = saveTargets;
 
 /* ═══════════════════════════════════════════════════════════════════
    RENDER · INVENTORY  (Stage B)
@@ -1912,6 +2961,9 @@ function enterApp() {
   document.getElementById('userRole').textContent = state.user.role;
   // hide branch picker for non-owners
   document.getElementById('branchPicker').style.display = (state.role === 'owner') ? '' : 'none';
+  // Phase 2: ⚙️ targets sidebar link — owner only
+  const navTargets = document.getElementById('navTargets');
+  if (navTargets) navTargets.style.display = (state.role === 'owner') ? '' : 'none';
   populateMonthPicker();
   // Bug 2 fix: populate branch picker immediately (from STORE_META + any
   // seeded codes) so it's visible before the first fetch resolves.

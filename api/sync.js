@@ -1461,6 +1461,148 @@ export default async function handler(req, res) {
   const onlyTargets      = body?.tables || ALL_TARGETS;
 
   // ───────────────────────────────────────────────────────────────────────
+  // Phase 2 Sales Optimization (2026-05-16): monthly_targets UPSERT.
+  // Owner only (handler already enforces). Used by ⚙️ 目标设定 page.
+  //
+  // POST /api/sync { mode: 'targets_upsert',
+  //                  ym: 'YYYY-MM',
+  //                  targets: [ { store, target_type, target_value }, ... ] }
+  // (`updated_by` is auto-stamped from x-wp-user. Validation:
+  // target_type ∈ {sales, footfall}; store list checked against table CHECK
+  // by Postgres — we surface the DB error if a store is rejected.)
+  if (mode === 'targets_upsert') {
+    try {
+      const ym = String(body?.ym || '').trim();
+      const incoming = Array.isArray(body?.targets) ? body.targets : null;
+      if (!/^\d{4}-\d{2}$/.test(ym)) {
+        return res.status(400).json({ ok: false, error: 'bad ym; expected YYYY-MM' });
+      }
+      if (!incoming || incoming.length === 0) {
+        return res.status(400).json({ ok: false, error: 'targets[] required' });
+      }
+      // Sanitize + validate.
+      const ALLOWED_TYPES = new Set(['sales', 'footfall']);
+      const rows = [];
+      const errors = [];
+      const nowIso = new Date().toISOString();
+      for (const t of incoming) {
+        const store = String(t?.store || '').trim().toUpperCase();
+        const type  = String(t?.target_type || '').trim().toLowerCase();
+        const val   = Number(t?.target_value);
+        if (!store)              { errors.push('missing store'); continue; }
+        if (!ALLOWED_TYPES.has(type)) { errors.push(`bad target_type "${type}" for ${store}`); continue; }
+        if (!Number.isFinite(val) || val < 0) { errors.push(`bad target_value for ${store}/${type}`); continue; }
+        rows.push({
+          ym, store, target_type: type, target_value: val,
+          updated_by: user.username, updated_at: nowIso,
+        });
+      }
+      if (errors.length > 0 && rows.length === 0) {
+        return res.status(400).json({ ok: false, error: 'no valid rows', errors });
+      }
+      // UPSERT — unique key (ym, store, target_type).
+      const { data, error } = await sb()
+        .from('monthly_targets')
+        .upsert(rows, { onConflict: 'ym,store,target_type' })
+        .select('store, target_type, target_value, updated_by, updated_at');
+      if (error) {
+        return res.status(500).json({ ok: false, error: 'upsert failed: ' + error.message, errors });
+      }
+      return res.status(200).json({
+        ok: true,
+        mode: 'targets_upsert',
+        ym,
+        rows_upserted: (data && data.length) || rows.length,
+        rows_skipped:  errors.length,
+        validation_errors: errors,
+        sample: (data || []).slice(0, 3),
+      });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message, where: 'targets_upsert' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Phase 2 Sales: Action Plan "mark done" persistence.
+  // Optional — frontend may use localStorage. This endpoint exists so the
+  // /Today aggregator (later sprint) can see mark-done state across devices.
+  //
+  // POST /api/sync { mode: 'action_done',
+  //                  action_id: '<string>',
+  //                  done: true | false }
+  // Backed by a tiny `action_plan_done` table (owner-namespaced).
+  // Best-effort: if table doesn't exist, return ok:true with 'no_persist'.
+  if (mode === 'action_done') {
+    try {
+      const actionId = String(body?.action_id || '').trim();
+      const done     = body?.done !== false;
+      if (!actionId) return res.status(400).json({ ok: false, error: 'action_id required' });
+      // Try to write to action_plan_done. If table missing, just no-op so
+      // frontend localStorage stays in charge.
+      const row = {
+        action_id: actionId,
+        owner: user.username,
+        done,
+        marked_at: new Date().toISOString(),
+      };
+      const { error } = await sb()
+        .from('action_plan_done')
+        .upsert([row], { onConflict: 'action_id,owner' });
+      if (error) {
+        // table likely missing — degrade gracefully.
+        return res.status(200).json({ ok: true, mode: 'action_done', persisted: false,
+          note: 'action_plan_done table not provisioned; localStorage is canonical for now',
+          error: error.message });
+      }
+      return res.status(200).json({ ok: true, mode: 'action_done', persisted: true, action_id: actionId, done });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message, where: 'action_done' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Stage C-cleanup (2026-05-16): During Stage C verification I made a
+  // probe call that accidentally inserted 3,970 rows at snapshot_date
+  // '2099-12-31'. Because inventory_dashboard_payload returns the LATEST
+  // snapshot, the test pollution now masks 2026-04-30 as the displayed
+  // snap. Cleanup is surgical and limited to far-future test dates
+  // (snapshot_date YEAR >= 2099) — never touches real historical data.
+  //
+  // POST /api/sync { mode: 'cleanup_test_snapshot_2099',
+  //                  confirm_jym: 'YES_CLEAN_2099_TEST_CRUFT' }
+  if (mode === 'cleanup_test_snapshot_2099') {
+    try {
+      if (body?.confirm_jym !== 'YES_CLEAN_2099_TEST_CRUFT') {
+        return res.status(400).json({ ok: false,
+          error: 'confirm_jym must equal "YES_CLEAN_2099_TEST_CRUFT"' });
+      }
+      // Hardcoded — never accept a snapshot_date from the body. Only the
+      // year-2099 cruft date is allowed to be cleaned by this mode.
+      const CRUFT_DATE = '2099-12-31';
+      const { error: delErr, count: deletedCount } = await sb()
+        .from('inventory_snapshots')
+        .delete({ count: 'exact' })
+        .eq('snapshot_date', CRUFT_DATE);
+      if (delErr) {
+        return res.status(500).json({ ok: false, error: 'DELETE failed: ' + delErr.message });
+      }
+      let mviewErr = null;
+      try { await sb().rpc('refresh_all_mviews'); }
+      catch (e) { mviewErr = e.message; }
+      return res.status(200).json({
+        ok: true,
+        mode: 'cleanup_test_snapshot_2099',
+        cruft_date: CRUFT_DATE,
+        rows_deleted: deletedCount,
+        mview_refresh_error: mviewErr,
+      });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message,
+        where: 'cleanup_test_snapshot_2099' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Stage C-orphan-alert (2026-05-16 18:00): Jym hard rule per Notion
   // 3620a2d3110081c7a7a0c0173eab6780 — orphan SKUs (in Sheet Raw CS, not
   // in Sheet SM master) NEVER silent-dropped. UPSERT minimal placeholder
