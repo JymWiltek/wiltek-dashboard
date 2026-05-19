@@ -2889,8 +2889,8 @@ function renderSalesOwnerV3(s) {
 
   // ── Hero (Part B.1)
   const hero = company
-    ? renderS4Hero(company)
-    : renderS4HeroFallback(s);
+    ? renderS4Hero(company, anomalies)
+    : renderS4HeroFallback(s, anomalies);
 
   // ── Store Matrix (Part B.2)
   const matrix = stores.length > 0
@@ -2916,44 +2916,69 @@ function renderSalesOwnerV3(s) {
     + '</div>';
 }
 
-function renderS4Hero(company) {
+function renderS4Hero(company, anomalies) {
+  // Phase 4 hotfix (2026-05-20):
+  //   - Bug 1: removed double-`+` typo (was casting '</div>' to NaN and
+  //     concatenating "NaN" suffix after the shortfall number).
+  //   - Bug 2: 4-col grid layout; column 4 now = 出事店数 (red anomaly
+  //     count) per spec, not 实际销售 (实际 is already in progress meta).
+  //   - Bug 3: all amount formatting via fmtRM() — no .00, comma千位, etc.
   const pct = company.pct;
   const status = pct == null ? 'gray'
               : pct >= 100 ? 'green'
               : pct >= 85  ? 'amber'
               : 'red';
   const shortfallNum = +company.shortfall || 0;
-  const shortfallSign = shortfallNum >= 0 ? '-' : '+';
   const vsLy = company.vs_last_year_pct;
   const vsLm = company.vs_last_month_pct;
   const vs6m = company.vs_6mo_avg_pct;
+  // Anomaly count for column 4 — filter to red severity (critical/落后).
+  const redAnomCount = Array.isArray(anomalies)
+    ? anomalies.filter(a => a && a.severity === 'red').length
+    : 0;
+  // Format shortfall as signed RM with千位 (no .00). Sign goes BEFORE 'RM '.
+  const shortfallStr = shortfallNum === 0
+    ? fmtRM(0)
+    : (shortfallNum > 0 ? '-' : '+') + fmtRM(Math.abs(shortfallNum));
+
   return ''
     + '<div class="s4-hero">'
     +   '<div class="s4-hero-row">'
+    // ── Col 1: 达标率 (status light + pct)
     +     '<div class="s4-hero-col">'
-    +       '<div><span class="dot ' + status + '"></span><span class="num ' + status + '">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
+    +       '<div><span class="dot ' + status + '"></span><span class="num ' + status + '">'
+    +         (pct != null ? pct.toFixed(1) + '%' : '—')
+    +       '</span></div>'
     +       '<div class="label">达标率 vs target</div>'
     +     '</div>'
+    // ── Col 2: 本月缺口 (signed RM)
     +     '<div class="s4-hero-col">'
-    +       '<div class="num ' + (shortfallNum > 0 ? 'red' : 'green') + '">'
-    +         (shortfallNum > 0 ? '-' : '+') + 'RM ' + Math.round(Math.abs(shortfallNum)).toLocaleString('en-US')
-    +       + '</div>'
+    +       '<div class="num ' + (shortfallNum > 0 ? 'red' : 'green') + '">' + shortfallStr + '</div>'
     +       '<div class="label">' + (shortfallNum > 0 ? '本月缺口' : '本月超出') + '</div>'
     +     '</div>'
+    // ── Col 3: vs 去年同月 (pct delta with arrow)
     +     '<div class="s4-hero-col">'
-    +       '<div class="num ' + (vsLy != null && vsLy < 0 ? 'red' : 'green') + '">' + (vsLy != null ? (vsLy > 0 ? '↑ ' : '↓ ') + Math.abs(vsLy).toFixed(1) + '%' : '—') + '</div>'
+    +       '<div class="num ' + (vsLy != null && vsLy < 0 ? 'red' : 'green') + '">'
+    +         (vsLy != null ? (vsLy > 0 ? '↑ ' : '↓ ') + Math.abs(vsLy).toFixed(1) + '%' : '—')
+    +       '</div>'
     +       '<div class="label">vs 去年同月</div>'
     +     '</div>'
+    // ── Col 4: 出事店数 (red anomaly count)
     +     '<div class="s4-hero-col">'
-    +       '<div class="num ' + (shortfallNum > 0 ? 'red' : 'green') + '">' + (company.sales != null ? fmtRM(company.sales) : '—') + '</div>'
-    +       '<div class="label">本月实际销售</div>'
+    +       '<div class="num ' + (redAnomCount > 0 ? 'red' : 'green') + '">'
+    +         (redAnomCount > 0 ? '⚠ ' + redAnomCount + ' stores' : '✓ all on track')
+    +       '</div>'
+    +       '<div class="label">' + (redAnomCount > 0 ? '严重落后店' : '本月无严重异常') + '</div>'
     +     '</div>'
     +   '</div>'
+    // ── Progress bar (full-width, beneath the 4-col grid)
     +   '<div class="s4-hero-progress">'
     +     '<div class="bar"><span class="' + status + '" style="width:' + Math.min(100, pct || 0) + '%"></span></div>'
-    +     '<div><span class="bar-meta-l">vs target ' + (company.target != null ? fmtRM(company.target) : '—') + '</span>'
+    +     '<div><span class="bar-meta-l">实际 ' + (company.sales != null ? fmtRM(company.sales) : '—')
+    +       ' · 目标 ' + (company.target != null ? fmtRM(company.target) : '—') + '</span>'
     +       '<span class="bar-meta-r" style="margin-left:24px">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
     +   '</div>'
+    // ── Compare row (3 history comparisons + headline量价)
     +   '<div class="s4-hero-compare">'
     +     '<span>vs 上月 ' + (vsLm != null ? '<span class="' + (vsLm >= 0 ? 'delta-up' : 'delta-down') + '">' + (vsLm > 0 ? '↑' : '↓') + ' ' + Math.abs(vsLm).toFixed(1) + '%</span>' : '—') + '</span>'
     +     '<span>vs 6 月均 ' + (vs6m != null ? '<span class="' + (vs6m >= 0 ? 'delta-up' : 'delta-down') + '">' + (vs6m > 0 ? '↑' : '↓') + ' ' + Math.abs(vs6m).toFixed(1) + '%</span>' : '—') + '</span>'
@@ -2962,7 +2987,7 @@ function renderS4Hero(company) {
     +   '</div>'
     + '</div>';
 }
-function renderS4HeroFallback(s) {
+function renderS4HeroFallback(s, anomalies) {
   // Use legacy /api/kpi data if sales-owner RPC missing
   const d = s.data.kpi || {};
   const t = s.data.targets || {};
@@ -2975,7 +3000,32 @@ function renderS4HeroFallback(s) {
     vs_last_month_pct: (d.last_month_sales > 0) ? (d.sales - d.last_month_sales) / d.last_month_sales * 100 : null,
     vs_last_year_pct:  (d.last_year_sales  > 0) ? (d.sales - d.last_year_sales)  / d.last_year_sales  * 100 : null,
     vs_6mo_avg_pct:    (d.six_m_avg_sales  > 0) ? (d.sales - d.six_m_avg_sales)  / d.six_m_avg_sales  * 100 : null,
-  });
+  }, anomalies);
+}
+
+// Phase 4 hotfix (Bug 3): when the RPC returns a pre-formatted detail
+// string like "实际 RM 5299.00 / 目标 RM 20000.00 / 缺口 RM 14701.00",
+// rewrite to Part E.5 spec: integer (no .00), thousand commas, · separator.
+// Idempotent — already-clean strings stay clean.
+function sanitizeRpcDetail(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/(\d+)\.00\b/g, '$1')                // strip "5299.00" → "5299"
+    .replace(/RM\s*(\d{4,})\b/g, function(_, n) {  // re-comma "RM 5299" → "RM 5,299"
+      return 'RM ' + Number(n).toLocaleString('en-US');
+    })
+    .replace(/\s*\/\s*/g, ' · ');                  // " / " → " · "
+}
+
+function buildStoreAttribDetail(row) {
+  if (!row) return '';
+  const shortfall = row.shortfall;
+  const gapStr = shortfall > 0
+    ? '缺口 RM ' + Math.round(shortfall).toLocaleString('en-US')
+    : '超 RM '   + Math.round(Math.abs(shortfall)).toLocaleString('en-US');
+  return '实际 ' + fmtRM(row.actual)
+       + ' · 目标 ' + fmtRM(row.target)
+       + ' · ' + gapStr;
 }
 
 function renderS4StoreMatrix(stores, anomalies) {
@@ -2994,7 +3044,9 @@ function renderS4StoreMatrix(stores, anomalies) {
     const shortfall = row.shortfall;
     const isOver = shortfall < 0;
     const anom = anomByStore[row.store];
-    const attrib = anom?.detail || '';
+    // Phase 4 hotfix Bug 3: always build attribution client-side via
+    // structured row data. Don't trust RPC pre-formatted detail string.
+    const attrib = buildStoreAttribDetail(row);
     const btnLabel = row.status === 'exceeded' ? '复盘' : '派派';
     const recoSeed = anom ? {
       title: anom.title, severity: anom.severity, detail: anom.detail,
@@ -3131,8 +3183,10 @@ function renderS4OwnerActionPlan(s, anomalies) {
   // Left: anomaly cards (with [→ 派派] prefilled)
   const anomCards = (anomalies || []).map(a => {
     const sev = a.severity || 'amber';
+    // Phase 4 hotfix Bug 3: clean RPC's pre-formatted detail text.
+    const cleanDetail = sanitizeRpcDetail(a.detail);
     const seed = JSON.stringify({
-      title: a.title, severity: a.severity, detail: a.detail,
+      title: a.title, severity: a.severity, detail: cleanDetail,
       recommended_action: a.recommended_action,
       recommended_assignee: a.recommended_assignee,
       recommended_amount: a.recommended_amount,
@@ -3143,7 +3197,7 @@ function renderS4OwnerActionPlan(s, anomalies) {
     return ''
       + '<div class="s4-action-card ' + sev + '">'
       +   '<div class="a-title">' + escapeHtml(a.title) + '</div>'
-      +   '<div class="a-detail">' + escapeHtml(a.detail || '') + '</div>'
+      +   '<div class="a-detail">' + escapeHtml(cleanDetail) + '</div>'
       +   (a.recommended_action ? '<div class="a-action-text">👉 ' + escapeHtml(a.recommended_action) + '</div>' : '')
       +   '<div class="a-controls"><button class="s4-btn primary" onclick="openAssignModal(' + seed + ')">→ 派派</button></div>'
       + '</div>';
@@ -3233,7 +3287,7 @@ function renderSalesStoreV3(s) {
     ? '<div class="s4-action-grid" style="grid-template-columns:1fr"><div>' + tier.anomalies.map(a =>
         '<div class="s4-action-card ' + (a.severity || 'amber') + '">'
         + '<div class="a-title">' + escapeHtml(a.title) + '</div>'
-        + '<div class="a-detail">' + escapeHtml(a.detail || '') + '</div>'
+        + '<div class="a-detail">' + escapeHtml(sanitizeRpcDetail(a.detail)) + '</div>'
         + '</div>').join('') + '</div></div>'
     : '<div class="s4-data-gap">本月暂无显著异常 ✓</div>';
 
