@@ -971,31 +971,56 @@ function monthQuery() {
 }
 
 async function fetchSales(signal) {
-  // Phase 2 (2026-05-16): Sales view now needs 4 data sources in parallel —
-  // monthly KPI, this month's daily breakdown, 12M trend (for Layer-3
-  // charts), and monthly_targets (for Layer-1 progress + Action Plan).
-  // Hard-rule § "切月份 < 0.5s": KPI/targets/daily resolve fast (~300ms
-  // total via mview + small selects); 12M trend is the slow leg (~1-2s
-  // — full sales table scan paginated). We Promise.all all four so the
-  // first paint can use kpi/targets/daily; trend renders into Layer 3
-  // when it lands.
+  // Phase 3 fix 4 (2026-05-18): trend is the slow leg (~1-2s, full sales
+  // table paginated). Don't block first paint on it. Promise.all only the
+  // 3 fast endpoints (kpi/targets/daily) — Layer 1/2/4 render immediately
+  // (< 500ms). trend is kicked off as a background fetch that updates
+  // state.data.trend + re-renders Layer 3 in place when it lands.
   const baseQ  = kpiQuery();
-  const trendQ = baseQ.replace('view=sales', 'view=sales-trend');
   const dailyQ = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
-  const [kpi, targets, daily, trend] = await Promise.all([
-    getJSON('/api/kpi?' + baseQ,     signal),
-    getJSON('/api/kpi?' + targetsQ,  signal),
-    getJSON('/api/kpi?' + dailyQ,    signal),
-    getJSON('/api/kpi?' + trendQ,    signal).catch(e => ({ ok: false, error: e.message, series: [], branch_series: {} })),
+  const [kpi, targets, daily] = await Promise.all([
+    getJSON('/api/kpi?' + baseQ,    signal),
+    getJSON('/api/kpi?' + targetsQ, signal),
+    getJSON('/api/kpi?' + dailyQ,   signal),
   ]);
   state.role = kpi.session_role || state.role;
+  // Kick off trend fetch — fire-and-forget. It updates state.data.trend
+  // and re-renders when ready. Newer month switches cancel via trendLoadId.
+  loadSalesTrendBackground(state.month, state.branch);
   return {
     kpi:     kpi.data,
     targets: targets,
     daily:   daily,
-    trend:   trend,
+    trend:   null, // marker: "loading" until background load resolves
   };
+}
+
+// Background loader for the 12M sales-trend slice. Uses an incrementing
+// trendLoadId so a stale response (e.g. month switched mid-load) is
+// discarded silently — matches the AbortController pattern at endpoint level
+// but covers the case where the parent signal is already resolved.
+let trendLoadId = 0;
+function loadSalesTrendBackground(month, branch) {
+  const myId = ++trendLoadId;
+  const params = new URLSearchParams({ view: 'sales-trend', month });
+  if (branch) params.set('branch', branch);
+  getJSON('/api/kpi?' + params.toString(), undefined)
+    .then(trend => {
+      // Stale? user moved on — discard.
+      if (myId !== trendLoadId) return;
+      if (state.view !== 'sales') return;
+      if (state.data) state.data.trend = trend;
+      renderView();
+    })
+    .catch(e => {
+      if (myId !== trendLoadId) return;
+      console.warn('[V2] sales-trend bg load failed:', e && e.message);
+      if (state.view !== 'sales') return;
+      // Attach error marker so renderSalesLayer3 can show a real error
+      if (state.data) state.data.trend = { ok: false, error: e && e.message, series: [], branch_series: {} };
+      renderView();
+    });
 }
 
 async function fetchTargets(signal) {
@@ -1097,30 +1122,38 @@ async function loadView() {
 
 /* ── DEV byte-match assertion ──────────────────────────────────── */
 function runByteMatchAssertion() {
-  if (state.view !== 'sales' || state.branch) return;
-  const expect = BYTE_MATCH_TRUTH[state.month];
-  if (!expect || !state.data) return;
-  const got = {
-    sales: round2(state.data.sales),
-    units: state.data.units,
-    aov:   round2(state.data.aov),
-  };
-  const ok = (got.sales === round2(expect.sales))
-          && (got.units === expect.units)
-          && (Math.abs(got.aov - expect.aov) < 1);
+  // Phase 3 fix 1 (2026-05-18): Sales state.data shape changed in Phase 2
+  // from raw kpi to { kpi, targets, daily, trend } — the reader still
+  // pointed at state.data.sales/units/aov which are undefined under the new
+  // shape, so the badge perma-failed with NaN/undefined. Hide badge entirely
+  // for non-sales views and read from state.data.kpi.* for sales.
   const badge = document.getElementById('devBadge');
-  if (badge) {
-    badge.classList.remove('hidden', 'fail');
-    if (ok) {
-      badge.textContent = '✓ byte-match ' + state.month;
-    } else {
-      badge.classList.add('fail');
-      badge.textContent = '✗ byte-match ' + state.month + ' got ' + got.sales + '/' + got.units;
-    }
-  }
+  if (!badge) return;
+  if (state.view !== 'sales' || state.branch) { badge.classList.add('hidden'); return; }
+  const expect = BYTE_MATCH_TRUTH[state.month];
+  const kpi    = state.data && state.data.kpi;
+  if (!expect || !kpi) { badge.classList.add('hidden'); return; }
+  const got = {
+    sales:    round2(kpi.sales),
+    units:    kpi.units,
+    invoices: kpi.invoices,
+  };
+  // Match on the two strong invariants (sales + units). AOV is derived and
+  // can disagree on rounding boundary; ignore it for the badge.
+  const ok = Number.isFinite(got.sales)
+          && Number.isFinite(got.units)
+          && got.sales === round2(expect.sales)
+          && got.units === expect.units;
+  badge.classList.remove('hidden', 'fail');
   if (ok) {
-    console.log('%c[V2 byte-match] ' + state.month + ' PASS', 'color:#2E7D5B;font-weight:600', got);
+    badge.textContent = '✓ byte-match ' + state.month;
+    console.log('%c[V2 byte-match] ' + state.month + ' PASS',
+      'color:#2E7D5B;font-weight:600', got);
   } else {
+    badge.classList.add('fail');
+    badge.textContent = '✗ byte-match ' + state.month + ' got '
+      + (Number.isFinite(got.sales) ? got.sales : '—') + '/'
+      + (Number.isFinite(got.units) ? got.units : '—');
     console.warn('[V2 byte-match] ' + state.month + ' FAIL — expected', expect, 'got', got);
   }
 }
@@ -1140,6 +1173,10 @@ function renderView() {
   // month picker keeps state in sync
   const mp = document.getElementById('monthPicker');
   if (mp && mp.value !== state.month) mp.value = state.month;
+  // Phase 3 fix 1: dev badge only meaningful on Sales view (all-stores).
+  // Hide on every other view so the red toast doesn't linger across nav.
+  const badge = document.getElementById('devBadge');
+  if (badge && (state.view !== 'sales' || state.branch)) badge.classList.add('hidden');
 
   const renderers = {
     sales:     renderSales,
@@ -1309,7 +1346,11 @@ function renderSales(s) {
   const d           = s.data.kpi     || {};
   const targetsResp = s.data.targets || {};
   const daily       = s.data.daily   || {};
-  const trend       = s.data.trend   || {};
+  // Phase 3 fix 4: KEEP null when trend is still loading — DON'T fall back
+  // to {}, otherwise renderSalesLayer3's trendLoading guard (== null)
+  // evaluates false and skeleton path is bypassed. Layer 1/3 helpers
+  // already handle null/undefined via optional chaining.
+  const trend       = s.data.trend;
 
   return title
     + '<div class="section-title">Layer 1 · 顶部 KPI</div>'
@@ -1417,11 +1458,21 @@ function renderSalesLayer1(s, d, targetsResp, daily, trend) {
     const storeRows = stores.length === 0
       ? '<div class="muted" style="font-size:11px">该日无销售</div>'
       : stores.map(b => '<div class="kpi-row"><span class="name">' + b.st + '</span><span class="val">' + fmtRM(b.sales) + '</span></div>').join('');
+    // Phase 3 fix 3: honest annotation when sales.sale_date is collapsed.
+    // We detect "collapsed" as: only 1 day in daily.days AND that day's
+    // sales matches the month total — both true when the migration put
+    // all month sales on YYYY-MM-01.
+    const daysList = Array.isArray(daily.days) ? daily.days : [];
+    const collapsed = daysList.length === 1 && Math.abs((today.sales || 0) - (d.sales || 0)) < 1;
+    const honesty = collapsed
+      ? '<div class="muted" style="font-size:10px;margin-top:4px;color:var(--text-light)">⚠️ Sales 数据当前仅月颗粒度 · ' + today.date + ' = 整月汇总 (Sheet 来源是月级别)</div>'
+      : '';
     c3 = ''
       + '<div class="card">'
       +   '<div class="label">③ 今日销售 · 5 店分布</div>'
       +   '<div class="value num">' + fmtRM(today.sales) + '</div>'
       +   '<div class="month-tag">' + today.date + ' · ' + fmtInt(today.invoices) + ' 单 · ' + fmtInt(today.units) + ' 件</div>'
+      +   honesty
       +   '<div class="kpi-rows">' + storeRows + '</div>'
       + '</div>';
   } else {
@@ -1436,6 +1487,13 @@ function renderSalesLayer1(s, d, targetsResp, daily, trend) {
   // Card 4: 本周进度 vs 周目标 = (月目标 / 4)
   const weekTarget = (tgtTotal != null) ? (tgtTotal / 4) : null;
   const wtd = daily.wtd || null;
+  // Phase 3 fix 3: detect collapsed sale_date so we can annotate honestly.
+  const daysListForC4 = Array.isArray(daily.days) ? daily.days : [];
+  const collapsedC4 = daysListForC4.length === 1
+                    && Math.abs(((wtd && wtd.sales) || 0) - (d.sales || 0)) < 1;
+  const honestyC4 = collapsedC4
+    ? '<div class="muted" style="font-size:10px;margin-top:4px;color:var(--text-light)">⚠️ Sales 仅月颗粒度 · WTD = 整月累计 · 进度% 不代表实际周表现</div>'
+    : '';
   let c4;
   if (wtd && weekTarget != null) {
     const wtdProgPct = weekTarget > 0 ? (wtd.sales / weekTarget) : null;
@@ -1448,6 +1506,7 @@ function renderSalesLayer1(s, d, targetsResp, daily, trend) {
       +       ((wtdProgPct||0) >= 1 ? 'over' : ((wtdProgPct||0) < 0.7 ? 'under' : ''))
       +       '" style="width:' + Math.min(100, (wtdProgPct || 0) * 100) + '%"></div></div>'
       +   '<div class="progress-meta"><span>周目标 ' + fmtRM(weekTarget) + ' (月 ÷ 4)</span><span>' + fmtPct(wtdProgPct) + '</span></div>'
+      +   honestyC4
       + '</div>';
   } else if (wtd) {
     c4 = ''
@@ -1611,9 +1670,20 @@ function renderSalesLayer2(s, d, daily) {
 
 /* ── Layer 3: 5 趋势图 (inline SVG) ───────────────────────────────── */
 function renderSalesLayer3(s, d, daily, trend) {
+  // Phase 3 fix 4: trend may be `null` (still loading) — show inline
+  // skeleton placeholders for trend-dependent charts (1 + 3). Daily-driven
+  // charts (2 heatmap, 4 ramp) render immediately. Chart 5 is data-gap.
+  const trendLoading = (trend == null);
+  const skeletonChart = (label, hint) => '<div class="chart-card"><div class="label">' + label + '</div>'
+    + '<div style="height:220px;display:flex;align-items:center;justify-content:center;background:var(--surface);border-radius:4px"><div style="text-align:center"><div class="skeleton h-value" style="margin:0 auto 8px;width:120px"></div><div class="muted" style="font-size:11px">' + hint + '</div></div></div></div>';
+  const skeletonWide  = (label, hint) => '<div class="chart-card wide"><div class="label">' + label + '</div>'
+    + '<div style="height:240px;display:flex;align-items:center;justify-content:center;background:var(--surface);border-radius:4px"><div style="text-align:center"><div class="skeleton h-value" style="margin:0 auto 8px;width:160px"></div><div class="muted" style="font-size:11px">' + hint + '</div></div></div></div>';
+
   // Chart 1 — 12M 5 店销售线图 (multi-series)
   let chart1;
-  if (Array.isArray(trend.series) && trend.series.length > 0) {
+  if (trendLoading) {
+    chart1 = skeletonWide('① 12M 销售线图 · 全公司 + 5 店', 'Loading 12-month trend (~1-2s) — first paint not blocked');
+  } else if (Array.isArray(trend.series) && trend.series.length > 0) {
     const series = [{
       name: '全公司',
       color: '#1F5F4A',
@@ -1667,7 +1737,9 @@ function renderSalesLayer3(s, d, daily, trend) {
   // Chart 3 — 每店每月单数 (bar) + AOV (line) 双坐标 — uses trend series totals,
   // limited to last 6 months for legibility
   let chart3;
-  if (Array.isArray(trend.series) && trend.series.length > 0) {
+  if (trendLoading) {
+    chart3 = skeletonChart('③ 单数 + AOV (按单) 双坐标 · 近 6 月', 'Loading trend…');
+  } else if (Array.isArray(trend.series) && trend.series.length > 0) {
     const last6 = trend.series.slice(-6);
     chart3 = '<div class="chart-card"><div class="label">③ 单数 + AOV (按单) 双坐标 · 近 6 月</div>'
            + svgBarLine({
@@ -1736,34 +1808,77 @@ function renderSalesLayer4(s, d, targetsResp, daily) {
   return '<div class="action-plan-list">' + cards + '</div>';
 }
 
+function monthProgressForYm(ym) {
+  // Calendar-based month progress.
+  //   - past month   → 1.0 (full month completed)
+  //   - current month → days_elapsed / days_in_month
+  //   - future month → 0
+  // Phase 3 fix 2 (2026-05-18): The previous heuristic (daysSeen / 30)
+  // broke when sales.sale_date is collapsed (only 1 row exists for the
+  // month, so daysSeen=1 → progress=0.033 → all stores trivially exceed
+  // the tiny expected baseline → zero actions, even for WCO 26.5%.)
+  // Calendar-based is honest: a closed month is fully expected.
+  const m = String(ym || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return 0;
+  const y = +m[1], mo = +m[2];
+  const monthEndUtc = new Date(Date.UTC(y, mo, 0)); // day-0 of next mo = last day of this mo
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  if (todayUtc > monthEndUtc) return 1.0;
+  if (todayUtc.getUTCFullYear() === y && (todayUtc.getUTCMonth() + 1) === mo) {
+    const dayOfMo  = todayUtc.getUTCDate();
+    const daysInMo = monthEndUtc.getUTCDate();
+    return Math.min(1.0, dayOfMo / daysInMo);
+  }
+  return 0;
+}
+
 function computeSalesActions(s, d, targetsResp, daily) {
   const actions = [];
   const summaryByStore = (targetsResp && targetsResp.summary && targetsResp.summary.by_store) || {};
   const daysSeen   = Array.isArray(daily?.days) ? daily.days.length : 0;
   const today      = daily?.today;
 
-  // Heuristic: month_progress = days seen / 30 (rough). Use a softer
-  // benchmark "store at-pace" = target × month_progress.
-  const monthProgress = daysSeen > 0 ? Math.min(1, daysSeen / 30) : 0;
+  // Phase 3 fix 2: calendar-based progress so a closed month evaluates at
+  // 100% expected (not artificially capped by sale_date collapse anomaly).
+  const monthProgress = monthProgressForYm(s.month);
 
-  // 1. 进度落后店: actual < target × monthProgress × 0.85
+  // 1. 进度落后店 / 远超目标店 — uses real monthly_targets per store.
   for (const b of SALES_PROGRESS_STORES) {
     const tgt = (summaryByStore[b] && summaryByStore[b].sales) || 0;
     if (tgt <= 0) continue;
     const actual = (d.by_branch && d.by_branch[b] && d.by_branch[b].sales) || 0;
     const expected = tgt * monthProgress;
     if (expected <= 0) continue;
-    const ratio = actual / expected;
+    const ratio = actual / expected; // 1.0 = on pace
     if (ratio < 0.85) {
+      // Lagging
       actions.push({
         id: 'sales-lag-' + b + '-' + s.month,
         severity: ratio < 0.7 ? 'red' : 'amber',
-        title: b + ' 月进度落后 (' + (ratio * 100).toFixed(0) + '% of pace)',
+        title: b + ' 进度落后 · ' + (ratio * 100).toFixed(1) + '% of target pace',
         description: '实际 RM ' + fmtMoneyShort(actual) + ' · 应至 RM ' + fmtMoneyShort(expected)
-                     + ' · 月目标 RM ' + fmtMoneyShort(tgt),
-        action: '本周对 ' + b + ' 加大推广 / 检视价格 / 联系老客',
+                     + ' · 月目标 RM ' + fmtMoneyShort(tgt)
+                     + ' · 缺口 RM ' + fmtMoneyShort(Math.max(0, expected - actual)),
+        action: ratio < 0.5
+          ? '本周对 ' + b + ' 做现场调研 — 是经营本身问题, 还是数据维度问题 (e.g. WCO 不做零售?)'
+          : '本周对 ' + b + ' 加大推广 · 检视价格 · 联系老客',
         link:   '?view=sales&month=' + s.month + '&branch=' + b,
         bubble_to_today: ratio < 0.7,
+        mark_done_ts: null,
+      });
+    } else if (ratio > 1.2) {
+      // Over-target — Phase 3 fix 2 new action type. Per Notion spec:
+      // "远超目标店 → amber · 复盘对的, 推广其他店".
+      actions.push({
+        id: 'sales-over-' + b + '-' + s.month,
+        severity: 'amber',
+        title: b + ' 超目标 · ' + (ratio * 100).toFixed(1) + '% of target pace',
+        description: '实际 RM ' + fmtMoneyShort(actual) + ' · 月目标 RM ' + fmtMoneyShort(tgt)
+                     + ' · 超出 RM ' + fmtMoneyShort(actual - tgt) + ' (' + ((ratio - 1) * 100).toFixed(0) + '%)',
+        action: '复盘 ' + b + ' ' + s.month + ' 做对了什么 (品类 / 客户 / 推广) · 推广到他店',
+        link:   '?view=sales&month=' + s.month + '&branch=' + b,
+        bubble_to_today: false,
         mark_done_ts: null,
       });
     }
