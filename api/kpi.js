@@ -459,7 +459,9 @@ export default async function handler(req, res) {
     res.status(400).json({ ok: false, error: 'bad view; allowed: ' + ALLOWED_VIEWS.join(',') });
     return;
   }
-  if (!/^\d{4}-\d{2}$/.test(ym)) {
+  // view=actions doesn't need month (it queries actions_assigned directly,
+  // not month-bounded KPI data). All other views require YYYY-MM.
+  if (view !== 'actions' && !/^\d{4}-\d{2}$/.test(ym)) {
     res.status(400).json({ ok: false, error: 'bad month; expected YYYY-MM' });
     return;
   }
