@@ -599,6 +599,347 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
   text-align: center; color: var(--text-meta); font-size: 13px;
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+   Phase 4 · Sales Module V3 — Visual规范 (Part E)
+   - 5-tier font scale · status color sets · 8px spacing · card system
+   - Hero strip · Store matrix · Drill tabs · Action plan cards · Modals
+═══════════════════════════════════════════════════════════════════════ */
+
+/* Status colors (Part E.2) — REQUIRED for red/amber/green semantics */
+:root {
+  --s4-red-text: #DC2626;
+  --s4-red-bg:   #FEE2E2;
+  --s4-red-bg-soft: #FEF2F2;
+  --s4-amber-text: #D97706;
+  --s4-amber-bg:   #FEF3C7;
+  --s4-amber-bg-soft: #FEFCE8;
+  --s4-green-text: #16A34A;
+  --s4-green-bg:   #DCFCE7;
+  --s4-green-bg-soft: #F0FDF4;
+  --s4-text-primary: #111827;
+  --s4-text-meta:    #6B7280;
+  --s4-text-light:   #9CA3AF;
+  --s4-divider:      #E5E7EB;
+  --s4-page-bg:      #FAFAFA;
+  --s4-card-bg:      #FFFFFF;
+  --s4-card-shadow:        0 1px 3px rgba(0,0,0,0.05);
+  --s4-card-shadow-hover:  0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Page-level wrapper for Sales V3 — soft bg + extra padding */
+.sales-v3 {
+  background: var(--s4-page-bg);
+  margin: -32px -36px;        /* extend over the .app-content default padding */
+  padding: 28px 36px 40px;
+  min-height: calc(100vh - 65px);
+}
+
+/* Sales V3 header strip (page-title row with month picker + 派派 btn) */
+.s4-page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-bottom: 8px;
+}
+.s4-page-header .s4-title {
+  font-size: 24px; font-weight: 700; color: var(--s4-text-primary); margin: 0;
+}
+.s4-page-header .s4-sub {
+  font-size: 14px; color: var(--s4-text-meta); margin-top: 2px;
+}
+
+/* HERO STRIP — 4 columns equal width, big numbers (Part E.1 · E.4) */
+.s4-hero {
+  background: var(--s4-card-bg);
+  border: 1px solid var(--s4-divider);
+  border-radius: 6px;
+  padding: 28px 32px;
+  margin: 16px 0 24px;
+  box-shadow: var(--s4-card-shadow);
+}
+.s4-hero-row {
+  display: grid; gap: 32px;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: end;
+}
+.s4-hero-col { min-width: 0; }
+.s4-hero-col .num {
+  font-size: 48px; font-weight: 800; line-height: 1.1;
+  color: var(--s4-text-primary);
+  font-family: 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+}
+.s4-hero-col .num.red   { color: var(--s4-red-text); }
+.s4-hero-col .num.amber { color: var(--s4-amber-text); }
+.s4-hero-col .num.green { color: var(--s4-green-text); }
+.s4-hero-col .label {
+  font-size: 14px; color: var(--s4-text-meta);
+  margin-top: 8px;
+}
+.s4-hero-col .dot {
+  display: inline-block; width: 24px; height: 24px;
+  border-radius: 50%; margin-right: 8px; vertical-align: 4px;
+}
+.s4-hero-col .dot.red   { background: var(--s4-red-text); }
+.s4-hero-col .dot.amber { background: var(--s4-amber-text); }
+.s4-hero-col .dot.green { background: var(--s4-green-text); }
+.s4-hero-col .dot.gray  { background: var(--s4-text-light); }
+.s4-hero-progress {
+  margin-top: 20px;
+  display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+}
+.s4-hero-progress .bar {
+  height: 12px; background: #F3F4F6; border-radius: 6px; overflow: hidden;
+  position: relative;
+}
+.s4-hero-progress .bar > span {
+  display: block; height: 100%; background: var(--s4-amber-text); border-radius: 6px;
+  transition: width 0.25s ease;
+}
+.s4-hero-progress .bar > span.green { background: var(--s4-green-text); }
+.s4-hero-progress .bar > span.red   { background: var(--s4-red-text); }
+.s4-hero-progress .bar-meta-l { font-size: 14px; color: var(--s4-text-meta); }
+.s4-hero-progress .bar-meta-r { font-size: 16px; font-weight: 600; color: var(--s4-text-primary); }
+.s4-hero-compare {
+  margin-top: 12px; font-size: 14px; color: var(--s4-text-meta);
+}
+.s4-hero-compare .delta-up   { color: var(--s4-green-text); }
+.s4-hero-compare .delta-down { color: var(--s4-red-text); }
+.s4-hero-compare span + span::before { content: ' · '; color: var(--s4-text-light); }
+
+/* SECTION TITLE — used between hero/matrix/drill/actions */
+.s4-section-title {
+  font-size: 20px; font-weight: 700; color: var(--s4-text-primary);
+  margin: 32px 0 12px;
+}
+.s4-section-title .s4-section-aux {
+  font-size: 13px; color: var(--s4-text-meta); font-weight: 400; margin-left: 8px;
+}
+
+/* STORE MATRIX — cards stacked, status background */
+.s4-store-row {
+  display: grid; gap: 16px;
+  grid-template-columns: 24px minmax(120px, auto) 1fr minmax(160px, auto) minmax(120px, auto) auto;
+  align-items: center;
+  background: var(--s4-card-bg);
+  border: 1px solid var(--s4-divider);
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  box-shadow: var(--s4-card-shadow);
+}
+.s4-store-row.red    { background: var(--s4-red-bg-soft);   border-left-color: var(--s4-red-text); }
+.s4-store-row.red.critical { background: var(--s4-red-bg); }
+.s4-store-row.amber  { background: var(--s4-amber-bg-soft); border-left-color: var(--s4-amber-text); }
+.s4-store-row.green  { background: var(--s4-green-bg-soft); border-left-color: var(--s4-green-text); }
+.s4-store-row .dot   { width: 16px; height: 16px; border-radius: 50%; }
+.s4-store-row .dot.red   { background: var(--s4-red-text); }
+.s4-store-row .dot.amber { background: var(--s4-amber-text); }
+.s4-store-row .dot.green { background: var(--s4-green-text); }
+.s4-store-row .name  { font-size: 18px; font-weight: 700; color: var(--s4-text-primary); }
+.s4-store-row .attrib { font-size: 13px; color: var(--s4-text-meta); margin-top: 4px; grid-column: 2 / -1; }
+.s4-store-row .bar {
+  height: 10px; background: rgba(0,0,0,0.06); border-radius: 5px; overflow: hidden;
+  margin-right: 10px;
+}
+.s4-store-row .bar > span { display: block; height: 100%; }
+.s4-store-row.red   .bar > span { background: var(--s4-red-text); }
+.s4-store-row.amber .bar > span { background: var(--s4-amber-text); }
+.s4-store-row.green .bar > span { background: var(--s4-green-text); }
+.s4-store-row .progress-pct { font-size: 18px; font-weight: 700; min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.s4-store-row .amounts { font-size: 14px; color: var(--s4-text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+.s4-store-row .amounts .target { color: var(--s4-text-meta); font-size: 13px; }
+.s4-store-row .shortfall { font-size: 14px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.s4-store-row .shortfall.red   { color: var(--s4-red-text); }
+.s4-store-row .shortfall.green { color: var(--s4-green-text); }
+.s4-store-row .row-action { display: flex; align-items: center; }
+.s4-store-row.clickable { cursor: pointer; }
+.s4-store-row.clickable:hover { box-shadow: var(--s4-card-shadow-hover); }
+
+/* BUTTON SYSTEM (Part E.7) */
+.s4-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 16px;
+  border: 1px solid transparent; border-radius: 6px;
+  font-size: 14px; font-weight: 500; line-height: 1;
+  cursor: pointer; transition: all 0.15s;
+  background: var(--s4-card-bg); color: var(--s4-text-primary);
+  border-color: var(--s4-divider);
+}
+.s4-btn:hover { border-color: var(--brand); color: var(--brand); }
+.s4-btn.primary {
+  background: var(--brand); color: #fff; border-color: var(--brand);
+}
+.s4-btn.primary:hover { background: #19503e; border-color: #19503e; color: #fff; }
+.s4-btn.danger  { background: var(--s4-red-text); color: #fff; border-color: var(--s4-red-text); }
+.s4-btn.danger:hover { background: #B91C1C; border-color: #B91C1C; color: #fff; }
+.s4-btn.text    { background: transparent; border-color: transparent; color: var(--brand); padding: 0 8px; height: 28px; }
+.s4-btn.text:hover { background: transparent; text-decoration: underline; }
+.s4-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* DRILL TABS */
+.s4-drill {
+  background: var(--s4-card-bg);
+  border: 1px solid var(--s4-divider);
+  border-radius: 6px;
+  padding: 0;
+  box-shadow: var(--s4-card-shadow);
+  overflow: hidden;
+}
+.s4-drill-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--s4-divider);
+  background: #F9FAFB;
+}
+.s4-drill-tabs button {
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  padding: 14px 20px; font-size: 14px; font-weight: 500;
+  color: var(--s4-text-meta); cursor: pointer;
+}
+.s4-drill-tabs button.active {
+  color: var(--brand); border-bottom-color: var(--brand); background: var(--s4-card-bg);
+}
+.s4-drill-tabs button:hover { color: var(--s4-text-primary); }
+.s4-drill-body { padding: 24px; }
+.s4-drill-body .s4-data-gap {
+  background: var(--s4-amber-bg-soft); border-left: 3px solid var(--s4-amber-text);
+  border-radius: 4px; padding: 14px 18px;
+  font-size: 14px; color: var(--s4-text-primary);
+}
+.s4-drill-body .s4-data-gap strong { color: var(--s4-amber-text); }
+.s4-drill-body table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.s4-drill-body table th, .s4-drill-body table td {
+  padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--s4-divider);
+  font-variant-numeric: tabular-nums;
+}
+.s4-drill-body table th:first-child, .s4-drill-body table td:first-child { text-align: left; }
+.s4-drill-body table th { font-size: 12px; color: var(--s4-text-meta); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ACTION PLAN — owner anomalies + sent-out + assigned-to-me */
+.s4-action-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 1000px) { .s4-action-grid { grid-template-columns: 1fr; } }
+.s4-action-card {
+  background: var(--s4-card-bg);
+  border: 1px solid var(--s4-divider);
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 16px 20px;
+  box-shadow: var(--s4-card-shadow);
+}
+.s4-action-card.red   { background: var(--s4-red-bg-soft);   border-left-color: var(--s4-red-text); }
+.s4-action-card.amber { background: var(--s4-amber-bg-soft); border-left-color: var(--s4-amber-text); }
+.s4-action-card.green { background: var(--s4-green-bg-soft); border-left-color: var(--s4-green-text); }
+.s4-action-card .a-title  { font-size: 16px; font-weight: 600; color: var(--s4-text-primary); }
+.s4-action-card .a-detail { font-size: 13px; color: var(--s4-text-meta); margin-top: 4px; }
+.s4-action-card .a-attrib { font-size: 13px; color: var(--s4-text-primary); margin-top: 8px; background: rgba(0,0,0,0.04); padding: 6px 10px; border-radius: 4px; }
+.s4-action-card .a-action-text { font-size: 13px; color: var(--s4-text-primary); margin-top: 8px; }
+.s4-action-card .a-controls { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Assigned action (Tier 2 + Tier 1 sent-out list) */
+.s4-action-status-pending      { color: var(--s4-amber-text); font-weight: 600; }
+.s4-action-status-accepted     { color: var(--brand); font-weight: 600; }
+.s4-action-status-done         { color: var(--s4-green-text); font-weight: 600; }
+.s4-action-status-overdue      { color: var(--s4-red-text); font-weight: 700; }
+.s4-action-status-rejected     { color: var(--s4-text-light); font-weight: 600; }
+.s4-action-status-renegotiating { color: #7C3AED; font-weight: 600; }
+
+/* MODALS — assign / accept / done / renegotiate / approve */
+.s4-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(17, 24, 39, 0.5);
+  display: flex; align-items: center; justify-content: center; z-index: 2000;
+  padding: 20px;
+}
+.s4-modal {
+  background: var(--s4-card-bg); border-radius: 8px;
+  width: 100%; max-width: 540px;
+  max-height: calc(100vh - 40px); overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+.s4-modal .s4-modal-header {
+  padding: 20px 24px; border-bottom: 1px solid var(--s4-divider);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.s4-modal .s4-modal-header h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.s4-modal .s4-modal-body { padding: 24px; }
+.s4-modal .s4-modal-footer {
+  padding: 16px 24px; border-top: 1px solid var(--s4-divider);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.s4-modal label { display: block; font-size: 13px; color: var(--s4-text-meta); margin-bottom: 4px; }
+.s4-modal input, .s4-modal select, .s4-modal textarea {
+  width: 100%; padding: 8px 12px; font-size: 14px;
+  border: 1px solid var(--s4-divider); border-radius: 6px;
+  background: var(--s4-card-bg); color: var(--s4-text-primary);
+  margin-bottom: 14px;
+}
+.s4-modal textarea { resize: vertical; min-height: 80px; }
+.s4-modal input:focus, .s4-modal select:focus, .s4-modal textarea:focus { outline: none; border-color: var(--brand); }
+.s4-modal .s4-modal-source {
+  background: #F9FAFB; border: 1px solid var(--s4-divider);
+  border-radius: 4px; padding: 10px 12px;
+  font-family: 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--s4-text-meta);
+  margin-bottom: 14px; word-break: break-all;
+}
+
+/* Toast (派派 success / failure) */
+.s4-toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--s4-text-primary); color: #fff;
+  padding: 12px 18px; border-radius: 6px;
+  font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 2100;
+  animation: s4ToastIn 0.2s ease;
+}
+.s4-toast.ok { background: var(--s4-green-text); }
+.s4-toast.bad { background: var(--s4-red-text); }
+@keyframes s4ToastIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+/* TIER 2 (store view) — specific blocks */
+.s4-tier2-target {
+  background: var(--s4-card-bg); border-radius: 8px; padding: 28px 32px;
+  border: 1px solid var(--s4-divider); box-shadow: var(--s4-card-shadow);
+  margin-bottom: 16px;
+}
+.s4-tier2-target .label { font-size: 14px; color: var(--s4-text-meta); }
+.s4-tier2-target .target-num {
+  font-size: 36px; font-weight: 800; color: var(--s4-text-primary);
+  margin-top: 4px; font-variant-numeric: tabular-nums;
+}
+.s4-tier2-target .row2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 24px;
+}
+.s4-tier2-target .actual-num,
+.s4-tier2-target .gap-num {
+  font-size: 32px; font-weight: 800; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.s4-tier2-target .row3 { margin-top: 20px; }
+.s4-tier2-target .compare-row { font-size: 14px; color: var(--s4-text-meta); margin-top: 4px; }
+.s4-tier2-target .compare-row .delta-up   { color: var(--s4-green-text); }
+.s4-tier2-target .compare-row .delta-down { color: var(--s4-red-text); }
+
+.s4-peer-ranking {
+  background: var(--s4-card-bg); border-radius: 8px; padding: 20px 24px;
+  border: 1px solid var(--s4-divider); box-shadow: var(--s4-card-shadow);
+}
+.s4-peer-ranking .peer-row {
+  display: grid; grid-template-columns: 20px auto 1fr auto; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--s4-divider);
+  font-size: 14px;
+}
+.s4-peer-ranking .peer-row:last-child { border-bottom: 0; }
+.s4-peer-ranking .peer-row.self { background: rgba(31,95,74,0.08); padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+.s4-peer-ranking .peer-row .rank { font-weight: 700; }
+.s4-peer-ranking .peer-row .dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; }
+.s4-peer-ranking .peer-row .dot.red   { background: var(--s4-red-text); }
+.s4-peer-ranking .peer-row .dot.amber { background: var(--s4-amber-text); }
+.s4-peer-ranking .peer-row .dot.green { background: var(--s4-green-text); }
+.s4-peer-ranking .peer-row .pct { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.s4-peer-ranking .peer-row .you-tag { font-size: 11px; color: var(--brand); margin-left: 6px; font-weight: 600; }
+
 /* ── Skeleton (loading) ───────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200px 0; }
@@ -971,28 +1312,51 @@ function monthQuery() {
 }
 
 async function fetchSales(signal) {
-  // Phase 3 fix 4 (2026-05-18): trend is the slow leg (~1-2s, full sales
-  // table paginated). Don't block first paint on it. Promise.all only the
-  // 3 fast endpoints (kpi/targets/daily) — Layer 1/2/4 render immediately
-  // (< 500ms). trend is kicked off as a background fetch that updates
-  // state.data.trend + re-renders Layer 3 in place when it lands.
-  const baseQ  = kpiQuery();
-  const dailyQ = baseQ.replace('view=sales', 'view=sales-daily');
+  // Phase 4 (2026-05-19) · Agentic OS 2-tier dispatch.
+  // Owner tier loads: kpi + targets + daily + sales-owner + actions(assigner=jym).
+  // Store tier loads:  kpi + targets + daily + sales-store + actions(assignee=me).
+  // 12M trend stays a background fetch (Phase 3 fix 4 — slow leg).
+  // All RPC-backed endpoints degrade gracefully: missing migration →
+  // degraded:true response so frontend can show banner.
+  const baseQ   = kpiQuery();
+  const dailyQ  = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
-  const [kpi, targets, daily] = await Promise.all([
-    getJSON('/api/kpi?' + baseQ,    signal),
-    getJSON('/api/kpi?' + targetsQ, signal),
-    getJSON('/api/kpi?' + dailyQ,   signal),
+  const role    = (state.user && state.user.role) || state.role || 'owner';
+  const userKey = (state.user && state.user.username) || '';
+  const tierIsOwner = role === 'owner';
+
+  // Tier-specific endpoint
+  const tierQ = tierIsOwner
+    ? new URLSearchParams({ view: 'sales-owner', month: state.month }).toString()
+    : (function() {
+        const p = new URLSearchParams({ view: 'sales-store', month: state.month });
+        if (state.user && state.user.store) p.set('branch', state.user.store);
+        return p.toString();
+      })();
+
+  // Action-list endpoint
+  const actionsQ = tierIsOwner
+    ? new URLSearchParams({ view: 'actions', assigner: userKey || 'jym' }).toString()
+    : new URLSearchParams({ view: 'actions', assignee: userKey }).toString();
+
+  const [kpi, targets, daily, tier, actions] = await Promise.all([
+    getJSON('/api/kpi?' + baseQ,     signal),
+    getJSON('/api/kpi?' + targetsQ,  signal),
+    getJSON('/api/kpi?' + dailyQ,    signal),
+    getJSON('/api/kpi?' + tierQ,     signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + actionsQ,  signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
   ]);
   state.role = kpi.session_role || state.role;
-  // Kick off trend fetch — fire-and-forget. It updates state.data.trend
-  // and re-renders when ready. Newer month switches cancel via trendLoadId.
+  // Kick off trend fetch — fire-and-forget (background).
   loadSalesTrendBackground(state.month, state.branch);
   return {
     kpi:     kpi.data,
     targets: targets,
     daily:   daily,
-    trend:   null, // marker: "loading" until background load resolves
+    trend:   null,
+    tier:    tier,        // { degraded?, data: sales_owner_overview | sales_store_view }
+    actions: actions,     // { actions: [...] }
+    tier_role: role,
   };
 }
 
@@ -1324,11 +1688,27 @@ function escapeHtml(s) {
    术语锁定 (Notion brief): 单数 = invoices, 件数 = units, AOV = sales/invoices
 ═══════════════════════════════════════════════════════════════════ */
 function renderSales(s) {
+  // Phase 4 (2026-05-19) · Agentic OS 2-tier dispatcher.
+  //   owner             → Tier 1 (renderSalesOwnerV3)
+  //   w0X_mgr / store_mgr → Tier 2 (renderSalesStoreV3)
+  //   anything else (no role) → Tier 1 fallback for legacy callers
+  const role = (s.user && s.user.role) || s.role || 'owner';
+  const isManager = /_mgr$|_manager$/i.test(role || '') || (role !== 'owner' && s.user && s.user.store);
+  if (isManager && s.user && s.user.store) {
+    return renderSalesStoreV3(s);
+  }
+  return renderSalesOwnerV3(s);
+}
+
+// Legacy V2 4-layer renderer — kept available for fallback debugging via
+// ?legacy=1 (not wired by default). Phase 4 dispatcher above is the
+// production entry point.
+function renderSalesLegacyV2(s) {
   const title = '<h1 class="page-title">Sales</h1>'
               + '<p class="page-sub">'
               +   'Snapshot ' + s.month
               +   (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · 全公司')
-              +   ' · KPI 默认单月 + 3 行对比 · 12M 趋势 · Action Plan'
+              +   ' · KPI 默认单月 + 3 行对比 · 12M 趋势 · Action Plan (V2 fallback)'
               + '</p>';
 
   if (s.loading || !s.data) {
@@ -2175,6 +2555,798 @@ function svgBarLine(opts) {
   svg += '<text class="legend-text" x="' + (padL + 104) + '" y="' + (padT + 0) + '">' + svgEscape(opts.lineLabel || 'line') + '</text>';
   svg += '</svg>';
   return svg;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 4 · Sales Module V3 — Agentic OS 2-tier renderers
+   Part B (Tier 1 Owner) · Part C (Tier 2 Store) · Part D (5 modals)
+═══════════════════════════════════════════════════════════════════ */
+
+// State for the currently-open drill tab (per-render)
+let salesDrillTab = 'trend12m'; // trend12m | category | customer | supplier | priceband
+function setSalesDrillTab(tab) {
+  salesDrillTab = tab;
+  // Lazy-load drill data if not yet fetched
+  if (['category','customer','supplier'].includes(tab)) {
+    const cached = salesDrillCache[tab];
+    if (!cached) loadSalesDrill(tab);
+  }
+  renderView();
+}
+window.setSalesDrillTab = setSalesDrillTab;
+
+const salesDrillCache = {}; // tab -> response
+let drillLoadId = 0;
+function loadSalesDrill(dim) {
+  const myId = ++drillLoadId;
+  const p = new URLSearchParams({ view: 'sales-drill', dim, month: state.month });
+  if (state.branch) p.set('branch', state.branch);
+  getJSON('/api/kpi?' + p.toString(), undefined)
+    .then(j => {
+      if (myId !== drillLoadId) return;
+      salesDrillCache[dim] = j;
+      if (state.view === 'sales') renderView();
+    })
+    .catch(e => {
+      if (myId !== drillLoadId) return;
+      salesDrillCache[dim] = { ok: false, error: e.message, degraded: true };
+      if (state.view === 'sales') renderView();
+    });
+}
+
+/* ── Action Plan: API helpers (assign / accept / done / renegotiate / approve) ── */
+async function postAction(payload) {
+  const r = await fetch('/api/sync', {
+    method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function showS4Toast(message, tone) {
+  const t = document.createElement('div');
+  t.className = 's4-toast ' + (tone || '');
+  t.textContent = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+/* ── Modal: assign Action (派派) — owner only, opens from anomaly or store row ── */
+let pendingAssignSeed = null;
+function openAssignModal(seed) {
+  pendingAssignSeed = seed || {};
+  document.body.appendChild(buildAssignModalDom());
+}
+window.openAssignModal = openAssignModal;
+function closeAssignModal() {
+  document.querySelectorAll('.s4-modal-backdrop[data-modal=assign]').forEach(n => n.remove());
+}
+window.closeAssignModal = closeAssignModal;
+function buildAssignModalDom() {
+  const s = pendingAssignSeed || {};
+  const wrap = document.createElement('div');
+  wrap.className = 's4-modal-backdrop';
+  wrap.setAttribute('data-modal', 'assign');
+  wrap.onclick = (e) => { if (e.target === wrap) closeAssignModal(); };
+  const today = new Date();
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
+  // Assignee options — keep narrow to known active roles
+  const assignees = [
+    { value: 'jym',          label: 'Jym (owner / 我自己)' },
+    { value: 'w01_manager',  label: 'W01 店长' },
+    { value: 'w02_manager',  label: 'W02 店长' },
+    { value: 'w03_manager',  label: 'W03 店长' },
+    { value: 'w05_manager',  label: 'W05 店长' },
+    { value: 'w07_manager',  label: 'W07 店长' },
+    { value: 'marketing_lead', label: 'Marketing 负责人' },
+    { value: 'purchasing_lead', label: '采购负责人' },
+  ];
+  const sevSel = s.severity || 'amber';
+  const seedSourceUrl = s.source_url || (window.location.pathname + window.location.search);
+  const seedSourceData = s.source_data || {
+    actual: s.actual, target: s.target, pct: s.pct, store: s.store, month: state.month,
+  };
+  wrap.innerHTML = ''
+    + '<div class="s4-modal">'
+    +   '<div class="s4-modal-header"><h2>派派 Action</h2>'
+    +     '<button class="s4-btn text" onclick="closeAssignModal()">✕</button></div>'
+    +   '<div class="s4-modal-body">'
+    +     '<label>对象 (assignee)</label>'
+    +     '<select id="s4AssignAssignee">'
+    +       assignees.map(a => '<option value="' + a.value + '"' +
+            (a.value === (s.recommended_assignee || '') ? ' selected' : '') +
+            '>' + a.label + '</option>').join('')
+    +     '</select>'
+    +     '<label>事项标题</label>'
+    +     '<input id="s4AssignTitle" type="text" value="' + escapeHtml(s.title || '') + '" />'
+    +     '<label>详情 (description)</label>'
+    +     '<textarea id="s4AssignDesc">' + escapeHtml(s.detail || s.recommended_action || '') + '</textarea>'
+    +     '<label>金额 (RM, 可空)</label>'
+    +     '<input id="s4AssignAmount" type="number" step="0.01" value="' + (s.recommended_amount != null ? s.recommended_amount : (s.amount != null ? s.amount : '')) + '" />'
+    +     '<label>截止日期</label>'
+    +     '<input id="s4AssignDdl" type="date" value="' + (s.ddl || monthEnd) + '" />'
+    +     '<label>优先级</label>'
+    +     '<select id="s4AssignSeverity">'
+    +       '<option value="red"' + (sevSel === 'red' ? ' selected' : '') + '>🔴 红 · 严重</option>'
+    +       '<option value="amber"' + (sevSel === 'amber' ? ' selected' : '') + '>🟡 黄 · 注意</option>'
+    +       '<option value="green"' + (sevSel === 'green' ? ' selected' : '') + '>🟢 绿 · 复盘 / 表扬</option>'
+    +     '</select>'
+    +     '<label>数据来源 (自动填入)</label>'
+    +     '<div class="s4-modal-source">' + escapeHtml(seedSourceUrl) + '<br>'
+    +       'snapshot: ' + escapeHtml(JSON.stringify(seedSourceData)) + '</div>'
+    +   '</div>'
+    +   '<div class="s4-modal-footer">'
+    +     '<button class="s4-btn" onclick="closeAssignModal()">取消</button>'
+    +     '<button class="s4-btn primary" id="s4AssignSubmit" onclick="submitAssign()">确认派派</button>'
+    +   '</div>'
+    + '</div>';
+  return wrap;
+}
+async function submitAssign() {
+  const btn = document.getElementById('s4AssignSubmit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const payload = {
+    mode: 'action_assign',
+    module: 'sales',
+    assignee: document.getElementById('s4AssignAssignee').value,
+    title:    document.getElementById('s4AssignTitle').value.trim(),
+    description: document.getElementById('s4AssignDesc').value.trim(),
+    amount:   document.getElementById('s4AssignAmount').value ? Number(document.getElementById('s4AssignAmount').value) : null,
+    amount_unit: 'RM',
+    ddl:      document.getElementById('s4AssignDdl').value || null,
+    severity: document.getElementById('s4AssignSeverity').value,
+    source_url:  pendingAssignSeed.source_url || window.location.pathname + window.location.search,
+    source_data: pendingAssignSeed.source_data || null,
+  };
+  try {
+    const j = await postAction(payload);
+    showS4Toast('已派派 (#' + j.action_id + ')', 'ok');
+    closeAssignModal();
+    loadView(); // re-fetch including actions list
+  } catch (e) {
+    showS4Toast('派派失败: ' + e.message, 'bad');
+    if (btn) { btn.disabled = false; btn.textContent = '确认派派'; }
+  }
+}
+window.submitAssign = submitAssign;
+
+/* ── Modal: Accept Action (Tier 2 store manager) ── */
+async function acceptAction(actionId) {
+  try {
+    await postAction({ mode: 'action_accept', action_id: actionId });
+    showS4Toast('已接受 (#' + actionId + ')', 'ok');
+    loadView();
+  } catch (e) {
+    showS4Toast('接受失败: ' + e.message, 'bad');
+  }
+}
+window.acceptAction = acceptAction;
+
+/* ── Modal: Mark Done with optional note ── */
+let pendingDoneActionId = null;
+function openDoneModal(actionId) {
+  pendingDoneActionId = actionId;
+  const wrap = document.createElement('div');
+  wrap.className = 's4-modal-backdrop';
+  wrap.setAttribute('data-modal', 'done');
+  wrap.onclick = (e) => { if (e.target === wrap) closeDoneModal(); };
+  wrap.innerHTML = ''
+    + '<div class="s4-modal">'
+    +   '<div class="s4-modal-header"><h2>Mark Done — Action #' + actionId + '</h2>'
+    +     '<button class="s4-btn text" onclick="closeDoneModal()">✕</button></div>'
+    +   '<div class="s4-modal-body">'
+    +     '<label>完成备注 (可空, 给 Jym 看)</label>'
+    +     '<textarea id="s4DoneNote" placeholder="例: 本周抓 designer 客 push 大单, 完成 RM 52,000"></textarea>'
+    +   '</div>'
+    +   '<div class="s4-modal-footer">'
+    +     '<button class="s4-btn" onclick="closeDoneModal()">取消</button>'
+    +     '<button class="s4-btn primary" id="s4DoneSubmit" onclick="submitDone()">标记完成</button>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(wrap);
+}
+window.openDoneModal = openDoneModal;
+function closeDoneModal() {
+  document.querySelectorAll('.s4-modal-backdrop[data-modal=done]').forEach(n => n.remove());
+}
+window.closeDoneModal = closeDoneModal;
+async function submitDone() {
+  const btn = document.getElementById('s4DoneSubmit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await postAction({
+      mode: 'action_done',
+      action_id: pendingDoneActionId,
+      done_note: document.getElementById('s4DoneNote').value.trim() || null,
+    });
+    showS4Toast('已标记完成', 'ok');
+    closeDoneModal();
+    loadView();
+  } catch (e) {
+    showS4Toast('标记失败: ' + e.message, 'bad');
+    if (btn) { btn.disabled = false; btn.textContent = '标记完成'; }
+  }
+}
+window.submitDone = submitDone;
+
+/* ── Modal: Renegotiate (ddl / amount + note) ── */
+let pendingRenegAction = null;
+function openRenegotiateModal(action) {
+  pendingRenegAction = action;
+  const wrap = document.createElement('div');
+  wrap.className = 's4-modal-backdrop';
+  wrap.setAttribute('data-modal', 'reneg');
+  wrap.onclick = (e) => { if (e.target === wrap) closeRenegotiateModal(); };
+  wrap.innerHTML = ''
+    + '<div class="s4-modal">'
+    +   '<div class="s4-modal-header"><h2>谈判 — Action #' + action.id + '</h2>'
+    +     '<button class="s4-btn text" onclick="closeRenegotiateModal()">✕</button></div>'
+    +   '<div class="s4-modal-body">'
+    +     '<div class="muted" style="font-size:12px;margin-bottom:14px">'
+    +       '当前: ddl ' + (action.ddl || '—') + ' / 金额 ' + (action.amount != null ? fmtRM(action.amount) : '—') + '</div>'
+    +     '<label>提议新 ddl (可空)</label>'
+    +     '<input id="s4RenegDdl" type="date" value="' + (action.ddl || '') + '" />'
+    +     '<label>提议新金额 (可空)</label>'
+    +     '<input id="s4RenegAmount" type="number" step="0.01" value="' + (action.amount != null ? action.amount : '') + '" />'
+    +     '<label>理由 (必填)</label>'
+    +     '<textarea id="s4RenegNote" placeholder="例: 月底装修影响业务, 申请 ddl 延 7 天"></textarea>'
+    +   '</div>'
+    +   '<div class="s4-modal-footer">'
+    +     '<button class="s4-btn" onclick="closeRenegotiateModal()">取消</button>'
+    +     '<button class="s4-btn primary" id="s4RenegSubmit" onclick="submitRenegotiate()">提交申请</button>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(wrap);
+}
+window.openRenegotiateModal = openRenegotiateModal;
+function closeRenegotiateModal() {
+  document.querySelectorAll('.s4-modal-backdrop[data-modal=reneg]').forEach(n => n.remove());
+}
+window.closeRenegotiateModal = closeRenegotiateModal;
+async function submitRenegotiate() {
+  const btn = document.getElementById('s4RenegSubmit');
+  const note = (document.getElementById('s4RenegNote').value || '').trim();
+  if (!note) { showS4Toast('请填写理由', 'bad'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await postAction({
+      mode: 'action_renegotiate',
+      action_id: pendingRenegAction.id,
+      proposed_ddl:    document.getElementById('s4RenegDdl').value || null,
+      proposed_amount: document.getElementById('s4RenegAmount').value ? Number(document.getElementById('s4RenegAmount').value) : null,
+      proposed_note:   note,
+    });
+    showS4Toast('已提交谈判申请, 等老板批准', 'ok');
+    closeRenegotiateModal();
+    loadView();
+  } catch (e) {
+    showS4Toast('提交失败: ' + e.message, 'bad');
+    if (btn) { btn.disabled = false; btn.textContent = '提交申请'; }
+  }
+}
+window.submitRenegotiate = submitRenegotiate;
+
+/* ── Modal: owner Approve / Reject renegotiation ── */
+async function approveRenegotiate(actionId, approved) {
+  try {
+    await postAction({ mode: 'action_approve_renegotiate', action_id: actionId, approved });
+    showS4Toast(approved ? '已批准谈判' : '已驳回谈判', 'ok');
+    loadView();
+  } catch (e) {
+    showS4Toast('操作失败: ' + e.message, 'bad');
+  }
+}
+window.approveRenegotiate = approveRenegotiate;
+
+async function rejectAction(actionId) {
+  if (!confirm('确认拒绝这条 Action? 不会再追问.')) return;
+  try {
+    await postAction({ mode: 'action_reject', action_id: actionId });
+    showS4Toast('已拒绝', 'ok');
+    loadView();
+  } catch (e) {
+    showS4Toast('拒绝失败: ' + e.message, 'bad');
+  }
+}
+window.rejectAction = rejectAction;
+
+/* ═══════════════════════════════════════════════════════════════════
+   PART B — TIER 1 OWNER VIEW (renderSalesOwnerV3)
+═══════════════════════════════════════════════════════════════════ */
+function renderSalesOwnerV3(s) {
+  // Wraps the page in .sales-v3 for visual规范 styling
+  const header = ''
+    + '<div class="s4-page-header">'
+    +   '<div><h1 class="s4-title">Sales · Tier 1 Owner BI</h1>'
+    +     '<div class="s4-sub">月份 ' + s.month + ' · 数据颗粒度: 月 · 下次更新 月底 sync</div></div>'
+    +   '<button class="s4-btn primary" onclick="openAssignModal({})">⊕ 派派</button>'
+    + '</div>';
+
+  if (s.loading || !s.data) {
+    return '<div class="sales-v3">' + header
+      + '<div class="s4-hero"><div class="skeleton h-value" style="width:120px;height:48px"></div></div>'
+      + '<div class="skeleton h-row" style="margin:12px 0"></div>'
+      + '<div class="skeleton h-row" style="margin:12px 0"></div>'
+      + '</div>';
+  }
+
+  const tierResp = s.data.tier || {};
+  const tierData = tierResp.data || null;
+  const degraded = !!tierResp.degraded;
+  const company  = tierData?.company  || null;
+  const stores   = Array.isArray(tierData?.stores)    ? tierData.stores : [];
+  const anomalies = Array.isArray(tierData?.anomalies) ? tierData.anomalies : [];
+
+  let banner = '';
+  if (degraded) {
+    banner = '<div class="s4-drill" style="margin-bottom:16px"><div class="s4-drill-body"><div class="s4-data-gap">'
+           + '<strong>RPC 未部署</strong> — sales_owner_overview 缺失. '
+           + '<code>tools/migration_phase4_sales_v3.sql</code> 待 Claude-chat apply. 下方 fallback 用 /api/kpi sales + targets 旧路径渲染.'
+           + '</div></div></div>';
+  }
+
+  // ── Hero (Part B.1)
+  const hero = company
+    ? renderS4Hero(company)
+    : renderS4HeroFallback(s);
+
+  // ── Store Matrix (Part B.2)
+  const matrix = stores.length > 0
+    ? renderS4StoreMatrix(stores, anomalies)
+    : renderS4StoreMatrixFallback(s);
+
+  // ── Drill cross-cut (Part B.3)
+  const drill = renderS4Drill(s);
+
+  // ── Action Plan + Sent-out status (Part B.4)
+  const actionPlan = renderS4OwnerActionPlan(s, anomalies);
+
+  return '<div class="sales-v3">'
+    + header
+    + banner
+    + hero
+    + '<div class="s4-section-title">店铺表现 <span class="s4-section-aux">按完成率排序 · 红色优先</span></div>'
+    + matrix
+    + '<div class="s4-section-title">钻取 + Cross-cut</div>'
+    + drill
+    + '<div class="s4-section-title">Action Plan <span class="s4-section-aux">异常自动检测 + 派出去状态</span></div>'
+    + actionPlan
+    + '</div>';
+}
+
+function renderS4Hero(company) {
+  const pct = company.pct;
+  const status = pct == null ? 'gray'
+              : pct >= 100 ? 'green'
+              : pct >= 85  ? 'amber'
+              : 'red';
+  const shortfallNum = +company.shortfall || 0;
+  const shortfallSign = shortfallNum >= 0 ? '-' : '+';
+  const vsLy = company.vs_last_year_pct;
+  const vsLm = company.vs_last_month_pct;
+  const vs6m = company.vs_6mo_avg_pct;
+  return ''
+    + '<div class="s4-hero">'
+    +   '<div class="s4-hero-row">'
+    +     '<div class="s4-hero-col">'
+    +       '<div><span class="dot ' + status + '"></span><span class="num ' + status + '">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
+    +       '<div class="label">达标率 vs target</div>'
+    +     '</div>'
+    +     '<div class="s4-hero-col">'
+    +       '<div class="num ' + (shortfallNum > 0 ? 'red' : 'green') + '">'
+    +         (shortfallNum > 0 ? '-' : '+') + 'RM ' + Math.round(Math.abs(shortfallNum)).toLocaleString('en-US')
+    +       + '</div>'
+    +       '<div class="label">' + (shortfallNum > 0 ? '本月缺口' : '本月超出') + '</div>'
+    +     '</div>'
+    +     '<div class="s4-hero-col">'
+    +       '<div class="num ' + (vsLy != null && vsLy < 0 ? 'red' : 'green') + '">' + (vsLy != null ? (vsLy > 0 ? '↑ ' : '↓ ') + Math.abs(vsLy).toFixed(1) + '%' : '—') + '</div>'
+    +       '<div class="label">vs 去年同月</div>'
+    +     '</div>'
+    +     '<div class="s4-hero-col">'
+    +       '<div class="num ' + (shortfallNum > 0 ? 'red' : 'green') + '">' + (company.sales != null ? fmtRM(company.sales) : '—') + '</div>'
+    +       '<div class="label">本月实际销售</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="s4-hero-progress">'
+    +     '<div class="bar"><span class="' + status + '" style="width:' + Math.min(100, pct || 0) + '%"></span></div>'
+    +     '<div><span class="bar-meta-l">vs target ' + (company.target != null ? fmtRM(company.target) : '—') + '</span>'
+    +       '<span class="bar-meta-r" style="margin-left:24px">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
+    +   '</div>'
+    +   '<div class="s4-hero-compare">'
+    +     '<span>vs 上月 ' + (vsLm != null ? '<span class="' + (vsLm >= 0 ? 'delta-up' : 'delta-down') + '">' + (vsLm > 0 ? '↑' : '↓') + ' ' + Math.abs(vsLm).toFixed(1) + '%</span>' : '—') + '</span>'
+    +     '<span>vs 6 月均 ' + (vs6m != null ? '<span class="' + (vs6m >= 0 ? 'delta-up' : 'delta-down') + '">' + (vs6m > 0 ? '↑' : '↓') + ' ' + Math.abs(vs6m).toFixed(1) + '%</span>' : '—') + '</span>'
+    +     '<span>本月单数 ' + (company.invoices != null ? fmtInt(company.invoices) + ' 单' : '—') + '</span>'
+    +     '<span>AOV ' + (company.aov != null ? fmtRMpr(company.aov) : '—') + '</span>'
+    +   '</div>'
+    + '</div>';
+}
+function renderS4HeroFallback(s) {
+  // Use legacy /api/kpi data if sales-owner RPC missing
+  const d = s.data.kpi || {};
+  const t = s.data.targets || {};
+  const target = t.summary?.sales_total || null;
+  const pct = (target && target > 0) ? (d.sales / target * 100) : null;
+  return renderS4Hero({
+    sales: d.sales, target, pct, invoices: d.invoices, units: d.units,
+    aov: d.invoices > 0 ? d.sales / d.invoices : null,
+    shortfall: target != null ? target - d.sales : 0,
+    vs_last_month_pct: (d.last_month_sales > 0) ? (d.sales - d.last_month_sales) / d.last_month_sales * 100 : null,
+    vs_last_year_pct:  (d.last_year_sales  > 0) ? (d.sales - d.last_year_sales)  / d.last_year_sales  * 100 : null,
+    vs_6mo_avg_pct:    (d.six_m_avg_sales  > 0) ? (d.sales - d.six_m_avg_sales)  / d.six_m_avg_sales  * 100 : null,
+  });
+}
+
+function renderS4StoreMatrix(stores, anomalies) {
+  // Map anomalies keyed by store to inject attribution text
+  const anomByStore = {};
+  for (const a of anomalies || []) if (a.store) anomByStore[a.store] = a;
+  return stores.map(row => {
+    const sev = row.status === 'critical' ? 'red critical'
+              : row.status === 'behind'   ? 'red'
+              : row.status === 'exceeded' ? 'green'
+              : 'amber';
+    const dotCls = (row.status === 'exceeded') ? 'green'
+                 : (row.status === 'critical' || row.status === 'behind') ? 'red' : 'amber';
+    const pct = row.pct == null ? '—' : row.pct.toFixed(1) + '%';
+    const barPct = Math.min(100, row.pct || 0);
+    const shortfall = row.shortfall;
+    const isOver = shortfall < 0;
+    const anom = anomByStore[row.store];
+    const attrib = anom?.detail || '';
+    const btnLabel = row.status === 'exceeded' ? '复盘' : '派派';
+    const recoSeed = anom ? {
+      title: anom.title, severity: anom.severity, detail: anom.detail,
+      recommended_action: anom.recommended_action,
+      recommended_assignee: anom.recommended_assignee,
+      recommended_amount: anom.recommended_amount,
+      source_url: '?view=sales&month=' + state.month + '&branch=' + row.store,
+      source_data: { actual: row.actual, target: row.target, pct: row.pct, store: row.store },
+      store: row.store, amount: anom.recommended_amount,
+    } : {
+      title: row.store + ' ' + state.month,
+      severity: row.status === 'exceeded' ? 'green' : (row.status === 'critical' ? 'red' : 'amber'),
+      detail: 'store=' + row.store + ' actual=' + row.actual + ' target=' + row.target + ' pct=' + row.pct,
+      source_url: '?view=sales&month=' + state.month + '&branch=' + row.store,
+      source_data: { actual: row.actual, target: row.target, pct: row.pct, store: row.store },
+      store: row.store,
+      recommended_amount: Math.max(0, row.shortfall),
+    };
+    return ''
+      + '<div class="s4-store-row ' + sev + '">'
+      +   '<span class="dot ' + dotCls + '"></span>'
+      +   '<div class="name">' + row.store + '</div>'
+      +   '<div class="bar"><span style="width:' + barPct + '%"></span></div>'
+      +   '<div class="amounts"><strong>' + fmtRM(row.actual) + '</strong>'
+      +     '<div class="target">/ ' + fmtRM(row.target) + ' · ' + fmtInt(row.invoices || 0) + ' 单 · AOV ' + (row.aov != null ? fmtRMpr(row.aov) : '—') + '</div></div>'
+      +   '<div class="shortfall ' + (isOver ? 'green' : 'red') + '">' + (isOver ? '+RM ' : '-RM ') + Math.round(Math.abs(shortfall)).toLocaleString('en-US') + '</div>'
+      +   '<div class="row-action"><button class="s4-btn primary" onclick=\'openAssignModal(' + JSON.stringify(recoSeed).replace(/"/g, '&quot;') + ')\'>' + btnLabel + '</button></div>'
+      +   (attrib ? '<div class="attrib">' + escapeHtml(attrib) + '</div>' : '')
+      + '</div>';
+  }).join('');
+}
+function renderS4StoreMatrixFallback(s) {
+  // Use legacy /api/kpi sales by_branch + targets to synthesize rows
+  const d = s.data.kpi || {};
+  const t = s.data.targets || {};
+  const summaryByStore = t.summary?.by_store || {};
+  const SALES_STORES_FB = ['W01','W02','W03','W05','W07','WCO'];
+  const rows = SALES_STORES_FB.map(b => {
+    const branch = d.by_branch && d.by_branch[b] || { sales: 0, invoices: 0, units: 0 };
+    const target = summaryByStore[b]?.sales || 0;
+    const pct = target > 0 ? branch.sales / target * 100 : null;
+    const status = target === 0 ? 'no_target'
+                 : pct >= 100   ? 'exceeded'
+                 : pct >= 85    ? 'approaching'
+                 : pct >= 50    ? 'behind'
+                 : 'critical';
+    return { store: b, actual: branch.sales, target, pct, shortfall: target - branch.sales, status,
+             invoices: branch.invoices, units: branch.units,
+             aov: branch.invoices > 0 ? branch.sales / branch.invoices : null };
+  }).sort((a, b) => (a.pct || 0) - (b.pct || 0));
+  return renderS4StoreMatrix(rows, []);
+}
+
+function renderS4Drill(s) {
+  const tabs = [
+    { id: 'trend12m', label: '12M 趋势' },
+    { id: 'category', label: '品类' },
+    { id: 'customer', label: '客型' },
+    { id: 'supplier', label: 'OEM/Agency' },
+    { id: 'priceband', label: '价格段' },
+  ];
+  const tabHtml = tabs.map(t =>
+    '<button class="' + (salesDrillTab === t.id ? 'active' : '') + '" onclick="setSalesDrillTab(\'' + t.id + '\')">' + t.label + '</button>'
+  ).join('');
+  let body;
+  if (salesDrillTab === 'trend12m') {
+    const trend = s.data.trend;
+    if (trend == null) {
+      body = '<div class="muted">Loading 12M trend ~1-2s …</div>';
+    } else if (Array.isArray(trend.series) && trend.series.length > 0) {
+      const series = [{ name: '全公司', color: '#1F5F4A', points: trend.series.map(p => ({ x: p.ym, y: p.sales })) }];
+      if (trend.branch_series && !s.branch) {
+        const colors = ['#3B82F6','#F59E0B','#EF4444','#A855F7','#10B981','#8B5CF6'];
+        let i = 0;
+        for (const st of ['W01','W02','W03','W05','W07','WCO']) {
+          if (trend.branch_series[st]) {
+            series.push({ name: st, color: colors[i++ % colors.length],
+              points: trend.branch_series[st].map(p => ({ x: p.ym, y: p.sales })) });
+          }
+        }
+      }
+      body = svgLineChart({ series, width: 900, height: 260, yFmt: fmtMoneyShort });
+    } else {
+      body = '<div class="s4-data-gap">/api/kpi?view=sales-trend 返空</div>';
+    }
+  } else if (salesDrillTab === 'priceband') {
+    body = '<div class="s4-data-gap"><strong>价格段拆分</strong> · 需要 SKU 价格归类 · Sprint 6+ backlog.</div>';
+  } else {
+    // category / customer / supplier — lazy-loaded
+    const cached = salesDrillCache[salesDrillTab];
+    if (!cached) {
+      body = '<div class="muted">Loading…</div>';
+      // Kick off load (may already be loading via cache check; idempotent)
+      if (!salesDrillCache[salesDrillTab + '__loading']) {
+        salesDrillCache[salesDrillTab + '__loading'] = true;
+        loadSalesDrill(salesDrillTab);
+      }
+    } else if (cached.degraded || cached.data?.status === 'data_gap') {
+      const msg = cached.data?.message || cached.degraded_reason || cached.error || '数据缺失';
+      body = '<div class="s4-data-gap"><strong>数据缺口</strong> · ' + escapeHtml(msg) + '</div>';
+    } else if (cached.data?.status === 'ok') {
+      if (salesDrillTab === 'category') {
+        const rows = cached.data.rows || [];
+        body = '<table><thead><tr><th>品类</th><th>销售 RM</th><th>单数</th><th>件数</th><th>AOV</th></tr></thead><tbody>'
+             + rows.map(r => '<tr><td>' + escapeHtml(r.category) + '</td><td>' + fmtRM(r.sales) + '</td><td>' + fmtInt(r.invoices) + '</td><td>' + fmtInt(r.units) + '</td><td>' + (r.aov != null ? fmtRMpr(r.aov) : '—') + '</td></tr>').join('')
+             + '</tbody></table>';
+      } else if (salesDrillTab === 'customer') {
+        const rows = cached.data.rows || [];
+        body = '<table><thead><tr><th>客型</th><th>销售 RM</th><th>明细行数</th></tr></thead><tbody>'
+             + rows.map(r => '<tr><td>' + escapeHtml(r.cust_type) + '</td><td>' + fmtRM(r.sales) + '</td><td>' + fmtInt(r.rows) + '</td></tr>').join('')
+             + '</tbody></table>';
+      } else if (salesDrillTab === 'supplier') {
+        const d = cached.data;
+        body = '<table><thead><tr><th>来源</th><th>销售 RM</th><th>单数</th></tr></thead><tbody>'
+             + '<tr><td>OEM (China)</td><td>' + fmtRM(d.OEM?.sales) + '</td><td>' + fmtInt(d.OEM?.invoices) + '</td></tr>'
+             + '<tr><td>Local Agency (Malaysia)</td><td>' + fmtRM(d.Local_Agency?.sales) + '</td><td>' + fmtInt(d.Local_Agency?.invoices) + '</td></tr>'
+             + '<tr><td><strong>Total</strong></td><td><strong>' + fmtRM(d.total) + '</strong></td><td>—</td></tr>'
+             + '</tbody></table>';
+      } else {
+        body = '<div class="muted">No data</div>';
+      }
+    } else {
+      body = '<div class="muted">Loading…</div>';
+    }
+  }
+  return ''
+    + '<div class="s4-drill">'
+    +   '<div class="s4-drill-tabs">' + tabHtml + '</div>'
+    +   '<div class="s4-drill-body">' + body + '</div>'
+    + '</div>';
+}
+
+function renderS4OwnerActionPlan(s, anomalies) {
+  // Left: anomaly cards (with [→ 派派] prefilled)
+  const anomCards = (anomalies || []).map(a => {
+    const sev = a.severity || 'amber';
+    const seed = JSON.stringify({
+      title: a.title, severity: a.severity, detail: a.detail,
+      recommended_action: a.recommended_action,
+      recommended_assignee: a.recommended_assignee,
+      recommended_amount: a.recommended_amount,
+      store: a.store,
+      source_url: '?view=sales&month=' + state.month + (a.store ? '&branch=' + a.store : ''),
+      source_data: a,
+    }).replace(/"/g, '&quot;');
+    return ''
+      + '<div class="s4-action-card ' + sev + '">'
+      +   '<div class="a-title">' + escapeHtml(a.title) + '</div>'
+      +   '<div class="a-detail">' + escapeHtml(a.detail || '') + '</div>'
+      +   (a.recommended_action ? '<div class="a-action-text">👉 ' + escapeHtml(a.recommended_action) + '</div>' : '')
+      +   '<div class="a-controls"><button class="s4-btn primary" onclick="openAssignModal(' + seed + ')">→ 派派</button></div>'
+      + '</div>';
+  }).join('');
+  const anomBlock = anomCards
+    ? '<div>' + anomCards + '</div>'
+    : '<div class="s4-data-gap">本月暂无 high-severity 异常 ✓</div>';
+
+  // Right: sent-out status (actions assigned by current user)
+  const actions = (s.data.actions && Array.isArray(s.data.actions.actions)) ? s.data.actions.actions : [];
+  const sentCards = actions.map(a => renderS4SentActionCard(a)).join('');
+  const sentBlock = sentCards
+    ? '<div>' + sentCards + '</div>'
+    : '<div class="s4-data-gap">尚未派出任何 Action — 点上方 [⊕ 派派] 派第一条</div>';
+
+  return ''
+    + '<div class="s4-action-grid">'
+    +   '<div><div class="s4-section-title" style="margin-top:0;font-size:16px">⚠ 异常 + 归因 (自动检测)</div>' + anomBlock + '</div>'
+    +   '<div><div class="s4-section-title" style="margin-top:0;font-size:16px">📋 我派出去的 Action (' + actions.length + ')</div>' + sentBlock + '</div>'
+    + '</div>';
+}
+
+function renderS4SentActionCard(a) {
+  const sevCls = (a.severity || 'amber');
+  const statusCls = 's4-action-status-' + (a.status || 'pending');
+  const ddlStr = a.ddl ? ' · ddl ' + a.ddl : '';
+  const amtStr = a.amount != null ? ' · RM ' + fmtInt(a.amount) : '';
+  let buttons = '';
+  if (a.status === 'renegotiating') {
+    buttons = '<button class="s4-btn" onclick="approveRenegotiate(' + a.id + ', true)">批准</button>'
+            + '<button class="s4-btn danger" onclick="approveRenegotiate(' + a.id + ', false)">驳回</button>';
+  } else if (a.status === 'overdue') {
+    buttons = '<button class="s4-btn">追问 (UI only)</button>'
+            + '<button class="s4-btn danger" onclick="rejectAction(' + a.id + ')">关闭</button>';
+  }
+  const renegBox = (a.status === 'renegotiating' && a.proposed_note)
+    ? '<div class="a-attrib"><strong>谈判申请:</strong> '
+        + (a.proposed_ddl ? '改 ddl → ' + a.proposed_ddl : '')
+        + (a.proposed_amount ? ' · 改金额 → RM ' + fmtInt(a.proposed_amount) : '')
+        + ' · ' + escapeHtml(a.proposed_note) + '</div>'
+    : '';
+  const doneNoteBox = (a.status === 'done' && a.done_note)
+    ? '<div class="a-attrib"><strong>完成备注:</strong> ' + escapeHtml(a.done_note) + '</div>'
+    : '';
+  return ''
+    + '<div class="s4-action-card ' + sevCls + '">'
+    +   '<div class="a-title">' + escapeHtml(a.title) + '</div>'
+    +   '<div class="a-detail">→ ' + escapeHtml(a.assignee) + amtStr + ddlStr + '</div>'
+    +   '<div class="a-detail"><span class="' + statusCls + '">状态: ' + (a.status || 'pending') + '</span></div>'
+    +   renegBox + doneNoteBox
+    +   (buttons ? '<div class="a-controls">' + buttons + '</div>' : '')
+    + '</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PART C — TIER 2 STORE MANAGER VIEW (renderSalesStoreV3)
+   Sections: My Target · My Anomalies · My Action Plan · Peer Ranking
+═══════════════════════════════════════════════════════════════════ */
+function renderSalesStoreV3(s) {
+  const myStore = (s.user && s.user.store) || '?';
+  const header = ''
+    + '<div class="s4-page-header">'
+    +   '<div><h1 class="s4-title">Sales · 我的店 ' + myStore + '</h1>'
+    +     '<div class="s4-sub">月份 ' + s.month + '</div></div>'
+    + '</div>';
+
+  if (s.loading || !s.data) {
+    return '<div class="sales-v3">' + header
+      + '<div class="s4-tier2-target"><div class="skeleton h-value" style="width:140px;height:36px"></div></div>'
+      + '</div>';
+  }
+
+  const tier = (s.data.tier && s.data.tier.data) || null;
+  const degraded = !!(s.data.tier && s.data.tier.degraded);
+  let banner = '';
+  if (degraded || !tier) {
+    banner = '<div class="s4-data-gap" style="margin:14px 0"><strong>RPC sales_store_view 未部署</strong> · 见 <code>tools/migration_phase4_sales_v3.sql</code>. 下方 fallback 用 /api/kpi sales 渲染.</div>';
+  }
+
+  // ── My Target (Part C / Section 1)
+  const myTarget = tier
+    ? renderS4MyTarget(tier)
+    : renderS4MyTargetFallback(s, myStore);
+
+  // ── My Anomalies
+  const myAnomalies = tier && Array.isArray(tier.anomalies) && tier.anomalies.length > 0
+    ? '<div class="s4-action-grid" style="grid-template-columns:1fr"><div>' + tier.anomalies.map(a =>
+        '<div class="s4-action-card ' + (a.severity || 'amber') + '">'
+        + '<div class="a-title">' + escapeHtml(a.title) + '</div>'
+        + '<div class="a-detail">' + escapeHtml(a.detail || '') + '</div>'
+        + '</div>').join('') + '</div></div>'
+    : '<div class="s4-data-gap">本月暂无显著异常 ✓</div>';
+
+  // ── My Action Plan (assigned by Jym)
+  const actions = (s.data.actions && Array.isArray(s.data.actions.actions)) ? s.data.actions.actions : [];
+  const assignedToMe = actions.filter(a => a.status !== 'done' && a.status !== 'rejected');
+  const myAP = assignedToMe.length > 0
+    ? '<div class="s4-action-grid" style="grid-template-columns:1fr"><div>'
+        + assignedToMe.map(a => renderS4AssignedActionCard(a)).join('')
+      + '</div></div>'
+    : '<div class="s4-data-gap">老板暂无派给你的 Action ✓</div>';
+
+  // ── Peer Ranking (pct + rank only, privacy enforced server-side)
+  const peers = tier && Array.isArray(tier.peer_ranking) ? tier.peer_ranking : [];
+  const peerRows = peers.map(p => {
+    const isSelf = p.store === myStore;
+    const dotCls = p.status === 'exceeded' ? 'green' : (p.status === 'critical' || p.status === 'behind' ? 'red' : 'amber');
+    return '<div class="peer-row ' + (isSelf ? 'self' : '') + '">'
+      + '<span class="rank">' + p.rank + '.</span>'
+      + '<span class="dot ' + dotCls + '"></span>'
+      + '<span><strong>' + p.store + '</strong>' + (isSelf ? '<span class="you-tag">你</span>' : '') + '</span>'
+      + '<span class="pct">' + (p.pct != null ? p.pct.toFixed(1) + '%' : '—') + '</span>'
+    + '</div>';
+  }).join('');
+  const peerBlock = peers.length > 0
+    ? '<div class="s4-peer-ranking">' + peerRows + '</div>'
+    : '<div class="s4-data-gap">Peer ranking 数据空</div>';
+
+  return '<div class="sales-v3">'
+    + header
+    + banner
+    + '<div class="s4-section-title">My Target · ' + s.month + '</div>'
+    + myTarget
+    + '<div class="s4-section-title">My Anomalies · 本月异常</div>'
+    + myAnomalies
+    + '<div class="s4-section-title">My Action Plan · 老板派给我的事</div>'
+    + myAP
+    + '<div class="s4-section-title">Peer Ranking · 6 店本月达标率 (隐私: 只看 % + 排名)</div>'
+    + peerBlock
+    + '</div>';
+}
+
+function renderS4MyTarget(tier) {
+  const pct = tier.pct;
+  const status = pct == null ? 'gray'
+              : pct >= 100   ? 'green'
+              : pct >= 85    ? 'amber'
+              : 'red';
+  const shortfall = tier.shortfall;
+  return ''
+    + '<div class="s4-tier2-target">'
+    +   '<div class="label">本月目标</div>'
+    +   '<div class="target-num">' + fmtRM(tier.target) + '</div>'
+    +   '<div class="row2">'
+    +     '<div><div class="label">我跑到</div>'
+    +       '<div class="actual-num ' + status + '" style="color:' + (status === 'red' ? 'var(--s4-red-text)' : status === 'green' ? 'var(--s4-green-text)' : 'var(--s4-amber-text)') + '">'
+    +       fmtRM(tier.actual) + (pct != null ? ' (' + pct.toFixed(1) + '%)' : '') + '</div>'
+    +     '</div>'
+    +     '<div><div class="label">缺口</div>'
+    +       '<div class="gap-num ' + (shortfall > 0 ? 'red' : 'green') + '" style="color:' + (shortfall > 0 ? 'var(--s4-red-text)' : 'var(--s4-green-text)') + '">'
+    +       (shortfall > 0 ? '-RM ' : '+RM ') + Math.round(Math.abs(shortfall)).toLocaleString('en-US') + '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="s4-hero-progress" style="margin-top:24px">'
+    +     '<div class="bar"><span class="' + status + '" style="width:' + Math.min(100, pct || 0) + '%"></span></div>'
+    +     '<div><span class="bar-meta-r">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
+    +   '</div>'
+    +   '<div class="row3">'
+    +     '<div class="compare-row">vs 上月 ' + (tier.vs_last_month != null ? fmtRM(tier.vs_last_month) + ' · <span class="' + (tier.actual >= tier.vs_last_month ? 'delta-up' : 'delta-down') + '">' + (tier.actual >= tier.vs_last_month ? '↑' : '↓') + ' ' + Math.abs((tier.actual - tier.vs_last_month) / Math.max(1, tier.vs_last_month) * 100).toFixed(1) + '%</span>' : '—') + '</div>'
+    +     '<div class="compare-row">vs 去年同月 ' + (tier.vs_last_year != null ? fmtRM(tier.vs_last_year) : '—') + '</div>'
+    +     '<div class="compare-row">vs 6 月均 ' + (tier.vs_6mo_avg != null ? fmtRM(tier.vs_6mo_avg) : '—') + '</div>'
+    +     '<div class="compare-row">本月单数 ' + fmtInt(tier.invoices) + ' · AOV (按单) ' + (tier.aov != null ? fmtRMpr(tier.aov) : '—') + '</div>'
+    +   '</div>'
+    + '</div>';
+}
+function renderS4MyTargetFallback(s, myStore) {
+  const d = s.data.kpi || {};
+  const t = s.data.targets || {};
+  const myT = t.summary?.by_store?.[myStore]?.sales || 0;
+  const branch = d.by_branch?.[myStore] || { sales: 0, invoices: 0 };
+  return renderS4MyTarget({
+    target: myT, actual: branch.sales,
+    pct: myT > 0 ? branch.sales / myT * 100 : null,
+    shortfall: myT - branch.sales,
+    invoices: branch.invoices,
+    aov: branch.invoices > 0 ? branch.sales / branch.invoices : null,
+    vs_last_month: null, vs_last_year: null, vs_6mo_avg: null,
+  });
+}
+
+function renderS4AssignedActionCard(a) {
+  const sev = a.severity || 'amber';
+  const statusCls = 's4-action-status-' + (a.status || 'pending');
+  const ddlStr = a.ddl ? ' · ddl ' + a.ddl : '';
+  const amtStr = a.amount != null ? ' · 目标 RM ' + fmtInt(a.amount) : '';
+  let buttons = '';
+  if (a.status === 'pending' || a.status === 'overdue') {
+    buttons = '<button class="s4-btn primary" onclick="acceptAction(' + a.id + ')">Accept</button>'
+            + '<button class="s4-btn" onclick="openRenegotiateModal(' + JSON.stringify(a).replace(/"/g, '&quot;') + ')">谈判</button>'
+            + '<button class="s4-btn" onclick="openDoneModal(' + a.id + ')">Mark Done</button>';
+  } else if (a.status === 'accepted') {
+    buttons = '<button class="s4-btn primary" onclick="openDoneModal(' + a.id + ')">Mark Done</button>'
+            + '<button class="s4-btn" onclick="openRenegotiateModal(' + JSON.stringify(a).replace(/"/g, '&quot;') + ')">谈判</button>';
+  } else if (a.status === 'renegotiating') {
+    buttons = '<div class="muted">等老板批准谈判申请…</div>';
+  }
+  return ''
+    + '<div class="s4-action-card ' + sev + '">'
+    +   '<div class="a-title">' + escapeHtml(a.title) + amtStr + ddlStr + '</div>'
+    +   (a.description ? '<div class="a-detail">' + escapeHtml(a.description) + '</div>' : '')
+    +   '<div class="a-detail"><span class="' + statusCls + '">状态: ' + (a.status || 'pending') + '</span></div>'
+    +   (buttons ? '<div class="a-controls">' + buttons + '</div>' : '')
+    + '</div>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════

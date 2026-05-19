@@ -3,6 +3,10 @@
     {
       "path": "/api/sync?mode=apply",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/sync?mode=actions_sweep_overdue",
+      "schedule": "5 0 * * *"
     }
   ],
   "rewrites": [
@@ -17,6 +21,14 @@
     {
       "source": "/api/targets",
       "destination": "/api/kpi?view=targets"
+    },
+    {
+      "source": "/api/sales-owner",
+      "destination": "/api/kpi?view=sales-owner"
+    },
+    {
+      "source": "/api/actions",
+      "destination": "/api/kpi?view=actions"
     }
   ]
 }

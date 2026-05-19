@@ -1523,6 +1523,109 @@ export default async function handler(req, res) {
   }
 
   // ───────────────────────────────────────────────────────────────────────
+  // Phase 4 — Agentic OS Action状态机 (2026-05-19)
+  // Modes: action_assign / action_accept / action_done / action_renegotiate /
+  //        action_approve_renegotiate / action_reject / actions_sweep_overdue.
+  // Backed by actions_assigned table (see tools/migration_phase4_sales_v3.sql).
+  // Graceful degrade: if table missing, returns ok:false with clear reason.
+  if (mode === 'action_assign' || mode === 'action_accept' || mode === 'action_done'
+      || mode === 'action_renegotiate' || mode === 'action_approve_renegotiate'
+      || mode === 'action_reject' || mode === 'actions_sweep_overdue') {
+    try {
+      // action_assign — owner only, INSERT new row
+      if (mode === 'action_assign') {
+        if (user.role !== 'owner') return res.status(403).json({ ok: false, error: 'owner only' });
+        const m   = String(body?.module || 'sales').toLowerCase();
+        const asn = String(body?.assignee || '').toLowerCase();
+        const tit = String(body?.title || '').trim();
+        const sev = String(body?.severity || 'amber').toLowerCase();
+        if (!asn || !tit || !sev) return res.status(400).json({ ok: false, error: 'assignee/title/severity required' });
+        const row = {
+          module: m,
+          assigner: user.username,
+          assignee: asn,
+          title: tit,
+          description: body?.description || null,
+          amount: body?.amount != null ? Number(body.amount) : null,
+          amount_unit: body?.amount_unit || null,
+          ddl: body?.ddl || null,
+          severity: sev,
+          source_url: body?.source_url || null,
+          source_data: body?.source_data || null,
+          status: 'pending',
+        };
+        const { data, error } = await sb().from('actions_assigned').insert(row).select('id,created_at').single();
+        if (error) return res.status(500).json({ ok: false, error: error.message, hint: 'actions_assigned table missing? apply migration_phase4_sales_v3.sql' });
+        return res.status(200).json({ ok: true, mode, action_id: data.id, created_at: data.created_at });
+      }
+
+      // All other modes operate on existing row by action_id
+      const actionId = Number(body?.action_id);
+      if (!Number.isFinite(actionId)) return res.status(400).json({ ok: false, error: 'action_id (numeric) required' });
+      const { data: cur, error: curErr } = await sb().from('actions_assigned')
+        .select('*').eq('id', actionId).maybeSingle();
+      if (curErr) return res.status(500).json({ ok: false, error: curErr.message });
+      if (!cur)   return res.status(404).json({ ok: false, error: 'action not found' });
+
+      // RBAC per mode
+      const isOwner   = user.role === 'owner';
+      const isAssignee = user.username === cur.assignee;
+
+      const nowIso = new Date().toISOString();
+      let patch = {};
+
+      if (mode === 'action_accept') {
+        if (!isAssignee) return res.status(403).json({ ok: false, error: 'only assignee can accept' });
+        patch = { status: 'accepted', accepted_at: nowIso };
+      } else if (mode === 'action_done') {
+        if (!isAssignee) return res.status(403).json({ ok: false, error: 'only assignee can mark done' });
+        patch = { status: 'done', done_at: nowIso, done_note: String(body?.done_note || '').slice(0, 1000) || null };
+      } else if (mode === 'action_renegotiate') {
+        if (!isAssignee) return res.status(403).json({ ok: false, error: 'only assignee can renegotiate' });
+        patch = {
+          status: 'renegotiating',
+          proposed_ddl:    body?.proposed_ddl    || null,
+          proposed_amount: body?.proposed_amount != null ? Number(body.proposed_amount) : null,
+          proposed_note:   String(body?.proposed_note || '').slice(0, 1000) || null,
+        };
+      } else if (mode === 'action_approve_renegotiate') {
+        if (!isOwner) return res.status(403).json({ ok: false, error: 'owner only' });
+        if (cur.status !== 'renegotiating') return res.status(400).json({ ok: false, error: 'action not in renegotiating' });
+        if (body?.approved === false) {
+          // Reject — revert to accepted (or pending) without modifying ddl/amount
+          patch = { status: cur.accepted_at ? 'accepted' : 'pending',
+                    proposed_ddl: null, proposed_amount: null, proposed_note: null };
+        } else {
+          // Approve — apply proposed values
+          patch = {
+            status: 'accepted',
+            ddl:    cur.proposed_ddl    || cur.ddl,
+            amount: cur.proposed_amount != null ? cur.proposed_amount : cur.amount,
+            proposed_ddl: null, proposed_amount: null, proposed_note: null,
+            accepted_at: cur.accepted_at || nowIso,
+          };
+        }
+      } else if (mode === 'action_reject') {
+        if (!isOwner) return res.status(403).json({ ok: false, error: 'owner only' });
+        patch = { status: 'rejected', rejected_at: nowIso };
+      } else if (mode === 'actions_sweep_overdue') {
+        // Owner OR cron only
+        if (!isOwner && user.username !== 'cron_daily') return res.status(403).json({ ok: false, error: 'forbidden' });
+        const { data: nRows, error: swErr } = await sb().rpc('actions_sweep_overdue');
+        if (swErr) return res.status(500).json({ ok: false, error: swErr.message });
+        return res.status(200).json({ ok: true, mode, rows_marked_overdue: nRows });
+      }
+
+      const { data: upd, error: updErr } = await sb().from('actions_assigned')
+        .update(patch).eq('id', actionId).select().single();
+      if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
+      return res.status(200).json({ ok: true, mode, action: upd });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message, where: 'action_state_machine' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Phase 2 Sales: Action Plan "mark done" persistence.
   // Optional — frontend may use localStorage. This endpoint exists so the
   // /Today aggregator (later sprint) can see mark-done state across devices.
