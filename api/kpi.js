@@ -26,7 +26,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const LEGACY_VIEWS = ['sales', 'inventory', 'customers', 'floatation', 'products'];
 const EXT_VIEWS    = ['targets', 'sales-trend', 'sales-daily'];
-const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS];
+// Phase 4 Sales V3 (2026-05-19): Tier 1 / Tier 2 views + drill + actions.
+const PHASE4_VIEWS = ['sales-owner', 'sales-store', 'sales-drill', 'actions'];
+const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
 const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
@@ -313,6 +315,134 @@ async function handleSalesDaily(req, res, user, ym, queryBranch) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 4 · Sales Module V3 (Agentic OS · 2-tier) — view handlers
+// ═══════════════════════════════════════════════════════════════════════
+
+// view=sales-owner — Tier 1 Owner overview. Owner only.
+async function handleSalesOwner(req, res, user, ym) {
+  if (user && user.role !== 'owner') {
+    return res.status(403).json({ ok: false, error: 'owner only' });
+  }
+  // Try RPC; if it errors (migration not applied), surface a clean
+  // banner-friendly degraded payload so the frontend can show a notice.
+  const { data, error } = await sb().rpc('sales_owner_overview', { p_ym: ym });
+  if (error) {
+    console.error('[/api/kpi sales-owner] rpc error:', error.message);
+    return res.status(200).json({
+      ok: true, view: 'sales-owner', ym,
+      degraded: true,
+      degraded_reason: 'sales_owner_overview RPC missing — apply tools/migration_phase4_sales_v3.sql',
+      data: null,
+    });
+  }
+  return res.status(200).json({
+    ok: true, view: 'sales-owner', ym,
+    session_role: user?.role || null,
+    fetched_at: new Date().toISOString(),
+    data,
+  });
+}
+
+// view=sales-store — Tier 2 single-store view. Manager pinned, owner free.
+async function handleSalesStore(req, res, user, ym, queryBranch) {
+  let p_store = queryBranch;
+  if (!user || user.role !== 'owner') {
+    if (!user || !user.store) return res.status(403).json({ ok: false, error: 'store assignment missing' });
+    if (queryBranch && queryBranch !== user.store) {
+      return res.status(403).json({ ok: false, error: 'store not allowed' });
+    }
+    p_store = user.store;
+  }
+  if (!p_store) return res.status(400).json({ ok: false, error: 'store required (?branch=...)' });
+  const { data, error } = await sb().rpc('sales_store_view', { p_store, p_ym: ym });
+  if (error) {
+    console.error('[/api/kpi sales-store] rpc error:', error.message);
+    return res.status(200).json({
+      ok: true, view: 'sales-store', ym, store: p_store,
+      degraded: true,
+      degraded_reason: 'sales_store_view RPC missing — apply migration_phase4_sales_v3.sql',
+      data: null,
+    });
+  }
+  return res.status(200).json({
+    ok: true, view: 'sales-store', ym, store: p_store,
+    session_role: user?.role || null,
+    fetched_at: new Date().toISOString(),
+    data,
+  });
+}
+
+// view=sales-drill&dim=category|customer|supplier — 3-RPC dispatcher.
+async function handleSalesDrill(req, res, user, ym, queryBranch) {
+  const dim = String(req.query?.dim || '').trim().toLowerCase();
+  const map = {
+    category: 'sales_drill_category',
+    customer: 'sales_drill_customer_type',
+    supplier: 'sales_drill_supplier',
+  };
+  if (!map[dim]) {
+    return res.status(400).json({ ok: false, error: 'bad dim; allowed: ' + Object.keys(map).join(',') });
+  }
+  // Manager pins to own store; owner can ?branch=
+  let p_store = queryBranch;
+  if (user && user.role !== 'owner') {
+    if (!user.store) return res.status(403).json({ ok: false, error: 'store assignment missing' });
+    p_store = user.store;
+  }
+  const { data, error } = await sb().rpc(map[dim], { p_ym: ym, p_store: p_store || null });
+  if (error) {
+    console.error('[/api/kpi sales-drill] rpc error:', error.message);
+    return res.status(200).json({
+      ok: true, view: 'sales-drill', dim, ym, store: p_store || null,
+      degraded: true,
+      degraded_reason: map[dim] + ' RPC missing — apply migration_phase4_sales_v3.sql',
+      data: null,
+    });
+  }
+  return res.status(200).json({
+    ok: true, view: 'sales-drill', dim, ym, store: p_store || null,
+    session_role: user?.role || null,
+    fetched_at: new Date().toISOString(),
+    data,
+  });
+}
+
+// view=actions — list Action Plan items. Filter by assignee (Tier 2)
+// or assigner (Tier 1).
+async function handleActions(req, res, user) {
+  const assignee = String(req.query?.assignee || '').trim().toLowerCase();
+  const assigner = String(req.query?.assigner || '').trim().toLowerCase();
+  // RBAC: owner can query anything; non-owner forced to own as assignee
+  let filter = {};
+  if (user && user.role === 'owner') {
+    if (assignee) filter.assignee = assignee;
+    if (assigner) filter.assigner = assigner;
+  } else if (user) {
+    filter.assignee = user.username;
+  } else {
+    return res.status(401).json({ ok: false, error: 'no session' });
+  }
+  let q = sb().from('actions_assigned')
+    .select('id,module,assigner,assignee,title,description,amount,amount_unit,ddl,severity,status,proposed_ddl,proposed_amount,proposed_note,source_url,source_data,created_at,accepted_at,done_at,rejected_at,done_note')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  for (const [k, v] of Object.entries(filter)) q = q.eq(k, v);
+  const { data, error } = await q;
+  if (error) {
+    return res.status(200).json({
+      ok: true, view: 'actions', degraded: true,
+      degraded_reason: 'actions_assigned table missing — apply migration',
+      actions: [],
+    });
+  }
+  return res.status(200).json({
+    ok: true, view: 'actions',
+    fetched_at: new Date().toISOString(),
+    actions: data || [],
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -356,6 +486,11 @@ export default async function handler(req, res) {
     if (view === 'targets')     return handleTargets(req, res, user, ym, queryBranch);
     if (view === 'sales-trend') return handleSalesTrend(req, res, user, ym, queryBranch);
     if (view === 'sales-daily') return handleSalesDaily(req, res, user, ym, queryBranch);
+    // Phase 4 — Agentic OS Sales V3 dispatch
+    if (view === 'sales-owner') return handleSalesOwner(req, res, user, ym);
+    if (view === 'sales-store') return handleSalesStore(req, res, user, ym, queryBranch);
+    if (view === 'sales-drill') return handleSalesDrill(req, res, user, ym, queryBranch);
+    if (view === 'actions')     return handleActions(req, res, user);
 
     // Legacy KPI path — single RPC dispatch
     const rpcName = view + '_kpi_one_month';
