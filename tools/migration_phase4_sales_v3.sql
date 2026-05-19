@@ -232,10 +232,11 @@ BEGIN
                                             WHEN 'behind'   THEN ' 落后 - 完成 ' || pct || '%'
                                             WHEN 'exceeded' THEN ' 超目标 ' || (pct - 100)::INT || '%'
                                             ELSE ' 接近目标 - 完成 ' || pct || '%' END,
-           'detail',              '实际 RM ' || actual::NUMERIC(14,2) || ' / 目标 RM ' || target::NUMERIC(14,2)
-                                    || ' / ' || CASE WHEN shortfall > 0
-                                                     THEN '缺口 RM ' || shortfall::NUMERIC(14,2)
-                                                     ELSE '超 RM ' || (-shortfall)::NUMERIC(14,2) END,
+           'detail',              '实际 RM ' || TRIM(TO_CHAR(actual, 'FM999,999,999'))
+                                    || ' · 目标 RM ' || TRIM(TO_CHAR(target, 'FM999,999,999'))
+                                    || ' · ' || CASE WHEN shortfall > 0
+                                                     THEN '缺口 RM ' || TRIM(TO_CHAR(shortfall, 'FM999,999,999'))
+                                                     ELSE '超 RM ' || TRIM(TO_CHAR(-shortfall, 'FM999,999,999')) END,
            'recommended_action',  CASE status
                                     WHEN 'critical' THEN '现场调研 ' || store
                                     WHEN 'behind'   THEN store || ' 本月追 RM ' || shortfall::INT
@@ -358,8 +359,9 @@ BEGIN
            THEN jsonb_build_array(jsonb_build_object(
              'severity','red',
              'title','本月进度落后 ' || ROUND(v_actual/v_target*100,1) || '%',
-             'detail','实际 RM ' || v_actual || ' / 目标 RM ' || v_target
-                        || ' / 缺口 RM ' || (v_target - v_actual)::NUMERIC(14,2)))
+             'detail','实际 RM ' || TRIM(TO_CHAR(v_actual, 'FM999,999,999'))
+                        || ' · 目标 RM ' || TRIM(TO_CHAR(v_target, 'FM999,999,999'))
+                        || ' · 缺口 RM ' || TRIM(TO_CHAR(v_target - v_actual, 'FM999,999,999'))))
            ELSE '[]'::jsonb END;
   END IF;
 
