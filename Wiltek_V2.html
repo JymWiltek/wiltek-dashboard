@@ -646,63 +646,113 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
   font-size: 14px; color: var(--s4-text-meta); margin-top: 2px;
 }
 
-/* HERO STRIP — 4 columns equal width, big numbers (Part E.1 · E.4) */
+/* HERO STRIP — 60/40 main+side layout (Jym redesign 2026-05-20).
+   Replaces old 4-col equal-width which forced 48px numbers to wrap on
+   1440px sidebar+content widths. New design: left HERO 60% (status dot +
+   96px% + actual/target + gap + progress bar), right 40% (3 stacked
+   subs aligned right). */
 .s4-hero {
   background: var(--s4-card-bg);
   border: 1px solid var(--s4-divider);
-  border-radius: 6px;
-  padding: 28px 32px;
+  border-radius: 8px;
+  padding: 32px;
   margin: 16px 0 24px;
   box-shadow: var(--s4-card-shadow);
 }
 .s4-hero-row {
-  display: grid; gap: 32px;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: end;
+  display: grid;
+  grid-template-columns: 60% 40%;
+  gap: 32px;
+  align-items: center;
 }
-.s4-hero-col { min-width: 0; }
-.s4-hero-col .num {
-  font-size: 48px; font-weight: 800; line-height: 1.1;
-  color: var(--s4-text-primary);
-  font-family: 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+@media (max-width: 900px) {
+  .s4-hero-row { grid-template-columns: 1fr; gap: 24px; }
 }
-.s4-hero-col .num.red   { color: var(--s4-red-text); }
-.s4-hero-col .num.amber { color: var(--s4-amber-text); }
-.s4-hero-col .num.green { color: var(--s4-green-text); }
-.s4-hero-col .label {
-  font-size: 14px; color: var(--s4-text-meta);
-  margin-top: 8px;
+
+/* Left main block */
+.s4-hero-main { min-width: 0; }
+.s4-hero-main .hero-line1 {
+  display: flex; align-items: center; gap: 16px;
 }
-.s4-hero-col .dot {
-  display: inline-block; width: 24px; height: 24px;
-  border-radius: 50%; margin-right: 8px; vertical-align: 4px;
+.s4-hero-main .hero-dot {
+  width: 24px; height: 24px; border-radius: 50%;
+  flex-shrink: 0;
 }
-.s4-hero-col .dot.red   { background: var(--s4-red-text); }
-.s4-hero-col .dot.amber { background: var(--s4-amber-text); }
-.s4-hero-col .dot.green { background: var(--s4-green-text); }
-.s4-hero-col .dot.gray  { background: var(--s4-text-light); }
-.s4-hero-progress {
-  margin-top: 20px;
-  display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+.s4-hero-main .hero-dot.red       { background: var(--s4-red-text); }
+.s4-hero-main .hero-dot.amber     { background: var(--s4-amber-text); }
+.s4-hero-main .hero-dot.green     { background: var(--s4-green-text); }
+.s4-hero-main .hero-dot.darkred   { background: #B91C1C; }
+.s4-hero-main .hero-dot.gray      { background: var(--s4-text-light); }
+.s4-hero-main .hero-pct {
+  font-size: 96px; font-weight: 800; line-height: 1;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.s4-hero-progress .bar {
-  height: 12px; background: #F3F4F6; border-radius: 6px; overflow: hidden;
-  position: relative;
+.s4-hero-main .hero-pct.red     { color: var(--s4-red-text); }
+.s4-hero-main .hero-pct.amber   { color: var(--s4-amber-text); }
+.s4-hero-main .hero-pct.green   { color: var(--s4-green-text); }
+.s4-hero-main .hero-pct.darkred { color: #B91C1C; }
+.s4-hero-main .hero-pct.gray    { color: var(--s4-text-light); }
+.s4-hero-main .hero-amounts {
+  margin-top: 12px;
+  font-size: 24px; font-weight: 600; color: var(--s4-text-primary);
+  font-variant-numeric: tabular-nums;
 }
-.s4-hero-progress .bar > span {
-  display: block; height: 100%; background: var(--s4-amber-text); border-radius: 6px;
+.s4-hero-main .hero-gap {
+  margin-top: 4px;
+  font-size: 20px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.s4-hero-main .hero-gap.red   { color: var(--s4-red-text); }
+.s4-hero-main .hero-gap.green { color: var(--s4-green-text); }
+.s4-hero-main .hero-bar {
+  margin-top: 16px;
+  height: 8px; background: #E5E7EB; border-radius: 4px; overflow: hidden;
+}
+.s4-hero-main .hero-bar > span {
+  display: block; height: 100%; border-radius: 4px;
   transition: width 0.25s ease;
 }
-.s4-hero-progress .bar > span.green { background: var(--s4-green-text); }
-.s4-hero-progress .bar > span.red   { background: var(--s4-red-text); }
-.s4-hero-progress .bar-meta-l { font-size: 14px; color: var(--s4-text-meta); }
-.s4-hero-progress .bar-meta-r { font-size: 16px; font-weight: 600; color: var(--s4-text-primary); }
-.s4-hero-compare {
-  margin-top: 12px; font-size: 14px; color: var(--s4-text-meta);
+.s4-hero-main .hero-bar > span.red     { background: var(--s4-red-text); }
+.s4-hero-main .hero-bar > span.amber   { background: var(--s4-amber-text); }
+.s4-hero-main .hero-bar > span.green   { background: var(--s4-green-text); }
+.s4-hero-main .hero-bar > span.darkred { background: #B91C1C; }
+
+/* If 96px overflows on very narrow content (e.g., 4-digit pct), fall back to 80px. */
+@media (max-width: 1100px) {
+  .s4-hero-main .hero-pct { font-size: 80px; }
 }
-.s4-hero-compare .delta-up   { color: var(--s4-green-text); }
-.s4-hero-compare .delta-down { color: var(--s4-red-text); }
-.s4-hero-compare span + span::before { content: ' · '; color: var(--s4-text-light); }
+@media (max-width: 760px) {
+  .s4-hero-main .hero-pct { font-size: 64px; }
+}
+
+/* Right side — 3 stacked sub-rows, digits right-aligned (consistent column) */
+.s4-hero-side {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+}
+.kpi-side-row {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  column-gap: 16px;
+  align-items: baseline;
+}
+.kpi-side-row .num {
+  text-align: right;
+  font-size: 24px; font-weight: 700;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kpi-side-row .num.red       { color: var(--s4-red-text); }
+.kpi-side-row .num.amber     { color: var(--s4-amber-text); }
+.kpi-side-row .num.green     { color: var(--s4-green-text); }
+.kpi-side-row .num.darkred   { color: #B91C1C; }
+.kpi-side-row .num.gray      { color: var(--s4-text-light); }
+.kpi-side-row .label {
+  text-align: left;
+  font-size: 14px; color: var(--s4-text-meta);
+}
 
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
@@ -2917,74 +2967,85 @@ function renderSalesOwnerV3(s) {
 }
 
 function renderS4Hero(company, anomalies) {
-  // Phase 4 hotfix (2026-05-20):
-  //   - Bug 1: removed double-`+` typo (was casting '</div>' to NaN and
-  //     concatenating "NaN" suffix after the shortfall number).
-  //   - Bug 2: 4-col grid layout; column 4 now = 出事店数 (red anomaly
-  //     count) per spec, not 实际销售 (实际 is already in progress meta).
-  //   - Bug 3: all amount formatting via fmtRM() — no .00, comma千位, etc.
+  // Phase 4 Hero redesign (2026-05-20): 60/40 main+side layout.
+  // Left 60%: status dot + 96px% (status-colored) + RM actual/target (24px)
+  //          + 缺口 line (20px) + thin progress bar.
+  // Right 40%: 3 stacked sub-rows (24px num + 14px label), digits aligned
+  //           on a consistent right edge via grid column.
+  // Responsive < 900px: stack vertical via CSS media query.
   const pct = company.pct;
+  // Refined status thresholds per Jym redesign brief:
+  //   >= 100 green / 80-99 amber / 50-79 red / < 50 darkred / null gray
   const status = pct == null ? 'gray'
-              : pct >= 100 ? 'green'
-              : pct >= 85  ? 'amber'
-              : 'red';
+              : pct >= 100   ? 'green'
+              : pct >= 80    ? 'amber'
+              : pct >= 50    ? 'red'
+              : 'darkred';
   const shortfallNum = +company.shortfall || 0;
+  const isShortfallPositive = shortfallNum > 0; // positive = behind target
   const vsLy = company.vs_last_year_pct;
   const vsLm = company.vs_last_month_pct;
-  const vs6m = company.vs_6mo_avg_pct;
-  // Anomaly count for column 4 — filter to red severity (critical/落后).
   const redAnomCount = Array.isArray(anomalies)
     ? anomalies.filter(a => a && a.severity === 'red').length
     : 0;
-  // Format shortfall as signed RM with千位 (no .00). Sign goes BEFORE 'RM '.
-  const shortfallStr = shortfallNum === 0
-    ? fmtRM(0)
-    : (shortfallNum > 0 ? '-' : '+') + fmtRM(Math.abs(shortfallNum));
+
+  // ── Left side: main block
+  const actualStr = company.sales != null ? fmtRM(company.sales) : '—';
+  const targetStr = company.target != null ? fmtRM(company.target) : '—';
+  const gapStr = shortfallNum === 0
+    ? ''
+    : (isShortfallPositive
+        ? '缺口 ' + fmtRM(shortfallNum)
+        : '超 '   + fmtRM(Math.abs(shortfallNum)));
+  const gapCls = isShortfallPositive ? 'red' : 'green';
+  const barPct = Math.min(100, Math.max(0, pct || 0));
+
+  const leftHtml = ''
+    + '<div class="s4-hero-main">'
+    +   '<div class="hero-line1">'
+    +     '<span class="hero-dot ' + status + '"></span>'
+    +     '<span class="hero-pct ' + status + '">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span>'
+    +   '</div>'
+    +   '<div class="hero-amounts">' + actualStr + ' / ' + targetStr + '</div>'
+    +   (gapStr ? '<div class="hero-gap ' + gapCls + '">' + gapStr + '</div>' : '')
+    +   '<div class="hero-bar"><span class="' + status + '" style="width:' + barPct + '%"></span></div>'
+    + '</div>';
+
+  // ── Right side: 3 stacked sub-rows
+  // Row 1: vs 去年同月
+  const vsLyCls = vsLy == null ? 'gray' : (vsLy < 0 ? 'red' : 'green');
+  const vsLyStr = vsLy == null
+    ? '—'
+    : (vsLy > 0 ? '↑ ' : '↓ ') + Math.abs(vsLy).toFixed(1) + '%';
+  // Row 2: vs 上月
+  const vsLmCls = vsLm == null ? 'gray' : (vsLm < 0 ? 'red' : 'green');
+  const vsLmStr = vsLm == null
+    ? '—'
+    : (vsLm > 0 ? '↑ ' : '↓ ') + Math.abs(vsLm).toFixed(1) + '%';
+  // Row 3: 出事店数 (red anomaly count). Jym: no plural 's' in Chinese; "1 store" not "1 stores"
+  const anomCls = redAnomCount > 0 ? 'red' : 'green';
+  const anomStr = redAnomCount > 0 ? '⚠ ' + redAnomCount + ' store' : '✓ 0';
+  const anomLabel = redAnomCount > 0 ? '严重落后' : '本月无严重异常';
+
+  const rightHtml = ''
+    + '<div class="s4-hero-side">'
+    +   '<div class="kpi-side-row">'
+    +     '<span class="num ' + vsLyCls + '">' + vsLyStr + '</span>'
+    +     '<span class="label">vs 去年同月</span>'
+    +   '</div>'
+    +   '<div class="kpi-side-row">'
+    +     '<span class="num ' + vsLmCls + '">' + vsLmStr + '</span>'
+    +     '<span class="label">vs 上月</span>'
+    +   '</div>'
+    +   '<div class="kpi-side-row">'
+    +     '<span class="num ' + anomCls + '">' + anomStr + '</span>'
+    +     '<span class="label">' + anomLabel + '</span>'
+    +   '</div>'
+    + '</div>';
 
   return ''
     + '<div class="s4-hero">'
-    +   '<div class="s4-hero-row">'
-    // ── Col 1: 达标率 (status light + pct)
-    +     '<div class="s4-hero-col">'
-    +       '<div><span class="dot ' + status + '"></span><span class="num ' + status + '">'
-    +         (pct != null ? pct.toFixed(1) + '%' : '—')
-    +       '</span></div>'
-    +       '<div class="label">达标率 vs target</div>'
-    +     '</div>'
-    // ── Col 2: 本月缺口 (signed RM)
-    +     '<div class="s4-hero-col">'
-    +       '<div class="num ' + (shortfallNum > 0 ? 'red' : 'green') + '">' + shortfallStr + '</div>'
-    +       '<div class="label">' + (shortfallNum > 0 ? '本月缺口' : '本月超出') + '</div>'
-    +     '</div>'
-    // ── Col 3: vs 去年同月 (pct delta with arrow)
-    +     '<div class="s4-hero-col">'
-    +       '<div class="num ' + (vsLy != null && vsLy < 0 ? 'red' : 'green') + '">'
-    +         (vsLy != null ? (vsLy > 0 ? '↑ ' : '↓ ') + Math.abs(vsLy).toFixed(1) + '%' : '—')
-    +       '</div>'
-    +       '<div class="label">vs 去年同月</div>'
-    +     '</div>'
-    // ── Col 4: 出事店数 (red anomaly count)
-    +     '<div class="s4-hero-col">'
-    +       '<div class="num ' + (redAnomCount > 0 ? 'red' : 'green') + '">'
-    +         (redAnomCount > 0 ? '⚠ ' + redAnomCount + ' stores' : '✓ all on track')
-    +       '</div>'
-    +       '<div class="label">' + (redAnomCount > 0 ? '严重落后店' : '本月无严重异常') + '</div>'
-    +     '</div>'
-    +   '</div>'
-    // ── Progress bar (full-width, beneath the 4-col grid)
-    +   '<div class="s4-hero-progress">'
-    +     '<div class="bar"><span class="' + status + '" style="width:' + Math.min(100, pct || 0) + '%"></span></div>'
-    +     '<div><span class="bar-meta-l">实际 ' + (company.sales != null ? fmtRM(company.sales) : '—')
-    +       ' · 目标 ' + (company.target != null ? fmtRM(company.target) : '—') + '</span>'
-    +       '<span class="bar-meta-r" style="margin-left:24px">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
-    +   '</div>'
-    // ── Compare row (3 history comparisons + headline量价)
-    +   '<div class="s4-hero-compare">'
-    +     '<span>vs 上月 ' + (vsLm != null ? '<span class="' + (vsLm >= 0 ? 'delta-up' : 'delta-down') + '">' + (vsLm > 0 ? '↑' : '↓') + ' ' + Math.abs(vsLm).toFixed(1) + '%</span>' : '—') + '</span>'
-    +     '<span>vs 6 月均 ' + (vs6m != null ? '<span class="' + (vs6m >= 0 ? 'delta-up' : 'delta-down') + '">' + (vs6m > 0 ? '↑' : '↓') + ' ' + Math.abs(vs6m).toFixed(1) + '%</span>' : '—') + '</span>'
-    +     '<span>本月单数 ' + (company.invoices != null ? fmtInt(company.invoices) + ' 单' : '—') + '</span>'
-    +     '<span>AOV ' + (company.aov != null ? fmtRMpr(company.aov) : '—') + '</span>'
-    +   '</div>'
+    +   '<div class="s4-hero-row">' + leftHtml + rightHtml + '</div>'
     + '</div>';
 }
 function renderS4HeroFallback(s, anomalies) {
