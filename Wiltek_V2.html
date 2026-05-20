@@ -754,6 +754,49 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
   font-size: 14px; color: var(--s4-text-meta);
 }
 
+/* ── Phase 5 · Overview 4-KPI Hero Row (Part C) ──────────────────────
+   Replaces the 60/40 hero on the Owner Overview. 4 equal cards, airport
+   lounge / investor-grade. (.s4-hero* rules above now dead post-Phase-5.) */
+.kpi-hero-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+@media (max-width: 900px) { .kpi-hero-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .kpi-hero-row { grid-template-columns: 1fr; } }
+
+.kpi-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border-top: 4px solid var(--s4-text-light);  /* status color set inline */
+  transition: all 0.2s;
+  min-width: 0;
+}
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.kpi-card .kpi-icon  { font-size: 24px; margin-bottom: 8px; }
+.kpi-card .kpi-title {
+  font-size: 14px; color: #6B7280; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;
+}
+.kpi-card .kpi-actual {
+  font-size: 32px; font-weight: 800; color: #111827; line-height: 1.1;
+  margin-bottom: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.kpi-card .kpi-status-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.kpi-card .kpi-pct { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi-card .kpi-bar {
+  height: 6px; background: #E5E7EB; border-radius: 3px; overflow: hidden; margin-bottom: 12px;
+}
+.kpi-card .kpi-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+.kpi-card .kpi-meta { font-size: 13px; color: #6B7280; line-height: 1.6; }
+.kpi-card .kpi-meta strong { color: #111827; font-weight: 600; }
+
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
   font-size: 20px; font-weight: 700; color: var(--s4-text-primary);
@@ -1076,8 +1119,10 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 
   <main class="app-main">
     <nav class="menu">
-      <div class="menu-section">Dashboards</div>
-      <a href="#" data-view="sales"     onclick="return onViewChange('sales')"><span class="icon">📊</span>Sales</a>
+      <div class="menu-section">MENU</div>
+      <!-- Phase 5 (2026-05-20): Sales → Overview (owner home). data-view
+           'overview'; ?view=sales kept as backward-compat alias. -->
+      <a href="#" data-view="overview" onclick="return onViewChange('overview')"><span class="icon">📊</span>Overview</a>
       <a href="#" data-view="inventory" onclick="return onViewChange('inventory')"><span class="icon">📦</span>Inventory</a>
       <a href="#" data-view="customers" onclick="return onViewChange('customers')"><span class="icon">👥</span>Customers</a>
       <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products</a>
@@ -1128,7 +1173,7 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 const state = {
   month:   '2026-04',
   branch:  null,        // null = all stores (owner only)
-  view:    'sales',
+  view:    'overview',  // Phase 5: owner default landing (was 'sales')
   role:    'owner',     // 'owner' | 'manager' | 'warehouse'
   user:    null,        // { username, display_name, role, store }
   loading: false,
@@ -1242,7 +1287,7 @@ function populateBranchPicker() {
 }
 
 /* ── Constants ──────────────────────────────────────────────────── */
-const ALLOWED_VIEWS = ['sales', 'inventory', 'customers', 'products', 'today', 'finance', 'targets'];
+const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'finance', 'targets'];
 const OWNER_ONLY_VIEWS = new Set(['targets']);
 
 // Phase 2: monthly_targets store list (10 stores per Notion + schema CHECK).
@@ -1387,8 +1432,14 @@ async function fetchSales(signal) {
   // Phase 4 hotfix (2026-05-20): action keys are ALL role-ids (userRoleId)
   // for consistency between writer (modal) and reader (this fetcher).
   // Previous bug: writer wrote assigner='owner', reader read assigner='jym'.
-  const baseQ   = kpiQuery();
-  const dailyQ  = baseQ.replace('view=sales', 'view=sales-daily');
+  // Phase 5: state.view may be 'overview' OR 'sales' (alias). Build all
+  // sub-queries from explicit 'sales*' view names + month/branch, never
+  // from kpiQuery() (which would carry 'view=overview' and break the
+  // .replace() derivations).
+  const mb = new URLSearchParams({ view: 'sales', month: state.month });
+  if (state.branch) mb.set('branch', state.branch);
+  const baseQ    = mb.toString();
+  const dailyQ   = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
   const role    = (state.user && state.user.role) || state.role || 'owner';
   const tierIsOwner = role === 'owner';
@@ -1408,23 +1459,33 @@ async function fetchSales(signal) {
     ? new URLSearchParams({ view: 'actions', assigner: myRoleId }).toString()
     : new URLSearchParams({ view: 'actions', assignee: myRoleId }).toString();
 
-  const [kpi, targets, daily, tier, actions] = await Promise.all([
+  // Phase 5 Overview 4-KPI hero (owner only). Degrades gracefully.
+  const overviewQ = new URLSearchParams({ view: 'overview', month: state.month }).toString();
+
+  const fetches = [
     getJSON('/api/kpi?' + baseQ,     signal),
     getJSON('/api/kpi?' + targetsQ,  signal),
     getJSON('/api/kpi?' + dailyQ,    signal),
     getJSON('/api/kpi?' + tierQ,     signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + actionsQ,  signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
-  ]);
+  ];
+  // Only owner needs the overview KPI block (Tier 2 has no 4-KPI hero).
+  fetches.push(tierIsOwner
+    ? getJSON('/api/kpi?' + overviewQ, signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null }))
+    : Promise.resolve(null));
+
+  const [kpi, targets, daily, tier, actions, overview] = await Promise.all(fetches);
   state.role = kpi.session_role || state.role;
   // Kick off trend fetch — fire-and-forget (background).
   loadSalesTrendBackground(state.month, state.branch);
   return {
-    kpi:     kpi.data,
-    targets: targets,
-    daily:   daily,
-    trend:   null,
-    tier:    tier,        // { degraded?, data: sales_owner_overview | sales_store_view }
-    actions: actions,     // { actions: [...] }
+    kpi:      kpi.data,
+    targets:  targets,
+    daily:    daily,
+    trend:    null,
+    tier:     tier,        // sales_owner_overview | sales_store_view
+    actions:  actions,
+    overview: overview,    // Phase 5 4-KPI block (owner only)
     tier_role: role,
   };
 }
@@ -1496,7 +1557,8 @@ async function fetchInventory(signal) {
 }
 
 const FETCHERS = {
-  sales:     fetchSales,
+  overview:  fetchSales,  // Phase 5 — same multi-source fetch (adds overview KPI)
+  sales:     fetchSales,  // backward-compat alias
   inventory: fetchInventory,
   customers: fetchCustomers,
   products:  fetchProducts,
@@ -1612,7 +1674,8 @@ function renderView() {
   if (badge && (state.view !== 'sales' || state.branch)) badge.classList.add('hidden');
 
   const renderers = {
-    sales:     renderSales,
+    overview:  renderSales,  // Phase 5 — dispatcher (owner→Overview, mgr→Tier 2)
+    sales:     renderSales,  // backward-compat alias
     inventory: renderInventory,
     customers: renderCustomers,
     products:  renderProducts,
@@ -2925,18 +2988,24 @@ window.rejectAction = rejectAction;
    PART B — TIER 1 OWNER VIEW (renderSalesOwnerV3)
 ═══════════════════════════════════════════════════════════════════ */
 function renderSalesOwnerV3(s) {
-  // Wraps the page in .sales-v3 for visual规范 styling
+  // Phase 5 (2026-05-20): renamed Sales → Overview (owner home).
+  // Old 60/40 hero deleted; replaced by 4-KPI hero row (renderOverviewKpiRow).
+  // Store Matrix / Drill / Action Plan unchanged below.
   const header = ''
     + '<div class="s4-page-header">'
-    +   '<div><h1 class="s4-title">Sales · Tier 1 Owner BI</h1>'
+    +   '<div><h1 class="s4-title">Overview · Owner BI</h1>'
     +     '<div class="s4-sub">月份 ' + s.month + ' · 数据颗粒度: 月 · 下次更新 月底 sync</div></div>'
     +   '<button class="s4-btn primary" onclick="openAssignModal({})">⊕ 派派</button>'
     + '</div>';
 
   if (s.loading || !s.data) {
     return '<div class="sales-v3">' + header
-      + '<div class="s4-hero"><div class="skeleton h-value" style="width:120px;height:48px"></div></div>'
-      + '<div class="skeleton h-row" style="margin:12px 0"></div>'
+      + '<div class="kpi-hero-row">'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="width:80%;height:32px"></div></div>'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="width:80%;height:32px"></div></div>'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="width:80%;height:32px"></div></div>'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="width:80%;height:32px"></div></div>'
+      + '</div>'
       + '<div class="skeleton h-row" style="margin:12px 0"></div>'
       + '</div>';
   }
@@ -2944,7 +3013,6 @@ function renderSalesOwnerV3(s) {
   const tierResp = s.data.tier || {};
   const tierData = tierResp.data || null;
   const degraded = !!tierResp.degraded;
-  const company  = tierData?.company  || null;
   const stores   = Array.isArray(tierData?.stores)    ? tierData.stores : [];
   const anomalies = Array.isArray(tierData?.anomalies) ? tierData.anomalies : [];
 
@@ -2952,30 +3020,28 @@ function renderSalesOwnerV3(s) {
   if (degraded) {
     banner = '<div class="s4-drill" style="margin-bottom:16px"><div class="s4-drill-body"><div class="s4-data-gap">'
            + '<strong>RPC 未部署</strong> — sales_owner_overview 缺失. '
-           + '<code>tools/migration_phase4_sales_v3.sql</code> 待 Claude-chat apply. 下方 fallback 用 /api/kpi sales + targets 旧路径渲染.'
+           + '<code>tools/migration_phase4_sales_v3.sql</code> 待 Claude-chat apply. 下方 store matrix fallback 用 /api/kpi sales + targets 旧路径渲染.'
            + '</div></div></div>';
   }
 
-  // ── Hero (Part B.1)
-  const hero = company
-    ? renderS4Hero(company, anomalies)
-    : renderS4HeroFallback(s, anomalies);
+  // ── Phase 5: 4-KPI Hero Row (Part C) — replaces old 60/40 hero
+  const kpiHero = renderOverviewKpiRow(s);
 
-  // ── Store Matrix (Part B.2)
+  // ── Store Matrix (Part B.2) — unchanged
   const matrix = stores.length > 0
     ? renderS4StoreMatrix(stores, anomalies)
     : renderS4StoreMatrixFallback(s);
 
-  // ── Drill cross-cut (Part B.3)
+  // ── Drill cross-cut (Part B.3) — unchanged
   const drill = renderS4Drill(s);
 
-  // ── Action Plan + Sent-out status (Part B.4)
+  // ── Action Plan + Sent-out status (Part B.4) — unchanged
   const actionPlan = renderS4OwnerActionPlan(s, anomalies);
 
   return '<div class="sales-v3">'
     + header
     + banner
-    + hero
+    + kpiHero
     + '<div class="s4-section-title">店铺表现 <span class="s4-section-aux">按完成率排序 · 红色优先</span></div>'
     + matrix
     + '<div class="s4-section-title">钻取 + Cross-cut</div>'
@@ -2985,103 +3051,130 @@ function renderSalesOwnerV3(s) {
     + '</div>';
 }
 
-function renderS4Hero(company, anomalies) {
-  // Phase 4 Hero redesign (2026-05-20): 60/40 main+side layout.
-  // Left 60%: status dot + 96px% (status-colored) + RM actual/target (24px)
-  //          + 缺口 line (20px) + thin progress bar.
-  // Right 40%: 3 stacked sub-rows (24px num + 14px label), digits aligned
-  //           on a consistent right edge via grid column.
-  // Responsive < 900px: stack vertical via CSS media query.
-  const pct = company.pct;
-  // Refined status thresholds per Jym redesign brief:
-  //   >= 100 green / 80-99 amber / 50-79 red / < 50 darkred / null gray
-  const status = pct == null ? 'gray'
-              : pct >= 100   ? 'green'
-              : pct >= 80    ? 'amber'
-              : pct >= 50    ? 'red'
-              : 'darkred';
-  const shortfallNum = +company.shortfall || 0;
-  const isShortfallPositive = shortfallNum > 0; // positive = behind target
-  const vsLy = company.vs_last_year_pct;
-  const vsLm = company.vs_last_month_pct;
-  const redAnomCount = Array.isArray(anomalies)
-    ? anomalies.filter(a => a && a.severity === 'red').length
-    : 0;
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 5 · Overview 4-KPI Hero Row (Part C)
+   Sales / Walk-in / Closing Rate / Basket Size — airport-lounge grade.
+   Data: state.data.overview.data.kpis (overview_kpi RPC). Degrades
+   gracefully: if RPC missing, synthesize Sales card from /api/kpi sales
+   + targets, others show "目标未设/数据待接".
+═══════════════════════════════════════════════════════════════════ */
+function renderOverviewKpiRow(s) {
+  const ovResp = s.data.overview || null;
+  const degraded = !ovResp || ovResp.degraded || !ovResp.data;
+  const kpis = (ovResp && ovResp.data && ovResp.data.kpis) || null;
 
-  // ── Left side: main block
-  const actualStr = company.sales != null ? fmtRM(company.sales) : '—';
-  const targetStr = company.target != null ? fmtRM(company.target) : '—';
-  const gapStr = shortfallNum === 0
-    ? ''
-    : (isShortfallPositive
-        ? '缺口 ' + fmtRM(shortfallNum)
-        : '超 '   + fmtRM(Math.abs(shortfallNum)));
-  const gapCls = isShortfallPositive ? 'red' : 'green';
+  // Card metadata
+  const defs = [
+    { key: 'sales',        icon: '💰', title: 'Sales',             fmt: 'rm'  },
+    { key: 'walkin',       icon: '👥', title: 'Walk-in Customers', fmt: 'int' },
+    { key: 'closing_rate', icon: '🎯', title: 'Closing Rate',      fmt: 'pct' },
+    { key: 'basket_size',  icon: '🛍', title: 'Basket Size (AOV)',  fmt: 'rm'  },
+  ];
+
+  // Degraded fallback: build a Sales-only block from kpi+targets so the
+  // first card still shows real numbers; the rest carry a notice.
+  let fallbackKpis = null;
+  if (degraded) {
+    const d = s.data.kpi || {};
+    const t = s.data.targets || {};
+    const salesTgt = (t.summary && t.summary.sales_total) || null;
+    const pct = (salesTgt && salesTgt > 0) ? +(d.sales / salesTgt * 100).toFixed(1) : null;
+    const vsLm = (d.last_month_sales > 0) ? +((d.sales - d.last_month_sales) / d.last_month_sales * 100).toFixed(1) : null;
+    fallbackKpis = {
+      sales: {
+        actual: d.sales, target: salesTgt, pct,
+        shortfall: salesTgt != null ? salesTgt - d.sales : null,
+        vs_last_month_pct: vsLm,
+        status: pct == null ? 'gray' : pct >= 100 ? 'green' : pct >= 80 ? 'amber' : pct >= 50 ? 'red' : 'darkred',
+      },
+      walkin:       { actual: null, target: null, pct: null, status: 'gray', _note: 'overview RPC 未部署' },
+      closing_rate: { actual: null, target: null, pct: null, status: 'gray', _note: 'overview RPC 未部署' },
+      basket_size:  { actual: d.invoices > 0 ? +(d.sales / d.invoices).toFixed(2) : null, target: null, pct: null, status: 'gray', _note: 'basket target 未设' },
+    };
+  }
+
+  const source = kpis || fallbackKpis || {};
+  const banner = degraded
+    ? '<div class="s4-data-gap" style="margin-bottom:12px"><strong>overview_kpi RPC 未部署</strong> · '
+      + '<code>tools/migration_phase5_overview.sql</code> 待 apply · Sales 卡用 fallback, 其余待数据.</div>'
+    : '';
+
+  const cards = defs.map(def => {
+    const k = source[def.key] || { status: 'gray' };
+    return renderOverviewKpiCard(def, k);
+  }).join('');
+
+  return banner + '<div class="kpi-hero-row">' + cards + '</div>';
+}
+
+function renderOverviewKpiCard(def, k) {
+  const status = k.status || 'gray';
+  const statusColor = {
+    green:   'var(--s4-green-text)',
+    amber:   'var(--s4-amber-text)',
+    red:     'var(--s4-red-text)',
+    darkred: '#B91C1C',
+    gray:    'var(--s4-text-light)',
+  }[status] || 'var(--s4-text-light)';
+
+  // Format actual per card type
+  const fmtActual = (v) => {
+    if (v == null) return '—';
+    if (def.fmt === 'rm')  return fmtRM(v);
+    if (def.fmt === 'int') return fmtInt(v);
+    if (def.fmt === 'pct') return Number(v).toFixed(1) + '%';
+    return String(v);
+  };
+  const fmtTargetVal = (v) => {
+    if (v == null) return null;
+    if (def.fmt === 'rm')  return fmtRM(v);
+    if (def.fmt === 'int') return fmtInt(v);
+    if (def.fmt === 'pct') return Number(v).toFixed(1) + '%';
+    return String(v);
+  };
+
+  const pct = k.pct;
+  const pctStr = pct != null ? pct.toFixed(1) + '%' : '—';
   const barPct = Math.min(100, Math.max(0, pct || 0));
+  const dotIcon = status === 'green' ? '🟢' : status === 'amber' ? '🟡' : status === 'gray' ? '⚪' : '🔴';
 
-  const leftHtml = ''
-    + '<div class="s4-hero-main">'
-    +   '<div class="hero-line1">'
-    +     '<span class="hero-dot ' + status + '"></span>'
-    +     '<span class="hero-pct ' + status + '">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span>'
-    +   '</div>'
-    +   '<div class="hero-amounts">' + actualStr + ' / ' + targetStr + '</div>'
-    +   (gapStr ? '<div class="hero-gap ' + gapCls + '">' + gapStr + '</div>' : '')
-    +   '<div class="hero-bar"><span class="' + status + '" style="width:' + barPct + '%"></span></div>'
-    + '</div>';
-
-  // ── Right side: 3 stacked sub-rows
-  // Row 1: vs 去年同月
-  const vsLyCls = vsLy == null ? 'gray' : (vsLy < 0 ? 'red' : 'green');
-  const vsLyStr = vsLy == null
-    ? '—'
-    : (vsLy > 0 ? '↑ ' : '↓ ') + Math.abs(vsLy).toFixed(1) + '%';
-  // Row 2: vs 上月
-  const vsLmCls = vsLm == null ? 'gray' : (vsLm < 0 ? 'red' : 'green');
-  const vsLmStr = vsLm == null
-    ? '—'
-    : (vsLm > 0 ? '↑ ' : '↓ ') + Math.abs(vsLm).toFixed(1) + '%';
-  // Row 3: 出事店数 (red anomaly count). Jym: no plural 's' in Chinese; "1 store" not "1 stores"
-  const anomCls = redAnomCount > 0 ? 'red' : 'green';
-  const anomStr = redAnomCount > 0 ? '⚠ ' + redAnomCount + ' store' : '✓ 0';
-  const anomLabel = redAnomCount > 0 ? '严重落后' : '本月无严重异常';
-
-  const rightHtml = ''
-    + '<div class="s4-hero-side">'
-    +   '<div class="kpi-side-row">'
-    +     '<span class="num ' + vsLyCls + '">' + vsLyStr + '</span>'
-    +     '<span class="label">vs 去年同月</span>'
-    +   '</div>'
-    +   '<div class="kpi-side-row">'
-    +     '<span class="num ' + vsLmCls + '">' + vsLmStr + '</span>'
-    +     '<span class="label">vs 上月</span>'
-    +   '</div>'
-    +   '<div class="kpi-side-row">'
-    +     '<span class="num ' + anomCls + '">' + anomStr + '</span>'
-    +     '<span class="label">' + anomLabel + '</span>'
-    +   '</div>'
-    + '</div>';
+  // Meta lines
+  const targetStr = fmtTargetVal(k.target);
+  const shortfall = k.shortfall;
+  let gapLine = '';
+  if (shortfall != null && def.fmt !== 'pct') {
+    gapLine = shortfall > 0
+      ? '缺口 <strong style="color:var(--s4-red-text)">-' + fmtActual(shortfall).replace('—','') + '</strong>'
+      : '超 <strong style="color:var(--s4-green-text)">+' + fmtActual(Math.abs(shortfall)) + '</strong>';
+  } else if (shortfall != null && def.fmt === 'pct') {
+    gapLine = shortfall > 0
+      ? '差 <strong style="color:var(--s4-red-text)">' + Number(shortfall).toFixed(1) + ' pp</strong>'
+      : '超 <strong style="color:var(--s4-green-text)">' + Number(Math.abs(shortfall)).toFixed(1) + ' pp</strong>';
+  }
+  const vsLm = k.vs_last_month_pct;
+  const vsLmLine = vsLm != null
+    ? 'vs 上月 <strong style="color:' + (vsLm >= 0 ? 'var(--s4-green-text)' : 'var(--s4-red-text)') + '">'
+      + (vsLm >= 0 ? '↑ ' : '↓ ') + Math.abs(vsLm).toFixed(1) + '%</strong>'
+    : '';
+  const noteLine = k._note ? '<span style="color:var(--s4-text-light)">' + escapeHtml(k._note) + '</span>' : '';
 
   return ''
-    + '<div class="s4-hero">'
-    +   '<div class="s4-hero-row">' + leftHtml + rightHtml + '</div>'
+    + '<div class="kpi-card" style="border-top-color:' + statusColor + '">'
+    +   '<div class="kpi-icon">' + def.icon + '</div>'
+    +   '<div class="kpi-title">' + def.title + '</div>'
+    +   '<div class="kpi-actual">' + fmtActual(k.actual) + '</div>'
+    +   '<div class="kpi-status-row">'
+    +     '<span class="kpi-pct" style="color:' + statusColor + '">' + dotIcon + ' ' + pctStr + '</span>'
+    +   '</div>'
+    +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + barPct + '%;background:' + statusColor + '"></div></div>'
+    +   '<div class="kpi-meta">'
+    +     (targetStr ? '目标 <strong>' + targetStr + '</strong><br>' : (k._note ? '' : '目标未设<br>'))
+    +     (gapLine ? gapLine + '<br>' : '')
+    +     (vsLmLine ? vsLmLine : noteLine)
+    +   '</div>'
     + '</div>';
 }
-function renderS4HeroFallback(s, anomalies) {
-  // Use legacy /api/kpi data if sales-owner RPC missing
-  const d = s.data.kpi || {};
-  const t = s.data.targets || {};
-  const target = t.summary?.sales_total || null;
-  const pct = (target && target > 0) ? (d.sales / target * 100) : null;
-  return renderS4Hero({
-    sales: d.sales, target, pct, invoices: d.invoices, units: d.units,
-    aov: d.invoices > 0 ? d.sales / d.invoices : null,
-    shortfall: target != null ? target - d.sales : 0,
-    vs_last_month_pct: (d.last_month_sales > 0) ? (d.sales - d.last_month_sales) / d.last_month_sales * 100 : null,
-    vs_last_year_pct:  (d.last_year_sales  > 0) ? (d.sales - d.last_year_sales)  / d.last_year_sales  * 100 : null,
-    vs_6mo_avg_pct:    (d.six_m_avg_sales  > 0) ? (d.sales - d.six_m_avg_sales)  / d.six_m_avg_sales  * 100 : null,
-  }, anomalies);
-}
+
 
 // Phase 4 hotfix (Bug 3): when the RPC returns a pre-formatted detail
 // string like "实际 RM 5299.00 / 目标 RM 20000.00 / 缺口 RM 14701.00",

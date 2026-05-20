@@ -28,7 +28,9 @@ const LEGACY_VIEWS = ['sales', 'inventory', 'customers', 'floatation', 'products
 const EXT_VIEWS    = ['targets', 'sales-trend', 'sales-daily'];
 // Phase 4 Sales V3 (2026-05-19): Tier 1 / Tier 2 views + drill + actions.
 const PHASE4_VIEWS = ['sales-owner', 'sales-store', 'sales-drill', 'actions'];
-const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS];
+// Phase 5 Owner Overview (2026-05-20): 4-KPI hero.
+const PHASE5_VIEWS = ['overview'];
+const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
 const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
@@ -319,6 +321,29 @@ async function handleSalesDaily(req, res, user, ym, queryBranch) {
 // Phase 4 · Sales Module V3 (Agentic OS · 2-tier) — view handlers
 // ═══════════════════════════════════════════════════════════════════════
 
+// view=overview — Phase 5 Owner Overview 4-KPI hero. Owner only.
+async function handleOverview(req, res, user, ym) {
+  if (user && user.role !== 'owner') {
+    return res.status(403).json({ ok: false, error: 'owner only' });
+  }
+  const { data, error } = await sb().rpc('overview_kpi', { p_ym: ym });
+  if (error) {
+    console.error('[/api/kpi overview] rpc error:', error.message);
+    return res.status(200).json({
+      ok: true, view: 'overview', ym,
+      degraded: true,
+      degraded_reason: 'overview_kpi RPC missing — apply tools/migration_phase5_overview.sql',
+      data: null,
+    });
+  }
+  return res.status(200).json({
+    ok: true, view: 'overview', ym,
+    session_role: user?.role || null,
+    fetched_at: new Date().toISOString(),
+    data,
+  });
+}
+
 // view=sales-owner — Tier 1 Owner overview. Owner only.
 async function handleSalesOwner(req, res, user, ym) {
   if (user && user.role !== 'owner') {
@@ -488,6 +513,8 @@ export default async function handler(req, res) {
     if (view === 'targets')     return handleTargets(req, res, user, ym, queryBranch);
     if (view === 'sales-trend') return handleSalesTrend(req, res, user, ym, queryBranch);
     if (view === 'sales-daily') return handleSalesDaily(req, res, user, ym, queryBranch);
+    // Phase 5 — Owner Overview 4-KPI hero
+    if (view === 'overview')    return handleOverview(req, res, user, ym);
     // Phase 4 — Agentic OS Sales V3 dispatch
     if (view === 'sales-owner') return handleSalesOwner(req, res, user, ym);
     if (view === 'sales-store') return handleSalesStore(req, res, user, ym, queryBranch);
