@@ -809,7 +809,16 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 /* STORE MATRIX — cards stacked, status background */
 .s4-store-row {
   display: grid; gap: 16px;
-  grid-template-columns: 24px minmax(120px, auto) 1fr minmax(160px, auto) minmax(120px, auto) auto;
+  /* Phase 5c (2026-05-20): FIXED column widths so progress bar / amounts /
+     缺口 / 派派 align across every row regardless of store-name length
+     (was minmax(...,auto) on the name col → ragged-edge "锯齿"). */
+  grid-template-columns:
+    32px              /* status dot */
+    260px             /* store name — fixed, ellipsis if longer */
+    1fr               /* progress bar — flexes, but starts at a fixed x */
+    160px             /* amounts (actual + AOV meta) */
+    120px             /* shortfall */
+    72px;             /* 派派 button */
   align-items: center;
   background: var(--s4-card-bg);
   border: 1px solid var(--s4-divider);
@@ -827,7 +836,10 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 .s4-store-row .dot.red   { background: var(--s4-red-text); }
 .s4-store-row .dot.amber { background: var(--s4-amber-text); }
 .s4-store-row .dot.green { background: var(--s4-green-text); }
-.s4-store-row .name  { font-size: 18px; font-weight: 700; color: var(--s4-text-primary); }
+.s4-store-row .name  {
+  font-size: 18px; font-weight: 700; color: var(--s4-text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;  /* Phase 5c */
+}
 .s4-store-row .attrib { font-size: 13px; color: var(--s4-text-meta); margin-top: 4px; grid-column: 2 / -1; }
 .s4-store-row .bar {
   height: 10px; background: rgba(0,0,0,0.06); border-radius: 5px; overflow: hidden;
@@ -3321,6 +3333,22 @@ function drillDeltaCell(cur, comp) {
   return '<span style="color:' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span>';
 }
 
+// Phase 5c Fix C: when EVERY row's 3 comparison fields are null, the
+// dimension has no usable history → show an amber banner explaining WHY
+// (not a silent "—" everywhere). dim: 'customer' | 'supplier' | 'category'.
+function histGapBanner(rows, dim) {
+  if (!Array.isArray(rows) || rows.length === 0) return '';
+  const anyHist = rows.some(r =>
+    r.sales_prev != null || r.sales_last_year != null || r.sales_12mo_avg != null);
+  if (anyHist) return '';
+  const msg = {
+    customer: '客户购买明细历史数据待 sync, 本月对比暂不可用。(customer_buy_lines 表仅 2026-04 1 个月。Apps Script sync 后自动启用。)',
+    category: '品类历史数据不足, 本月对比暂不可用。(sales 表该品类无往月记录。)',
+    supplier: 'OEM/Agency 历史数据不足, 本月对比暂不可用。',
+  }[dim] || '历史数据不足, 本月对比暂不可用。';
+  return '<div class="s4-data-gap" style="margin-bottom:12px">⚠ ' + escapeHtml(msg) + '</div>';
+}
+
 function renderS4Drill(s) {
   const tabs = [
     { id: 'trend12m', label: '12M 趋势' },
@@ -3370,16 +3398,31 @@ function renderS4Drill(s) {
       body = '<div class="s4-data-gap"><strong>数据缺口</strong> · ' + escapeHtml(msg) + '</div>';
     } else if (cached.data?.status === 'ok') {
       if (salesDrillTab === 'category') {
+        // Phase 5c: + vs 上月 / vs 去年同月 / vs 12M 均 (parity w/ customer/supplier)
         const rows = cached.data.rows || [];
-        body = '<table><thead><tr><th>品类</th><th>销售 RM</th><th>单数</th><th>件数</th><th>AOV</th></tr></thead><tbody>'
-             + rows.map(r => '<tr><td>' + escapeHtml(r.category) + '</td><td>' + fmtRM(r.sales) + '</td><td>' + fmtInt(r.invoices) + '</td><td>' + fmtInt(r.units) + '</td><td>' + (r.aov != null ? fmtRMpr(r.aov) : '—') + '</td></tr>').join('')
+        body = histGapBanner(rows, 'category')
+             + '<table><thead><tr>'
+             + '<th>品类</th><th>销售 RM</th><th>单数</th><th>件数</th><th>AOV</th>'
+             + '<th>vs 上月</th><th>vs 去年同月</th><th>vs 12M 均</th>'
+             + '</tr></thead><tbody>'
+             + rows.map(r => '<tr>'
+                 + '<td>' + escapeHtml(r.category) + '</td>'
+                 + '<td>' + fmtRM(r.sales) + '</td>'
+                 + '<td>' + fmtInt(r.invoices) + '</td>'
+                 + '<td>' + fmtInt(r.units) + '</td>'
+                 + '<td>' + (r.aov != null ? fmtRMpr(r.aov) : '—') + '</td>'
+                 + '<td>' + drillDeltaCell(r.sales, r.sales_prev) + '</td>'
+                 + '<td>' + drillDeltaCell(r.sales, r.sales_last_year) + '</td>'
+                 + '<td>' + drillDeltaCell(r.sales, r.sales_12mo_avg) + '</td>'
+               + '</tr>').join('')
              + '</tbody></table>';
       } else if (salesDrillTab === 'customer') {
         // Phase 5b: + vs 上月 / vs 去年同月 / vs 12M 均 columns. RPC returns
         // rows[{cust_type, sales, rows, sales_prev, sales_last_year,
         // sales_12mo_avg}]. Null comparison → "—" (no fake).
         const rows = cached.data.rows || [];
-        body = '<table><thead><tr>'
+        body = histGapBanner(rows, 'customer')
+             + '<table><thead><tr>'
              + '<th>客型</th><th>本月销售 RM</th><th>明细行数</th>'
              + '<th>vs 上月</th><th>vs 去年同月</th><th>vs 12M 均</th>'
              + '</tr></thead><tbody>'
@@ -3400,7 +3443,8 @@ function renderS4Drill(s) {
         if (Array.isArray(cached.data.rows)) {
           const rows = cached.data.rows;
           let total = 0; rows.forEach(r => total += (+r.sales || 0));
-          body = '<table><thead><tr>'
+          body = histGapBanner(rows, 'supplier')
+               + '<table><thead><tr>'
                + '<th>来源</th><th>本月销售 RM</th><th>单数</th>'
                + '<th>vs 上月</th><th>vs 去年同月</th><th>vs 12M 均</th>'
                + '</tr></thead><tbody>'
