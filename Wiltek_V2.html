@@ -1494,6 +1494,16 @@ async function fetchSales(signal) {
 // trendLoadId so a stale response (e.g. month switched mid-load) is
 // discarded silently — matches the AbortController pattern at endpoint level
 // but covers the case where the parent signal is already resolved.
+// Phase 5 hotfix (2026-05-20): Sales drill + 12M trend are sub-modules of
+// the Sales/Overview page. After Phase 5 renamed the owner home to
+// 'overview', these background loaders kept gating on
+// `state.view === 'sales'` and bailed silently → tabs stuck on "Loading".
+// isSalesFamilyView() returns true for BOTH 'sales' (legacy alias) and
+// 'overview' (new owner home), so drill/trend re-render correctly.
+function isSalesFamilyView() {
+  return state.view === 'sales' || state.view === 'overview';
+}
+
 let trendLoadId = 0;
 function loadSalesTrendBackground(month, branch) {
   const myId = ++trendLoadId;
@@ -1503,14 +1513,14 @@ function loadSalesTrendBackground(month, branch) {
     .then(trend => {
       // Stale? user moved on — discard.
       if (myId !== trendLoadId) return;
-      if (state.view !== 'sales') return;
+      if (!isSalesFamilyView()) return;
       if (state.data) state.data.trend = trend;
       renderView();
     })
     .catch(e => {
       if (myId !== trendLoadId) return;
       console.warn('[V2] sales-trend bg load failed:', e && e.message);
-      if (state.view !== 'sales') return;
+      if (!isSalesFamilyView()) return;
       // Attach error marker so renderSalesLayer3 can show a real error
       if (state.data) state.data.trend = { ok: false, error: e && e.message, series: [], branch_series: {} };
       renderView();
@@ -2717,12 +2727,12 @@ function loadSalesDrill(dim) {
     .then(j => {
       if (myId !== drillLoadId) return;
       salesDrillCache[dim] = j;
-      if (state.view === 'sales') renderView();
+      if (isSalesFamilyView()) renderView();
     })
     .catch(e => {
       if (myId !== drillLoadId) return;
       salesDrillCache[dim] = { ok: false, error: e.message, degraded: true };
-      if (state.view === 'sales') renderView();
+      if (isSalesFamilyView()) renderView();
     });
 }
 
@@ -3217,9 +3227,9 @@ function renderS4StoreMatrix(stores, anomalies) {
     const shortfall = row.shortfall;
     const isOver = shortfall < 0;
     const anom = anomByStore[row.store];
-    // Phase 4 hotfix Bug 3: always build attribution client-side via
-    // structured row data. Don't trust RPC pre-formatted detail string.
-    const attrib = buildStoreAttribDetail(row);
+    // Phase 5 hotfix Bug B (2026-05-20): removed the redundant 2nd amount
+    // line "实际 RM X · 目标 RM Y · 缺口 RM Z" — the amounts column +
+    // shortfall column already show all three. attrib no longer rendered.
     const btnLabel = row.status === 'exceeded' ? '复盘' : '派派';
     const recoSeed = anom ? {
       title: anom.title, severity: anom.severity, detail: anom.detail,
@@ -3247,7 +3257,6 @@ function renderS4StoreMatrix(stores, anomalies) {
       +     '<div class="target">/ ' + fmtRM(row.target) + ' · ' + fmtInt(row.invoices || 0) + ' 单 · AOV ' + (row.aov != null ? fmtRMpr(row.aov) : '—') + '</div></div>'
       +   '<div class="shortfall ' + (isOver ? 'green' : 'red') + '">' + (isOver ? '+RM ' : '-RM ') + Math.round(Math.abs(shortfall)).toLocaleString('en-US') + '</div>'
       +   '<div class="row-action"><button class="s4-btn primary" onclick=\'openAssignModal(' + JSON.stringify(recoSeed).replace(/"/g, '&quot;') + ')\'>' + btnLabel + '</button></div>'
-      +   (attrib ? '<div class="attrib">' + escapeHtml(attrib) + '</div>' : '')
       + '</div>';
   }).join('');
 }
