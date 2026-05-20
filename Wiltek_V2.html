@@ -3052,7 +3052,7 @@ function renderSalesOwnerV3(s) {
     + header
     + banner
     + kpiHero
-    + '<div class="s4-section-title">店铺表现 <span class="s4-section-aux">按完成率排序 · 红色优先</span></div>'
+    + '<div class="s4-section-title">店铺表现 <span class="s4-section-aux">按店号排序 · 状态色标注</span></div>'
     + matrix
     + '<div class="s4-section-title">钻取 + Cross-cut</div>'
     + drill
@@ -3211,11 +3211,39 @@ function buildStoreAttribDetail(row) {
        + ' · ' + gapStr;
 }
 
+// Phase 5b (2026-05-20): Store Matrix sorts by store CODE (not pct) and
+// shows store names. Order + names per Jym brief.
+const MATRIX_STORE_ORDER = ['W01','W02','W03','W05','W07','W11','WCO'];
+const MATRIX_STORE_NAME = {
+  W01: 'W01 Pandan Indah',
+  W02: 'W02 Ampang Waterfront',
+  W03: 'W03 Wangsa Maju',
+  W05: 'W05 Bangi Seksyen 7',
+  W07: 'W07 Pandan Jaya',
+  W11: 'W11 Midah Cheras',
+  WCO: 'WCO HQ',
+};
+function matrixStoreLabel(code) {
+  return MATRIX_STORE_NAME[code] || code;
+}
+function sortStoresByCode(stores) {
+  return (stores || []).slice().sort((a, b) => {
+    const ia = MATRIX_STORE_ORDER.indexOf(a.store);
+    const ib = MATRIX_STORE_ORDER.indexOf(b.store);
+    // Unknown codes go to the end, alpha order among themselves.
+    if (ia === -1 && ib === -1) return (a.store || '').localeCompare(b.store || '');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 function renderS4StoreMatrix(stores, anomalies) {
   // Map anomalies keyed by store to inject attribution text
   const anomByStore = {};
   for (const a of anomalies || []) if (a.store) anomByStore[a.store] = a;
-  return stores.map(row => {
+  // Phase 5b: sort by store code (W01→W02→W03→W05→W07→W11→WCO), not pct.
+  return sortStoresByCode(stores).map(row => {
     const sev = row.status === 'critical' ? 'red critical'
               : row.status === 'behind'   ? 'red'
               : row.status === 'exceeded' ? 'green'
@@ -3251,7 +3279,7 @@ function renderS4StoreMatrix(stores, anomalies) {
     return ''
       + '<div class="s4-store-row ' + sev + '">'
       +   '<span class="dot ' + dotCls + '"></span>'
-      +   '<div class="name">' + row.store + '</div>'
+      +   '<div class="name">' + escapeHtml(matrixStoreLabel(row.store)) + '</div>'
       +   '<div class="bar"><span style="width:' + barPct + '%"></span></div>'
       +   '<div class="amounts"><strong>' + fmtRM(row.actual) + '</strong>'
       +     '<div class="target">/ ' + fmtRM(row.target) + ' · ' + fmtInt(row.invoices || 0) + ' 单 · AOV ' + (row.aov != null ? fmtRMpr(row.aov) : '—') + '</div></div>'
@@ -3280,6 +3308,17 @@ function renderS4StoreMatrixFallback(s) {
              aov: branch.invoices > 0 ? branch.sales / branch.invoices : null };
   }).sort((a, b) => (a.pct || 0) - (b.pct || 0));
   return renderS4StoreMatrix(rows, []);
+}
+
+// Phase 5b: drill historical-comparison cell. Given current value + a
+// comparison baseline, returns "↑X.X%" (green) / "↓X.X%" (red) / "—"
+// (when baseline null/0 — no fake per Jym brief).
+function drillDeltaCell(cur, comp) {
+  if (comp == null || comp === 0 || cur == null) return '<span style="color:var(--s4-text-light)">—</span>';
+  const pct = (cur - comp) / Math.abs(comp) * 100;
+  const cls = pct >= 0 ? 'var(--s4-green-text)' : 'var(--s4-red-text)';
+  const arrow = pct >= 0 ? '↑' : '↓';
+  return '<span style="color:' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span>';
 }
 
 function renderS4Drill(s) {
@@ -3336,17 +3375,52 @@ function renderS4Drill(s) {
              + rows.map(r => '<tr><td>' + escapeHtml(r.category) + '</td><td>' + fmtRM(r.sales) + '</td><td>' + fmtInt(r.invoices) + '</td><td>' + fmtInt(r.units) + '</td><td>' + (r.aov != null ? fmtRMpr(r.aov) : '—') + '</td></tr>').join('')
              + '</tbody></table>';
       } else if (salesDrillTab === 'customer') {
+        // Phase 5b: + vs 上月 / vs 去年同月 / vs 12M 均 columns. RPC returns
+        // rows[{cust_type, sales, rows, sales_prev, sales_last_year,
+        // sales_12mo_avg}]. Null comparison → "—" (no fake).
         const rows = cached.data.rows || [];
-        body = '<table><thead><tr><th>客型</th><th>销售 RM</th><th>明细行数</th></tr></thead><tbody>'
-             + rows.map(r => '<tr><td>' + escapeHtml(r.cust_type) + '</td><td>' + fmtRM(r.sales) + '</td><td>' + fmtInt(r.rows) + '</td></tr>').join('')
+        body = '<table><thead><tr>'
+             + '<th>客型</th><th>本月销售 RM</th><th>明细行数</th>'
+             + '<th>vs 上月</th><th>vs 去年同月</th><th>vs 12M 均</th>'
+             + '</tr></thead><tbody>'
+             + rows.map(r => '<tr>'
+                 + '<td>' + escapeHtml(r.cust_type) + '</td>'
+                 + '<td>' + fmtRM(r.sales) + '</td>'
+                 + '<td>' + fmtInt(r.rows) + '</td>'
+                 + '<td>' + drillDeltaCell(r.sales, r.sales_prev) + '</td>'
+                 + '<td>' + drillDeltaCell(r.sales, r.sales_last_year) + '</td>'
+                 + '<td>' + drillDeltaCell(r.sales, r.sales_12mo_avg) + '</td>'
+               + '</tr>').join('')
              + '</tbody></table>';
       } else if (salesDrillTab === 'supplier') {
-        const d = cached.data;
-        body = '<table><thead><tr><th>来源</th><th>销售 RM</th><th>单数</th></tr></thead><tbody>'
-             + '<tr><td>OEM (China)</td><td>' + fmtRM(d.OEM?.sales) + '</td><td>' + fmtInt(d.OEM?.invoices) + '</td></tr>'
-             + '<tr><td>Local Agency (Malaysia)</td><td>' + fmtRM(d.Local_Agency?.sales) + '</td><td>' + fmtInt(d.Local_Agency?.invoices) + '</td></tr>'
-             + '<tr><td><strong>Total</strong></td><td><strong>' + fmtRM(d.total) + '</strong></td><td>—</td></tr>'
-             + '</tbody></table>';
+        // Phase 5b: rows[{bucket, sales, invoices, sales_prev,
+        // sales_last_year, sales_12mo_avg}] + 3 comparison columns.
+        // Backward-compat: if old shape (d.OEM/d.Local_Agency) present,
+        // render that (no comparisons available).
+        if (Array.isArray(cached.data.rows)) {
+          const rows = cached.data.rows;
+          let total = 0; rows.forEach(r => total += (+r.sales || 0));
+          body = '<table><thead><tr>'
+               + '<th>来源</th><th>本月销售 RM</th><th>单数</th>'
+               + '<th>vs 上月</th><th>vs 去年同月</th><th>vs 12M 均</th>'
+               + '</tr></thead><tbody>'
+               + rows.map(r => '<tr>'
+                   + '<td>' + escapeHtml(r.bucket) + '</td>'
+                   + '<td>' + fmtRM(r.sales) + '</td>'
+                   + '<td>' + fmtInt(r.invoices) + '</td>'
+                   + '<td>' + drillDeltaCell(r.sales, r.sales_prev) + '</td>'
+                   + '<td>' + drillDeltaCell(r.sales, r.sales_last_year) + '</td>'
+                   + '<td>' + drillDeltaCell(r.sales, r.sales_12mo_avg) + '</td>'
+                 + '</tr>').join('')
+               + '<tr><td><strong>Total</strong></td><td><strong>' + fmtRM(total) + '</strong></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>'
+               + '</tbody></table>';
+        } else {
+          const d = cached.data;
+          body = '<table><thead><tr><th>来源</th><th>销售 RM</th><th>单数</th></tr></thead><tbody>'
+               + '<tr><td>OEM (China)</td><td>' + fmtRM(d.OEM?.sales) + '</td><td>' + fmtInt(d.OEM?.invoices) + '</td></tr>'
+               + '<tr><td>Local Agency (Malaysia)</td><td>' + fmtRM(d.Local_Agency?.sales) + '</td><td>' + fmtInt(d.Local_Agency?.invoices) + '</td></tr>'
+               + '</tbody></table>';
+        }
       } else {
         body = '<div class="muted">No data</div>';
       }
