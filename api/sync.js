@@ -1540,9 +1540,20 @@ export default async function handler(req, res) {
         const tit = String(body?.title || '').trim();
         const sev = String(body?.severity || 'amber').toLowerCase();
         if (!asn || !tit || !sev) return res.status(400).json({ ok: false, error: 'assignee/title/severity required' });
+        // Phase 4 hotfix (2026-05-20): assigner = role-id, never user.username.
+        //   owner role  → 'owner'
+        //   store mgr   → 'w0X_manager' (derived from user.store)
+        //   future role → fall back to user.role string
+        // Ensures the same string is written here AND queried by the
+        // owner-tier sent-out fetcher (?assigner=role-id).
+        const assignerRoleId =
+          user.role === 'owner' ? 'owner'
+          : (user.store ? String(user.store).toLowerCase() + '_manager'
+          : (user.role ? String(user.role).toLowerCase()
+          : user.username));
         const row = {
           module: m,
-          assigner: user.username,
+          assigner: assignerRoleId,
           assignee: asn,
           title: tit,
           description: body?.description || null,

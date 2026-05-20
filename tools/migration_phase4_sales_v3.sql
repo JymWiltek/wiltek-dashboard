@@ -243,7 +243,7 @@ BEGIN
                                     WHEN 'exceeded' THEN '复盘 ' || store || ' 做对了什么, 推广到他店'
                                     ELSE store || ' 本月追 RM ' || GREATEST(shortfall, 0)::INT END,
            'recommended_assignee',CASE
-                                    WHEN status IN ('critical','exceeded') THEN 'jym'
+                                    WHEN status IN ('critical','exceeded') THEN 'owner'
                                     ELSE LOWER(store) || '_manager' END,
            'recommended_amount',  GREATEST(shortfall, 0),
            'shortfall',           shortfall

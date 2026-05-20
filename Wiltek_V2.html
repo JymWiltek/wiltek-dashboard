@@ -1329,6 +1329,22 @@ function authHeaders() {
   return u && u.username ? { 'x-wp-user': u.username } : {};
 }
 
+/* Phase 4 hotfix (2026-05-20) · Action key 统一 — role-as-id.
+   Owner = 'owner' (not 'jym'). Store managers = 'w0X_manager' derived
+   from user.store. This is the single source of truth for the assigner
+   column and the assignee dropdown / fetch key, ensuring writes and
+   reads use the SAME string regardless of which auth username the user
+   logged in with. Per Jym's directive: role-based, never user-based. */
+function userRoleId(u) {
+  if (!u) return null;
+  if (u.role === 'owner') return 'owner';
+  if (u.store) return String(u.store).toLowerCase() + '_manager';
+  // Future Tier 2 roles (marketing_lead / purchasing_lead / etc) when
+  // they get user records — fall back to whatever role string they have.
+  if (u.role) return String(u.role).toLowerCase();
+  return null;
+}
+
 /* ── Per-view fetchers (each returns the renderer's expected shape) ─ */
 async function getJSON(url, signal) {
   const r = await fetch(url, { signal, cache: 'no-store', headers: authHeaders() });
@@ -1363,17 +1379,20 @@ function monthQuery() {
 
 async function fetchSales(signal) {
   // Phase 4 (2026-05-19) · Agentic OS 2-tier dispatch.
-  // Owner tier loads: kpi + targets + daily + sales-owner + actions(assigner=jym).
-  // Store tier loads:  kpi + targets + daily + sales-store + actions(assignee=me).
+  // Owner tier loads: kpi + targets + daily + sales-owner + actions(assigner=owner).
+  // Store tier loads:  kpi + targets + daily + sales-store + actions(assignee=w0X_manager).
   // 12M trend stays a background fetch (Phase 3 fix 4 — slow leg).
   // All RPC-backed endpoints degrade gracefully: missing migration →
   // degraded:true response so frontend can show banner.
+  // Phase 4 hotfix (2026-05-20): action keys are ALL role-ids (userRoleId)
+  // for consistency between writer (modal) and reader (this fetcher).
+  // Previous bug: writer wrote assigner='owner', reader read assigner='jym'.
   const baseQ   = kpiQuery();
   const dailyQ  = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
   const role    = (state.user && state.user.role) || state.role || 'owner';
-  const userKey = (state.user && state.user.username) || '';
   const tierIsOwner = role === 'owner';
+  const myRoleId = userRoleId(state.user) || 'owner';
 
   // Tier-specific endpoint
   const tierQ = tierIsOwner
@@ -1384,10 +1403,10 @@ async function fetchSales(signal) {
         return p.toString();
       })();
 
-  // Action-list endpoint
+  // Action-list endpoint — role-id keys ONLY (not user.username)
   const actionsQ = tierIsOwner
-    ? new URLSearchParams({ view: 'actions', assigner: userKey || 'jym' }).toString()
-    : new URLSearchParams({ view: 'actions', assignee: userKey }).toString();
+    ? new URLSearchParams({ view: 'actions', assigner: myRoleId }).toString()
+    : new URLSearchParams({ view: 'actions', assignee: myRoleId }).toString();
 
   const [kpi, targets, daily, tier, actions] = await Promise.all([
     getJSON('/api/kpi?' + baseQ,     signal),
@@ -2684,7 +2703,7 @@ function buildAssignModalDom() {
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
   // Assignee options — keep narrow to known active roles
   const assignees = [
-    { value: 'jym',          label: 'Jym (owner / 我自己)' },
+    { value: 'owner',        label: 'Owner (Jym · 我自己)' },
     { value: 'w01_manager',  label: 'W01 店长' },
     { value: 'w02_manager',  label: 'W02 店长' },
     { value: 'w03_manager',  label: 'W03 店长' },
