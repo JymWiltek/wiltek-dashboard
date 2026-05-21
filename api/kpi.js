@@ -33,7 +33,8 @@ const PHASE5_VIEWS = ['overview'];
 // Phase 6 Customer page (2026-05-21): owner BI customer views.
 // Phase 6b (2026-05-21): customer-payload reuses V1's customers_payload RPC
 // (age-tier buckets / churn / cross-tab / top100 VIPs) — same Supabase as V1.
-const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload'];
+// Phase 6c (2026-05-21): age-bucket × category cross-tab (买什么).
+const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload', 'customer-age-category'];
 const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
@@ -339,6 +340,8 @@ async function handleCustomer(req, res, user, ym, view, queryBranch) {
     // Phase 6b: V1's full customer dataset (buckets_by_window / churn /
     // cross_by_window / top100). p_branch null = company; manager = own store.
     'customer-payload':  { rpc: 'customers_payload',          args: { p_month: ym, p_branch: queryBranch || null } },
+    // Phase 6c: 会员入会龄段 × 品类 (main_group) 本月销售矩阵.
+    'customer-age-category': { rpc: 'customer_age_category_crosstab', args: { p_ym: ym } },
   };
   const spec = map[view];
   if (!spec) return res.status(400).json({ ok: false, error: 'bad customer view' });
