@@ -319,7 +319,20 @@ BEGIN
       'dead_top50', COALESCE((SELECT jsonb_agg(jsonb_build_object('item_code',item_code,'main_group',main_group,'store',store,'qty',qty,'amount',amount) ORDER BY amount DESC) FROM sku_dead WHERE rn<=50),'[]'::jsonb),
       'slow_top50', COALESCE((SELECT jsonb_agg(jsonb_build_object('item_code',item_code,'main_group',main_group,'store',store,'qty',qty,'amount',amount) ORDER BY amount DESC) FROM sku_slow WHERE rn<=50),'[]'::jsonb),
       'discontinued_top50', COALESCE((SELECT jsonb_agg(jsonb_build_object('item_code',item_code,'main_group',main_group,'store',store,'qty',qty,'amount',amount) ORDER BY amount DESC) FROM sku_disc WHERE rn<=50),'[]'::jsonb),
-      'a_no_stock', COALESCE((SELECT jsonb_agg(jsonb_build_object('item_code',item_code,'main_group',main_group,'sales_90d_rm',sales_90d_rm,'rank_in_a',rnk) ORDER BY rnk) FROM a_no_stock_detail),'[]'::jsonb)
+      'a_no_stock', COALESCE((SELECT jsonb_agg(jsonb_build_object('item_code',item_code,'main_group',main_group,'sales_90d_rm',sales_90d_rm,'rank_in_a',rnk) ORDER BY rnk) FROM a_no_stock_detail),'[]'::jsonb),
+      -- Phase 7b: 全部 A 类 SKU (308 个) + 是否有库存 (Q5 核心货名单)
+      'a_class_all', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'item_code', ac.item_code, 'main_group', COALESCE(it.main_group,'—'),
+          'sales_90d_rm', ROUND(ac.amt_90d)::int, 'rank_in_a', ac.rnk,
+          'in_stock', EXISTS (
+            SELECT 1 FROM public.inventory_snapshots
+             WHERE snapshot_date = snap_latest AND store IN ('W01','W02','W03','W05','W07','W11')
+               AND item_code = ac.item_code AND qty > 0)
+        ) ORDER BY ac.rnk)
+        FROM (SELECT item_code, amt_90d, rnk FROM abc_classified WHERE abcd='A') ac
+        LEFT JOIN public.items it ON it.item_code = ac.item_code
+      ),'[]'::jsonb)
     ),
 
     'oem_in_transit', jsonb_build_object(
