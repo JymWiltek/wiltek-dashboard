@@ -377,6 +377,76 @@ table.branch-table .mini-bar-fill {
   color: var(--text-light); margin: 24px 0 10px;
 }
 
+/* ═══ Phase 7 — Inventory Owner BI ═══ */
+.inv-section-title { font-size: 18px; font-weight: 700; color: #0F172A; margin: 24px 0 4px; }
+.inv-section-sub { font-size: 13px; color: #6B7280; margin-bottom: 8px; }
+.inv-synth-banner {
+  background: #FEF3C7; border: 1px solid #FDE68A; color: #78350F;
+  padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; line-height: 1.5;
+}
+.inv-hero-card { position: relative; }
+.inv-synth-badge {
+  position: absolute; top: 8px; right: 8px; background: #FEF3C7; color: #92400E;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 3px;
+}
+.inv-hero-sub { display: flex; gap: 12px; font-size: 13px; color: #374151; margin: 2px 0 8px; }
+.inv-hero-pct { color: #6B7280; }
+.inv-5class-table { width: 100%; border-collapse: collapse; margin: 8px 0 24px; }
+.inv-5class-table th, .inv-5class-table td { padding: 10px 14px; border-bottom: 1px solid #E5E7EB; }
+.inv-5class-table th { font-size: 12px; color: #6B7280; text-align: left; letter-spacing: 0.5px; }
+.inv-5class-table td.num, .inv-5class-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-5class-table .cls-cell { font-weight: 600; padding-left: 16px; position: relative; }
+.inv-5class-table .cls-cell::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; }
+.inv-5class-table .cls-green::before { background: #16A34A; }
+.inv-5class-table .cls-amber::before { background: #D97706; }
+.inv-5class-table .cls-red::before   { background: #DC2626; }
+.inv-matrix {
+  display: grid; grid-template-columns: 60px 100px 100px 110px 100px 110px 110px 90px;
+  gap: 0; margin: 8px 0 24px; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #E5E7EB;
+}
+.inv-matrix > div { padding: 10px 12px; border-bottom: 1px solid #F3F4F6; font-variant-numeric: tabular-nums; font-size: 13px; }
+.inv-matrix .h { background: #F9FAFB; font-size: 12px; color: #6B7280; letter-spacing: 0.5px; font-weight: 600; }
+.inv-matrix .store-cell { font-weight: 700; color: #0F172A; }
+.inv-matrix .num { text-align: right; }
+.inv-matrix .deadpct-red   { color: #DC2626; font-weight: 700; background: #FEF2F2; }
+.inv-matrix .deadpct-amber { color: #D97706; font-weight: 600; background: #FFFBEB; }
+.inv-matrix .deadpct-green { color: #16A34A; font-weight: 600; }
+.inv-warehouse-row, .inv-abc-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 8px 0 24px; }
+.inv-warehouse-card, .inv-abc-card { background: #fff; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #E5E7EB; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.wh-code { font-size: 11px; color: #6B7280; letter-spacing: 1px; font-weight: 700; }
+.wh-label { font-size: 14px; color: #374151; font-weight: 600; }
+.wh-value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wh-rows { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #6B7280; margin-top: 4px; }
+.wh-rows > div { display: flex; justify-content: space-between; gap: 8px; }
+.wh-rk { color: #6B7280; }
+.wh-rv { color: #0F172A; font-weight: 500; text-align: right; }
+.inv-abc-alert { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; padding: 10px 14px; border-radius: 6px; margin: 8px 0 12px; font-size: 13px; font-weight: 600; }
+.inv-sku-tabs { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.inv-tab-btn { padding: 8px 14px; background: #fff; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 13px; color: #6B7280; cursor: pointer; transition: 0.15s; }
+.inv-tab-btn:hover { border-color: #94A3B8; }
+.inv-tab-btn.active { background: #0F172A; color: #fff; border-color: #0F172A; }
+.inv-sku-export-row { margin: 4px 0 12px; }
+.inv-csv-btn { padding: 6px 10px; background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.inv-sku-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+.inv-sku-table th, .inv-sku-table td { padding: 8px 12px; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
+.inv-sku-table th { background: #F9FAFB; font-size: 11px; color: #6B7280; letter-spacing: 0.5px; text-align: left; }
+.inv-sku-table th.num, .inv-sku-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-empty { padding: 24px; text-align: center; color: #6B7280; }
+.inv-oem-card { background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB; margin-bottom: 24px; }
+.oem-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-bottom: 1px solid #F3F4F6; }
+.oem-row:last-of-type { border-bottom: 0; }
+.oem-placeholder { font-size: 12px; color: #6B7280; padding: 8px 0; font-style: italic; }
+.inv-actions { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.inv-action-card { background: #fff; padding: 14px 18px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.inv-action-card .action-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.inv-action-card .action-icon { font-size: 14px; }
+.inv-action-card .action-title { font-weight: 600; font-size: 14px; color: #0F172A; }
+.inv-action-card .action-desc { font-size: 13px; color: #374151; margin-bottom: 8px; line-height: 1.5; }
+.inv-action-card .action-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.inv-action-card .action-suggest { font-size: 13px; color: #6B7280; }
+.inv-action-card .action-assign-btn { padding: 6px 12px; background: #16A34A; color: #fff; border: 0; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.inv-action-card .action-assign-btn:hover { background: #15803D; }
+
 /* Today: store table */
 table.store-table {
   width: 100%; border-collapse: collapse; font-size: 13px;
@@ -1584,19 +1654,16 @@ async function fetchToday(signal) {
   return j;
 }
 async function fetchInventory(signal) {
-  // 2 calls in parallel — /api/inventory_dashboard KPIs + alerts.
-  // Bug 3 fix (2026-05-15): branch threaded so owner picker scopes Inventory.
+  // Phase 7 (2026-05-21): Inventory Owner BI — 1 RPC (mode=phase7) returns the
+  // full 8-section payload (hero / 5class / matrix / warehouses / abc /
+  // sku_lists / oem / action_plan). Scope NOT IN (W10/W12/WEX).
   const baseQ = new URLSearchParams();
   if (state.month)  baseQ.set('month', state.month);
   if (state.branch) baseQ.set('branch', state.branch);
-  const base = baseQ.toString();
-  const sep = base ? '&' : '';
-  const [k, a] = await Promise.all([
-    getJSON('/api/inventory_dashboard?' + base + sep + '_=k', signal),
-    getJSON('/api/inventory_dashboard?' + base + sep + 'section=alerts', signal),
-  ]);
-  state.role = k.session_role || state.role;
-  return { kpis: k, alerts: a };
+  baseQ.set('mode', 'phase7');
+  const j = await getJSON('/api/inventory?' + baseQ.toString(), signal);
+  state.role = j.session_role || state.role;
+  return j;
 }
 
 const FETCHERS = {
@@ -3958,194 +4025,305 @@ window.saveTargets = saveTargets;
    Data: /api/inventory_dashboard (kpis + alerts in parallel).
    byte-match V1 Stage 3 + Stage 4 — same endpoint, same numbers.
 ═══════════════════════════════════════════════════════════════════ */
-function renderInventory(s) {
-  // Stage C-orphan (2026-05-16): top-of-page banner when Sheet has SKUs
-  // missing from items master. Click → modal with full list + CSV export.
-  // Per Notion 3620a2d3110081c7a7a0c0173eab6780 — never silent, always
-  // amber tone (not gray — this is an action item, not a passive caveat).
-  const orphan = (s.data && s.data.kpis && s.data.kpis.orphan_alert) || null;
-  const orphanBanner = (orphan && orphan.count > 0)
-    ? '<div class="orphan-banner" onclick="openOrphanModal()" role="button" tabindex="0">'
-    +   '<div class="ob-icon">⚠️</div>'
-    +   '<div class="ob-text">'
-    +     '<strong>' + orphan.count + ' SKU</strong> missing master data'
-    +     ' · 影响 RM ' + (orphan.value_rm || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
-    +     ' · Sheet Raw CS 有这些 code 但 SM master 没有, items 表已 placeholder'
-    +     ' · 添加到 Sheet SM tab 后 cron 自动 propagate'
-    +   '</div>'
-    +   '<div class="ob-cta">查看明细 →</div>'
-    + '</div>'
-    : '';
-
-  const title = orphanBanner
-              + '<h1 class="page-title">Inventory</h1>'
-              + '<p class="page-sub">Snapshot ' + s.month
-              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · Company-wide')
-              + ' · 4 KPI + 4 alerts · /api/inventory_dashboard</p>';
-
-  if (s.loading || !s.data) {
-    return title + '<div class="cards-grid">'
-      + skeletonCard('① Inventory health')
-      + skeletonCard('② Order gap')
-      + skeletonCard('③ Stockout risk')
-      + skeletonCard('④ OEM vs Agency')
-      + '</div>'
-      + '<div class="section-title">Action alerts</div>'
-      + '<div class="cards-grid">'
-      + skeletonCard('① OEM PO calendar')
-      + skeletonCard('② Transfer engine')
-      + skeletonCard('③ Liquidation')
-      + skeletonCard('④ PO anomalies')
-      + '</div>';
-  }
-
-  const k = s.data.kpis || {};
-  const a = s.data.alerts || {};
-  const asOf = k.snapshot_date ? 'snapshot ' + k.snapshot_date : '';
-  const ymPrev = k.ym_prev || '—';
-  // Stage C-synth (2026-05-16): when the snapshot is flagged synthetic in
-  // inventory_snapshots.is_synthetic, hide MoM comparisons (no real prior
-  // month to compare against) and surface a clear honest label per Notion
-  // SOP 3620a2d3110081bc8deef3944a4b8fe4. First real month-end snapshot
-  // expected 2026-05-31; until then the 2026-03-31 / 2026-04-30 rows are
-  // synthetic baselines.
-  const isSynthetic = !!k.is_synthetic;
-
-  // ── KPI 1: Inventory health (5-class breakdown + MoM) ─────────
-  const h = k.health || {};
-  const hClasses = h.classes || {};
-  const order = ['Active', 'Slow', 'Misplaced', 'Dead', 'Discontinued'];
-  // Class rows: hide MoM badge when synthetic (no comparable prior month).
-  const hRows = order.map(cls => {
-    const r = hClasses[cls] || { amount: 0, pct: 0, mom_amount: 0, mom_pct: null };
-    const trailer = isSynthetic ? '' : momBadge(r.mom_amount, r.mom_pct);
-    return kpiRow(cls,
-      fmtMoneyShort(r.amount) + ' (' + fmtPctSign(r.pct) + ')' + trailer);
-  }).join('');
-  const deadAmt = ((hClasses.Dead && hClasses.Dead.amount) || 0) + ((hClasses.Discontinued && hClasses.Discontinued.amount) || 0);
-  const deadPct = h.total_stock ? (deadAmt / h.total_stock * 100) : 0;
-  const k1Class = deadPct > 30 ? 'danger' : deadPct > 20 ? 'warn' : '';
-  const k1Sub = isSynthetic
-    ? '5-class distribution · MoM hidden (synthetic baseline)'
-    : '5-class distribution (MoM vs ' + ymPrev + ')';
-  // K1 wrapper — when synthetic, append a gray honest banner directly
-  // below the headline number, before the 5-class breakdown.
-  const syntheticBanner = isSynthetic
-    ? '<div class="synthetic-banner">⚠️ synthetic baseline · 真月底快照从 2026-05-31 起</div>'
-    : '';
-  const c1 = ''
-    + '<div class="card">'
-    +   '<div class="label">① Inventory health</div>'
-    +   '<div class="value num' + (k1Class ? ' ' + k1Class : '') + '">' + fmtMoneyShort(h.total_stock || 0) + '</div>'
-    +   syntheticBanner
-    +   '<div class="month-tag">' + k1Sub + '</div>'
-    +   '<div class="kpi-rows">' + hRows + '</div>'
-    +   (asOf ? '<div class="as-of">' + asOf + '</div>' : '')
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 7 (2026-05-21) — Inventory · Owner BI 重做.
+   1 RPC (mode=phase7) → 8 sections: SYNTH banner + Hero 4 + 5class +
+   matrix 6×5 + warehouses 3 + ABC + SKU drill tabs + OEM placeholder +
+   Action Plan. 所有数字带 vs 上月; synthetic 标 SYNTH; scope 变化警告。
+═══════════════════════════════════════════════════════════════════ */
+function invSkeleton() {
+  return '<div class="kpi-hero-row">'
+    + '<div class="kpi-card"><div class="skeleton h-value" style="height:32px"></div></div>'.repeat(4)
     + '</div>';
+}
 
-  // ── KPI 2: Order gap (PO vs Sales consumed) ───────────────────
-  const og = k.order_gap || {};
-  const gapNum = +(og.gap || 0);
-  const gapStr = (gapNum >= 0 ? '+' : '-') + fmtMoneyShort(Math.abs(gapNum));
-  const gapClass = gapNum < 0 ? 'danger' : 'ok';
-  const abcd = og.abcd_distribution || {};
-  const abcdStr = ['A', 'B', 'C', 'D'].map(g => g + '=' + (abcd[g] || 0)).join(' / ');
-  const c2 = kpiCard('② Order gap (' + (k.ym_curr || '—') + ')',
-    gapStr,
-    'PO ' + fmtMoneyShort(og.po_curr_amt) + ' · Sales ' + fmtMoneyShort(og.sales_consumed_curr),
-    kpiRow('Next-month projection', fmtMoneyShort(og.next_month_projection)) +
-    kpiRow('ABCD distribution', abcdStr),
-    'baseline: last-month sales × 1.05',
-    gapClass);
+function renderInventory(s) {
+  const title = '<h1 class="page-title">Inventory · Owner BI</h1>'
+              + '<p class="page-sub">月份 ' + s.month
+              + (s.branch ? ' · <strong>' + escapeHtml(s.branch) + '</strong>' : ' · 全公司 (主力 6 + 仓库 3 + HQ)')
+              + ' · 数据颗粒度: 月底快照</p>';
+  if (s.loading || !s.data) return title + invSkeleton();
 
-  // ── KPI 3: Stockout SKU alert (OEM/Agency split) ──────────────
-  const so = k.stockout || {};
-  const oemSo = so.OEM || { already_out: 0, at_risk_14d: 0, at_risk_30d: 0, lead_days: 51 };
-  const agcSo = so.Agency || { already_out: 0, at_risk_14d: 0, at_risk_30d: 0, lead_days: 8 };
-  const soTotal = (oemSo.already_out || 0) + (agcSo.already_out || 0);
-  const soClass = soTotal > 0 ? 'danger' : '';
-  const c3 = kpiCard('③ Stockout SKU alert',
-    soTotal + ' SKU out',
-    'split by source · lead-time differs OEM/Agency',
-    kpiRow('OEM (China · ' + oemSo.lead_days + 'd)',
-      oemSo.already_out + ' out / ' + oemSo.at_risk_14d + ' 14d / ' + oemSo.at_risk_30d + ' 30d') +
-    kpiRow('Agency (MY · ' + agcSo.lead_days + 'd)',
-      agcSo.already_out + ' out / ' + agcSo.at_risk_14d + ' 14d / ' + agcSo.at_risk_30d + ' 30d'),
-    asOf, soClass);
+  const d = s.data;
+  if (d.error) return title + '<div class="s4-data-gap">⚠ ' + escapeHtml(d.error) + '</div>';
 
-  // ── KPI 4: OEM vs Agency ──────────────────────────────────────
-  const ova = k.oem_vs_agency || {};
-  const oem = ova.OEM || {};
-  const agc = ova.Agency || {};
-  const totVal = (oem.stock_value || 0) + (agc.stock_value || 0);
-  const c4 = kpiCard('④ OEM vs Agency',
-    fmtMoneyShort(totVal),
-    'Stock value + dead-rate by source',
-    kpiRow('OEM stock', fmtMoneyShort(oem.stock_value) + ' · dead ' + fmtPctSign(oem.dead_rate_pct)) +
-    kpiRow('Agency stock', fmtMoneyShort(agc.stock_value) + ' · dead ' + fmtPctSign(agc.dead_rate_pct)) +
-    kpiRow('Lead time', 'OEM ' + (oem.lead_days || 51) + 'd · Agency ' + (agc.lead_days || 8) + 'd'),
-    'hard-coded lead · per-SKU pending po_grn multi-mo history');
-
-  // ── Alert 1: OEM PO calendar ──────────────────────────────────
-  const po = a.po_calendar || {};
-  const poRows = (po.by_eta_month || []).slice(0, 4).map(m =>
-    aRow(escapeHtml(m.eta_ym) + ' (' + escapeHtml(m.source || '—') + ')',
-      (m.open_pos || 0) + ' POs · ' + fmtMoneyShort(m.po_amt))
-  ).join('') || aRow('No open POs', '');
-  const a1Tone = (po.open_total || 0) > 0 ? 'warn' : 'ok';
-  const al1 = alertCard('① OEM PO calendar',
-    (po.open_total || 0) + ' open',
-    fmtMoneyShort(po.open_amt) + ' in-transit · lead OEM=51d / Agency=8d',
-    a1Tone, poRows);
-
-  // ── Alert 2: Transfer engine (Misplaced) ──────────────────────
-  const xfer = a.transfer_engine || {};
-  const xferRows = (xfer.top20 || []).slice(0, 5).map(t =>
-    aRow(escapeHtml(t.item_code) + ' ' + t.from_store + '→' + t.to_store,
-      (t.transfer_qty_est || 0) + ' pcs · ' + fmtMoneyShort(t.transfer_value_est))
-  ).join('') || aRow('No transfer opportunities', '');
-  const a2Tone = (xfer.total_opportunities || 0) > 0 ? 'ok' : 'na';
-  const al2 = alertCard('② Transfer engine (Misplaced)',
-    (xfer.total_opportunities || 0) + ' opps',
-    'Release est. ' + fmtMoneyShort(xfer.total_value_est) + ' · top 5 ↓',
-    a2Tone, xferRows);
-
-  // ── Alert 3: Liquidation ──────────────────────────────────────
-  const liq = a.liquidation || {};
-  const tier = liq.by_tier || {};
-  const tier365 = tier.tier_365_plus || { n: 0, amt: 0 };
-  const tier180 = tier.tier_180_365 || { n: 0 };
-  const tier90 = tier.tier_90_180 || { n: 0 };
-  const a3Tone = (liq.total_locked_value || 0) > 100000 ? 'bad'
-              : (liq.total_locked_value || 0) > 10000  ? 'warn' : 'ok';
-  const al3 = alertCard('③ Liquidation candidates (Dead/Disc)',
-    (liq.total_candidates || 0) + ' SKU',
-    'Capital locked ' + fmtMoneyShort(liq.total_locked_value),
-    a3Tone,
-    aRow('365d+', tier365.n + ' (' + fmtMoneyShort(tier365.amt) + ')') +
-    aRow('180-365d', tier180.n + '') +
-    aRow('90-180d', tier90.n + '') +
-    aRow('Discount rec.', '365d+ 50% · 180-365 25% · 90-180 10%'));
-
-  // ── Alert 4: PO anomalies ─────────────────────────────────────
-  const anom = a.po_anomalies || {};
-  const overd = anom.overdue_po || { count: 0 };
-  const deficit = anom.grn_deficit || { count: 0 };
-  const drift = anom.price_drift || { count: 0 };
-  const anomTotal = (overd.count || 0) + (deficit.count || 0) + (drift.count || 0);
-  const a4Tone = anomTotal > 0 ? 'warn' : 'ok';
-  const al4 = alertCard('④ Purchase anomalies',
-    anomTotal + ' issues',
-    null, a4Tone,
-    aRow('Overdue PO (>60d)', overd.count || 0) +
-    aRow('GRN < PO', deficit.count || 0) +
-    aRow('Unit price drift >20%', drift.count || 0));
+  const synthBanner = d.is_synthetic
+    ? '<div class="inv-synth-banner"><strong>⚠️ SYNTH</strong> · ' + escapeHtml(d.snapshot_date || '—')
+      + ' + ' + escapeHtml(d.snapshot_prev_date || '—') + ' 均为系统估算快照, 5/31 起换真月底快照.'
+      + (d.scope_warning ? '<br><strong>scope 警告</strong>: ' + escapeHtml(d.scope_warning) : '')
+      + '</div>'
+    : '';
 
   return title
-    + '<div class="cards-grid">' + c1 + c2 + c3 + c4 + '</div>'
-    + '<div class="section-title">Action alerts · ' + (a.snapshot_date || asOf) + '</div>'
-    + '<div class="cards-grid">' + al1 + al2 + al3 + al4 + '</div>';
+    + synthBanner
+    + renderInvHero(d.hero, d.is_synthetic)
+    + renderInv5Class(d.health_5class)
+    + renderInvMatrix(d.matrix_main6, d.matrix_company_dead_pct)
+    + renderInvWarehouses(d.warehouses)
+    + renderInvABC(d.abc)
+    + renderInvSkuLists(d.sku_lists)
+    + renderInvOemTransit(d.oem_in_transit)
+    + renderInvActionPlan(d.action_plan || []);
 }
+
+// ── Section 1: Hero 4 卡 (无目标进度条, 有 vs 上月 + SYNTH 角标) ──
+function renderInvHero(hero, isSynth) {
+  if (!hero) return '';
+  const defs = [
+    { key: 'total_stock',   icon: '📦', title: '总库存',            invert: true  },
+    { key: 'dead_combined', icon: '💀', title: '死货 (Dead+Disc)',  invert: true,  subSuffix: '% of 总库存' },
+    { key: 'slow',          icon: '🐢', title: '缓销',              invert: true,  subSuffix: '% of 总库存' },
+    { key: 'active',        icon: '✅', title: '健康货 (Active)',    invert: false, subSuffix: '% of 总库存' },
+  ];
+  return '<div class="kpi-hero-row inv-hero">' + defs.map(def => renderInvHeroCard(def, hero[def.key] || {}, isSynth)).join('') + '</div>';
+}
+function renderInvHeroCard(def, k, isSynth) {
+  const momPct = k.mom_pct, momAmt = k.mom_amount;
+  let momColor = 'var(--s4-text-light)', momArrow = '↔';
+  if (momPct != null && Math.abs(momPct) >= 2) {
+    if (momPct > 0) { momArrow = '↑'; momColor = def.invert ? 'var(--s4-red-text)' : 'var(--s4-green-text)'; }
+    else            { momArrow = '↓'; momColor = def.invert ? 'var(--s4-green-text)' : 'var(--s4-red-text)'; }
+  }
+  const amountStr = k.amount == null ? '—' : fmtRM(k.amount);
+  const skuLine = k.sku != null ? fmtInt(k.sku) + ' SKU' : '';
+  const pctLine = (def.subSuffix && k.pct_of_total != null) ? Number(k.pct_of_total).toFixed(1) + def.subSuffix : '';
+  const momLine = momPct != null
+    ? 'vs 上月 <strong style="color:' + momColor + '">' + momArrow + ' ' + Math.abs(momPct).toFixed(1) + '%</strong>'
+    : 'vs 上月 <strong style="color:var(--s4-text-light)">—</strong>';
+  const momAmtLine = (momAmt != null && momAmt !== 0)
+    ? '<span style="color:var(--s4-text-light);font-size:11px"> (' + (momAmt > 0 ? '+' : '') + fmtRM(momAmt) + ')</span>'
+    : '';
+  return ''
+    + '<div class="kpi-card inv-hero-card">'
+    +   (isSynth ? '<span class="inv-synth-badge">SYNTH</span>' : '')
+    +   '<div class="kpi-icon">' + def.icon + '</div>'
+    +   '<div class="kpi-title">' + def.title + '</div>'
+    +   '<div class="kpi-actual">' + amountStr + '</div>'
+    +   '<div class="inv-hero-sub">'
+    +     (skuLine ? '<span>' + skuLine + '</span>' : '')
+    +     (pctLine ? '<span class="inv-hero-pct">' + pctLine + '</span>' : '')
+    +   '</div>'
+    +   '<div class="kpi-meta">' + momLine + momAmtLine + '</div>'
+    + '</div>';
+}
+
+// ── Section 2: 5 段分类详表 ──
+function renderInv5Class(h) {
+  if (!h) return '';
+  const ORDER = ['Active', 'Slow', 'Misplaced', 'Dead', 'Discontinued'];
+  const TONE = { Active: 'green', Slow: 'amber', Misplaced: 'amber', Dead: 'red', Discontinued: 'red' };
+  const LABEL = { Active: 'Active 在转', Slow: 'Slow 缓销', Misplaced: 'Misplaced 错配店', Dead: 'Dead 死货', Discontinued: 'Discontinued 停产' };
+  const rows = ORDER.map(cls => {
+    const k = h[cls] || {};
+    const momPct = k.mom_pct;
+    const momColor = momPct == null ? 'var(--s4-text-light)' : (momPct > 0 ? 'var(--s4-red-text)' : 'var(--s4-green-text)');
+    const momStr = momPct == null ? '—' : (momPct > 0 ? '↑ +' : '↓ ') + momPct.toFixed(1) + '%';
+    return '<tr>'
+      + '<td class="cls-cell cls-' + TONE[cls] + '">' + LABEL[cls] + '</td>'
+      + '<td class="num">' + fmtRM(k.amount || 0) + '</td>'
+      + '<td class="num">' + fmtInt(k.sku || 0) + '</td>'
+      + '<td class="num">' + (k.pct != null ? k.pct.toFixed(1) + '%' : '—') + '</td>'
+      + '<td class="num" style="color:' + momColor + ';font-weight:600">' + momStr + '</td>'
+      + '</tr>';
+  }).join('');
+  return ''
+    + '<div class="inv-section-title">📊 5 段分类 (按 V1 逻辑)</div>'
+    + '<table class="inv-5class-table"><thead><tr><th>分类</th><th class="num">RM</th><th class="num">SKU</th><th class="num">占比</th><th class="num">vs 上月</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>';
+}
+
+// ── Section 3: 主力 6 店 × 5 段 矩阵 ──
+function renderInvMatrix(rows, companyDeadPct) {
+  if (!rows || !rows.length) return '';
+  const hdr = ['店', 'Active', 'Slow', 'Misplaced', 'Dead', 'Disc.', '总 RM', 'Dead%']
+    .map(h => '<div class="h ' + (h === '店' ? '' : 'num') + '">' + h + '</div>').join('');
+  const cells = rows.map(r => {
+    const dp = +r.dead_pct;
+    const dpClass = dp >= 50 ? 'deadpct-red' : dp >= 35 ? 'deadpct-amber' : 'deadpct-green';
+    return '<div class="store-cell">' + escapeHtml(r.store) + '</div>'
+      + '<div class="num">' + fmtRM(r.Active) + '</div>'
+      + '<div class="num">' + fmtRM(r.Slow) + '</div>'
+      + '<div class="num">' + fmtRM(r.Misplaced) + '</div>'
+      + '<div class="num">' + fmtRM(r.Dead) + '</div>'
+      + '<div class="num">' + fmtRM(r.Discontinued) + '</div>'
+      + '<div class="num" style="font-weight:600">' + fmtRM(r.total) + '</div>'
+      + '<div class="num ' + dpClass + '">' + dp.toFixed(1) + '%</div>';
+  }).join('');
+  const sub = '公司平均 Dead% = <strong>' + (companyDeadPct != null ? Number(companyDeadPct).toFixed(1) + '%' : '—') + '</strong> · 阈值: ≥ 50% 红, ≥ 35% 黄';
+  return ''
+    + '<div class="inv-section-title">🏪 主力 6 店 × 5 段 矩阵</div>'
+    + '<div class="inv-section-sub">' + sub + '</div>'
+    + '<div class="inv-matrix">' + hdr + cells + '</div>';
+}
+
+// ── Section 4: 仓库专区 (WLO / WSR / WL1) ──
+function warehouseCard(code, label, value, rows, tone) {
+  const toneColor = { red: '#DC2626', amber: '#D97706', neutral: '#0F172A' }[tone] || '#0F172A';
+  return ''
+    + '<div class="inv-warehouse-card" style="border-top:3px solid ' + toneColor + '">'
+    +   '<div class="wh-code">' + code + '</div>'
+    +   '<div class="wh-label">' + label + '</div>'
+    +   '<div class="wh-value" style="color:' + toneColor + '">' + fmtRM(value || 0) + '</div>'
+    +   '<div class="wh-rows">' + rows.map(r => '<div><span class="wh-rk">' + r[0] + '</span><span class="wh-rv">' + r[1] + '</span></div>').join('') + '</div>'
+    + '</div>';
+}
+function renderInvWarehouses(w) {
+  if (!w) return '';
+  const WLO = w.WLO || {}, WSR = w.WSR || {}, WL1 = w.WL1 || {};
+  const momStr = (o) => o.mom_note ? escapeHtml(o.mom_note) : (o.mom_amount != null ? ((o.mom_amount > 0 ? '↑ +' : '↓ ') + fmtRM(Math.abs(o.mom_amount))) : '—');
+  return ''
+    + '<div class="inv-section-title">🏭 仓库专区</div>'
+    + '<div class="inv-section-sub">业务逻辑独立, 不入主店统计</div>'
+    + '<div class="inv-warehouse-row">'
+    +   warehouseCard('WLO', '🏬 主仓', WLO.amount_rm, [['SKU', fmtInt(WLO.sku || 0) + ' 个'], ['件数', fmtInt(WLO.qty || 0) + ' 件'], ['vs 上月', momStr(WLO)]], 'neutral')
+    +   warehouseCard('WSR', '📋 顾客订货 (等提货)', WSR.amount_rm, [['SKU', fmtInt(WSR.sku || 0) + ' 个'], ['件数', fmtInt(WSR.qty || 0) + ' 件'], ['老化提醒', '(等 5/31 真快照后接老化逻辑)']], 'amber')
+    +   warehouseCard('WL1', '🛑 坏货区 · 总损失', WL1.cost_rm, [['SKU', fmtInt(WL1.sku || 0) + ' 个'], ['件数', fmtInt(WL1.qty || 0) + ' 件'], ['vs 上月', WL1.mom_note ? escapeHtml(WL1.mom_note) : '—']], 'red')
+    + '</div>';
+}
+
+// ── Section 5: ABC 分类 ──
+function abcCard(label, r, tone) {
+  const toneColor = { red: '#DC2626', amber: '#D97706', neutral: '#6B7280' }[tone];
+  return ''
+    + '<div class="inv-abc-card" style="border-top:3px solid ' + toneColor + '">'
+    +   '<div class="wh-label">' + label + '</div>'
+    +   '<div class="wh-value">' + fmtInt(r.sku || 0) + ' SKU</div>'
+    +   '<div class="wh-rows">'
+    +     '<div><span class="wh-rk">90d 销售</span><span class="wh-rv">' + fmtRM(r.sales_90d_rm || 0) + '</span></div>'
+    +     '<div><span class="wh-rk">占比</span><span class="wh-rv">' + (r.pct || 0).toFixed(1) + '%</span></div>'
+    +   '</div>'
+    + '</div>';
+}
+function renderInvABC(abc) {
+  if (!abc) return '';
+  const aNoStock = abc.a_no_stock_company || 0;
+  const aNoStockBanner = aNoStock > 0
+    ? '<div class="inv-abc-alert">🚨 A 类 ' + aNoStock + ' 个 SKU 主力 6 店全部无库存 — 见 SKU 名单</div>'
+    : '';
+  return ''
+    + '<div class="inv-section-title">🎯 ABC 分类 · Top 80% 收入贡献</div>'
+    + '<div class="inv-section-sub">基于近 90 天主力 6 店销售排名</div>'
+    + aNoStockBanner
+    + '<div class="inv-abc-row">'
+    +   abcCard('A 类 · Top 80% 收入', abc.A || {}, 'red')
+    +   abcCard('B 类 · 80-95%', abc.B || {}, 'amber')
+    +   abcCard('C 类 · 长尾 5%', abc.C || {}, 'neutral')
+    + '</div>';
+}
+
+// ── Section 6: SKU 名单 tabs (drill + CSV) ──
+function invSkuTabTable(key) {
+  const rows = (window.__invSkuLists && window.__invSkuLists[key]) || [];
+  if (!rows.length) return '<div class="inv-empty">— 无数据 —</div>';
+  const cols = key === 'a_no_stock'
+    ? [['rank_in_a', '排名'], ['item_code', '物料码'], ['main_group', '主分类'], ['sales_90d_rm', '90d 销售 RM']]
+    : [['item_code', '物料码'], ['main_group', '主分类'], ['store', '店'], ['qty', '件数'], ['amount', 'RM']];
+  const numKeys = new Set(['sales_90d_rm', 'qty', 'amount', 'rank_in_a']);
+  return '<table class="inv-sku-table"><thead><tr>'
+    + cols.map(c => '<th class="' + (numKeys.has(c[0]) ? 'num' : '') + '">' + c[1] + '</th>').join('')
+    + '</tr></thead><tbody>'
+    + rows.map(r => '<tr>' + cols.map(c => {
+        const v = r[c[0]];
+        if (v == null) return '<td>—</td>';
+        if (numKeys.has(c[0])) return '<td class="num">' + (c[0] === 'rank_in_a' ? '#' + v : fmtInt(v)) + '</td>';
+        return '<td>' + escapeHtml(String(v)) + '</td>';
+      }).join('') + '</tr>').join('')
+    + '</tbody></table>';
+}
+function renderInvSkuLists(lists) {
+  if (!lists) return '';
+  // Set globals (JS side — innerHTML-injected <script> would NOT execute).
+  window.__invSkuLists = lists;
+  window.__invActiveTab = 'dead_top50';
+  const tabs = [
+    { key: 'dead_top50', label: '💀 Dead Top 50' },
+    { key: 'slow_top50', label: '🐢 Slow Top 50' },
+    { key: 'discontinued_top50', label: '🚫 Discontinued Top 50' },
+    { key: 'a_no_stock', label: '🚨 A 类无库存 (' + (lists.a_no_stock || []).length + ')' },
+  ];
+  return ''
+    + '<div class="inv-section-title">📋 SKU 名单 (drill)</div>'
+    + '<div class="inv-sku-tabs">'
+    +   tabs.map((t, i) => '<button class="inv-tab-btn ' + (i === 0 ? 'active' : '') + '" onclick="invShowSkuTab(\'' + t.key + '\')" data-tab="' + t.key + '">' + t.label + '</button>').join('')
+    + '</div>'
+    + '<div class="inv-sku-export-row"><button class="inv-csv-btn" onclick="invExportSkuCsv()">📥 CSV 导出当前 tab</button></div>'
+    + '<div id="invSkuTabBody">' + invSkuTabTable('dead_top50') + '</div>';
+}
+window.invShowSkuTab = function(key) {
+  window.__invActiveTab = key;
+  document.querySelectorAll('.inv-tab-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === key));
+  const body = document.getElementById('invSkuTabBody');
+  if (body) body.innerHTML = invSkuTabTable(key);
+};
+window.invExportSkuCsv = function() {
+  const key = window.__invActiveTab || 'dead_top50';
+  const rows = (window.__invSkuLists && window.__invSkuLists[key]) || [];
+  if (!rows.length) { alert('当前 tab 无数据'); return; }
+  const keys = Object.keys(rows[0]);
+  const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => {
+    const v = r[k]; if (v == null) return '';
+    const str = String(v); return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  }).join(','))).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'inventory_' + key + '_' + (new Date().toISOString().slice(0, 10)) + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+};
+
+// ── Section 7: China OEM 在途 (placeholder) ──
+function renderInvOemTransit(o) {
+  if (!o) return '';
+  return ''
+    + '<div class="inv-section-title">🌏 China OEM 在途库存</div>'
+    + '<div class="inv-oem-card">'
+    +   '<div class="oem-row"><span>开放 PO 行数</span><strong>' + fmtInt(o.open_po_lines || 0) + '</strong></div>'
+    +   '<div class="oem-row"><span>在途金额</span><strong>' + fmtRM(o.open_po_amt_rm || 0) + '</strong></div>'
+    +   '<div class="oem-row"><span>Lead time (硬编码)</span><strong>' + (o.lead_days_hardcoded || 51) + ' 天</strong></div>'
+    +   '<div class="oem-placeholder">📊 月度 trend: ' + escapeHtml(o.trend_placeholder || '—') + '</div>'
+    + '</div>';
+}
+
+// ── Section 8: Action Plan (5 类异常 + 派派) ──
+function renderInvActionPlan(actions) {
+  if (!actions || !actions.length) {
+    return '<div class="inv-section-title">⚡ Inventory Action Plan</div><div class="inv-empty">— 今日健康, 暂无异常 —</div>';
+  }
+  window.__invActions = actions;
+  const cards = actions.map((a, i) => {
+    const toneColor = { red: '#DC2626', amber: '#D97706', green: '#16A34A' }[a.severity] || '#6B7280';
+    const icon = { red: '🔴', amber: '🟡', green: '🟢' }[a.severity] || '⚪';
+    return ''
+      + '<div class="inv-action-card" style="border-left:4px solid ' + toneColor + '">'
+      +   '<div class="action-head"><span class="action-icon">' + icon + '</span><span class="action-title">' + escapeHtml(a.title) + '</span></div>'
+      +   '<div class="action-desc">' + escapeHtml(a.desc || '') + '</div>'
+      +   '<div class="action-row">'
+      +     '<span class="action-suggest">→ ' + escapeHtml(a.action || '') + '</span>'
+      +     '<button class="action-assign-btn" onclick="invAssignAction(' + i + ')">📤 派派</button>'
+      +   '</div>'
+      + '</div>';
+  }).join('');
+  return '<div class="inv-section-title">⚡ Inventory Action Plan</div><div class="inv-actions">' + cards + '</div>';
+}
+// 派派: reuse 现有 openAssignModal (Customer/Sales 页同一接口)。
+window.invAssignAction = function(idx) {
+  const a = (window.__invActions || [])[idx];
+  if (!a) return;
+  const store = (a.source_data && a.source_data.store) || null;
+  const seed = {
+    title: a.title,
+    severity: a.severity,
+    detail: a.desc,
+    recommended_action: a.action,
+    recommended_amount: (a.amount_unit === 'RM' && a.amount != null) ? a.amount : null,
+    store: store,
+    source_url: '?view=inventory&month=' + state.month + (store ? '&branch=' + store : ''),
+    source_data: a,
+  };
+  if (typeof openAssignModal === 'function') openAssignModal(seed);
+  else alert('派派接口未就绪');
+};
 
 /* ═══════════════════════════════════════════════════════════════════
    RENDER · CUSTOMERS — Phase 6 Owner BI (2026-05-21)

@@ -219,6 +219,44 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Phase 7 (2026-05-21) — Inventory Owner BI. One RPC returns 8-section
+  // payload (hero / 5class / matrix / warehouses / abc / sku_lists / oem /
+  // action_plan). Scope NOT IN ('W10','W12','WEX'). Owner can ?branch=; manager
+  // pinned to own store. Old mode=dashboard untouched (Today 页可能引用).
+  if (mode === 'phase7') {
+    if (!user) return res.status(401).json({ ok: false, error: 'no session' });
+    const queryBranch = String(req.query?.branch || '').trim().toUpperCase();
+    let p_branch;
+    if (user.role === 'owner') {
+      p_branch = queryBranch || null;
+    } else {
+      if (queryBranch && queryBranch !== user.store) {
+        return res.status(403).json({ ok: false, error: 'branch not allowed for this user' });
+      }
+      p_branch = user.store;
+    }
+    const p_ym = String(req.query?.month || '').trim() || null;
+    try {
+      const { data, error } = await sb().rpc('inventory_phase7_payload', { p_ym, p_branch });
+      if (error) {
+        console.error('[/api/inventory mode=phase7] RPC error:', error);
+        return res.status(500).json({ ok: false, error: error.message });
+      }
+      return res.status(200).json({
+        ok: true,
+        fetched_at: new Date().toISOString(),
+        source: 'supabase:wiltek-portal',
+        session_role: user.role,
+        session_store: user.store,
+        effective_branch: p_branch,
+        ...data,
+      });
+    } catch (e) {
+      console.error('[/api/inventory mode=phase7] catch:', e);
+      return res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+  }
+
   // Default mode — full inventory payload (row-level + classifier).
   // Manager → scope rows[] to own store. Aggregates stay company-wide
   // because the V1.6 4-state classifier needs cross-store sales signal.
