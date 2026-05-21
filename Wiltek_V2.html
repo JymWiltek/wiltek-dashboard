@@ -487,6 +487,12 @@ table.targets-grid input.target-input {
 table.targets-grid input.target-input:focus { outline: none; border-color: var(--brand); }
 table.targets-grid input.target-input.dirty { border-color: var(--warn); background: #FFFCEC; }
 table.targets-grid td.note { font-size: 11px; color: var(--text-light); }
+/* Phase 6f — Race walk-in target sub-table */
+.targets-subhead { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 28px 0 4px; }
+table.targets-grid td.num, table.targets-grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.targets-grid.race-targets input.target-input { width: 90px; }
+table.targets-grid tr.targets-co-row { background: #FFF8E6; font-weight: 700; }
+table.targets-grid tr.targets-co-row td { border-top: 2px solid var(--border); }
 .targets-summary {
   display: grid; gap: 10px; margin-top: 18px;
   grid-template-columns: 1fr 1fr;
@@ -796,6 +802,35 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 .kpi-card .kpi-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
 .kpi-card .kpi-meta { font-size: 13px; color: #6B7280; line-height: 1.6; }
 .kpi-card .kpi-meta strong { color: #111827; font-weight: 600; }
+
+/* Phase 6f — Customer 种族 cards (严格规范: 等高对齐 + 历史对比行) */
+.cust-race-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px;
+}
+@media (max-width: 900px) { .cust-race-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .cust-race-grid { grid-template-columns: 1fr; } }
+.cust-race-card {
+  background: #FFFFFF; border-radius: 12px; padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-top: 4px solid #E5E7EB;
+  display: flex; flex-direction: column; min-height: 320px;
+}
+.cust-race-card .crc-icon  { font-size: 24px; margin-bottom: 8px; }
+.cust-race-card .crc-title { font-size: 14px; color: #6B7280; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; }
+.cust-race-card .crc-big   { font-size: 48px; font-weight: 800; color: #0F172A; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.cust-race-card .crc-big .crc-unit { font-size: 16px; color: #6B7280; font-weight: 400; }
+.cust-race-card .crc-cr    { font-size: 24px; font-weight: 700; margin: 8px 0; font-variant-numeric: tabular-nums; }
+.cust-race-card .crc-bar   { height: 6px; background: #E5E7EB; border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+.cust-race-card .crc-bar > span { display: block; height: 100%; background: #1F5F4A; }
+.cust-race-card .crc-meta  { font-size: 13px; color: #374151; line-height: 1.7; }
+.cust-race-card .crc-meta strong { color: #0F172A; font-weight: 700; }
+.cust-race-card .crc-target { font-size: 13px; color: #374151; margin-top: 6px; }
+.cust-race-card .crc-target strong { color: #0F172A; font-weight: 700; }
+.cust-race-card .crc-foot  { margin-top: auto; }
+.cust-race-card .crc-sep   { border: 0; border-top: 1px solid #E5E7EB; margin: 12px 0 8px; }
+.cust-race-card .crc-hist  { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: #6B7280; }
+.cust-race-card .crc-hist .crc-up   { color: #16A34A; font-weight: 600; }
+.cust-race-card .crc-hist .crc-down { color: #DC2626; font-weight: 600; }
+.cust-race-card .crc-hist .crc-flat { color: #6B7280; font-weight: 600; }
 
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
@@ -1317,6 +1352,14 @@ const TARGET_STORES = {
   WEX: { name: 'WEX · 展览/特殊',             group: 'historical' },
 };
 const TARGET_STORE_ORDER = ['W01','W02','W03','W05','W07','WCO','W10','W11','W12','WEX'];
+// Phase 6f — Race walk-in target editor: 6 主力店 × 4 种族 (公司层自动加总)。
+const RACE_TARGET_STORES = ['W01','W02','W03','W05','W07','W11'];
+const RACE_TARGET_COLS = [
+  { key: 'walkin_chinese', label: 'Chinese' },
+  { key: 'walkin_malay',   label: 'Malay' },
+  { key: 'walkin_indian',  label: 'Indian' },
+  { key: 'walkin_other',   label: 'Other' },
+];
 
 // Phase 2 Sales: store list used by the Layer-1 5-store progress table.
 // (Targets are tracked for active+WCO; we display non-target stores too if
@@ -3741,18 +3784,26 @@ const targetsEditor = {
   lastSaveStatus: null, // { ok: bool, message: string }
 };
 
+function blankTargetRow() {
+  return { sales: null, footfall: null, walkin_chinese: null, walkin_malay: null, walkin_indian: null, walkin_other: null };
+}
+
 function loadTargetsIntoEditor(targetsResp) {
   targetsEditor.ymLoaded = targetsResp.ym;
   targetsEditor.dirty = false;
   targetsEditor.byStore = {};
   for (const code of TARGET_STORE_ORDER) {
-    targetsEditor.byStore[code] = { sales: null, footfall: null };
+    targetsEditor.byStore[code] = blankTargetRow();
   }
   const summary = (targetsResp && targetsResp.summary && targetsResp.summary.by_store) || {};
   for (const code of Object.keys(summary)) {
-    if (!targetsEditor.byStore[code]) targetsEditor.byStore[code] = { sales: null, footfall: null };
+    if (!targetsEditor.byStore[code]) targetsEditor.byStore[code] = blankTargetRow();
     if (summary[code].sales    != null) targetsEditor.byStore[code].sales    = +summary[code].sales || 0;
     if (summary[code].footfall != null) targetsEditor.byStore[code].footfall = +summary[code].footfall || 0;
+    // Phase 6f: race walk-in targets (backend by_store carries any target_type).
+    for (const c of RACE_TARGET_COLS) {
+      if (summary[code][c.key] != null) targetsEditor.byStore[code][c.key] = +summary[code][c.key] || 0;
+    }
   }
 }
 
@@ -3806,6 +3857,38 @@ function renderTargets(s) {
   const footTot = Object.values(targetsEditor.byStore)
     .reduce((a, v) => a + (+v.footfall || 0), 0);
 
+  // Phase 6f — Race Walk-in Targets 表 (6 主力店 × 4 种族 + 公司层自动加总)
+  const raceRows = RACE_TARGET_STORES.map(code => {
+    const meta = TARGET_STORES[code];
+    const cur  = targetsEditor.byStore[code] || blankTargetRow();
+    let rowTot = 0;
+    const inputs = RACE_TARGET_COLS.map(c => {
+      const v = cur[c.key];
+      rowTot += (+v || 0);
+      return '<td><input type="number" min="0" step="1" class="target-input" '
+        + 'data-store="' + code + '" data-type="' + c.key + '" '
+        + 'value="' + (v != null ? v : '') + '" oninput="onTargetEdit(this)" /></td>';
+    }).join('');
+    return '<tr><td class="store-cell">' + escapeHtml(meta ? meta.name : code) + '</td>'
+      + inputs + '<td class="num" id="race-rowtot-' + code + '"><strong>' + fmtInt(rowTot) + '</strong></td></tr>';
+  }).join('');
+  const coTot = {}; RACE_TARGET_COLS.forEach(c => coTot[c.key] = 0);
+  RACE_TARGET_STORES.forEach(code => {
+    const cur = targetsEditor.byStore[code] || {};
+    RACE_TARGET_COLS.forEach(c => { coTot[c.key] += (+cur[c.key] || 0); });
+  });
+  const coAll = RACE_TARGET_COLS.reduce((a, c) => a + coTot[c.key], 0);
+  const coRow = '<tr class="targets-co-row"><td class="store-cell">公司层 (自动)</td>'
+    + RACE_TARGET_COLS.map(c => '<td class="num" id="race-cotot-' + c.key + '"><strong>' + fmtInt(coTot[c.key]) + '</strong></td>').join('')
+    + '<td class="num" id="race-cotot-all"><strong>' + fmtInt(coAll) + '</strong></td></tr>';
+  const raceSection = ''
+    + '<h2 class="targets-subhead">Race Walk-in Targets</h2>'
+    + '<p class="page-sub">6 主力店 × 4 种族走廊客目标 · 公司层自动加总 (SUMIF) · 与上方共用 [Save] 按钮</p>'
+    + '<table class="targets-grid race-targets">'
+    +   '<thead><tr><th>店</th>' + RACE_TARGET_COLS.map(c => '<th class="num">' + c.label + '</th>').join('') + '<th class="num">总</th></tr></thead>'
+    +   '<tbody>' + raceRows + coRow + '</tbody>'
+    + '</table>';
+
   const saveLabel = targetsEditor.saving ? 'Saving…' : (targetsEditor.dirty ? 'Save changes' : 'No unsaved changes');
   const saveStatus = targetsEditor.lastSaveStatus
     ? '<span class="targets-save-status ' + (targetsEditor.lastSaveStatus.ok ? 'ok' : 'bad') + '">'
@@ -3832,6 +3915,7 @@ function renderTargets(s) {
     +   '<thead><tr><th>店</th><th>销售目标 (RM)</th><th>客流目标 (人)</th><th>备注</th></tr></thead>'
     +   '<tbody>' + rows + '</tbody>'
     + '</table>'
+    + raceSection
     + '<div class="targets-summary">'
     +   '<div class="summary-cell"><div class="label">销售目标合计 (10 店)</div>'
     +     '<div class="value">' + fmtRM(salesTot) + '</div></div>'
@@ -3844,7 +3928,7 @@ function onTargetEdit(input) {
   const store = input.getAttribute('data-store');
   const type  = input.getAttribute('data-type');
   const val   = input.value === '' ? null : Number(input.value);
-  if (!targetsEditor.byStore[store]) targetsEditor.byStore[store] = { sales: null, footfall: null };
+  if (!targetsEditor.byStore[store]) targetsEditor.byStore[store] = blankTargetRow();
   targetsEditor.byStore[store][type] = (val == null || isNaN(val)) ? null : val;
   if (!input.classList.contains('dirty')) input.classList.add('dirty');
   if (!targetsEditor.dirty) {
@@ -3862,8 +3946,30 @@ function onTargetEdit(input) {
     summaryCells[0].textContent = fmtRM(salesTot);
     summaryCells[1].textContent = fmtInt(footTot) + ' 人';
   }
+  // Phase 6f: race walk-in edits → recompute per-row + company auto totals inline.
+  if (type && type.indexOf('walkin_') === 0) updateRaceTargetTotals();
 }
 window.onTargetEdit = onTargetEdit;
+
+// Phase 6f — live SUMIF for race walk-in table (per-row 总 + 公司层 row).
+function updateRaceTargetTotals() {
+  const co = {}; RACE_TARGET_COLS.forEach(c => co[c.key] = 0);
+  RACE_TARGET_STORES.forEach(code => {
+    const cur = targetsEditor.byStore[code] || {};
+    let rowTot = 0;
+    RACE_TARGET_COLS.forEach(c => { const v = +cur[c.key] || 0; co[c.key] += v; rowTot += v; });
+    const el = document.getElementById('race-rowtot-' + code);
+    if (el) el.innerHTML = '<strong>' + fmtInt(rowTot) + '</strong>';
+  });
+  let all = 0;
+  RACE_TARGET_COLS.forEach(c => {
+    const el = document.getElementById('race-cotot-' + c.key);
+    if (el) el.innerHTML = '<strong>' + fmtInt(co[c.key]) + '</strong>';
+    all += co[c.key];
+  });
+  const allEl = document.getElementById('race-cotot-all');
+  if (allEl) allEl.innerHTML = '<strong>' + fmtInt(all) + '</strong>';
+}
 
 function applyTargetsTemplate(kind) {
   // Need last-month targets for "copy_last" / "last_x_105". We have them
@@ -3872,7 +3978,7 @@ function applyTargetsTemplate(kind) {
   const ymPrev = ymLastMonth(state.month);
   if (kind === 'clear') {
     for (const code of TARGET_STORE_ORDER) {
-      targetsEditor.byStore[code] = { sales: null, footfall: null };
+      targetsEditor.byStore[code] = blankTargetRow();
     }
     targetsEditor.dirty = true;
     renderView();
@@ -3887,11 +3993,15 @@ function applyTargetsTemplate(kind) {
       const factor = (kind === 'last_x_105') ? 1.05 : 1.0;
       for (const code of TARGET_STORE_ORDER) {
         const meta = TARGET_STORES[code];
-        if (!targetsEditor.byStore[code]) targetsEditor.byStore[code] = { sales: null, footfall: null };
+        if (!targetsEditor.byStore[code]) targetsEditor.byStore[code] = blankTargetRow();
         const src = by[code] || {};
         // Historical stores stay 0 if Jym originally set 0 last month.
         targetsEditor.byStore[code].sales    = (src.sales    != null) ? Math.round(src.sales    * factor) : (meta.group === 'historical' ? 0 : null);
         targetsEditor.byStore[code].footfall = (src.footfall != null) ? Math.round(src.footfall * factor) : (meta.group === 'historical' ? 0 : null);
+        // Phase 6f: also carry race walk-in targets through the template.
+        for (const c of RACE_TARGET_COLS) {
+          targetsEditor.byStore[code][c.key] = (src[c.key] != null) ? Math.round(src[c.key] * factor) : null;
+        }
       }
       targetsEditor.dirty = true;
       renderView();
@@ -3914,6 +4024,10 @@ async function saveTargets() {
     const v = targetsEditor.byStore[code] || {};
     if (v.sales    != null) targets.push({ store: code, target_type: 'sales',    target_value: +v.sales });
     if (v.footfall != null) targets.push({ store: code, target_type: 'footfall', target_value: +v.footfall });
+    // Phase 6f: race walk-in targets (only the 6 race stores carry these).
+    for (const c of RACE_TARGET_COLS) {
+      if (v[c.key] != null) targets.push({ store: code, target_type: c.key, target_value: +v[c.key] });
+    }
   }
   if (targets.length === 0) {
     targetsEditor.saving = false;
@@ -4437,6 +4551,16 @@ function renderCustomerActionPlan(s) {
 }
 
 // 种族 4 cards — data display (no status border)
+// Phase 6f: vs-comparison span — ↑绿 / ↓红 / 持平(差<2%)灰 ↔. base 空/0 → —.
+// 走廊客 walk-in 越多越好, 故 ↑ = 绿。
+function histPctSpan(label, cur, base) {
+  if (base == null || base === 0) return '<span>' + label + ' —</span>';
+  const pct = (cur - base) / base * 100;
+  const cls = pct > 2 ? 'crc-up' : pct < -2 ? 'crc-down' : 'crc-flat';
+  const arrow = pct > 2 ? '↑' : pct < -2 ? '↓' : '↔';
+  return '<span>' + label + ' <span class="' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span></span>';
+}
+
 function renderCustomerRaceCards(s) {
   const resp = s.data.race || {};
   if (resp.degraded || !resp.data) {
@@ -4445,33 +4569,39 @@ function renderCustomerRaceCards(s) {
   const races = Array.isArray(resp.data.races) ? resp.data.races : [];
   const byRace = {}; races.forEach(r => byRace[r.race] = r);
   const cards = RACE_ORDER.map(rk => {
-    const r = byRace[rk] || { walkin: 0, purchases: 0, closing_rate: null, revenue: 0, revenue_pct: null, avg_basket: null, walkin_pct: null, walkin_target: null, walkin_target_pct: null };
+    const r = byRace[rk] || {};
     const meta = RACE_META[rk];
     const cr = r.closing_rate;
+    const crColor = cr == null ? '#6B7280' : cr >= 80 ? '#16A34A' : cr >= 60 ? '#D97706' : '#DC2626';
     const barPct = Math.min(100, cr || 0);
-    // Phase 6b: 走廊客 target line (null → 「目标待设」, no fabricated numbers).
+    const tgtColor = r.walkin_target_pct == null ? '#6B7280'
+      : r.walkin_target_pct >= 100 ? '#16A34A' : r.walkin_target_pct >= 80 ? '#D97706' : '#DC2626';
     const targetLine = (r.walkin_target != null)
-      ? '<br>走廊客目标 <strong>' + fmtInt(r.walkin_target) + '</strong> · 进度 '
-        + (r.walkin_target_pct != null
-            ? '<strong style="color:' + (r.walkin_target_pct >= 100 ? 'var(--s4-green-text)' : r.walkin_target_pct >= 80 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)') + '">' + r.walkin_target_pct.toFixed(0) + '%</strong>'
-            : '—')
-      : '<br><span style="color:var(--s4-text-light)">走廊客目标待设</span>';
+      ? '走廊客目标 <strong>' + fmtInt(r.walkin_target) + '</strong> · 进度 <strong style="color:' + tgtColor + '">'
+        + (r.walkin_target_pct != null ? r.walkin_target_pct.toFixed(0) + '%' : '—') + '</strong>'
+      : '<span style="color:#9CA3AF">走廊客目标待设</span>';
+    const hist = '<div class="crc-hist">'
+      + histPctSpan('vs 上月', r.walkin || 0, r.walkin_prev)
+      + '<span>vs 去年 —</span>'
+      + histPctSpan('vs 3月均', r.walkin || 0, r.walkin_3mo_avg)
+      + '</div>';
     return ''
-      + '<div class="kpi-card" style="border-top-color:var(--s4-text-light)">'
-      +   '<div class="kpi-icon">' + meta.icon + '</div>'
-      +   '<div class="kpi-title">' + meta.label + '</div>'
-      +   '<div class="kpi-actual">' + fmtInt(r.walkin) + ' <span style="font-size:14px;color:var(--s4-text-meta);font-weight:400">人</span></div>'
-      +   '<div class="kpi-status-row"><span class="kpi-pct" style="color:var(--s4-text-primary)">' + (cr != null ? cr.toFixed(1) + '%' : '—') + ' 成交</span></div>'
-      +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + barPct + '%;background:var(--brand)"></div></div>'
-      +   '<div class="kpi-meta">'
-      +     '购买 <strong>' + fmtInt(r.purchases) + '</strong> 人 · 占客流 ' + (r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
-      +     'Revenue <strong>' + fmtRM(r.revenue) + '</strong> (' + (r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
+      + '<div class="cust-race-card">'
+      +   '<div class="crc-icon">' + meta.icon + '</div>'
+      +   '<div class="crc-title">' + meta.label + '</div>'
+      +   '<div class="crc-big">' + fmtInt(r.walkin || 0) + ' <span class="crc-unit">人</span></div>'
+      +   '<div class="crc-cr" style="color:' + crColor + '">' + (cr != null ? cr.toFixed(1) + '% 成交' : '— 成交') + '</div>'
+      +   '<div class="crc-bar"><span style="width:' + barPct + '%"></span></div>'
+      +   '<div class="crc-meta">'
+      +     '购买 <strong>' + fmtInt(r.purchases || 0) + '</strong> 人 · 占客流 ' + (r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
+      +     'Revenue <strong>' + fmtRM(r.revenue || 0) + '</strong> (' + (r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
       +     'Avg Basket <strong>' + (r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
-      +     targetLine
       +   '</div>'
+      +   '<div class="crc-target">' + targetLine + '</div>'
+      +   '<div class="crc-foot"><hr class="crc-sep">' + hist + '</div>'
       + '</div>';
   }).join('');
-  return '<div class="kpi-hero-row">' + cards + '</div>';
+  return '<div class="cust-race-grid">' + cards + '</div>';
 }
 
 // 6 店 × 4 种族 matrix — table, closing% color-coded
@@ -4494,7 +4624,17 @@ function renderCustomerStoreRaceMatrix(s) {
     if (rc.walkin >= 5 && cr != null) {
       color = cr >= 80 ? 'var(--s4-green-text)' : cr >= 60 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)';
     }
-    return '<span title="Revenue ' + fmtRM(rc.revenue) + ' · AOV ' + (rc.purchases > 0 ? fmtRMpr(rc.revenue / rc.purchases) : '—') + '">'
+    // Phase 6f: tooltip 加 vs 上月 成交 (pp) + walk-in (%)。
+    let tip = 'Revenue ' + fmtRM(rc.revenue) + ' · AOV ' + (rc.purchases > 0 ? fmtRMpr(rc.revenue / rc.purchases) : '—');
+    if (rc.closing_prev != null && cr != null) {
+      const dpp = cr - rc.closing_prev;
+      tip += ' · vs 上月成交 ' + (dpp >= 0 ? '+' : '') + dpp.toFixed(1) + 'pp';
+    }
+    if (rc.walkin_prev != null && rc.walkin_prev > 0) {
+      const wd = (rc.walkin - rc.walkin_prev) / rc.walkin_prev * 100;
+      tip += ' · vs 上月客流 ' + (wd >= 0 ? '+' : '') + wd.toFixed(0) + '%';
+    }
+    return '<span title="' + tip + '">'
       + fmtInt(rc.walkin) + ' → ' + fmtInt(rc.purchases)
       + (cr != null ? ' <span style="color:' + color + '">(' + cr.toFixed(0) + '%)</span>' : '')
       + '</span>';
