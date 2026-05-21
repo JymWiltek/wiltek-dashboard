@@ -30,7 +30,9 @@ const EXT_VIEWS    = ['targets', 'sales-trend', 'sales-daily'];
 const PHASE4_VIEWS = ['sales-owner', 'sales-store', 'sales-drill', 'actions'];
 // Phase 5 Owner Overview (2026-05-20): 4-KPI hero.
 const PHASE5_VIEWS = ['overview'];
-const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS];
+// Phase 6 Customer page (2026-05-21): owner BI customer views.
+const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member'];
+const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
 const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
@@ -321,6 +323,38 @@ async function handleSalesDaily(req, res, user, ym, queryBranch) {
 // Phase 4 · Sales Module V3 (Agentic OS · 2-tier) — view handlers
 // ═══════════════════════════════════════════════════════════════════════
 
+// Phase 6 — Customer page (owner BI). 5 sub-views map to 5 RPCs.
+async function handleCustomer(req, res, user, ym, view, queryBranch) {
+  if (user && user.role !== 'owner') {
+    return res.status(403).json({ ok: false, error: 'owner only' });
+  }
+  const map = {
+    'customer-overview': { rpc: 'customer_overview_kpi',      args: { p_ym: ym } },
+    'customer-race':     { rpc: 'customer_by_race',           args: { p_ym: ym, p_store: queryBranch || null } },
+    'customer-matrix':   { rpc: 'customer_store_race_matrix', args: { p_ym: ym } },
+    'customer-trend':    { rpc: 'customer_trend',             args: { p_ym: ym } },
+    'customer-member':   { rpc: 'customer_member_analysis',   args: { p_ym: ym } },
+  };
+  const spec = map[view];
+  if (!spec) return res.status(400).json({ ok: false, error: 'bad customer view' });
+  const { data, error } = await sb().rpc(spec.rpc, spec.args);
+  if (error) {
+    console.error('[/api/kpi ' + view + '] rpc error:', error.message);
+    return res.status(200).json({
+      ok: true, view, ym,
+      degraded: true,
+      degraded_reason: spec.rpc + ' RPC missing — apply tools/migration_phase6_customer.sql',
+      data: null,
+    });
+  }
+  return res.status(200).json({
+    ok: true, view, ym,
+    session_role: user?.role || null,
+    fetched_at: new Date().toISOString(),
+    data,
+  });
+}
+
 // view=overview — Phase 5 Owner Overview 4-KPI hero. Owner only.
 async function handleOverview(req, res, user, ym) {
   if (user && user.role !== 'owner') {
@@ -515,6 +549,8 @@ export default async function handler(req, res) {
     if (view === 'sales-daily') return handleSalesDaily(req, res, user, ym, queryBranch);
     // Phase 5 — Owner Overview 4-KPI hero
     if (view === 'overview')    return handleOverview(req, res, user, ym);
+    // Phase 6 — Customer page (owner only)
+    if (view.startsWith('customer-')) return handleCustomer(req, res, user, ym, view, queryBranch);
     // Phase 4 — Agentic OS Sales V3 dispatch
     if (view === 'sales-owner') return handleSalesOwner(req, res, user, ym);
     if (view === 'sales-store') return handleSalesStore(req, res, user, ym, queryBranch);

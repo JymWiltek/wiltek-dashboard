@@ -1548,9 +1548,20 @@ async function fetchTargets(signal) {
   return j;
 }
 async function fetchCustomers(signal) {
-  const j = await getJSON('/api/kpi?' + kpiQuery(), signal);
-  state.role = j.session_role || state.role;
-  return j.data;
+  // Phase 6 (2026-05-21): Customer page Owner BI. Parallel-fetch 5 views.
+  // Each degrades gracefully (degraded:true) if migration not applied.
+  const m = state.month;
+  const raceQ = new URLSearchParams({ view: 'customer-race', month: m });
+  if (state.branch) raceQ.set('branch', state.branch);
+  const [overview, race, matrix, trend, member] = await Promise.all([
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-overview', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-trend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-member', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+  ]);
+  if (overview && overview.session_role) state.role = overview.session_role;
+  return { overview, race, matrix, trend, member };
 }
 async function fetchProducts(signal) {
   const j = await getJSON('/api/products' + monthBranchQuery(), signal);
@@ -4127,84 +4138,237 @@ function renderInventory(s) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   RENDER · CUSTOMERS  (Stage B)
-   3 KPI from /api/kpi?view=customers (members / member_sales / walk_in_sales)
-   + 4 alerts as placeholders (V1 also pending for most; data not in /api/kpi).
+   RENDER · CUSTOMERS — Phase 6 Owner BI (2026-05-21)
+   4-KPI hero (walk-in/closing/basket/revenue) · 种族 4 cards · 6 店×4 种族
+   matrix · trend+cross-cut tabs · Action Plan placeholder. Owner only.
+   Data: /api/kpi customer-overview/race/matrix/trend/member (5 RPCs).
 ═══════════════════════════════════════════════════════════════════ */
+const RACE_META = {
+  chinese: { icon: '🀄', label: 'Chinese 走廊客' },
+  malay:   { icon: '🕌', label: 'Malay 走廊客' },
+  indian:  { icon: '🪔', label: 'Indian 走廊客' },
+  other:   { icon: '🌏', label: 'Other 走廊客' },
+};
+const RACE_ORDER = ['chinese', 'malay', 'indian', 'other'];
+
+let customerTab = 'trend12m'; // trend12m | racetrend | member | memberbuy
+function setCustomerTab(t) { customerTab = t; renderView(); }
+window.setCustomerTab = setCustomerTab;
+
 function renderCustomers(s) {
-  const title = '<h1 class="page-title">Customers</h1>'
-              + '<p class="page-sub">Snapshot ' + s.month
-              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · All stores')
-              + ' · 3 KPI + 4 alerts · /api/kpi?view=customers</p>';
+  // Owner-only (Tier 2 customer view = future sprint).
+  if (s.role && s.role !== 'owner') {
+    return '<div class="sales-v3"><h1 class="s4-title">Customer</h1>'
+      + '<div class="s4-data-gap">Tier 2 客户视角下个 sprint。当前仅 owner。</div></div>';
+  }
+  const header = ''
+    + '<div class="s4-page-header">'
+    +   '<div><h1 class="s4-title">Customer · Owner BI</h1>'
+    +     '<div class="s4-sub">月份 ' + s.month + ' · 数据颗粒度: 日 (floatation) + 月 (customer_buy_lines)</div></div>'
+    +   '<button class="s4-btn primary" onclick="openAssignModal({module:\'customer\'})">⊕ 派派</button>'
+    + '</div>';
 
   if (s.loading || !s.data) {
-    return title + '<div class="cards-grid">'
-      + skeletonCard('① Members')
-      + skeletonCard('② Member sales')
-      + skeletonCard('③ Walk-in sales')
-      + '</div>'
-      + '<div class="section-title">Action alerts</div>'
-      + '<div class="cards-grid">'
-      + skeletonCard('① Sleeping Top 50')
-      + skeletonCard('② Pro segments')
-      + skeletonCard('③ Churn risk')
-      + skeletonCard('④ Race cross-tab')
-      + '</div>';
+    return '<div class="sales-v3">' + header
+      + '<div class="kpi-hero-row">'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="height:32px"></div></div>'.repeat(4)
+      + '</div></div>';
   }
 
-  const d = s.data;
-  const ymPrev = ymLastMonth(s.month);
-  const ymYr   = ymLastYear(s.month);
+  return '<div class="sales-v3">'
+    + header
+    + renderCustomerKpiRow(s)
+    + '<div class="s4-section-title">种族拆分 <span class="s4-section-aux">本月走廊客 by race</span></div>'
+    + renderCustomerRaceCards(s)
+    + '<div class="s4-section-title">6 店 × 种族表现矩阵 <span class="s4-section-aux">walk-in → 购买 (成交率)</span></div>'
+    + renderCustomerStoreRaceMatrix(s)
+    + '<div class="s4-section-title">趋势 + Cross-cut</div>'
+    + renderCustomerTabs(s)
+    + '<div class="s4-section-title">Action Plan <span class="s4-section-aux">异常检测 placeholder (Sprint 9+ 跨页面归因)</span></div>'
+    + renderCustomerActionPlaceholder(s);
+}
 
-  // ── KPI 1: Members (count) ─────────────────────────────────────
-  const c1 = ''
-    + '<div class="card">'
-    +   '<div class="label">① Active members</div>'
-    +   '<div class="value num">' + fmtInt(d.members || 0) + ' <span class="unit">people</span></div>'
-    +   '<div class="month-tag">distinct member customers in ' + s.month + '</div>'
-    +   '<div class="compare"><div class="row"><span>distinct_customers (sales table)</span><span class="delta-flat">' + fmtInt(d.members) + '</span></div></div>'
-    + '</div>';
+// 4-KPI hero — reuse renderOverviewKpiCard
+function renderCustomerKpiRow(s) {
+  const resp = s.data.overview || {};
+  const kpis = (resp.data && resp.data.kpis) || null;
+  const banner = (!kpis || resp.degraded)
+    ? '<div class="s4-data-gap" style="margin-bottom:12px"><strong>customer_overview_kpi RPC 未部署</strong> · <code>tools/migration_phase6_customer.sql</code> 待 apply</div>'
+    : '';
+  const defs = [
+    { key: 'walkin',              icon: '👥', title: 'Walk-in Total',       fmt: 'int' },
+    { key: 'closing_rate',        icon: '🎯', title: 'Closing Rate',        fmt: 'pct' },
+    { key: 'basket_size',         icon: '🛍', title: 'Basket Size (AOV)',    fmt: 'rm'  },
+    { key: 'revenue_from_walkin', icon: '💵', title: 'Revenue from Walk-in', fmt: 'rm'  },
+  ];
+  const cards = defs.map(def => renderOverviewKpiCard(def, (kpis && kpis[def.key]) || { status: 'gray' })).join('');
+  return banner + '<div class="kpi-hero-row">' + cards + '</div>';
+}
 
-  // ── KPI 2: Member sales ────────────────────────────────────────
-  const c2 = ''
-    + '<div class="card">'
-    +   '<div class="label">② Member sales</div>'
-    +   '<div class="value num">' + fmtRM(d.member_sales) + '</div>'
-    +   '<div class="month-tag">RM through enrolled members</div>'
-    +   '<div class="compare">'
-    +     deltaCell(d.member_sales, d.last_month_member_sales, 'vs ' + ymPrev,  fmtRM)
-    +     deltaCell(d.member_sales, d.last_year_member_sales,  'vs ' + ymYr,    fmtRM)
-    +     deltaCell(d.member_sales, d.six_m_avg_member_sales,  'vs 6-mo avg',   fmtRM)
-    +   '</div>'
-    + '</div>';
+// 种族 4 cards — data display (no status border)
+function renderCustomerRaceCards(s) {
+  const resp = s.data.race || {};
+  if (resp.degraded || !resp.data) {
+    return '<div class="s4-data-gap">customer_by_race RPC 未部署 · 待 migration apply</div>';
+  }
+  const races = Array.isArray(resp.data.races) ? resp.data.races : [];
+  const byRace = {}; races.forEach(r => byRace[r.race] = r);
+  const cards = RACE_ORDER.map(rk => {
+    const r = byRace[rk] || { walkin: 0, purchases: 0, closing_rate: null, revenue: 0, revenue_pct: null, avg_basket: null, walkin_pct: null };
+    const meta = RACE_META[rk];
+    const cr = r.closing_rate;
+    const barPct = Math.min(100, cr || 0);
+    return ''
+      + '<div class="kpi-card" style="border-top-color:var(--s4-text-light)">'
+      +   '<div class="kpi-icon">' + meta.icon + '</div>'
+      +   '<div class="kpi-title">' + meta.label + '</div>'
+      +   '<div class="kpi-actual">' + fmtInt(r.walkin) + ' <span style="font-size:14px;color:var(--s4-text-meta);font-weight:400">人</span></div>'
+      +   '<div class="kpi-status-row"><span class="kpi-pct" style="color:var(--s4-text-primary)">' + (cr != null ? cr.toFixed(1) + '%' : '—') + ' 成交</span></div>'
+      +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + barPct + '%;background:var(--brand)"></div></div>'
+      +   '<div class="kpi-meta">'
+      +     '购买 <strong>' + fmtInt(r.purchases) + '</strong> 人 · 占客流 ' + (r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
+      +     'Revenue <strong>' + fmtRM(r.revenue) + '</strong> (' + (r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
+      +     'Avg Basket <strong>' + (r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
+      +   '</div>'
+      + '</div>';
+  }).join('');
+  return '<div class="kpi-hero-row">' + cards + '</div>';
+}
 
-  // ── KPI 3: Walk-in sales (data fact: 2026-04 has 0 walk-ins) ──
-  const c3 = ''
-    + '<div class="card">'
-    +   '<div class="label">③ Walk-in sales</div>'
-    +   '<div class="value num">' + fmtRM(d.walk_in_sales) + '</div>'
-    +   '<div class="month-tag">' + fmtInt(d.walk_in_invoices || 0) + ' invoices · non-member</div>'
-    +   '<div class="compare">'
-    +     deltaCell(d.walk_in_sales, d.last_month_walk_in_sales, 'vs ' + ymPrev,  fmtRM)
-    +     deltaCell(d.walk_in_sales, d.last_year_walk_in_sales,  'vs ' + ymYr,    fmtRM)
-    +     deltaCell(d.walk_in_sales, d.six_m_avg_walk_in_sales,  'vs 6-mo avg',   fmtRM)
-    +   '</div>'
-    + '</div>';
+// 6 店 × 4 种族 matrix — table, closing% color-coded
+function renderCustomerStoreRaceMatrix(s) {
+  const resp = s.data.matrix || {};
+  if (resp.degraded || !resp.data) {
+    return '<div class="s4-data-gap">customer_store_race_matrix RPC 未部署 · 待 migration apply</div>';
+  }
+  const matrix = Array.isArray(resp.data.matrix) ? resp.data.matrix : [];
+  const sorted = matrix.slice().sort((a, b) => {
+    const ia = MATRIX_STORE_ORDER.indexOf(a.store), ib = MATRIX_STORE_ORDER.indexOf(b.store);
+    if (ia === -1 && ib === -1) return (a.store||'').localeCompare(b.store||'');
+    if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib;
+  });
+  const cell = (rc) => {
+    if (!rc || (!rc.walkin && !rc.purchases)) return '<span style="color:var(--s4-text-light)">—</span>';
+    const cr = rc.closing_rate;
+    // color only when sample >= 5 walk-in
+    let color = 'var(--s4-text-primary)';
+    if (rc.walkin >= 5 && cr != null) {
+      color = cr >= 80 ? 'var(--s4-green-text)' : cr >= 60 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)';
+    }
+    return '<span title="Revenue ' + fmtRM(rc.revenue) + ' · AOV ' + (rc.purchases > 0 ? fmtRMpr(rc.revenue / rc.purchases) : '—') + '">'
+      + fmtInt(rc.walkin) + ' → ' + fmtInt(rc.purchases)
+      + (cr != null ? ' <span style="color:' + color + '">(' + cr.toFixed(0) + '%)</span>' : '')
+      + '</span>';
+  };
+  const rows = sorted.map(m => ''
+    + '<tr>'
+    +   '<td><strong>' + escapeHtml(matrixStoreLabel(m.store)) + '</strong></td>'
+    +   '<td>' + cell(m.chinese) + '</td>'
+    +   '<td>' + cell(m.malay) + '</td>'
+    +   '<td>' + cell(m.indian) + '</td>'
+    +   '<td>' + cell(m.other) + '</td>'
+    +   '<td class="num"><strong>' + fmtInt(m.total_walkin) + '</strong></td>'
+    + '</tr>').join('');
+  // company total row
+  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0 };
+  sorted.forEach(m => {
+    tot.ch += (m.chinese?.walkin || 0); tot.my += (m.malay?.walkin || 0);
+    tot.in_ += (m.indian?.walkin || 0); tot.ot += (m.other?.walkin || 0);
+    tot.walk += (m.total_walkin || 0);
+  });
+  const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)">'
+    + '<td>公司合计</td>'
+    + '<td>' + fmtInt(tot.ch) + '</td><td>' + fmtInt(tot.my) + '</td>'
+    + '<td>' + fmtInt(tot.in_) + '</td><td>' + fmtInt(tot.ot) + '</td>'
+    + '<td class="num">' + fmtInt(tot.walk) + '</td></tr>';
+  return ''
+    + '<div class="s4-drill"><div class="s4-drill-body">'
+    +   '<table><thead><tr>'
+    +     '<th>店</th><th>Chinese</th><th>Malay</th><th>Indian</th><th>Other</th><th>Total 客流</th>'
+    +   '</tr></thead><tbody>' + rows + totRow + '</tbody></table>'
+    +   '<div class="muted" style="margin-top:8px;font-size:11px">格式: 客流 → 购买 (成交率%) · 绿≥80% 黄60-79% 红<60% · 样本<5 不上色 · hover 看 Revenue/AOV</div>'
+    + '</div></div>';
+}
 
-  // ── Alerts (V1 mostly placeholder — data lives in /api/customers WP_CUSTOMERS rows) ─
-  const al1 = alertCard('① Sleeping high-value Top 50',  null,
-    'Members with 0 invoices in 3m · needs /api/customers full member rows', 'na', null);
-  const al2 = alertCard('② Designer / Contractor / Builders',  null,
-    'Pro segment counts + AOV · needs cust_type field on /api/customers', 'na', null);
-  const al3 = alertCard('③ Churn risk', null,
-    'Active in 6m, silent this month · needs member 6m timeline', 'na', null);
-  const al4 = alertCard('④ Race × category cross-tab', null,
-    'Customer_Buy_v3 has no race field · Customer Floatation aggregate only', 'na', null);
+// Trend + cross-cut tabs
+function renderCustomerTabs(s) {
+  const tabs = [
+    { id: 'trend12m',  label: '12M 趋势' },
+    { id: 'racetrend', label: '种族对比' },
+    { id: 'member',    label: '客型分析' },
+    { id: 'memberbuy', label: '会员购买' },
+  ];
+  const tabHtml = tabs.map(t =>
+    '<button class="' + (customerTab === t.id ? 'active' : '') + '" onclick="setCustomerTab(\'' + t.id + '\')">' + t.label + '</button>'
+  ).join('');
+  let body;
+  if (customerTab === 'trend12m') {
+    const tr = s.data.trend || {};
+    const series = (tr.data && tr.data.series) || [];
+    if (tr.degraded || series.length === 0) {
+      body = '<div class="s4-data-gap">customer_trend RPC 未部署或无数据</div>';
+    } else {
+      body = svgLineChart({
+        series: [
+          { name: 'Walk-in', color: '#1F5F4A', points: series.map(p => ({ x: p.ym, y: p.walkin })) },
+        ], width: 900, height: 240, yFmt: fmtInt,
+      }) + '<div class="meta">12M walk-in 客流。closing/basket/revenue 切换待 Sprint 7 (多线 selector)。</div>';
+    }
+  } else if (customerTab === 'racetrend') {
+    // current-month race comparison as bars (floatation is monthly; no daily race)
+    const resp = s.data.race || {};
+    const races = (resp.data && resp.data.races) || [];
+    if (resp.degraded || races.length === 0) {
+      body = '<div class="s4-data-gap">种族数据未部署</div>';
+    } else {
+      body = svgBarLine({
+        labels: races.map(r => RACE_META[r.race]?.label.split(' ')[0] || r.race),
+        bars:   races.map(r => r.walkin),
+        line:   races.map(r => r.closing_rate || 0),
+        barLabel: '客流', lineLabel: '成交率%',
+        width: 900, height: 240,
+      }) + '<div class="meta">本月 by race 客流 (柱) + 成交率 (折线)。floatation 月颗粒, 无逐日 race 拆分。</div>';
+    }
+  } else if (customerTab === 'member') {
+    const resp = s.data.member || {};
+    if (resp.degraded || resp.data?.status === 'data_gap' || !resp.data) {
+      const msg = resp.data?.message || resp.degraded_reason || 'customer_buy_lines 本月无数据';
+      body = '<div class="s4-data-gap">⚠ ' + escapeHtml(msg) + ' (cbl 仅 2026-04 1 月, Apps Script sync 后启用)</div>';
+    } else {
+      const d = resp.data;
+      const types = d.cust_types || [];
+      body = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">'
+           + '<div class="kpi-card" style="border-top-color:var(--brand)"><div class="kpi-title">会员占比</div><div class="kpi-actual">' + (d.member_pct != null ? d.member_pct.toFixed(1) + '%' : '—') + '</div><div class="kpi-meta">' + fmtInt(d.member_rows) + ' / ' + fmtInt(d.total_rows) + ' 行有 member_code</div></div>'
+           + '<div class="kpi-card" style="border-top-color:var(--brand)"><div class="kpi-title">新客 vs 老客 (销售)</div><div class="kpi-meta" style="margin-top:8px;font-size:14px">新客 <strong>' + fmtRM(d.new_customer_sales) + '</strong><br>老客 <strong>' + fmtRM(d.old_customer_sales) + '</strong></div></div>'
+           + '</div>'
+           + '<table><thead><tr><th>客型</th><th>会员数</th><th>销售 RM</th><th>明细行数</th></tr></thead><tbody>'
+           + types.map(t => '<tr><td>' + escapeHtml(t.cust_type) + '</td><td>' + fmtInt(t.members) + '</td><td>' + fmtRM(t.sales) + '</td><td>' + fmtInt(t.rows) + '</td></tr>').join('')
+           + '</tbody></table>';
+    }
+  } else if (customerTab === 'memberbuy') {
+    body = '<div class="s4-data-gap"><strong>会员购买 Top 20</strong> · 需 per-member 明细 RPC (Sprint 7+). 当前 customer_member_analysis 返聚合, 未返单会员排行。</div>';
+  } else {
+    body = '<div class="muted">No data</div>';
+  }
+  return '<div class="s4-drill"><div class="s4-drill-tabs">' + tabHtml + '</div><div class="s4-drill-body">' + body + '</div></div>';
+}
 
-  return title
-    + '<div class="cards-grid">' + c1 + c2 + c3 + '</div>'
-    + '<div class="section-title">Action alerts</div>'
-    + '<div class="cards-grid">' + al1 + al2 + al3 + al4 + '</div>';
+// Action Plan placeholder (full cross-page attribution = Sprint 9+)
+function renderCustomerActionPlaceholder(s) {
+  const resp = s.data.race || {};
+  const races = (resp.data && resp.data.races) || [];
+  const cards = [];
+  // Heuristic: race with low closing despite decent walk-in
+  races.forEach(r => {
+    if (r.walkin >= 50 && r.closing_rate != null && r.closing_rate < 50) {
+      cards.push('<div class="s4-action-card amber"><div class="a-title">' + (RACE_META[r.race]?.label || r.race) + ' 转化偏低</div>'
+        + '<div class="a-detail">客流 ' + fmtInt(r.walkin) + ' 但成交率仅 ' + r.closing_rate.toFixed(1) + '% · Revenue ' + fmtRM(r.revenue) + '</div></div>');
+    }
+  });
+  if (!cards.length) {
+    cards.push('<div class="s4-data-gap">本 sprint Action Plan 仅 placeholder。完整跨页面归因 Sprint 9+ (Today 大脑组装时)。</div>');
+  }
+  return '<div class="s4-action-grid" style="grid-template-columns:1fr"><div>' + cards.join('') + '</div></div>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
