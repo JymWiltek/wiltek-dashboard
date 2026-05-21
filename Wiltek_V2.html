@@ -1553,20 +1553,25 @@ async function fetchCustomers(signal) {
   // 复用既有 customers_payload RPC. race + matrix 保留自 PR#55; trend = 12M
   // 走廊客折线. 删 overview (4-KPI hero, 与 Overview 页重复) + member tab.
   // 每个 view 优雅降级 (degraded:true).
+  // Phase 6c (2026-05-21): 加 customer-age-category (年龄段×品类 cross-tab)
+  // + actions (Action Plan 第 6 层「我派出去的」列, assigner=owner).
   const m = state.month;
   const raceQ = new URLSearchParams({ view: 'customer-race', month: m });
   if (state.branch) raceQ.set('branch', state.branch);
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
   if (state.branch) payloadQ.set('branch', state.branch);
-  const [payload, race, matrix, trend] = await Promise.all([
+  const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
+  const [payload, race, matrix, trend, agecat, actions] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-trend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-age-category', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'actions', assigner: myRoleId }), signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
   ]);
   if (race && race.session_role) state.role = race.session_role;
   else if (payload && payload.session_role) state.role = payload.session_role;
-  return { payload, race, matrix, trend };
+  return { payload, race, matrix, trend, agecat, actions };
 }
 async function fetchProducts(signal) {
   const j = await getJSON('/api/products' + monthBranchQuery(), signal);
@@ -4191,22 +4196,30 @@ function renderCustomers(s) {
       + '</div></div>';
   }
 
+  // Phase 6c 6+1 层链路: 谁来 → 多忠 → 买什么 → 哪店哪族 → 具体人 → 趋势 → 行动。
   return '<div class="sales-v3">'
     + header
-    + '<div class="s4-section-title">会员年龄分段 <span class="s4-section-aux">入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价</span></div>'
-    + renderCustomerAgeTiers(s)
-    + '<div class="s4-section-title">今日 3 件事 <span class="s4-section-aux">从本月客户数据自动选出</span></div>'
-    + renderCustomerActionPlan(s)
+    // 第 1 层 — 种族 (谁来)
     + '<div class="s4-section-title">种族拆分 <span class="s4-section-aux">本月走廊客 by race · 含走廊客目标</span></div>'
     + renderCustomerRaceCards(s)
+    // 第 2 层 — 会员年龄分段 (这群人多忠)
+    + '<div class="s4-section-title">会员年龄分段 <span class="s4-section-aux">入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价</span></div>'
+    + renderCustomerAgeTiers(s)
+    // 第 3 层 — 年龄段 × 品类 (他们买什么) — NEW
+    + '<div class="s4-section-title">会员年龄段 × 品类 <span class="s4-section-aux">本月销售 · 各龄段买什么 (customer_buy_lines)</span></div>'
+    + renderCustomerAgeCategoryCrosstab(s)
+    // 第 4 层 — 6 店 × 种族 (哪店哪族表现好)
     + '<div class="s4-section-title">6 店 × 种族表现矩阵 <span class="s4-section-aux">walk-in → 购买 (成交率)</span></div>'
     + renderCustomerStoreRaceMatrix(s)
+    // 第 5 层 — 客户名单 (具体到人)
     + '<div class="s4-section-title">客户名单 <span class="s4-section-aux">沉睡 VIP / 老客流失 / Top VIP · 可按店筛选</span></div>'
     + renderCustomerLists(s)
-    + '<div class="s4-section-title">客型 × 会员龄段 <span class="s4-section-aux">12 月汇总 · 会员数 + 消费 RM</span></div>'
-    + renderCustomerCrossTab(s)
+    // 12M 趋势 (背景趋势, 保留)
     + '<div class="s4-section-title">12 月走廊客趋势</div>'
-    + renderCustomerTrend(s);
+    + renderCustomerTrend(s)
+    // 第 6 层 — Action Plan (该做什么 · 收尾) — NEW
+    + '<div class="s4-section-title">Customer Action Plan <span class="s4-section-aux">异常自动检测 + 归因 + 派派</span></div>'
+    + renderCustomerActionPlan(s);
 }
 
 // 会员年龄分段 4 cards — replaces PR#55 4-KPI hero. From customers_payload
@@ -4243,65 +4256,162 @@ function renderCustomerAgeTiers(s) {
   return '<div class="kpi-hero-row">' + cards + '</div>';
 }
 
-// 今日 3 件事 — real Customer Action Plan (沉睡 VIP / 老客流失 / 种族转化偏低).
-// Replaces PR#55 placeholder. Auto-picked from payload + race data.
-function custActionCard(title, tone, interp, action) {
-  return ''
-    + '<div class="s4-action-card ' + tone + '">'
-    +   '<div class="a-title">' + title + '</div>'
-    +   '<div class="a-detail">' + interp + '</div>'
-    +   '<div class="a-action-text">建议:' + action + '</div>'
-    + '</div>';
-}
-function renderCustomerActionPlan(s) {
+// Customer Action Plan (第 6 层 · 收尾) — 5 个异常自动检测 + 归因 + 派派。
+// 复用 Sales/Overview 框架 (.s4-action-card + openAssignModal seed +
+// renderS4SentActionCard)。数据全来自已 fetch 的 payload / race / matrix / agecat,
+// 不需新 RPC。
+function buildCustomerAnomalies(s) {
   const pd = (s.data.payload && s.data.payload.data) || null;
-  const rd = (s.data.race && s.data.race.data) || null;
-  const cards = [];
-  if (pd) {
-    // 1) 沉睡 VIP — 高值会员近 3 月 0 单 (top100, m3_visits===0)
-    const sleeping = (pd.top100 || [])
-      .filter(r => (r.m3_visits || 0) === 0)
-      .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
-    if (sleeping.length) {
-      const s0 = sleeping[0];
-      const sumLt = sleeping.reduce((a, r) => a + (r.lifetime_amt || 0), 0);
-      const tone = sleeping.length > 30 ? 'red' : sleeping.length > 10 ? 'amber' : 'green';
-      cards.push(custActionCard('😴 沉睡 VIP 顾客', tone,
-        '近 3 月 0 单的高值会员 ' + fmtInt(sleeping.length) + ' 位 · 终身合计 ' + fmtRM(sumLt),
-        '优先回访头号 ' + escapeHtml(s0.name || s0.mc || '—') + ' (' + escapeHtml(s0.branch || '—') + ' · 终身 ' + fmtRM(s0.lifetime_amt || 0) + ')'));
-    }
-    // 2) 老客流失 — 高值老客 6 月+ 没回 (churn.summary)
-    const ch = pd.churn && pd.churn.summary;
-    if (ch && (ch.n_high_value || 0) > 0) {
-      const thr = ch.high_value_threshold || 1000;
-      const c0 = (pd.churn.rows || [])
-        .filter(r => (r.amount || 0) >= thr)
-        .sort((a, b) => (b.amount || 0) - (a.amount || 0))[0];
-      const tone = ch.n_high_value > 100 ? 'red' : ch.n_high_value > 30 ? 'amber' : 'green';
-      cards.push(custActionCard('⚠ 老客流失预警', tone,
-        fmtInt(ch.n_high_value) + ' 位高值老客 ' + (ch.cutoff_months || 6) + ' 月+ 没回 · 终身合计 ' + fmtRM(ch.lifetime_rm || 0),
-        c0 ? ('先打 ' + escapeHtml(c0.name || c0.mc || '—') + ' (' + escapeHtml(c0.branch || '—') + ' · 终身 ' + fmtRM(c0.amount || 0) + ' · ' + (c0.months_ago != null ? c0.months_ago + ' 月前' : '?') + ')') : '打开「老客流失」名单逐个回访'));
-    }
+  const rd = (s.data.race    && s.data.race.data)    || null;
+  const md = (s.data.matrix  && s.data.matrix.data)  || null;
+  const ad = (s.data.agecat  && s.data.agecat.data)  || null;
+  const RACE_LABEL = { chinese: 'Chinese', malay: 'Malay', indian: 'Indian', other: 'Other' };
+  const out = [];
+
+  // 1) 店 × 种族 closing < 60% AND 样本 ≥ 5 (取最差 3 个)
+  if (md && Array.isArray(md.matrix)) {
+    const companyCr = (rd && rd.total && rd.total.closing_rate != null) ? rd.total.closing_rate : null;
+    const cells = [];
+    md.matrix.forEach(row => {
+      ['chinese', 'malay', 'indian', 'other'].forEach(rk => {
+        const c = row[rk];
+        if (c && (c.walkin || 0) >= 5 && c.closing_rate != null && c.closing_rate < 60) {
+          cells.push({ store: row.store, race: rk, cr: c.closing_rate, walkin: c.walkin });
+        }
+      });
+    });
+    cells.sort((a, b) => a.cr - b.cr).slice(0, 3).forEach(c => {
+      out.push({
+        severity: c.cr < 50 ? 'red' : 'amber',
+        title: c.store + ' ' + RACE_LABEL[c.race] + ' 转化偏低',
+        detail: c.store + ' ' + RACE_LABEL[c.race] + ' 成交 ' + c.cr.toFixed(1) + '% (样本 ' + fmtInt(c.walkin) + ' 人)'
+              + (companyCr != null ? ' · 公司均 ' + companyCr.toFixed(1) + '%' : ''),
+        recommended_action: '派给 ' + c.store + ' 店长本周观察该族接待流程',
+        recommended_assignee: c.store.toLowerCase() + '_manager',
+        store: c.store,
+      });
+    });
   }
-  // 3) 种族转化偏低 — walk-in 够多但成交率低于公司均值
+
+  // 2) 沉睡 / 流失高值会员 — churn n_high_value ≥ 50
+  if (pd && pd.churn && pd.churn.summary && (pd.churn.summary.n_high_value || 0) >= 50) {
+    const ch = pd.churn.summary;
+    const thr = ch.high_value_threshold || 1000;
+    const tops = (pd.churn.rows || []).filter(r => (r.amount || 0) >= thr).sort((a, b) => (b.amount || 0) - (a.amount || 0));
+    const top3sum = tops.slice(0, 3).reduce((a, r) => a + (r.amount || 0), 0);
+    const c0 = tops[0];
+    out.push({
+      severity: ch.n_high_value > 100 ? 'red' : 'amber',
+      title: '沉睡 / 流失高值会员',
+      detail: fmtInt(ch.n_high_value) + ' 位高值老客 ' + (ch.cutoff_months || 6) + ' 月+ 没回 · top3 共 ' + fmtRM(top3sum) + ' · 终身合计 ' + fmtRM(ch.lifetime_rm || 0),
+      recommended_action: '本周打电话 top 5' + (c0 ? ' (头号 ' + (c0.name || c0.mc || '—') + ' RM ' + fmtInt(c0.amount || 0) + ')' : ''),
+      recommended_assignee: 'marketing_lead',
+    });
+  }
+
+  // 3) 年龄段 × 品类偏单一 (单一品类 > 40%) — 取最集中 2 个龄段
+  if (ad && Array.isArray(ad.rows) && ad.rows.length) {
+    const byAge = {};
+    ad.rows.forEach(r => {
+      const a = r.age_bucket; if (!byAge[a]) byAge[a] = { total: 0, cats: {} };
+      byAge[a].total += (+r.sales || 0);
+      byAge[a].cats[r.category] = (byAge[a].cats[r.category] || 0) + (+r.sales || 0);
+    });
+    const flagged = [];
+    Object.keys(byAge).forEach(a => {
+      const b = byAge[a]; if (b.total <= 0) return;
+      let topCat = null, topV = 0, secCat = null, secV = 0;
+      Object.entries(b.cats).forEach(([cat, v]) => {
+        if (v > topV) { secCat = topCat; secV = topV; topCat = cat; topV = v; }
+        else if (v > secV) { secCat = cat; secV = v; }
+      });
+      const share = topV / b.total * 100;
+      if (share > 40) flagged.push({ age: a, cat: topCat, share, sec: secCat });
+    });
+    flagged.sort((x, y) => y.share - x.share).slice(0, 2).forEach(f => {
+      out.push({
+        severity: 'amber',
+        title: f.age + ' 会员品类偏单一',
+        detail: f.age + ' 会员 ' + f.cat + ' 占 ' + f.share.toFixed(0) + '% · 集中单一品类',
+        recommended_action: '向该龄段推' + (f.sec ? ' ' + f.sec + ' 等' : '') + '互补品类 / 套餐',
+      });
+    });
+  }
+
+  // 4) 种族 walk-in target 缺口 (<80%) — 仅在目标已设时触发
   if (rd && Array.isArray(rd.races)) {
-    const companyCr = (rd.total && rd.total.closing_rate != null) ? rd.total.closing_rate : 70;
-    const cand = rd.races
-      .filter(r => (r.walkin || 0) >= 50 && r.closing_rate != null && r.closing_rate < companyCr)
-      .sort((a, b) => a.closing_rate - b.closing_rate)[0];
-    if (cand) {
-      const meta = RACE_META[cand.race] || { label: cand.race, icon: '🌏' };
-      const tone = cand.closing_rate < 50 ? 'red' : 'amber';
-      cards.push(custActionCard(meta.icon + ' ' + meta.label + ' 转化偏低', tone,
-        '客流 ' + fmtInt(cand.walkin) + ' 但成交率仅 ' + cand.closing_rate.toFixed(1) + '% (公司 ' + companyCr.toFixed(1) + '%)',
-        '复盘该族客群接待/选品 · 本月 Revenue 仅 ' + fmtRM(cand.revenue || 0)));
+    rd.races.forEach(r => {
+      if (r.walkin_target != null && r.walkin_target_pct != null && r.walkin_target_pct < 80) {
+        const gap = Math.max(0, Math.round((r.walkin_target || 0) - (r.walkin || 0)));
+        out.push({
+          severity: r.walkin_target_pct < 60 ? 'red' : 'amber',
+          title: RACE_LABEL[r.race] + ' walk-in 进度落后',
+          detail: RACE_LABEL[r.race] + ' walk-in 完成 ' + r.walkin_target_pct.toFixed(0) + '% (' + fmtInt(r.walkin) + ' / 目标 ' + fmtInt(r.walkin_target) + ')',
+          recommended_action: '本月还差 ' + fmtInt(gap) + ' 人 · 加投该族客群拉新',
+          recommended_assignee: 'marketing_lead',
+        });
+      }
+    });
+  }
+
+  // 5) 8y+ 老客消费占比偏低 (会员占比 ≥15% 但销售占比 <10%)
+  if (pd && pd.summary && pd.buckets_by_window && pd.buckets_by_window['12m']) {
+    const total = pd.summary.total_members || 0;
+    const b12 = pd.buckets_by_window['12m'];
+    const eightY = b12.find(x => x.key === '8y+');
+    const sumAmt = b12.reduce((a, x) => a + (+x.amt || 0), 0);
+    if (eightY && total > 0 && sumAmt > 0) {
+      const memShare = eightY.n / total * 100;
+      const salesShare = (+eightY.amt || 0) / sumAmt * 100;
+      if (memShare >= 15 && salesShare < 10) {
+        out.push({
+          severity: 'amber',
+          title: '8y+ 老客消费占比偏低',
+          detail: '8y+ 会员占 ' + memShare.toFixed(1) + '% 但贡献销售只 ' + salesShare.toFixed(1) + '% · 老客资产未激活',
+          recommended_action: '老客回访清单 + VIP 专属优惠唤醒',
+          recommended_assignee: 'marketing_lead',
+        });
+      }
     }
   }
-  if (!cards.length) {
-    return '<div class="s4-data-gap">本月无紧急客户事项 (沉睡 / 流失 / 转化均健康),或 customers_payload 数据未就绪。</div>';
-  }
-  const top3 = cards.slice(0, 3);
-  return '<div class="s4-action-grid" style="grid-template-columns:repeat(' + top3.length + ',1fr)">' + top3.join('') + '</div>';
+  return out;
+}
+
+function renderCustomerActionPlan(s) {
+  const anomalies = buildCustomerAnomalies(s);
+  const anomCards = anomalies.map(a => {
+    const sev = a.severity || 'amber';
+    const seed = JSON.stringify({
+      title: a.title, severity: sev, detail: a.detail,
+      recommended_action: a.recommended_action,
+      recommended_assignee: a.recommended_assignee,
+      store: a.store || null,
+      source_url: '?view=customers&month=' + state.month + (a.store ? '&branch=' + a.store : ''),
+      source_data: a,
+    }).replace(/"/g, '&quot;');
+    return ''
+      + '<div class="s4-action-card ' + sev + '">'
+      +   '<div class="a-title">' + escapeHtml(a.title) + '</div>'
+      +   '<div class="a-detail">' + escapeHtml(a.detail) + '</div>'
+      +   (a.recommended_action ? '<div class="a-action-text">👉 ' + escapeHtml(a.recommended_action) + '</div>' : '')
+      +   '<div class="a-controls"><button class="s4-btn primary" onclick="openAssignModal(' + seed + ')">→ 派派</button></div>'
+      + '</div>';
+  }).join('');
+  const anomBlock = anomCards
+    ? '<div>' + anomCards + '</div>'
+    : '<div class="s4-data-gap">本月暂无 high-severity 客户异常 ✓</div>';
+
+  const actions = (s.data.actions && Array.isArray(s.data.actions.actions)) ? s.data.actions.actions : [];
+  const sentCards = actions.map(a => renderS4SentActionCard(a)).join('');
+  const sentBlock = sentCards
+    ? '<div>' + sentCards + '</div>'
+    : '<div class="s4-data-gap">尚未派出任何 Action — 点页顶 [⊕ 派派] 派第一条</div>';
+
+  return ''
+    + '<div class="s4-action-grid">'
+    +   '<div><div class="s4-section-title" style="margin-top:0;font-size:16px">⚠ 异常 + 归因 (自动检测)</div>' + anomBlock + '</div>'
+    +   '<div><div class="s4-section-title" style="margin-top:0;font-size:16px">📋 我派出去的 Action (' + actions.length + ')</div>' + sentBlock + '</div>'
+    + '</div>';
 }
 
 // 种族 4 cards — data display (no status border)
@@ -4487,43 +4597,73 @@ function renderCustomerLists(s) {
     + '<div class="s4-drill-body">' + body + '</div></div>';
 }
 
-// 客型 × 会员龄段 cross-tab — from customers_payload cross_by_window['12m'].
-// Each cell: 会员数 + 12 月消费 RM. Mirrors V1 ciCrossTable.
-function renderCustomerCrossTab(s) {
-  const resp = s.data.payload || {};
+// 会员年龄段 × 品类 cross-tab (第 3 层 · NEW) — from customer_age_category_crosstab.
+// 横 = 4 龄段, 纵 = top 8 品类 (按总销售). 每格 = 本月销售 RM, 空 → —.
+// 格底色按 sales 深浅 (绿色渐变), 一眼看出龄段×品类热点。Jym:「这群顾客买什么」。
+function renderCustomerAgeCategoryCrosstab(s) {
+  const resp = s.data.agecat || {};
   const pd = resp.data;
-  if (resp.degraded || !pd || !pd.cross_by_window) {
-    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">customers_payload 无 cross_by_window 数据。</div></div></div>';
+  const rowsRaw = (pd && pd.rows) || [];
+  if (resp.degraded || !pd || pd.status === 'data_gap' || rowsRaw.length === 0) {
+    const msg = (pd && pd.message) || resp.degraded_reason || 'customer_buy_lines 本月无品类数据';
+    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">⚠ ' + escapeHtml(msg) + '</div></div></div>';
   }
-  const cross = pd.cross_by_window['12m'] || {};
-  const types = pd.types || ['Walk-in', 'Contractor', 'Interior Designer', 'Other'];
   const ages = AGE_TIER_ORDER;
-  const rows = types.map(tp => {
+  // pivot: category -> {age: sales}; track category totals for top-8 select.
+  const byCat = {};
+  rowsRaw.forEach(r => {
+    const cat = r.category || '(未分类)';
+    if (!byCat[cat]) byCat[cat] = { total: 0, cells: {} };
+    byCat[cat].cells[r.age_bucket] = (byCat[cat].cells[r.age_bucket] || 0) + (+r.sales || 0);
+    byCat[cat].total += (+r.sales || 0);
+  });
+  const cats = Object.keys(byCat).sort((a, b) => byCat[b].total - byCat[a].total).slice(0, 8);
+  // max cell value (across displayed cats) for color depth.
+  let maxCell = 0;
+  cats.forEach(c => ages.forEach(a => { const v = byCat[c].cells[a] || 0; if (v > maxCell) maxCell = v; }));
+  const cellBg = (v) => {
+    if (!v || maxCell <= 0) return '';
+    const alpha = 0.08 + 0.55 * (v / maxCell); // 0.08–0.63 green tint
+    return 'background:rgba(31,95,74,' + alpha.toFixed(3) + ');' + (alpha > 0.4 ? 'color:#fff;' : '');
+  };
+  const head = '<tr><th>品类</th>' + ages.map(a => '<th>' + a + '</th>').join('') + '<th>合计</th></tr>';
+  const body = cats.map(c => {
     const cells = ages.map(a => {
-      const c = (cross[tp] && cross[tp][a]) || { n: 0, amt: 0 };
-      return '<td>' + fmtInt(c.n) + '<br><span style="font-size:11px;color:#6B7280">' + fmtRM(c.amt) + '</span></td>';
+      const v = byCat[c].cells[a] || 0;
+      return v > 0
+        ? '<td style="' + cellBg(v) + '">' + fmtRM(v) + '</td>'
+        : '<td style="color:var(--s4-text-light)">—</td>';
     }).join('');
-    return '<tr><td><strong>' + escapeHtml(tp) + '</strong></td>' + cells + '</tr>';
+    return '<tr><td><strong>' + escapeHtml(c) + '</strong></td>' + cells + '<td><strong>' + fmtRM(byCat[c].total) + '</strong></td></tr>';
   }).join('');
+  // column totals row
+  const colTot = ages.map(a => {
+    let t = 0; cats.forEach(c => { t += byCat[c].cells[a] || 0; });
+    return '<td><strong>' + fmtRM(t) + '</strong></td>';
+  }).join('');
+  const grand = cats.reduce((acc, c) => acc + byCat[c].total, 0);
+  const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)"><td>合计</td>' + colTot + '<td>' + fmtRM(grand) + '</td></tr>';
   return '<div class="s4-drill"><div class="s4-drill-body">'
-    + '<table><thead><tr><th>客型</th>' + ages.map(a => '<th>' + a + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table>'
-    + '<div class="muted" style="margin-top:8px;font-size:11px">每格: 会员数 + 12 月消费 RM</div>'
+    + '<table><thead>' + head + '</thead><tbody>' + body + totRow + '</tbody></table>'
+    + '<div class="muted" style="margin-top:8px;font-size:11px">每格: 本月销售 RM · 底色越深销售越高 · top 8 品类</div>'
     + '</div></div>';
 }
 
 // 12 月走廊客趋势 — single line (floatation monthly). From customer_trend RPC.
+// RPC 返回 { rows:[{ym, walkin, ...}] }. 过滤掉 walkin=0 的早期月份
+// (floatation 数据自 2026-01 起,之前为 0 → 折线会出现误导性悬崖)。
 function renderCustomerTrend(s) {
   const tr = s.data.trend || {};
-  const series = (tr.data && tr.data.series) || [];
-  if (tr.degraded || series.length === 0) {
+  const rows = ((tr.data && tr.data.rows) || []).filter(p => (p.walkin || 0) > 0);
+  if (tr.degraded || rows.length === 0) {
     return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">customer_trend RPC 未部署或无数据。</div></div></div>';
   }
   return '<div class="s4-drill"><div class="s4-drill-body">'
     + svgLineChart({
-        series: [{ name: 'Walk-in', color: '#1F5F4A', points: series.map(p => ({ x: p.ym, y: p.walkin })) }],
+        series: [{ name: 'Walk-in', color: '#1F5F4A', points: rows.map(p => ({ x: p.ym, y: p.walkin })) }],
         width: 900, height: 240, yFmt: fmtInt,
       })
-    + '<div class="meta" style="font-size:12px;color:#6B7280;margin-top:8px">12 月月度走廊客 (floatation 月颗粒)。</div>'
+    + '<div class="meta" style="font-size:12px;color:#6B7280;margin-top:8px">月度走廊客 (floatation 月颗粒,自 2026-01 起有记录)。</div>'
     + '</div></div>';
 }
 
