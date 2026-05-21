@@ -4268,29 +4268,35 @@ function buildCustomerAnomalies(s) {
   const RACE_LABEL = { chinese: 'Chinese', malay: 'Malay', indian: 'Indian', other: 'Other' };
   const out = [];
 
-  // 1) 店 × 种族 closing < 60% AND 样本 ≥ 5 (取最差 3 个)
+  // 1) 店 × 种族 closing 偏低 (样本 ≥ 5):
+  //    < 60% 红 (严重); 60-70% 且比公司均低 ≥10pp 黄 (中度)。
   if (md && Array.isArray(md.matrix)) {
     const companyCr = (rd && rd.total && rd.total.closing_rate != null) ? rd.total.closing_rate : null;
     const cells = [];
     md.matrix.forEach(row => {
       ['chinese', 'malay', 'indian', 'other'].forEach(rk => {
         const c = row[rk];
-        if (c && (c.walkin || 0) >= 5 && c.closing_rate != null && c.closing_rate < 60) {
-          cells.push({ store: row.store, race: rk, cr: c.closing_rate, walkin: c.walkin });
-        }
+        if (!c || (c.walkin || 0) < 5 || c.closing_rate == null) return;
+        const cr = c.closing_rate;
+        let sev = null;
+        if (cr < 60) sev = 'red';
+        else if (cr < 70 && companyCr != null && (companyCr - cr) >= 10) sev = 'amber';
+        if (sev) cells.push({ store: row.store, race: rk, cr, walkin: c.walkin, sev });
       });
     });
-    cells.sort((a, b) => a.cr - b.cr).slice(0, 3).forEach(c => {
-      out.push({
-        severity: c.cr < 50 ? 'red' : 'amber',
-        title: c.store + ' ' + RACE_LABEL[c.race] + ' 转化偏低',
-        detail: c.store + ' ' + RACE_LABEL[c.race] + ' 成交 ' + c.cr.toFixed(1) + '% (样本 ' + fmtInt(c.walkin) + ' 人)'
-              + (companyCr != null ? ' · 公司均 ' + companyCr.toFixed(1) + '%' : ''),
-        recommended_action: '派给 ' + c.store + ' 店长本周观察该族接待流程',
-        recommended_assignee: c.store.toLowerCase() + '_manager',
-        store: c.store,
+    // 红优先, 再按成交率升序; 最多 5 张避免刷屏。
+    cells.sort((a, b) => (a.sev === b.sev ? a.cr - b.cr : (a.sev === 'red' ? -1 : 1)))
+      .slice(0, 5).forEach(c => {
+        out.push({
+          severity: c.sev,
+          title: c.store + ' ' + RACE_LABEL[c.race] + ' 转化偏低',
+          detail: c.store + ' ' + RACE_LABEL[c.race] + ' 成交 ' + c.cr.toFixed(1) + '% (样本 ' + fmtInt(c.walkin) + ' 人)'
+                + (companyCr != null ? ' · 公司均 ' + companyCr.toFixed(1) + '%' : ''),
+          recommended_action: '派给 ' + c.store + ' 店长本周观察该族接待流程',
+          recommended_assignee: c.store.toLowerCase() + '_manager',
+          store: c.store,
+        });
       });
-    });
   }
 
   // 2) 沉睡 / 流失高值会员 — churn n_high_value ≥ 50
@@ -4309,14 +4315,16 @@ function buildCustomerAnomalies(s) {
     });
   }
 
-  // 3) 年龄段 × 品类偏单一 (单一品类 > 40%) — 取最集中 2 个龄段
+  // 3) 年龄段 × 品类偏单一 (单一品类 > 30%) + 3b) 主流品类缺口 (=0)。
   if (ad && Array.isArray(ad.rows) && ad.rows.length) {
+    const MAINSTREAM = ['Faucet', 'Water Closet', 'Kitchen Sink', 'Wash Basin', 'Appliances'];
     const byAge = {};
     ad.rows.forEach(r => {
       const a = r.age_bucket; if (!byAge[a]) byAge[a] = { total: 0, cats: {} };
       byAge[a].total += (+r.sales || 0);
       byAge[a].cats[r.category] = (byAge[a].cats[r.category] || 0) + (+r.sales || 0);
     });
+    // 3) 偏单一 > 30% (Wiltek 品类分散, 40% 永不触发) — 取最集中 3 个龄段
     const flagged = [];
     Object.keys(byAge).forEach(a => {
       const b = byAge[a]; if (b.total <= 0) return;
@@ -4326,14 +4334,28 @@ function buildCustomerAnomalies(s) {
         else if (v > secV) { secCat = cat; secV = v; }
       });
       const share = topV / b.total * 100;
-      if (share > 40) flagged.push({ age: a, cat: topCat, share, sec: secCat });
+      if (share > 30) flagged.push({ age: a, cat: topCat, share, sec: secCat });
     });
-    flagged.sort((x, y) => y.share - x.share).slice(0, 2).forEach(f => {
+    flagged.sort((x, y) => y.share - x.share).slice(0, 3).forEach(f => {
       out.push({
         severity: 'amber',
         title: f.age + ' 会员品类偏单一',
         detail: f.age + ' 会员 ' + f.cat + ' 占 ' + f.share.toFixed(0) + '% · 集中单一品类',
         recommended_action: '向该龄段推' + (f.sec ? ' ' + f.sec + ' 等' : '') + '互补品类 / 套餐',
+      });
+    });
+    // 3b) 主流品类 (Top 5) 在某龄段 = 0 → 调查是否异常 (最多 3 张)
+    const gaps = [];
+    AGE_TIER_ORDER.forEach(a => {
+      const b = byAge[a]; if (!b || b.total <= 0) return;
+      MAINSTREAM.forEach(cat => { if (!(b.cats[cat] > 0)) gaps.push({ age: a, cat }); });
+    });
+    gaps.slice(0, 3).forEach(g => {
+      out.push({
+        severity: 'amber',
+        title: g.age + ' 没买 ' + g.cat,
+        detail: g.age + ' 会员本月 ' + g.cat + ' 销售 = 0 (主流品类) · 其他龄段有买',
+        recommended_action: '调查该龄段是否缺货 / 陈列 / 客群不匹配',
       });
     });
   }
@@ -4363,7 +4385,7 @@ function buildCustomerAnomalies(s) {
     if (eightY && total > 0 && sumAmt > 0) {
       const memShare = eightY.n / total * 100;
       const salesShare = (+eightY.amt || 0) / sumAmt * 100;
-      if (memShare >= 15 && salesShare < 10) {
+      if (memShare >= 15 && salesShare < memShare * 0.7) {
         out.push({
           severity: 'amber',
           title: '8y+ 老客消费占比偏低',
