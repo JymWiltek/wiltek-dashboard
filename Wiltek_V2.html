@@ -4512,18 +4512,20 @@ function renderCustomerCrossTab(s) {
 }
 
 // 12 月走廊客趋势 — single line (floatation monthly). From customer_trend RPC.
+// RPC 返回 { rows:[{ym, walkin, ...}] }. 过滤掉 walkin=0 的早期月份
+// (floatation 数据自 2026-01 起,之前为 0 → 折线会出现误导性悬崖)。
 function renderCustomerTrend(s) {
   const tr = s.data.trend || {};
-  const series = (tr.data && tr.data.series) || [];
-  if (tr.degraded || series.length === 0) {
+  const rows = ((tr.data && tr.data.rows) || []).filter(p => (p.walkin || 0) > 0);
+  if (tr.degraded || rows.length === 0) {
     return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">customer_trend RPC 未部署或无数据。</div></div></div>';
   }
   return '<div class="s4-drill"><div class="s4-drill-body">'
     + svgLineChart({
-        series: [{ name: 'Walk-in', color: '#1F5F4A', points: series.map(p => ({ x: p.ym, y: p.walkin })) }],
+        series: [{ name: 'Walk-in', color: '#1F5F4A', points: rows.map(p => ({ x: p.ym, y: p.walkin })) }],
         width: 900, height: 240, yFmt: fmtInt,
       })
-    + '<div class="meta" style="font-size:12px;color:#6B7280;margin-top:8px">12 月月度走廊客 (floatation 月颗粒)。</div>'
+    + '<div class="meta" style="font-size:12px;color:#6B7280;margin-top:8px">月度走廊客 (floatation 月颗粒,自 2026-01 起有记录)。</div>'
     + '</div></div>';
 }
 
