@@ -257,6 +257,23 @@ export default async function handler(req, res) {
     }
   }
 
+  // Phase 7b (2026-05-21) — Inventory 经营判断卡 (5 问 5 答 + 综合判断)。
+  if (mode === 'judgement') {
+    if (!user) return res.status(401).json({ ok: false, error: 'no session' });
+    const p_ym = String(req.query?.month || '').trim() || null;
+    try {
+      const { data, error } = await sb().rpc('inventory_judgement_card', { p_ym });
+      if (error) {
+        console.error('[/api/inventory mode=judgement] RPC error:', error);
+        return res.status(500).json({ ok: false, error: error.message });
+      }
+      return res.status(200).json({ ok: true, session_role: user.role, ...data });
+    } catch (e) {
+      console.error('[/api/inventory mode=judgement] catch:', e);
+      return res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+  }
+
   // Default mode — full inventory payload (row-level + classifier).
   // Manager → scope rows[] to own store. Aggregates stay company-wide
   // because the V1.6 4-state classifier needs cross-store sales signal.

@@ -377,6 +377,31 @@ table.branch-table .mini-bar-fill {
   color: var(--text-light); margin: 24px 0 10px;
 }
 
+/* ═══ Phase 7b — Inventory 经营判断卡 ═══ */
+.inv-judgement-card {
+  background: linear-gradient(135deg, #fff 0%, #FAFBFC 100%);
+  border: 2px solid #0F172A; border-radius: 12px; padding: 20px 24px; margin: 0 0 24px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+.judge-head { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #E5E7EB; }
+.judge-title { font-size: 18px; font-weight: 700; color: #0F172A; margin-bottom: 6px; }
+.judge-verdict { font-size: 14px; color: #374151; }
+.judge-verdict strong { font-weight: 700; }
+.judge-synth { font-size: 12px; color: #92400E; margin-top: 6px; font-style: italic; }
+.judge-q-list { display: flex; flex-direction: column; gap: 4px; }
+.judge-q { padding: 12px 0; border-bottom: 1px dashed #E5E7EB; }
+.judge-q:last-child { border-bottom: 0; }
+.judge-q-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.judge-q-q { font-size: 15px; font-weight: 700; color: #0F172A; }
+.judge-q-a { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.judge-q-headline { font-size: 14px; color: #374151; line-height: 1.5; margin-bottom: 4px; }
+.judge-q-detail { font-size: 12px; color: #6B7280; font-style: italic; margin-bottom: 8px; }
+.judge-q-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.judge-q-btn { padding: 6px 12px; background: #F3F4F6; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 12px; color: #374151; cursor: pointer; transition: 0.15s; }
+.judge-q-btn:hover { background: #E5E7EB; border-color: #9CA3AF; }
+.inv-flash { animation: inv-flash-anim 1.5s ease-out; }
+@keyframes inv-flash-anim { 0% { background-color: #FEF3C7; } 100% { background-color: transparent; } }
+
 /* ═══ Phase 7 — Inventory Owner BI ═══ */
 .inv-section-title { font-size: 18px; font-weight: 700; color: #0F172A; margin: 24px 0 4px; }
 .inv-section-sub { font-size: 13px; color: #6B7280; margin-bottom: 8px; }
@@ -1697,16 +1722,19 @@ async function fetchToday(signal) {
   return j;
 }
 async function fetchInventory(signal) {
-  // Phase 7 (2026-05-21): Inventory Owner BI — 1 RPC (mode=phase7) returns the
-  // full 8-section payload (hero / 5class / matrix / warehouses / abc /
-  // sku_lists / oem / action_plan). Scope NOT IN (W10/W12/WEX).
+  // Phase 7 (mode=phase7): 8-section payload. Phase 7b (mode=judgement):
+  // 顶部经营判断卡 (5 问 5 答). 并行拉, judgement 优雅降级。
   const baseQ = new URLSearchParams();
   if (state.month)  baseQ.set('month', state.month);
   if (state.branch) baseQ.set('branch', state.branch);
-  baseQ.set('mode', 'phase7');
-  const j = await getJSON('/api/inventory?' + baseQ.toString(), signal);
-  state.role = j.session_role || state.role;
-  return j;
+  const base = baseQ.toString();
+  const sep = base ? '&' : '';
+  const [main, judgement] = await Promise.all([
+    getJSON('/api/inventory?' + base + sep + 'mode=phase7', signal),
+    getJSON('/api/inventory?' + base + sep + 'mode=judgement', signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message })),
+  ]);
+  state.role = main.session_role || state.role;
+  return { ...main, judgement };
 }
 
 const FETCHERS = {
@@ -4170,6 +4198,7 @@ function renderInventory(s) {
 
   return title
     + synthBanner
+    + renderInvJudgement(d.judgement)
     + renderInvHero(d.hero, d.is_synthetic)
     + renderInv5Class(d.health_5class)
     + renderInvMatrix(d.matrix_main6, d.matrix_company_dead_pct)
@@ -4178,6 +4207,116 @@ function renderInventory(s) {
     + renderInvSkuLists(d.sku_lists)
     + renderInvOemTransit(d.oem_in_transit)
     + renderInvActionPlan(d.action_plan || []);
+}
+
+// ── Phase 7b: 经营判断卡 (顶部, 5 问 5 答 + 综合判断) ──
+function renderInvJudgement(j) {
+  if (!j || j.degraded || !j.verdict) return '';
+  const v = j.verdict || {};
+  const verdictColor = { red: '#DC2626', amber: '#D97706', green: '#16A34A' }[v.level] || '#6B7280';
+  const verdictIcon = { red: '🔴', amber: '🟡', green: '🟢' }[v.level] || '⚪';
+  const dirIcon = { up: '↑', down: '↓', same: '→', unknown: '—' }[v.direction] || '—';
+  const dirColor = { up: '#16A34A', down: '#DC2626', same: '#6B7280', unknown: '#6B7280' }[v.direction] || '#6B7280';
+
+  const q1 = qBlock('Q1. 订货太多吗?', j.q1_overstock, []);
+  const q2 = qBlock('Q2. 订货太少吗?', j.q2_understock, [
+    { label: '📋 看名单', action: () => invJumpToSkuTab('a_no_stock') },
+    { label: '📤 派采购', action: () => invJudgeAssign(j.q2_understock) },
+  ]);
+  const q3 = qBlock('Q3. 该订什么货?', {
+    level: 'amber', answer: '',
+    headline: (j.q3_what_to_order || {}).headline || '',
+    detail: q3Top10Detail((j.q3_what_to_order || {}).top10),
+  }, [{ label: '📋 看 top 10', action: () => invJumpToSkuTab('a_no_stock') }]);
+  const q4 = qBlock('Q4. 什么货卖不动?', {
+    level: (j.q4_dead || {}).level, answer: '',
+    headline: fmtInt((j.q4_dead || {}).dead_sku || 0) + ' 个 Dead+Disc SKU · ' + fmtRM((j.q4_dead || {}).dead_rm || 0) + ' 资金锁死',
+    detail: (j.q4_dead || {}).detail,
+  }, [
+    { label: '📋 Dead 名单', action: () => invJumpToSkuTab('dead_top50') },
+    { label: '📋 Disc 名单', action: () => invJumpToSkuTab('discontinued_top50') },
+    { label: '📤 派清仓', action: () => invJudgeAssign(j.q4_dead) },
+  ]);
+  const q5c = j.q5_core || {};
+  const q5 = qBlock('Q5. 必须有库存的核心货?', {
+    level: q5c.level, answer: '',
+    headline: 'A 类共 ' + fmtInt(q5c.a_total_sku || 0) + ' 个 SKU, 其中 ' + (q5c.a_no_stock || 0) + ' 个目前 0 库存',
+    detail: q5c.detail,
+  }, [{ label: '📋 看 A 类全单', action: () => invJumpToSkuTab('a_class_all') }]);
+
+  return ''
+    + '<div class="inv-judgement-card">'
+    +   '<div class="judge-head">'
+    +     '<div class="judge-title">📋 ' + escapeHtml(j.snapshot_date || '') + ' Inventory 经营判断</div>'
+    +     '<div class="judge-verdict" style="color:' + verdictColor + '">'
+    +       verdictIcon + ' 综合: <strong>' + escapeHtml(v.label || '—') + '</strong>'
+    +       ' · vs 上月 <span style="color:' + dirColor + '">' + dirIcon + ' ' + escapeHtml(v.direction_label || '—') + '</span>'
+    +       ' (<strong>' + (v.red_lines_triggered != null ? v.red_lines_triggered : 0) + '</strong> 条红线触发'
+    +       (v.red_lines_prev > 0 ? ', 上月 ' + v.red_lines_prev + ' 条' : '') + ')'
+    +     '</div>'
+    +     (j.is_synthetic ? '<div class="judge-synth">⚠️ 含 SYNTH 数据 · 5/31 真月底快照后判断更准</div>' : '')
+    +   '</div>'
+    +   '<div class="judge-q-list">' + q1 + q2 + q3 + q4 + q5 + '</div>'
+    + '</div>';
+}
+function qBlock(question, ans, buttons) {
+  if (!ans) return '';
+  const dotColor = { red: '#DC2626', amber: '#D97706', green: '#16A34A' }[ans.level] || '#6B7280';
+  const dot = { red: '🔴', amber: '🟡', green: '🟢' }[ans.level] || '⚪';
+  if (!window.__invJudgeBtns) window.__invJudgeBtns = {};
+  const btnsHtml = (buttons && buttons.length)
+    ? '<div class="judge-q-btns">' + buttons.map((b, i) => {
+        const key = invButtonKey(question, i);
+        window.__invJudgeBtns[key] = b.action;
+        return '<button class="judge-q-btn" data-bk="' + key + '">' + escapeHtml(b.label) + '</button>';
+      }).join('') + '</div>'
+    : '';
+  return ''
+    + '<div class="judge-q">'
+    +   '<div class="judge-q-head">'
+    +     '<span class="judge-q-q">' + escapeHtml(question) + '</span>'
+    +     (ans.answer ? '<span class="judge-q-a" style="color:' + dotColor + '">' + dot + ' ' + escapeHtml(ans.answer) + '</span>' : '')
+    +   '</div>'
+    +   '<div class="judge-q-headline">' + escapeHtml(ans.headline || '') + '</div>'
+    +   (ans.detail ? '<div class="judge-q-detail">' + escapeHtml(ans.detail) + '</div>' : '')
+    +   btnsHtml
+    + '</div>';
+}
+function invButtonKey(q, i) { return q.replace(/\W/g, '_').slice(0, 20) + '_' + i; }
+function q3Top10Detail(top10) {
+  if (!top10 || !top10.length) return 'A 类无库存名单已生成 (见 SKU 名单)';
+  return '前 3 个 SKU: ' + top10.slice(0, 3).map(r => r.item_code).join(', ') + ' …';
+}
+window.invJumpToSkuTab = function(tab) {
+  if (typeof window.invShowSkuTab === 'function') window.invShowSkuTab(tab);
+  const body = document.getElementById('invSkuTabBody');
+  if (body) {
+    body.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    body.classList.add('inv-flash');
+    setTimeout(() => body.classList.remove('inv-flash'), 1500);
+  }
+};
+window.invJudgeAssign = function(ans) {
+  if (!ans) return;
+  if (typeof window.openAssignModal === 'function') {
+    window.openAssignModal({
+      title: ans.headline || 'Inventory 判断卡 action',
+      detail: ans.detail || ans.headline || '',
+      severity: ans.level || 'amber',
+      source_url: '?view=inventory&month=' + state.month,
+      source_data: ans,
+    });
+  } else { alert('派派 modal 未加载'); }
+};
+// 事件代理 (注册一次): 判断卡按钮 click → 查 window.__invJudgeBtns
+if (!window.__invJudgeDelegated) {
+  window.__invJudgeDelegated = true;
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest && e.target.closest('.judge-q-btn');
+    if (!btn) return;
+    const fn = window.__invJudgeBtns && window.__invJudgeBtns[btn.getAttribute('data-bk')];
+    if (typeof fn === 'function') fn();
+  });
 }
 
 // ── Section 1: Hero 4 卡 (无目标进度条, 有 vs 上月 + SYNTH 角标) ──
@@ -4331,6 +4470,8 @@ function invSkuTabTable(key) {
   if (!rows.length) return '<div class="inv-empty">— 无数据 —</div>';
   const cols = key === 'a_no_stock'
     ? [['rank_in_a', '排名'], ['item_code', '物料码'], ['main_group', '主分类'], ['sales_90d_rm', '90d 销售 RM']]
+    : key === 'a_class_all'
+    ? [['rank_in_a', '排名'], ['item_code', '物料码'], ['main_group', '主分类'], ['sales_90d_rm', '90d 销售 RM'], ['in_stock', '有库存']]
     : [['item_code', '物料码'], ['main_group', '主分类'], ['store', '店'], ['qty', '件数'], ['amount', 'RM']];
   const numKeys = new Set(['sales_90d_rm', 'qty', 'amount', 'rank_in_a']);
   return '<table class="inv-sku-table"><thead><tr>'
@@ -4338,6 +4479,7 @@ function invSkuTabTable(key) {
     + '</tr></thead><tbody>'
     + rows.map(r => '<tr>' + cols.map(c => {
         const v = r[c[0]];
+        if (c[0] === 'in_stock') return '<td>' + (v ? '✅' : '❌') + '</td>';
         if (v == null) return '<td>—</td>';
         if (numKeys.has(c[0])) return '<td class="num">' + (c[0] === 'rank_in_a' ? '#' + v : fmtInt(v)) + '</td>';
         return '<td>' + escapeHtml(String(v)) + '</td>';
@@ -4354,6 +4496,7 @@ function renderInvSkuLists(lists) {
     { key: 'slow_top50', label: '🐢 Slow Top 50' },
     { key: 'discontinued_top50', label: '🚫 Discontinued Top 50' },
     { key: 'a_no_stock', label: '🚨 A 类无库存 (' + (lists.a_no_stock || []).length + ')' },
+    { key: 'a_class_all', label: '⭐ A 类全单 (' + (lists.a_class_all || []).length + ')' },
   ];
   return ''
     + '<div class="inv-section-title">📋 SKU 名单 (drill)</div>'
