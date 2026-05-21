@@ -1548,20 +1548,25 @@ async function fetchTargets(signal) {
   return j;
 }
 async function fetchCustomers(signal) {
-  // Phase 6 (2026-05-21): Customer page Owner BI. Parallel-fetch 5 views.
-  // Each degrades gracefully (degraded:true) if migration not applied.
+  // Phase 6b (2026-05-21): Customer page 从 V1 重做. customer-payload =
+  // V1 的完整数据集 (buckets_by_window / churn / cross_by_window / top100),
+  // 复用既有 customers_payload RPC. race + matrix 保留自 PR#55; trend = 12M
+  // 走廊客折线. 删 overview (4-KPI hero, 与 Overview 页重复) + member tab.
+  // 每个 view 优雅降级 (degraded:true).
   const m = state.month;
   const raceQ = new URLSearchParams({ view: 'customer-race', month: m });
   if (state.branch) raceQ.set('branch', state.branch);
-  const [overview, race, matrix, trend, member] = await Promise.all([
-    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-overview', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+  const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
+  if (state.branch) payloadQ.set('branch', state.branch);
+  const [payload, race, matrix, trend] = await Promise.all([
+    getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-trend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
-    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-member', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
   ]);
-  if (overview && overview.session_role) state.role = overview.session_role;
-  return { overview, race, matrix, trend, member };
+  if (race && race.session_role) state.role = race.session_role;
+  else if (payload && payload.session_role) state.role = payload.session_role;
+  return { payload, race, matrix, trend };
 }
 async function fetchProducts(signal) {
   const j = await getJSON('/api/products' + monthBranchQuery(), signal);
@@ -4151,9 +4156,20 @@ const RACE_META = {
 };
 const RACE_ORDER = ['chinese', 'malay', 'indian', 'other'];
 
-let customerTab = 'trend12m'; // trend12m | racetrend | member | memberbuy
-function setCustomerTab(t) { customerTab = t; renderView(); }
-window.setCustomerTab = setCustomerTab;
+// Phase 6b (2026-05-21): Customer page 根本性重做 — 从 V1 (Wiltek_MASTER.html)
+// 搬照真实设计。删 PR#55 的 4-KPI Hero (与 Overview 重复); 保留种族 cards +
+// 6店×种族矩阵; 新增 会员年龄分段 / 真·今日3件事 / 客户名单(沉睡VIP·老客流失·
+// Top VIP) / 客型×龄段 cross-tab / 12M走廊客趋势。数据来自既有的
+// customers_payload RPC (V1 同一个 Supabase)。
+let custListTab = 'sleeping'; // sleeping | churn | vip
+function setCustListTab(t) { custListTab = t; renderView(); }
+window.setCustListTab = setCustListTab;
+let custVipStore = ''; // '' = 全部店
+function setCustVipStore(v) { custVipStore = v; renderView(); }
+window.setCustVipStore = setCustVipStore;
+
+const AGE_TIER_ORDER = ['<1y', '1-5y', '5-8y', '8y+'];
+const AGE_TIER_ICON  = { '<1y': '🌱', '1-5y': '🌿', '5-8y': '🌳', '8y+': '🏛' };
 
 function renderCustomers(s) {
   // Owner-only (Tier 2 customer view = future sprint).
@@ -4164,7 +4180,7 @@ function renderCustomers(s) {
   const header = ''
     + '<div class="s4-page-header">'
     +   '<div><h1 class="s4-title">Customer · Owner BI</h1>'
-    +     '<div class="s4-sub">月份 ' + s.month + ' · 数据颗粒度: 日 (floatation) + 月 (customer_buy_lines)</div></div>'
+    +     '<div class="s4-sub">月份 ' + s.month + ' · 会员资产 + 走廊客转化 + 流失/沉睡名单 (customers_payload + floatation)</div></div>'
     +   '<button class="s4-btn primary" onclick="openAssignModal({module:\'customer\'})">⊕ 派派</button>'
     + '</div>';
 
@@ -4177,32 +4193,115 @@ function renderCustomers(s) {
 
   return '<div class="sales-v3">'
     + header
-    + renderCustomerKpiRow(s)
-    + '<div class="s4-section-title">种族拆分 <span class="s4-section-aux">本月走廊客 by race</span></div>'
+    + '<div class="s4-section-title">会员年龄分段 <span class="s4-section-aux">入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价</span></div>'
+    + renderCustomerAgeTiers(s)
+    + '<div class="s4-section-title">今日 3 件事 <span class="s4-section-aux">从本月客户数据自动选出</span></div>'
+    + renderCustomerActionPlan(s)
+    + '<div class="s4-section-title">种族拆分 <span class="s4-section-aux">本月走廊客 by race · 含走廊客目标</span></div>'
     + renderCustomerRaceCards(s)
     + '<div class="s4-section-title">6 店 × 种族表现矩阵 <span class="s4-section-aux">walk-in → 购买 (成交率)</span></div>'
     + renderCustomerStoreRaceMatrix(s)
-    + '<div class="s4-section-title">趋势 + Cross-cut</div>'
-    + renderCustomerTabs(s)
-    + '<div class="s4-section-title">Action Plan <span class="s4-section-aux">异常检测 placeholder (Sprint 9+ 跨页面归因)</span></div>'
-    + renderCustomerActionPlaceholder(s);
+    + '<div class="s4-section-title">客户名单 <span class="s4-section-aux">沉睡 VIP / 老客流失 / Top VIP · 可按店筛选</span></div>'
+    + renderCustomerLists(s)
+    + '<div class="s4-section-title">客型 × 会员龄段 <span class="s4-section-aux">12 月汇总 · 会员数 + 消费 RM</span></div>'
+    + renderCustomerCrossTab(s)
+    + '<div class="s4-section-title">12 月走廊客趋势</div>'
+    + renderCustomerTrend(s);
 }
 
-// 4-KPI hero — reuse renderOverviewKpiCard
-function renderCustomerKpiRow(s) {
-  const resp = s.data.overview || {};
-  const kpis = (resp.data && resp.data.kpis) || null;
-  const banner = (!kpis || resp.degraded)
-    ? '<div class="s4-data-gap" style="margin-bottom:12px"><strong>customer_overview_kpi RPC 未部署</strong> · <code>tools/migration_phase6_customer.sql</code> 待 apply</div>'
-    : '';
-  const defs = [
-    { key: 'walkin',              icon: '👥', title: 'Walk-in Total',       fmt: 'int' },
-    { key: 'closing_rate',        icon: '🎯', title: 'Closing Rate',        fmt: 'pct' },
-    { key: 'basket_size',         icon: '🛍', title: 'Basket Size (AOV)',    fmt: 'rm'  },
-    { key: 'revenue_from_walkin', icon: '💵', title: 'Revenue from Walk-in', fmt: 'rm'  },
-  ];
-  const cards = defs.map(def => renderOverviewKpiCard(def, (kpis && kpis[def.key]) || { status: 'gray' })).join('');
-  return banner + '<div class="kpi-hero-row">' + cards + '</div>';
+// 会员年龄分段 4 cards — replaces PR#55 4-KPI hero. From customers_payload
+// buckets_by_window: 12m → 会员数/复购率/12M 客单价; 1m → 本月消费.
+function renderCustomerAgeTiers(s) {
+  const resp = s.data.payload || {};
+  const pd = resp.data;
+  if (resp.degraded || !pd) {
+    return '<div class="s4-data-gap">customers_payload 未返回数据 — 会员分段不可用。' + escapeHtml(resp.degraded_reason || '') + '</div>';
+  }
+  const b12 = (pd.buckets_by_window && pd.buckets_by_window['12m']) || [];
+  const b1  = (pd.buckets_by_window && pd.buckets_by_window['1m'])  || [];
+  const by12 = {}; b12.forEach(x => by12[x.key] = x);
+  const by1  = {}; b1.forEach(x => by1[x.key] = x);
+  const total = (pd.summary && pd.summary.total_members) || b12.reduce((a, x) => a + (x.n || 0), 0);
+  const cards = AGE_TIER_ORDER.map(k => {
+    const r = by12[k] || { n: 0, amt: 0, aov: 0, repeat_pct: null };
+    const m = by1[k]  || { amt: 0 };
+    const sharePct = total > 0 ? (r.n / total * 100) : 0;
+    return ''
+      + '<div class="kpi-card" style="border-top-color:var(--brand)">'
+      +   '<div class="kpi-icon">' + AGE_TIER_ICON[k] + '</div>'
+      +   '<div class="kpi-title">' + k + ' 会员</div>'
+      +   '<div class="kpi-actual">' + fmtInt(r.n) + ' <span style="font-size:14px;color:#6B7280;font-weight:400">人</span></div>'
+      +   '<div class="kpi-status-row"><span class="kpi-pct" style="color:var(--s4-text-primary);font-size:16px">占会员 ' + sharePct.toFixed(1) + '%</span></div>'
+      +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + Math.min(100, sharePct) + '%;background:var(--brand)"></div></div>'
+      +   '<div class="kpi-meta">'
+      +     '本月消费 <strong>' + fmtRM(m.amt) + '</strong><br>'
+      +     '复购率 <strong>' + (r.repeat_pct != null ? Number(r.repeat_pct).toFixed(1) + '%' : '—') + '</strong> (≥2 单)<br>'
+      +     '12M 客单价 <strong>' + (r.aov != null ? fmtRM(r.aov) : '—') + '</strong>'
+      +   '</div>'
+      + '</div>';
+  }).join('');
+  return '<div class="kpi-hero-row">' + cards + '</div>';
+}
+
+// 今日 3 件事 — real Customer Action Plan (沉睡 VIP / 老客流失 / 种族转化偏低).
+// Replaces PR#55 placeholder. Auto-picked from payload + race data.
+function custActionCard(title, tone, interp, action) {
+  return ''
+    + '<div class="s4-action-card ' + tone + '">'
+    +   '<div class="a-title">' + title + '</div>'
+    +   '<div class="a-detail">' + interp + '</div>'
+    +   '<div class="a-action-text">建议:' + action + '</div>'
+    + '</div>';
+}
+function renderCustomerActionPlan(s) {
+  const pd = (s.data.payload && s.data.payload.data) || null;
+  const rd = (s.data.race && s.data.race.data) || null;
+  const cards = [];
+  if (pd) {
+    // 1) 沉睡 VIP — 高值会员近 3 月 0 单 (top100, m3_visits===0)
+    const sleeping = (pd.top100 || [])
+      .filter(r => (r.m3_visits || 0) === 0)
+      .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
+    if (sleeping.length) {
+      const s0 = sleeping[0];
+      const sumLt = sleeping.reduce((a, r) => a + (r.lifetime_amt || 0), 0);
+      const tone = sleeping.length > 30 ? 'red' : sleeping.length > 10 ? 'amber' : 'green';
+      cards.push(custActionCard('😴 沉睡 VIP 顾客', tone,
+        '近 3 月 0 单的高值会员 ' + fmtInt(sleeping.length) + ' 位 · 终身合计 ' + fmtRM(sumLt),
+        '优先回访头号 ' + escapeHtml(s0.name || s0.mc || '—') + ' (' + escapeHtml(s0.branch || '—') + ' · 终身 ' + fmtRM(s0.lifetime_amt || 0) + ')'));
+    }
+    // 2) 老客流失 — 高值老客 6 月+ 没回 (churn.summary)
+    const ch = pd.churn && pd.churn.summary;
+    if (ch && (ch.n_high_value || 0) > 0) {
+      const thr = ch.high_value_threshold || 1000;
+      const c0 = (pd.churn.rows || [])
+        .filter(r => (r.amount || 0) >= thr)
+        .sort((a, b) => (b.amount || 0) - (a.amount || 0))[0];
+      const tone = ch.n_high_value > 100 ? 'red' : ch.n_high_value > 30 ? 'amber' : 'green';
+      cards.push(custActionCard('⚠ 老客流失预警', tone,
+        fmtInt(ch.n_high_value) + ' 位高值老客 ' + (ch.cutoff_months || 6) + ' 月+ 没回 · 终身合计 ' + fmtRM(ch.lifetime_rm || 0),
+        c0 ? ('先打 ' + escapeHtml(c0.name || c0.mc || '—') + ' (' + escapeHtml(c0.branch || '—') + ' · 终身 ' + fmtRM(c0.amount || 0) + ' · ' + (c0.months_ago != null ? c0.months_ago + ' 月前' : '?') + ')') : '打开「老客流失」名单逐个回访'));
+    }
+  }
+  // 3) 种族转化偏低 — walk-in 够多但成交率低于公司均值
+  if (rd && Array.isArray(rd.races)) {
+    const companyCr = (rd.total && rd.total.closing_rate != null) ? rd.total.closing_rate : 70;
+    const cand = rd.races
+      .filter(r => (r.walkin || 0) >= 50 && r.closing_rate != null && r.closing_rate < companyCr)
+      .sort((a, b) => a.closing_rate - b.closing_rate)[0];
+    if (cand) {
+      const meta = RACE_META[cand.race] || { label: cand.race, icon: '🌏' };
+      const tone = cand.closing_rate < 50 ? 'red' : 'amber';
+      cards.push(custActionCard(meta.icon + ' ' + meta.label + ' 转化偏低', tone,
+        '客流 ' + fmtInt(cand.walkin) + ' 但成交率仅 ' + cand.closing_rate.toFixed(1) + '% (公司 ' + companyCr.toFixed(1) + '%)',
+        '复盘该族客群接待/选品 · 本月 Revenue 仅 ' + fmtRM(cand.revenue || 0)));
+    }
+  }
+  if (!cards.length) {
+    return '<div class="s4-data-gap">本月无紧急客户事项 (沉睡 / 流失 / 转化均健康),或 customers_payload 数据未就绪。</div>';
+  }
+  const top3 = cards.slice(0, 3);
+  return '<div class="s4-action-grid" style="grid-template-columns:repeat(' + top3.length + ',1fr)">' + top3.join('') + '</div>';
 }
 
 // 种族 4 cards — data display (no status border)
@@ -4214,10 +4313,17 @@ function renderCustomerRaceCards(s) {
   const races = Array.isArray(resp.data.races) ? resp.data.races : [];
   const byRace = {}; races.forEach(r => byRace[r.race] = r);
   const cards = RACE_ORDER.map(rk => {
-    const r = byRace[rk] || { walkin: 0, purchases: 0, closing_rate: null, revenue: 0, revenue_pct: null, avg_basket: null, walkin_pct: null };
+    const r = byRace[rk] || { walkin: 0, purchases: 0, closing_rate: null, revenue: 0, revenue_pct: null, avg_basket: null, walkin_pct: null, walkin_target: null, walkin_target_pct: null };
     const meta = RACE_META[rk];
     const cr = r.closing_rate;
     const barPct = Math.min(100, cr || 0);
+    // Phase 6b: 走廊客 target line (null → 「目标待设」, no fabricated numbers).
+    const targetLine = (r.walkin_target != null)
+      ? '<br>走廊客目标 <strong>' + fmtInt(r.walkin_target) + '</strong> · 进度 '
+        + (r.walkin_target_pct != null
+            ? '<strong style="color:' + (r.walkin_target_pct >= 100 ? 'var(--s4-green-text)' : r.walkin_target_pct >= 80 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)') + '">' + r.walkin_target_pct.toFixed(0) + '%</strong>'
+            : '—')
+      : '<br><span style="color:var(--s4-text-light)">走廊客目标待设</span>';
     return ''
       + '<div class="kpi-card" style="border-top-color:var(--s4-text-light)">'
       +   '<div class="kpi-icon">' + meta.icon + '</div>'
@@ -4229,6 +4335,7 @@ function renderCustomerRaceCards(s) {
       +     '购买 <strong>' + fmtInt(r.purchases) + '</strong> 人 · 占客流 ' + (r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
       +     'Revenue <strong>' + fmtRM(r.revenue) + '</strong> (' + (r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
       +     'Avg Basket <strong>' + (r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
+      +     targetLine
       +   '</div>'
       + '</div>';
   }).join('');
@@ -4290,85 +4397,134 @@ function renderCustomerStoreRaceMatrix(s) {
     + '</div></div>';
 }
 
-// Trend + cross-cut tabs
-function renderCustomerTabs(s) {
+// 客户名单 — tabs: 沉睡 VIP / 老客流失 / Top VIP. From customers_payload
+// (top100 + churn.rows). Per-store filter dropdown. Mirrors V1 churn list +
+// computeSleepingTop + VIP lifetime sort.
+function renderCustomerLists(s) {
+  const resp = s.data.payload || {};
+  const pd = resp.data;
+  if (resp.degraded || !pd) {
+    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">customers_payload 未返回数据 — 客户名单不可用。</div></div></div>';
+  }
+  const top = pd.top100 || [];
+  const churnRows = (pd.churn && pd.churn.rows) || [];
+  const thr = (pd.churn && pd.churn.summary && pd.churn.summary.high_value_threshold) || 1000;
+
+  // store filter options (union of top100 + churn branches)
+  const storeSet = new Set();
+  top.forEach(r => { if (r.branch) storeSet.add(r.branch); });
+  churnRows.forEach(r => { if (r.branch) storeSet.add(r.branch); });
+  const stores = sortStoresByCode(Array.from(storeSet));
+  const matchStore = (b) => !custVipStore || b === custVipStore;
+  const storeSel = '<select onchange="setCustVipStore(this.value)" style="height:30px;border:1px solid var(--s4-divider);border-radius:6px;padding:0 8px;font-size:13px;background:var(--s4-card-bg);color:var(--s4-text-primary)">'
+    + '<option value=""' + (custVipStore === '' ? ' selected' : '') + '>全部店</option>'
+    + stores.map(st => '<option value="' + st + '"' + (custVipStore === st ? ' selected' : '') + '>' + escapeHtml(matrixStoreLabel(st)) + '</option>').join('')
+    + '</select>';
+
   const tabs = [
-    { id: 'trend12m',  label: '12M 趋势' },
-    { id: 'racetrend', label: '种族对比' },
-    { id: 'member',    label: '客型分析' },
-    { id: 'memberbuy', label: '会员购买' },
+    { id: 'sleeping', label: '😴 沉睡 VIP' },
+    { id: 'churn',    label: '⚠ 老客流失' },
+    { id: 'vip',      label: '⭐ Top VIP' },
   ];
   const tabHtml = tabs.map(t =>
-    '<button class="' + (customerTab === t.id ? 'active' : '') + '" onclick="setCustomerTab(\'' + t.id + '\')">' + t.label + '</button>'
+    '<button class="' + (custListTab === t.id ? 'active' : '') + '" onclick="setCustListTab(\'' + t.id + '\')">' + t.label + '</button>'
   ).join('');
+
+  const CAP = 50;
+  const capNote = (n) => n > CAP
+    ? '<div class="muted" style="margin-top:8px;font-size:11px">只显示前 ' + CAP + ' 条,共 ' + fmtInt(n) + ' 条。</div>'
+    : '';
+  const nameCell = (r) => '<td><div style="font-weight:600">' + escapeHtml(r.name || r.mc || '—') + '</div><div style="font-size:11px;color:#6B7280">' + escapeHtml(r.mc || '') + '</div></td>';
+  const storeTag = (b) => '<td><strong>' + escapeHtml(b || '—') + '</strong></td>';
+
   let body;
-  if (customerTab === 'trend12m') {
-    const tr = s.data.trend || {};
-    const series = (tr.data && tr.data.series) || [];
-    if (tr.degraded || series.length === 0) {
-      body = '<div class="s4-data-gap">customer_trend RPC 未部署或无数据</div>';
+  if (custListTab === 'sleeping') {
+    const rows = top.filter(r => (r.m3_visits || 0) === 0 && matchStore(r.branch))
+      .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
+    if (!rows.length) {
+      body = '<div class="s4-data-gap">无沉睡 VIP (近 3 月 0 单的高值会员)' + (custVipStore ? ' · ' + escapeHtml(matrixStoreLabel(custVipStore)) : '') + '。</div>';
     } else {
-      body = svgLineChart({
-        series: [
-          { name: 'Walk-in', color: '#1F5F4A', points: series.map(p => ({ x: p.ym, y: p.walkin })) },
-        ], width: 900, height: 240, yFmt: fmtInt,
-      }) + '<div class="meta">12M walk-in 客流。closing/basket/revenue 切换待 Sprint 7 (多线 selector)。</div>';
+      body = '<table><thead><tr><th>店</th><th>会员</th><th>终身 RM</th><th>近 6 月消费</th><th>上次</th></tr></thead><tbody>'
+        + rows.slice(0, CAP).map(r => '<tr>' + storeTag(r.branch) + nameCell(r)
+            + '<td>' + fmtRM(r.lifetime_amt || 0) + '</td>'
+            + '<td>' + fmtRM(r.m6_amt || 0) + '</td>'
+            + '<td>' + escapeHtml(r.last || '—') + '</td></tr>').join('')
+        + '</tbody></table>' + capNote(rows.length);
     }
-  } else if (customerTab === 'racetrend') {
-    // current-month race comparison as bars (floatation is monthly; no daily race)
-    const resp = s.data.race || {};
-    const races = (resp.data && resp.data.races) || [];
-    if (resp.degraded || races.length === 0) {
-      body = '<div class="s4-data-gap">种族数据未部署</div>';
+  } else if (custListTab === 'churn') {
+    const rows = churnRows.filter(r => (r.amount || 0) >= thr && matchStore(r.branch))
+      .sort((a, b) => (b.amount || 0) - (a.amount || 0));
+    if (!rows.length) {
+      body = '<div class="s4-data-gap">无高值流失老客 (终身 ≥ RM ' + fmtInt(thr) + ',6 月+ 没回)' + (custVipStore ? ' · ' + escapeHtml(matrixStoreLabel(custVipStore)) : '') + '。</div>';
     } else {
-      body = svgBarLine({
-        labels: races.map(r => RACE_META[r.race]?.label.split(' ')[0] || r.race),
-        bars:   races.map(r => r.walkin),
-        line:   races.map(r => r.closing_rate || 0),
-        barLabel: '客流', lineLabel: '成交率%',
-        width: 900, height: 240,
-      }) + '<div class="meta">本月 by race 客流 (柱) + 成交率 (折线)。floatation 月颗粒, 无逐日 race 拆分。</div>';
+      body = '<table><thead><tr><th>店</th><th>会员</th><th>终身 RM</th><th>沉默</th><th>客型</th><th>上次</th></tr></thead><tbody>'
+        + rows.slice(0, CAP).map(r => '<tr>' + storeTag(r.branch) + nameCell(r)
+            + '<td>' + fmtRM(r.amount || 0) + '</td>'
+            + '<td>' + (r.months_ago != null ? r.months_ago + ' 月' : '—') + '</td>'
+            + '<td>' + escapeHtml(r.cust_type || '—') + '</td>'
+            + '<td>' + escapeHtml(r.last || '—') + '</td></tr>').join('')
+        + '</tbody></table>' + capNote(rows.length);
     }
-  } else if (customerTab === 'member') {
-    const resp = s.data.member || {};
-    if (resp.degraded || resp.data?.status === 'data_gap' || !resp.data) {
-      const msg = resp.data?.message || resp.degraded_reason || 'customer_buy_lines 本月无数据';
-      body = '<div class="s4-data-gap">⚠ ' + escapeHtml(msg) + ' (cbl 仅 2026-04 1 月, Apps Script sync 后启用)</div>';
+  } else { // vip
+    const rows = top.filter(r => matchStore(r.branch))
+      .sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0));
+    if (!rows.length) {
+      body = '<div class="s4-data-gap">无 VIP 数据' + (custVipStore ? ' · ' + escapeHtml(matrixStoreLabel(custVipStore)) : '') + '。</div>';
     } else {
-      const d = resp.data;
-      const types = d.cust_types || [];
-      body = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">'
-           + '<div class="kpi-card" style="border-top-color:var(--brand)"><div class="kpi-title">会员占比</div><div class="kpi-actual">' + (d.member_pct != null ? d.member_pct.toFixed(1) + '%' : '—') + '</div><div class="kpi-meta">' + fmtInt(d.member_rows) + ' / ' + fmtInt(d.total_rows) + ' 行有 member_code</div></div>'
-           + '<div class="kpi-card" style="border-top-color:var(--brand)"><div class="kpi-title">新客 vs 老客 (销售)</div><div class="kpi-meta" style="margin-top:8px;font-size:14px">新客 <strong>' + fmtRM(d.new_customer_sales) + '</strong><br>老客 <strong>' + fmtRM(d.old_customer_sales) + '</strong></div></div>'
-           + '</div>'
-           + '<table><thead><tr><th>客型</th><th>会员数</th><th>销售 RM</th><th>明细行数</th></tr></thead><tbody>'
-           + types.map(t => '<tr><td>' + escapeHtml(t.cust_type) + '</td><td>' + fmtInt(t.members) + '</td><td>' + fmtRM(t.sales) + '</td><td>' + fmtInt(t.rows) + '</td></tr>').join('')
-           + '</tbody></table>';
+      body = '<table><thead><tr><th>店</th><th>会员</th><th>终身 RM</th><th>12M 访问</th><th>客型</th><th>上次</th></tr></thead><tbody>'
+        + rows.slice(0, CAP).map(r => '<tr>' + storeTag(r.branch) + nameCell(r)
+            + '<td>' + fmtRM(r.lifetime_amt || 0) + '</td>'
+            + '<td>' + fmtInt(r.ltm_visits || 0) + '</td>'
+            + '<td>' + escapeHtml(r.cust_type || '—') + '</td>'
+            + '<td>' + escapeHtml(r.last || '—') + '</td></tr>').join('')
+        + '</tbody></table>' + capNote(rows.length);
     }
-  } else if (customerTab === 'memberbuy') {
-    body = '<div class="s4-data-gap"><strong>会员购买 Top 20</strong> · 需 per-member 明细 RPC (Sprint 7+). 当前 customer_member_analysis 返聚合, 未返单会员排行。</div>';
-  } else {
-    body = '<div class="muted">No data</div>';
   }
-  return '<div class="s4-drill"><div class="s4-drill-tabs">' + tabHtml + '</div><div class="s4-drill-body">' + body + '</div></div>';
+  return '<div class="s4-drill">'
+    + '<div class="s4-drill-tabs">' + tabHtml
+    +   '<div style="margin-left:auto;display:flex;align-items:center;padding:6px 14px">' + storeSel + '</div>'
+    + '</div>'
+    + '<div class="s4-drill-body">' + body + '</div></div>';
 }
 
-// Action Plan placeholder (full cross-page attribution = Sprint 9+)
-function renderCustomerActionPlaceholder(s) {
-  const resp = s.data.race || {};
-  const races = (resp.data && resp.data.races) || [];
-  const cards = [];
-  // Heuristic: race with low closing despite decent walk-in
-  races.forEach(r => {
-    if (r.walkin >= 50 && r.closing_rate != null && r.closing_rate < 50) {
-      cards.push('<div class="s4-action-card amber"><div class="a-title">' + (RACE_META[r.race]?.label || r.race) + ' 转化偏低</div>'
-        + '<div class="a-detail">客流 ' + fmtInt(r.walkin) + ' 但成交率仅 ' + r.closing_rate.toFixed(1) + '% · Revenue ' + fmtRM(r.revenue) + '</div></div>');
-    }
-  });
-  if (!cards.length) {
-    cards.push('<div class="s4-data-gap">本 sprint Action Plan 仅 placeholder。完整跨页面归因 Sprint 9+ (Today 大脑组装时)。</div>');
+// 客型 × 会员龄段 cross-tab — from customers_payload cross_by_window['12m'].
+// Each cell: 会员数 + 12 月消费 RM. Mirrors V1 ciCrossTable.
+function renderCustomerCrossTab(s) {
+  const resp = s.data.payload || {};
+  const pd = resp.data;
+  if (resp.degraded || !pd || !pd.cross_by_window) {
+    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">customers_payload 无 cross_by_window 数据。</div></div></div>';
   }
-  return '<div class="s4-action-grid" style="grid-template-columns:1fr"><div>' + cards.join('') + '</div></div>';
+  const cross = pd.cross_by_window['12m'] || {};
+  const types = pd.types || ['Walk-in', 'Contractor', 'Interior Designer', 'Other'];
+  const ages = AGE_TIER_ORDER;
+  const rows = types.map(tp => {
+    const cells = ages.map(a => {
+      const c = (cross[tp] && cross[tp][a]) || { n: 0, amt: 0 };
+      return '<td>' + fmtInt(c.n) + '<br><span style="font-size:11px;color:#6B7280">' + fmtRM(c.amt) + '</span></td>';
+    }).join('');
+    return '<tr><td><strong>' + escapeHtml(tp) + '</strong></td>' + cells + '</tr>';
+  }).join('');
+  return '<div class="s4-drill"><div class="s4-drill-body">'
+    + '<table><thead><tr><th>客型</th>' + ages.map(a => '<th>' + a + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table>'
+    + '<div class="muted" style="margin-top:8px;font-size:11px">每格: 会员数 + 12 月消费 RM</div>'
+    + '</div></div>';
+}
+
+// 12 月走廊客趋势 — single line (floatation monthly). From customer_trend RPC.
+function renderCustomerTrend(s) {
+  const tr = s.data.trend || {};
+  const series = (tr.data && tr.data.series) || [];
+  if (tr.degraded || series.length === 0) {
+    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">customer_trend RPC 未部署或无数据。</div></div></div>';
+  }
+  return '<div class="s4-drill"><div class="s4-drill-body">'
+    + svgLineChart({
+        series: [{ name: 'Walk-in', color: '#1F5F4A', points: series.map(p => ({ x: p.ym, y: p.walkin })) }],
+        width: 900, height: 240, yFmt: fmtInt,
+      })
+    + '<div class="meta" style="font-size:12px;color:#6B7280;margin-top:8px">12 月月度走廊客 (floatation 月颗粒)。</div>'
+    + '</div></div>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════

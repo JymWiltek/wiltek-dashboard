@@ -31,7 +31,9 @@ const PHASE4_VIEWS = ['sales-owner', 'sales-store', 'sales-drill', 'actions'];
 // Phase 5 Owner Overview (2026-05-20): 4-KPI hero.
 const PHASE5_VIEWS = ['overview'];
 // Phase 6 Customer page (2026-05-21): owner BI customer views.
-const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member'];
+// Phase 6b (2026-05-21): customer-payload reuses V1's customers_payload RPC
+// (age-tier buckets / churn / cross-tab / top100 VIPs) — same Supabase as V1.
+const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload'];
 const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
@@ -334,6 +336,9 @@ async function handleCustomer(req, res, user, ym, view, queryBranch) {
     'customer-matrix':   { rpc: 'customer_store_race_matrix', args: { p_ym: ym } },
     'customer-trend':    { rpc: 'customer_trend',             args: { p_ym: ym } },
     'customer-member':   { rpc: 'customer_member_analysis',   args: { p_ym: ym } },
+    // Phase 6b: V1's full customer dataset (buckets_by_window / churn /
+    // cross_by_window / top100). p_branch null = company; manager = own store.
+    'customer-payload':  { rpc: 'customers_payload',          args: { p_month: ym, p_branch: queryBranch || null } },
   };
   const spec = map[view];
   if (!spec) return res.status(400).json({ ok: false, error: 'bad customer view' });
