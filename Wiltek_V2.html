@@ -405,6 +405,13 @@ table.branch-table .mini-bar-fill {
 /* ═══ Phase 7 — Inventory Owner BI ═══ */
 .inv-section-title { font-size: 18px; font-weight: 700; color: #0F172A; margin: 24px 0 4px; }
 .inv-section-sub { font-size: 13px; color: #6B7280; margin-bottom: 8px; }
+/* ═══ Phase 8 — Products Owner BI ═══ */
+.prod-bar { display: inline-block; height: 8px; background: #0F172A; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.prod-pro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 900px) { .prod-pro-grid { grid-template-columns: 1fr; } }
+.prod-pro-top10-title { font-size: 14px; font-weight: 600; color: #0F172A; margin: 12px 0 8px; }
+.prod-pro-row { background: #FFFBEB; }
+.prod-hero-sub { font-size: 13px; color: #374151; margin-top: 2px; }
 .inv-synth-banner {
   background: #FEF3C7; border: 1px solid #FDE68A; color: #78350F;
   padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; line-height: 1.5;
@@ -1712,7 +1719,14 @@ async function fetchCustomers(signal) {
   return { payload, race, matrix, trend, agecat, actions };
 }
 async function fetchProducts(signal) {
-  const j = await getJSON('/api/products' + monthBranchQuery(), signal);
+  // Phase 8: Products Owner BI — 1 RPC (mode=phase8) returns the 8-section
+  // payload (hero / price_bands / top_main_groups / source_split / top20_sku /
+  // pro_preference / top_brands / action_plan). Scope NOT IN (W10/W12/WEX).
+  const baseQ = new URLSearchParams();
+  if (state.month)  baseQ.set('month', state.month);
+  if (state.branch) baseQ.set('branch', state.branch);
+  baseQ.set('mode', 'phase8');
+  const j = await getJSON('/api/products?' + baseQ.toString(), signal);
   state.role = j.session_role || state.role;
   return j;
 }
@@ -4543,9 +4557,10 @@ function renderInvOemTransit(o) {
 }
 
 // ── Section 8: Action Plan (5 类异常 + 派派) ──
-function renderInvActionPlan(actions) {
+function renderInvActionPlan(actions, sectionTitle) {
+  const t = sectionTitle || '⚡ Inventory Action Plan';
   if (!actions || !actions.length) {
-    return '<div class="inv-section-title">⚡ Inventory Action Plan</div><div class="inv-empty">— 今日健康, 暂无异常 —</div>';
+    return '<div class="inv-section-title">' + t + '</div><div class="inv-empty">— 今日健康, 暂无异常 —</div>';
   }
   window.__invActions = actions;
   const cards = actions.map((a, i) => {
@@ -4561,7 +4576,7 @@ function renderInvActionPlan(actions) {
       +   '</div>'
       + '</div>';
   }).join('');
-  return '<div class="inv-section-title">⚡ Inventory Action Plan</div><div class="inv-actions">' + cards + '</div>';
+  return '<div class="inv-section-title">' + t + '</div><div class="inv-actions">' + cards + '</div>';
 }
 // 派派: reuse 现有 openAssignModal (Customer/Sales 页同一接口)。
 window.invAssignAction = function(idx) {
@@ -5155,86 +5170,202 @@ function renderCustomerTrend(s) {
    3 KPI from /api/products (Velocity ABCD / Top 20 migrations / Strategic Push)
    + 4 alerts (mostly placeholder — V1 same; need stock context).
 ═══════════════════════════════════════════════════════════════════ */
+// ═══ Phase 8 — Products Owner BI (8 sections, Inventory prototype) ═══
 function renderProducts(s) {
-  const title = '<h1 class="page-title">Products</h1>'
-              + '<p class="page-sub">Snapshot ' + s.month
-              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · Company-wide')
-              + ' · 3 KPI + 4 alerts · /api/products</p>';
-
-  if (s.loading || !s.data) {
-    return title + '<div class="cards-grid">'
-      + skeletonCard('① SKU Velocity')
-      + skeletonCard('② Top 20 migrations')
-      + skeletonCard('③ Strategic Push')
-      + '</div>'
-      + '<div class="section-title">Action alerts</div>'
-      + '<div class="cards-grid">'
-      + skeletonCard('① Stockout risk')
-      + skeletonCard('② Slow-mover drain')
-      + skeletonCard('③ SKU tier migration')
-      + skeletonCard('④ Designer/Contractor pref')
-      + '</div>';
-  }
-
-  const j = s.data;
-  const v = j.velocity || {};
-  const mig = j.migrations || {};
-  const sp = j.strategic_push || {};
-  const cls = v.classes || {};
-  const asOf = 'snapshot ' + (j.snapshot || '—') + (j.prev_snapshot ? ' (vs ' + j.prev_snapshot + ')' : '');
-
-  // ── KPI 1: SKU Velocity (ABCD 90d) ────────────────────────────
-  const abcdRows = ['A', 'B', 'C', 'D'].map(t => {
-    const c = cls[t] || { n: 0, amt: 0, pct: 0 };
-    return kpiRow(t + ' tier', c.n + ' SKU · ' + fmtMoneyShort(c.amt) + ' (' + (c.pct || 0) + '%)');
-  }).join('');
-  const c1 = kpiCard('① SKU Velocity (ABCD · 90d)',
-    (v.total_sku || 0) + ' SKU',
-    (v.total_active || 0) + ' active · A=top10% / B=20% / C=40% / D=30%',
-    abcdRows, asOf);
-
-  // ── KPI 2: Top 20 migrations ──────────────────────────────────
-  const migRows = (mig.top20 || []).slice(0, 6).map(x =>
-    kpiRow(escapeHtml(x.item_code) + ' · ' + escapeHtml(x.brand || '—'),
-      escapeHtml(x.migration || '') + ' · ' + fmtMoneyShort(x.amt_90d))
-  ).join('') || kpiRow('No significant cross-tier migrations', '');
-  const c2 = kpiCard('② Top 20 anomaly migrations',
-    (mig.count || 0) + '',
-    'A→C/D warning · D→A/B opportunity · C→A breakout (top 6 ↓)',
-    migRows);
-
-  // ── KPI 3: Strategic Push ─────────────────────────────────────
-  const spRows = (sp.items || []).map(x =>
-    kpiRow(escapeHtml(x.item_code) + ' · ' + escapeHtml(x.brand || '—'),
-      'opened ' + (x.days_since_open || 0) + 'd ago · ' + fmtMoneyShort(x.amt_90d))
-  ).join('') || kpiRow('No new A-tier SKUs in last 60 days', '');
-  const c3 = kpiCard('③ Strategic Push (placeholder)',
-    (sp.count || 0) + '',
-    escapeHtml(sp.note || 'Strategic_Push field pending in Item Master'),
-    spRows);
-
-  // ── Alerts (V1 same — most pending) ───────────────────────────
-  const al1 = alertCard('① Stockout risk', null,
-    '<14d SKUs · split by OEM/Agency lead time · in /api/inventory_dashboard', 'na', null);
-  const al2 = alertCard('② Slow-mover capital drain', null,
-    'Locked-up SKUs by tier · merges into /api/inventory_dashboard liquidation', 'na', null);
-  const al3Rows = (mig.top20 || []).filter(x =>
-    (x.migration || '').includes('A→') || (x.migration || '').includes('→D')
-  ).slice(0, 4).map(x =>
-    aRow(escapeHtml(x.item_code), escapeHtml(x.migration))
-  ).join('');
-  const al3 = alertCard('③ SKU tier migration',
-    al3Rows ? (mig.top20 || []).filter(x =>
-      (x.migration || '').includes('A→') || (x.migration || '').includes('→D')).length + ' moves' : null,
-    al3Rows ? 'Top 4 A-tier drops or D-tier rises' : 'No critical tier moves vs ' + (j.prev_snapshot || '—'),
-    al3Rows ? 'warn' : 'ok', al3Rows);
-  const al4 = alertCard('④ Designer / Contractor SKU pref', null,
-    'Per-cust-type per-SKU map pending · cust_type on /api/customers', 'na', null);
-
+  const title = '<h1 class="page-title">Products · Owner BI</h1>'
+              + '<p class="page-sub">月份 ' + s.month
+              + (s.branch ? ' · <strong>' + s.branch + '</strong>' : ' · 全公司 (主力 6 店 + 仓 NOT IN W10/W12/WEX)')
+              + ' · 数据颗粒度: 月</p>';
+  if (s.loading || !s.data) return title + '<div class="inv-empty">加载中... / Loading...</div>';
+  const d = s.data;
   return title
-    + '<div class="cards-grid">' + c1 + c2 + c3 + '</div>'
-    + '<div class="section-title">Action alerts</div>'
-    + '<div class="cards-grid">' + al1 + al2 + al3 + al4 + '</div>';
+    + renderProdDataNotes(d.data_notes)
+    + renderProdHero(d.hero)
+    + renderProdPriceBands(d.price_bands)
+    + renderProdTopMainGroups(d.top_main_groups)
+    + renderProdSourceSplit(d.source_split)
+    + renderProdTop20Sku(d.top20_sku)
+    + renderProdProPreference(d.pro_preference)
+    + renderProdTopBrands(d.top_brands)
+    + renderInvActionPlan(d.action_plan || [], '⚡ Products Action Plan');
+}
+
+function renderProdDataNotes(notes) {
+  if (!notes) return '';
+  return '<div class="inv-synth-banner" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A">'
+    + '<strong>📌 数据说明</strong>: sales 28 月历史 · customer_buy_lines 仅 2026-04 单月 (多月 sync 等) · '
+    + '价格段从真实成交反推 (items.prc_range 字段不可信)</div>';
+}
+
+function renderProdHero(hero) {
+  if (!hero) return '';
+  const defs = [
+    { key: 'sales_total',    icon: '💰', title: '总销售 / Total Sales', fmt: 'rm' },
+    { key: 'sales_per_sku',  icon: '📊', title: '每 SKU 平均 / Per-SKU Avg', fmt: 'rm' },
+    { key: 'active_sku',     icon: '✅', title: '活跃 SKU / Active SKU', fmt: 'count_pct' },
+    { key: 'top_main_group', icon: '🏆', title: 'Top 品类 / Top Category', fmt: 'category' },
+  ];
+  return '<div class="kpi-hero-row prod-hero">' + defs.map(def => renderProdHeroCard(def, hero[def.key] || {})).join('') + '</div>';
+}
+function renderProdHeroCard(def, k) {
+  let bigNum = '—', subLine = '';
+  if (def.fmt === 'rm') { bigNum = fmtRM(k.amount_rm || 0); subLine = k.sku_count != null ? fmtInt(k.sku_count) + ' SKU' : ''; }
+  else if (def.fmt === 'count_pct') { bigNum = fmtInt(k.count || 0); subLine = k.pct != null ? k.pct.toFixed(1) + '% of ' + fmtInt(k.total_sku || 0) : ''; }
+  else if (def.fmt === 'category') { bigNum = escapeHtml(k.name || '—'); subLine = (k.pct != null ? k.pct.toFixed(1) + '%' : '—') + ' · ' + fmtRM(k.amount_rm || 0); }
+  const momPct = k.mom_pct;
+  let momColor = 'var(--s4-text-light)', momArrow = '↔';
+  if (momPct != null && Math.abs(momPct) >= 2) {
+    if (momPct > 0) { momArrow = '↑'; momColor = 'var(--s4-green-text)'; }
+    else { momArrow = '↓'; momColor = 'var(--s4-red-text)'; }
+  }
+  const momLine = momPct != null
+    ? 'vs 上月 <strong style="color:' + momColor + '">' + momArrow + ' ' + Math.abs(momPct).toFixed(1) + '%</strong>'
+    : 'vs 上月 <strong style="color:var(--s4-text-light)">—</strong>';
+  return '<div class="kpi-card prod-hero-card">'
+    + '<div class="kpi-icon">' + def.icon + '</div>'
+    + '<div class="kpi-title">' + def.title + '</div>'
+    + '<div class="kpi-actual">' + bigNum + '</div>'
+    + '<div class="prod-hero-sub">' + escapeHtml(subLine || '') + '</div>'
+    + '<div class="kpi-meta">' + momLine + '</div>'
+    + '</div>';
+}
+
+function prodMomCell(momPct) {
+  const momStr = momPct == null ? '—' : (momPct > 0 ? '↑ +' : '↓ ') + Math.abs(momPct).toFixed(1) + '%';
+  const momColor = momPct == null ? 'var(--s4-text-light)' : (momPct > 0 ? 'var(--s4-green-text)' : 'var(--s4-red-text)');
+  return '<td class="num" style="color:' + momColor + ';font-weight:600">' + momStr + '</td>';
+}
+
+function renderProdPriceBands(bands) {
+  if (!bands || !bands.length) return '';
+  const rows = bands.map(b => '<tr>'
+    + '<td class="cls-cell">' + escapeHtml(b.band) + '</td>'
+    + '<td class="num">' + fmtRM(b.sales_rm) + '</td>'
+    + '<td class="num">' + fmtInt(b.sku_count) + '</td>'
+    + '<td class="num">' + (b.pct != null ? b.pct.toFixed(1) + '%' : '—') + '</td>'
+    + prodMomCell(b.mom_pct) + '</tr>').join('');
+  return '<div class="inv-section-title">💵 价格段分布 / Price Band Distribution</div>'
+    + '<div class="inv-section-sub">从 sales 真实成交单价反推 (items.prc_range 字段不可信)</div>'
+    + '<table class="inv-5class-table"><thead><tr><th>价格段</th><th class="num">销售 RM</th><th class="num">SKU</th><th class="num">占比</th><th class="num">vs 上月</th></tr></thead><tbody>'
+    + rows + '</tbody></table>';
+}
+
+function renderProdTopMainGroups(mgs) {
+  if (!mgs || !mgs.length) return '';
+  const rows = mgs.map((m, i) => '<tr>'
+    + '<td>#' + (i + 1) + '</td>'
+    + '<td><strong>' + escapeHtml(m.name) + '</strong></td>'
+    + '<td class="num">' + fmtRM(m.sales_rm) + '</td>'
+    + '<td class="num">' + fmtInt(m.sku_count) + '</td>'
+    + '<td>' + (m.pct ? '<span class="prod-bar" style="width:' + Math.min(120, m.pct * 2) + 'px"></span> ' : '') + (m.pct != null ? m.pct.toFixed(1) + '%' : '—') + '</td>'
+    + prodMomCell(m.mom_pct) + '</tr>').join('');
+  return '<div class="inv-section-title">🏷️ Top 10 品类 / Top 10 Main Groups</div>'
+    + '<table class="inv-5class-table"><thead><tr><th>#</th><th>品类</th><th class="num">销售 RM</th><th class="num">SKU</th><th>占比</th><th class="num">vs 上月</th></tr></thead><tbody>'
+    + rows + '</tbody></table>';
+}
+
+function renderProdSourceSplit(src) {
+  if (!src) return '';
+  const labels = {
+    oem_cn:    { code: 'OEM (CN)',    label: '🇨🇳 自牌 / OEM China',         tone: '#D97706' },
+    agency_my: { code: 'Agency (MY)', label: '🇲🇾 代理 / Agency Malaysia',   tone: '#16A34A' },
+    other:     { code: 'Other',       label: '🌐 其他 / Other',              tone: '#6B7280' },
+  };
+  const cards = ['oem_cn', 'agency_my', 'other'].map(key => {
+    const k = src[key] || {}; const def = labels[key];
+    const momPct = k.mom_pct;
+    const momStr = momPct == null ? '—' : (momPct > 0 ? '↑ +' : '↓ ') + Math.abs(momPct).toFixed(1) + '%';
+    const momColor = momPct == null ? '#6B7280' : (momPct > 0 ? '#16A34A' : '#DC2626');
+    return '<div class="inv-warehouse-card" style="border-top:3px solid ' + def.tone + '">'
+      + '<div class="wh-code">' + def.code + '</div>'
+      + '<div class="wh-label">' + def.label + '</div>'
+      + '<div class="wh-value" style="color:' + def.tone + '">' + fmtRM(k.sales_rm || 0) + '</div>'
+      + '<div class="wh-rows">'
+      +   '<div><span class="wh-rk">SKU</span><span class="wh-rv">' + fmtInt(k.sku_count || 0) + ' 个</span></div>'
+      +   '<div><span class="wh-rk">占比</span><span class="wh-rv">' + (k.pct != null ? k.pct.toFixed(1) + '%' : '—') + '</span></div>'
+      +   '<div><span class="wh-rk">vs 上月</span><span class="wh-rv" style="color:' + momColor + '">' + momStr + '</span></div>'
+      + '</div></div>';
+  }).join('');
+  return '<div class="inv-section-title">🌏 来源对比 / Source Split (OEM vs Agency)</div>'
+    + '<div class="inv-warehouse-row">' + cards + '</div>';
+}
+
+function renderProdTop20Sku(skus) {
+  if (!skus || !skus.length) return '';
+  window.__prodTop20 = skus;  // for CSV export (avoid inline <script> injection)
+  const rows = skus.map((s, i) => {
+    const flag = { CHINA: '🇨🇳 CN', MALAYSIA: '🇲🇾 MY' }[s.country] || '🌐';
+    return '<tr>'
+      + '<td>#' + (i + 1) + '</td>'
+      + '<td><code>' + escapeHtml(s.item_code) + '</code></td>'
+      + '<td>' + escapeHtml(s.main_group || '—') + '</td>'
+      + '<td>' + escapeHtml(s.brand || '—') + ' <span style="font-size:11px;color:#6B7280">' + flag + '</span></td>'
+      + '<td class="num">' + fmtInt(s.qty_30d || 0) + '</td>'
+      + '<td class="num"><strong>' + fmtRM(s.sales_30d_rm) + '</strong></td>'
+      + '<td class="num">' + fmtRM(s.avg_price || 0) + '</td></tr>';
+  }).join('');
+  return '<div class="inv-section-title">⭐ Top 20 SKU (按销售)</div>'
+    + '<div class="inv-sku-export-row"><button class="inv-csv-btn" onclick="prodExportTop20Csv()">📥 CSV 导出</button></div>'
+    + '<table class="inv-sku-table"><thead><tr><th>#</th><th>物料</th><th>品类</th><th>品牌</th><th class="num">件</th><th class="num">销售 RM</th><th class="num">单价 RM</th></tr></thead><tbody>'
+    + rows + '</tbody></table>';
+}
+window.prodExportTop20Csv = function() {
+  const rows = window.__prodTop20 || [];
+  if (!rows.length) return alert('无数据');
+  const keys = Object.keys(rows[0]);
+  const csv = [keys.join(',')].concat(rows.map(r => keys.map(k => {
+    const v = r[k]; if (v == null) return '';
+    const x = String(v); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
+  }).join(','))).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'products_top20_' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+};
+
+function renderProdProPreference(pro) {
+  if (!pro) return '';
+  const byType = pro.by_cust_type || [];
+  const summaryRows = byType.map(t => {
+    const isPro = t.cust_type === 'D' || t.cust_type === 'C';
+    return '<tr' + (isPro ? ' class="prod-pro-row"' : '') + '>'
+      + '<td><strong>' + escapeHtml(t.cust_type_label) + '</strong> <code>' + escapeHtml(t.cust_type) + '</code></td>'
+      + '<td class="num">' + fmtInt(t.customer_count) + '</td>'
+      + '<td class="num">' + fmtInt(t.sku_count) + '</td>'
+      + '<td class="num">' + fmtInt(t.lines) + '</td>'
+      + '<td class="num"><strong>' + fmtRM(t.rm) + '</strong></td></tr>';
+  }).join('');
+  const top10Tbl = (label, items) => {
+    if (!items || !items.length) return '<div class="prod-pro-top10-title">' + label + '</div><div class="inv-empty">— 无数据 —</div>';
+    return '<div class="prod-pro-top10-title">' + label + '</div>'
+      + '<table class="inv-sku-table"><thead><tr><th>#</th><th>物料</th><th>品类</th><th class="num">单数</th><th class="num">RM</th></tr></thead><tbody>'
+      + items.map((it, i) => '<tr><td>#' + (i + 1) + '</td><td><code>' + escapeHtml(it.item_code) + '</code></td><td>' + escapeHtml(it.main_group || '—') + '</td><td class="num">' + fmtInt(it.lines) + '</td><td class="num">' + fmtRM(it.amount) + '</td></tr>').join('')
+      + '</tbody></table>';
+  };
+  return '<div class="inv-section-title">🎨 Designer & Contractor SKU 偏好</div>'
+    + '<div class="inv-section-sub">' + escapeHtml(pro.data_window || '') + '</div>'
+    + '<table class="inv-5class-table"><thead><tr><th>客户类型</th><th class="num">客户数</th><th class="num">SKU 数</th><th class="num">单数</th><th class="num">销售 RM</th></tr></thead><tbody>'
+    + summaryRows + '</tbody></table>'
+    + '<div class="prod-pro-grid">'
+    +   '<div>' + top10Tbl('🏗️ Contractor Top 10 SKU', pro.contractor_top10) + '</div>'
+    +   '<div>' + top10Tbl('🎨 Designer Top 10 SKU', pro.designer_top10) + '</div>'
+    + '</div>';
+}
+
+function renderProdTopBrands(brands) {
+  if (!brands || !brands.length) return '';
+  const rows = brands.map((b, i) => {
+    const flag = { CHINA: '🇨🇳 CN', MALAYSIA: '🇲🇾 MY' }[b.country] || '🌐';
+    return '<tr>'
+      + '<td>#' + (i + 1) + '</td>'
+      + '<td><strong>' + escapeHtml(b.brand) + '</strong> ' + flag + '</td>'
+      + '<td class="num">' + fmtInt(b.sku_count) + '</td>'
+      + '<td class="num">' + fmtRM(b.sales_rm) + '</td>'
+      + '<td class="num">' + (b.pct != null ? b.pct.toFixed(1) + '%' : '—') + '</td>'
+      + prodMomCell(b.mom_pct) + '</tr>';
+  }).join('');
+  return '<div class="inv-section-title">🏆 Top 10 品牌 / Top 10 Brands</div>'
+    + '<table class="inv-5class-table"><thead><tr><th>#</th><th>品牌</th><th class="num">SKU</th><th class="num">销售 RM</th><th class="num">占比</th><th class="num">vs 上月</th></tr></thead><tbody>'
+    + rows + '</tbody></table>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
