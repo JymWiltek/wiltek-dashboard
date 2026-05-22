@@ -102,6 +102,14 @@ header.app-header {
   padding: 6px 12px; color: var(--text-meta); font-size: 13px;
 }
 .logout-btn:hover { color: var(--brand); border-color: var(--brand); }
+/* ═══ Phase 10B — charts + Hero status lights ═══ */
+.chart-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; margin: 8px 0 24px; overflow-x: auto; }
+.chart-card .chart-svg { width: 100%; height: auto; display: block; }
+.chart-legend-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0 8px; font-size: 12px; color: #6B7280; }
+.chart-legend-row .lg { display: inline-flex; align-items: center; gap: 5px; }
+.chart-legend-row .lg i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.hero-light-dot { position: absolute; top: 8px; left: 8px; font-size: 15px; line-height: 1; }
+.kpi-card, .cust-race-card { position: relative; }
 /* ═══ Phase 10A — lang toggle + 派派盒 (Inbox) ═══ */
 .s4-lang-btn { background: transparent; border: 1px solid #94A3B8; color: #475569; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: 0.15s; }
 .s4-lang-btn:hover { background: #F1F5F9; }
@@ -1366,6 +1374,12 @@ window.i18n = {
     'nav.inbox':     { zh: '派派盒 / Inbox',   en: 'Inbox' },
     'nav.targets':   { zh: '目标 / Targets',   en: 'Targets' },
     'lang.toggle':   { zh: 'EN', en: '中文' },
+    // Phase 10B — chart titles
+    'chart.dead_by_store':    { zh: '6 店死货 RM / Dead Stock by Store',       en: 'Dead Stock by Store' },
+    'chart.store_closing':    { zh: '6 店成交率 / Store Closing Rate',          en: 'Store Closing Rate' },
+    'chart.cat_12m':          { zh: '12 月品类销售趋势 / 12-Month Category Trend', en: '12-Month Category Trend' },
+    'chart.price_band_donut': { zh: '价格段分布 / Price Band Distribution',     en: 'Price Band Distribution' },
+    'chart.top_mg_bar':       { zh: 'Top 10 品类销售 / Top 10 Categories',       en: 'Top 10 Categories' },
     'title.inbox':   { zh: '派派盒 · Action Inbox', en: 'Action Inbox' },
     'inbox.owner_view':    { zh: '我派出去的', en: 'Actions I Assigned' },
     'inbox.assignee_view': { zh: '我被派的',   en: 'Actions Assigned to Me' },
@@ -2950,6 +2964,66 @@ function svgHeatmap(opts) {
   return svg;
 }
 
+// Phase 10B — svgBarChart: horizontal bars (6 店对比). opts:{rows:[{label,value,color?}],width,height,valueFmt}
+function svgBarChart(opts) {
+  const W = opts.width || 600, H = opts.height || 240;
+  const padL = 100, padR = 90, padT = 14, padB = 14;
+  const plotW = W - padL - padR;
+  const rows = opts.rows || [];
+  if (!rows.length) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  const rowH = (H - padT - padB) / rows.length;
+  const maxV = Math.max(...rows.map(r => r.value || 0), 0);
+  const xScale = v => maxV > 0 ? (v / maxV) * plotW : 0;
+  const valueFmt = opts.valueFmt || (v => Math.round(v).toString());
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  rows.forEach((r, i) => {
+    const cy = padT + i * rowH + rowH / 2;
+    const barH = Math.min(rowH * 0.6, 22);
+    const barW = xScale(r.value || 0);
+    const color = r.color || '#0F172A';
+    svg += '<text class="axis-text" x="' + (padL - 8) + '" y="' + (cy + 4) + '" text-anchor="end">' + svgEscape(r.label || '') + '</text>';
+    svg += '<rect x="' + padL + '" y="' + (cy - barH / 2) + '" width="' + Math.max(0, barW) + '" height="' + barH + '" fill="' + color + '" rx="2"/>';
+    svg += '<text class="legend-text" x="' + (padL + Math.max(0, barW) + 6) + '" y="' + (cy + 4) + '">' + svgEscape(valueFmt(r.value || 0)) + '</text>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// Phase 10B — svgPieChart: donut (分布对比). opts:{slices:[{label,value,color}],width,height,valueFmt}
+function svgPieChart(opts) {
+  const W = opts.width || 360, H = opts.height || 240;
+  const slices = (opts.slices || []).filter(s => (s.value || 0) > 0);
+  const total = slices.reduce((a, b) => a + (b.value || 0), 0);
+  if (!slices.length || total <= 0) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  const cx = 110, cy = H / 2, rOuter = 90, rInner = 50;
+  const valueFmt = opts.valueFmt || (v => v.toString());
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  let startA = -Math.PI / 2;
+  slices.forEach(s => {
+    const sweep = (s.value / total) * Math.PI * 2;
+    const endA = startA + sweep;
+    const x1 = cx + Math.cos(startA) * rOuter, y1 = cy + Math.sin(startA) * rOuter;
+    const x2 = cx + Math.cos(endA) * rOuter,   y2 = cy + Math.sin(endA) * rOuter;
+    const x3 = cx + Math.cos(endA) * rInner,   y3 = cy + Math.sin(endA) * rInner;
+    const x4 = cx + Math.cos(startA) * rInner, y4 = cy + Math.sin(startA) * rInner;
+    const largeArc = sweep > Math.PI ? 1 : 0;
+    svg += '<path d="M ' + x1 + ',' + y1 + ' A ' + rOuter + ',' + rOuter + ' 0 ' + largeArc + ',1 ' + x2 + ',' + y2
+         + ' L ' + x3 + ',' + y3 + ' A ' + rInner + ',' + rInner + ' 0 ' + largeArc + ',0 ' + x4 + ',' + y4 + ' Z" fill="' + (s.color || '#94A3B8') + '"/>';
+    startA = endA;
+  });
+  svg += '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="11" fill="#6B7280">Total</text>';
+  svg += '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" font-size="15" font-weight="700" fill="#0F172A">' + svgEscape(valueFmt(total)) + '</text>';
+  const legendX = 220, startY = (H - slices.length * 18) / 2 + 8;
+  slices.forEach((s, i) => {
+    const ly = startY + i * 18;
+    const pct = ((s.value / total) * 100).toFixed(1);
+    svg += '<rect x="' + legendX + '" y="' + (ly - 8) + '" width="10" height="10" fill="' + (s.color || '#94A3B8') + '" rx="2"/>';
+    svg += '<text class="legend-text" x="' + (legendX + 16) + '" y="' + ly + '">' + svgEscape(s.label) + ' ' + pct + '%</text>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+
 function svgBarLine(opts) {
   // opts: { labels:[], bars:[], line:[], barLabel, lineLabel, width, height }
   const W = opts.width || 400, H = opts.height || 200;
@@ -3474,6 +3548,7 @@ function renderOverviewKpiCard(def, k) {
 
   return ''
     + '<div class="kpi-card" style="border-top-color:' + statusColor + '">'
+    +   heroLightDot(status)   // Phase 10B 灯 (复用 RPC 已算的 status)
     +   '<div class="kpi-icon">' + def.icon + '</div>'
     +   '<div class="kpi-title">' + def.title + '</div>'
     +   '<div class="kpi-actual">' + fmtActual(k.actual) + '</div>'
@@ -4334,6 +4409,7 @@ function renderInventory(s) {
     + renderInvJudgement(d.judgement)
     + renderInvHero(d.hero, d.is_synthetic)
     + renderInv5Class(d.health_5class)
+    + renderInventoryCharts(d.matrix_main6)
     + renderInvMatrix(d.matrix_main6, d.matrix_company_dead_pct)
     + renderInvWarehouses(d.warehouses)
     + renderInvABC(d.abc)
@@ -4452,6 +4528,29 @@ if (!window.__invJudgeDelegated) {
   });
 }
 
+// Phase 10B — Inventory: 6 店死货 RM 横条 (复用 matrix_main6, 无新后端)
+function renderInventoryCharts(matrix) {
+  if (!matrix || !matrix.length) return '';
+  const rows = matrix.slice()
+    .map(r => ({ label: r.store, value: (r.Dead || 0) + (r.Discontinued || 0),
+                 color: r.dead_pct >= 50 ? '#DC2626' : r.dead_pct >= 35 ? '#D97706' : '#16A34A' }))
+    .sort((a, b) => b.value - a.value);
+  return '<div class="inv-section-title">💀 ' + t('chart.dead_by_store', '6 店死货 RM / Dead Stock by Store') + '</div>'
+    + '<div class="chart-card">' + svgBarChart({ rows, width: 640, height: 220, valueFmt: fmtMoneyShort }) + '</div>';
+}
+
+// Phase 10B — Hero 状态灯 helper. invert=true 表示数字越低越好。
+function heroLightColor(value, gThresh, aThresh, invert) {
+  if (value == null) return 'gray';
+  if (invert) { if (value <= gThresh) return 'green'; if (value <= aThresh) return 'amber'; return 'red'; }
+  if (value >= gThresh) return 'green';
+  if (value >= aThresh) return 'amber';
+  return 'red';
+}
+function heroLightDot(color) {
+  return '<span class="hero-light-dot">' + ({ green: '🟢', amber: '🟡', red: '🔴', gray: '⚪' }[color] || '⚪') + '</span>';
+}
+
 // ── Section 1: Hero 4 卡 (无目标进度条, 有 vs 上月 + SYNTH 角标) ──
 function renderInvHero(hero, isSynth) {
   if (!hero) return '';
@@ -4479,8 +4578,12 @@ function renderInvHeroCard(def, k, isSynth) {
   const momAmtLine = (momAmt != null && momAmt !== 0)
     ? '<span style="color:var(--s4-text-light);font-size:11px"> (' + (momAmt > 0 ? '+' : '') + fmtRM(momAmt) + ')</span>'
     : '';
+  // Phase 10B 灯: invert 卡 (库存/死货/缓销) ↓≥10% 绿; active ↑≥10% 绿。
+  const lightColor = momPct == null ? 'gray'
+    : (def.invert ? heroLightColor(momPct, -10, 10, true) : heroLightColor(momPct, 10, -10, false));
   return ''
     + '<div class="kpi-card inv-hero-card">'
+    +   heroLightDot(lightColor)
     +   (isSynth ? '<span class="inv-synth-badge">SYNTH</span>' : '')
     +   '<div class="kpi-icon">' + def.icon + '</div>'
     +   '<div class="kpi-title">' + def.title + '</div>'
@@ -4778,6 +4881,7 @@ function renderCustomers(s) {
     + '<div class="s4-section-title">会员年龄段 × 品类 <span class="s4-section-aux">本月销售 · 各龄段买什么 (customer_buy_lines)</span></div>'
     + renderCustomerAgeCategoryCrosstab(s)
     // 第 4 层 — 6 店 × 种族 (哪店哪族表现好)
+    + renderCustomerCharts(s)
     + '<div class="s4-section-title">6 店 × 种族表现矩阵 <span class="s4-section-aux">walk-in → 购买 (成交率)</span></div>'
     + renderCustomerStoreRaceMatrix(s)
     // 第 5 层 — 客户名单 (具体到人)
@@ -5016,6 +5120,28 @@ function histPctSpan(label, cur, base) {
   return '<span>' + label + ' <span class="' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span></span>';
 }
 
+// Phase 10B — Customer chart: 6 店成交率横条 (复用 matrix: Σ race purchases /
+// total_walkin per store)。走廊客趋势已由 renderCustomerTrend 渲染, 不重复。
+function renderCustomerCharts(s) {
+  let html = '';
+  const matrix = (s.data.matrix && s.data.matrix.data && s.data.matrix.data.matrix) || [];
+  if (matrix.length) {
+    const races = ['chinese', 'malay', 'indian', 'other'];
+    const bars = matrix.map(m => {
+      const walk = m.total_walkin || 0;
+      let pur = 0; races.forEach(rk => { if (m[rk]) pur += (m[rk].purchases || 0); });
+      const rate = walk > 0 ? Math.round(pur / walk * 1000) / 10 : 0;
+      return { label: matrixStoreLabel ? matrixStoreLabel(m.store) : m.store, value: rate,
+               color: rate >= 80 ? '#16A34A' : rate >= 60 ? '#D97706' : '#DC2626', store: m.store };
+    }).filter(b => b.value > 0).sort((a, b) => b.value - a.value);
+    if (bars.length) {
+      html += '<div class="inv-section-title">🎯 ' + t('chart.store_closing', '6 店成交率 / Store Closing Rate') + '</div>'
+        + '<div class="chart-card">' + svgBarChart({ rows: bars, width: 640, height: 220, valueFmt: v => v.toFixed(1) + '%' }) + '</div>';
+    }
+  }
+  return html;
+}
+
 function renderCustomerRaceCards(s) {
   const resp = s.data.race || {};
   if (resp.degraded || !resp.data) {
@@ -5040,8 +5166,11 @@ function renderCustomerRaceCards(s) {
       + '<span>vs 去年 —</span>'
       + histPctSpan('vs 3月均', r.walkin || 0, r.walkin_3mo_avg)
       + '</div>';
+    // Phase 10B 灯: 走廊客 target 完成率 ≥95 绿 / 80-95 黄 / <80 红; 无目标灰。
+    const raceLight = heroLightColor(r.walkin_target_pct, 95, 80, false);
     return ''
       + '<div class="cust-race-card">'
+      +   heroLightDot(raceLight)
       +   '<div class="crc-icon">' + meta.icon + '</div>'
       +   '<div class="crc-title">' + meta.label + '</div>'
       +   '<div class="crc-big">' + fmtInt(r.walkin || 0) + ' <span class="crc-unit">人</span></div>'
@@ -5451,11 +5580,41 @@ function renderProducts(s) {
     + renderProdHero(d.hero)
     + renderProdPriceBands(d.price_bands)
     + renderProdTopMainGroups(d.top_main_groups)
+    + renderProductsCharts(d)
     + renderProdSourceSplit(d.source_split)
     + renderProdTop20Sku(d.top20_sku)
     + renderProdProPreference(d.pro_preference)
     + renderProdTopBrands(d.top_brands)
     + renderInvActionPlan(d.action_plan || [], '⚡ Products Action Plan');
+}
+
+// Phase 10B — Products charts: 价格段饼图 + Top10 品类横条 (复用现有数据)
+// + 12M 品类趋势 (若 RPC 返 charts.sales_12m_by_mg)。
+function renderProductsCharts(d) {
+  let html = '';
+  const ts = (d.charts && d.charts.sales_12m_by_mg) || [];
+  if (ts.length) {
+    const byMg = {};
+    ts.forEach(r => { (byMg[r.mg] = byMg[r.mg] || []).push({ x: String(r.ym).slice(5), y: r.amt }); });
+    const palette = ['#0F172A', '#DC2626', '#D97706', '#16A34A', '#2563EB', '#94A3B8'];
+    const series = Object.keys(byMg).map((mg, i) => ({ name: mg, color: palette[i % palette.length], points: byMg[mg] }));
+    html += '<div class="inv-section-title">📈 ' + t('chart.cat_12m', '12 月品类销售趋势 / 12-Month Category Trend') + '</div>'
+         + '<div class="chart-card">' + svgLineChart({ series, width: 900, height: 260, yFmt: fmtMoneyShort }) + '</div>';
+  }
+  const bands = d.price_bands || [];
+  if (bands.length) {
+    const bandColors = ['#94A3B8', '#0F172A', '#16A34A', '#D97706', '#DC2626'];
+    const donut = svgPieChart({ slices: bands.map((b, i) => ({ label: b.band, value: b.sales_rm, color: bandColors[i % bandColors.length] })), width: 520, height: 240, valueFmt: fmtMoneyShort });
+    html += '<div class="inv-section-title">💵 ' + t('chart.price_band_donut', '价格段分布 / Price Band Distribution') + '</div>'
+         + '<div class="chart-card">' + donut + '</div>';
+  }
+  const mgs = d.top_main_groups || [];
+  if (mgs.length) {
+    const bar = svgBarChart({ rows: mgs.slice(0, 10).map(m => ({ label: m.name, value: m.sales_rm, color: '#0F172A' })), width: 680, height: 280, valueFmt: fmtMoneyShort });
+    html += '<div class="inv-section-title">🏷️ ' + t('chart.top_mg_bar', 'Top 10 品类销售 / Top 10 Categories') + '</div>'
+         + '<div class="chart-card">' + bar + '</div>';
+  }
+  return html;
 }
 
 function renderProdDataNotes(notes) {
@@ -5489,7 +5648,14 @@ function renderProdHeroCard(def, k) {
   const momLine = momPct != null
     ? 'vs 上月 <strong style="color:' + momColor + '">' + momArrow + ' ' + Math.abs(momPct).toFixed(1) + '%</strong>'
     : 'vs 上月 <strong style="color:var(--s4-text-light)">—</strong>';
+  // Phase 10B 灯 (按 def.key 业务规则)
+  let lightColor = 'gray';
+  if (def.key === 'sales_total')      lightColor = heroLightColor(momPct, 5, -5, false);
+  else if (def.key === 'active_sku')  lightColor = heroLightColor(k.pct, 20, 10, false);
+  else if (def.key === 'top_main_group') lightColor = (k.pct == null) ? 'gray' : (k.pct >= 25 && k.pct <= 40 ? 'green' : k.pct > 40 ? 'amber' : 'red');
+  else if (def.key === 'sales_per_sku') lightColor = heroLightColor(momPct, 5, -5, false);
   return '<div class="kpi-card prod-hero-card">'
+    + heroLightDot(lightColor)
     + '<div class="kpi-icon">' + def.icon + '</div>'
     + '<div class="kpi-title">' + def.title + '</div>'
     + '<div class="kpi-actual">' + bigNum + '</div>'
