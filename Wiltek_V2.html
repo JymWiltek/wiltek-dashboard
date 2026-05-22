@@ -102,6 +102,33 @@ header.app-header {
   padding: 6px 12px; color: var(--text-meta); font-size: 13px;
 }
 .logout-btn:hover { color: var(--brand); border-color: var(--brand); }
+/* ═══ Phase 10A — lang toggle + 派派盒 (Inbox) ═══ */
+.s4-lang-btn { background: transparent; border: 1px solid #94A3B8; color: #475569; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: 0.15s; }
+.s4-lang-btn:hover { background: #F1F5F9; }
+.inbox-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 16px 0; }
+@media (max-width: 900px) { .inbox-kpi-row { grid-template-columns: repeat(2, 1fr); } }
+.inbox-kpi-card { background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB; display: flex; flex-direction: column; gap: 6px; }
+.inbox-kpi-icon { font-size: 18px; }
+.inbox-kpi-label { font-size: 12px; color: #6B7280; letter-spacing: 0.5px; }
+.inbox-kpi-value { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.inbox-tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.inbox-tab-btn { padding: 8px 14px; background: #fff; border: 1px solid #E5E7EB; border-radius: 6px; font-size: 13px; color: #6B7280; cursor: pointer; transition: 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+.inbox-tab-btn:hover { border-color: #94A3B8; }
+.inbox-tab-btn.active { background: #0F172A; color: #fff; border-color: #0F172A; }
+.inbox-tab-count { background: rgba(0,0,0,0.1); padding: 1px 6px; border-radius: 8px; font-size: 11px; }
+.inbox-tab-btn.active .inbox-tab-count { background: rgba(255,255,255,0.2); }
+.inbox-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; margin-top: 8px; }
+.inbox-table th, .inbox-table td { padding: 10px 14px; border-bottom: 1px solid #F3F4F6; font-size: 13px; text-align: left; vertical-align: top; }
+.inbox-table th { background: #F9FAFB; font-size: 11px; color: #6B7280; letter-spacing: 0.5px; }
+.inbox-table .inbox-desc { font-size: 11px; color: #6B7280; }
+.inbox-table tr.inbox-row-overdue { background: #FEF2F2; }
+.inbox-action-cell { white-space: nowrap; }
+.inbox-action-cell .inbox-btn { padding: 4px 10px; border: 1px solid #D1D5DB; border-radius: 4px; font-size: 11px; cursor: pointer; margin-right: 4px; background: #fff; }
+.inbox-action-cell .inbox-btn.accept { background: #16A34A; color: #fff; border-color: #16A34A; }
+.inbox-action-cell .inbox-btn.done { background: #2563EB; color: #fff; border-color: #2563EB; }
+.inbox-action-cell .inbox-btn.propose { background: #fff; color: #7C3AED; border-color: #C4B5FD; }
+.inbox-action-cell .inbox-btn.view { background: #fff; color: #374151; }
+.inbox-action-cell .inbox-btn:hover { opacity: 0.85; }
 
 /* ── Layout: sidebar + main ───────────────────────────────────────── */
 main.app-main {
@@ -1230,6 +1257,8 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
         <option value="">All stores</option>
       </select>
       <select id="monthPicker" class="picker" title="Snapshot month"></select>
+      <button class="s4-lang-btn" id="langBtn" type="button" title="Language / 语言"
+              onclick="setLang(window.i18n.lang === 'zh' ? 'en' : 'zh')">EN</button>
       <button class="logout-btn" type="button" onclick="doLogout()">Sign out</button>
     </div>
   </header>
@@ -1245,6 +1274,8 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
       <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products</a>
       <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today</a>
       <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance<span class="stub">…</span></a>
+      <!-- Phase 10A (2026-05-22) 派派盒 — both owner + managers. -->
+      <a href="#" data-view="inbox"     onclick="return onViewChange('inbox')"><span class="icon">📥</span>派派盒</a>
       <!-- Phase 2 (2026-05-16) ⚙️ Targets page — owner only.
            hidden by default; populateMenu() shows it after enterApp() if role==='owner'. -->
       <a href="#" data-view="targets" id="navTargets" style="display:none"
@@ -1285,6 +1316,87 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 ═══════════════════════════════════════════════════════════════════ */
 
 'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 10A — i18n (bilingual base). Only nav + inbox + a few titles are
+   keyed here; the 6 page CONTENTS stay as-is (PR-B translates them).
+   setLang re-labels the (static) nav + re-renders #main.
+═══════════════════════════════════════════════════════════════════ */
+window.i18n = {
+  lang: (function () { try { return localStorage.getItem('wp_lang') || 'zh'; } catch (_) { return 'zh'; } })(),
+  dict: {
+    'nav.overview':  { zh: '总览 / Overview',  en: 'Overview' },
+    'nav.inventory': { zh: '库存 / Inventory', en: 'Inventory' },
+    'nav.customers': { zh: '客户 / Customers', en: 'Customers' },
+    'nav.products':  { zh: '产品 / Products',  en: 'Products' },
+    'nav.today':     { zh: '今日 / Today',     en: 'Today' },
+    'nav.finance':   { zh: '财务 / Finance',   en: 'Finance' },
+    'nav.inbox':     { zh: '派派盒 / Inbox',   en: 'Inbox' },
+    'nav.targets':   { zh: '目标 / Targets',   en: 'Targets' },
+    'lang.toggle':   { zh: 'EN', en: '中文' },
+    'title.inbox':   { zh: '派派盒 · Action Inbox', en: 'Action Inbox' },
+    'inbox.owner_view':    { zh: '我派出去的', en: 'Actions I Assigned' },
+    'inbox.assignee_view': { zh: '我被派的',   en: 'Actions Assigned to Me' },
+    'inbox.kpi.pending':    { zh: '待接受',       en: 'Pending' },
+    'inbox.kpi.accepted':   { zh: '已接受未完成', en: 'In Progress' },
+    'inbox.kpi.done_month': { zh: '本月已完成',   en: 'Done This Month' },
+    'inbox.kpi.overdue':    { zh: '已逾期',       en: 'Overdue' },
+    'inbox.tab.all':       { zh: '全部',   en: 'All' },
+    'inbox.tab.pending':   { zh: '待接受', en: 'Pending' },
+    'inbox.tab.accepted':  { zh: '已接受', en: 'Accepted' },
+    'inbox.tab.renegotiating': { zh: '协商中', en: 'Renegotiating' },
+    'inbox.tab.done':      { zh: '已完成', en: 'Done' },
+    'inbox.tab.rejected':  { zh: '已拒绝', en: 'Rejected' },
+    'inbox.tab.overdue':   { zh: '已逾期', en: 'Overdue' },
+    'inbox.col.title':    { zh: '标题',   en: 'Title' },
+    'inbox.col.assignee': { zh: '负责人', en: 'Assignee' },
+    'inbox.col.module':   { zh: '模块',   en: 'Module' },
+    'inbox.col.severity': { zh: '优先',   en: 'Priority' },
+    'inbox.col.ddl':      { zh: '截止',   en: 'DDL' },
+    'inbox.col.status':   { zh: '状态',   en: 'Status' },
+    'inbox.col.action':   { zh: '操作',   en: 'Action' },
+    'inbox.btn.accept':  { zh: '✓ 接受',    en: '✓ Accept' },
+    'inbox.btn.done':    { zh: '✓ 完成',    en: '✓ Mark Done' },
+    'inbox.btn.propose': { zh: '💬 提议改',  en: '💬 Propose' },
+    'inbox.btn.view':    { zh: '查看',      en: 'View' },
+    'inbox.status.pending':       { zh: '🟠 待接受', en: '🟠 Pending' },
+    'inbox.status.accepted':      { zh: '🔵 进行中', en: '🔵 In Progress' },
+    'inbox.status.renegotiating': { zh: '🟣 协商中', en: '🟣 Renegotiating' },
+    'inbox.status.done':          { zh: '✅ 已完成', en: '✅ Done' },
+    'inbox.status.rejected':      { zh: '❌ 已拒绝', en: '❌ Rejected' },
+    'inbox.status.overdue':       { zh: '🔴 逾期',   en: '🔴 Overdue' },
+    'inbox.empty':          { zh: '— 暂无 action —', en: '— No actions —' },
+    'inbox.confirm_done':   { zh: '完工备注 (你做了什么):', en: 'Done note (what did you do):' },
+    'inbox.propose_ddl':    { zh: '提议新截止日 (YYYY-MM-DD, 可空):', en: 'Propose new DDL (YYYY-MM-DD, optional):' },
+    'inbox.propose_amount': { zh: '提议新金额 (数字, 可空):', en: 'Propose new amount (number, optional):' },
+    'inbox.propose_note':   { zh: '提议说明:', en: 'Proposal note:' },
+  },
+};
+function t(key, fallback) {
+  const e = window.i18n.dict[key];
+  if (!e) return fallback || key;
+  return e[window.i18n.lang] || e.zh || fallback || key;
+}
+window.t = t;
+const NAV_ICON = { overview: '📊', inventory: '📦', customers: '👥', products: '🏷️', today: '🏠', finance: '💰', inbox: '📥', targets: '⚙️' };
+function applyI18nNav() {
+  document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
+    const v = a.getAttribute('data-view');
+    let html = '<span class="icon">' + (NAV_ICON[v] || '') + '</span>' + t('nav.' + v, v);
+    if (v === 'finance') html += '<span class="stub">…</span>';
+    a.innerHTML = html;
+  });
+  const lb = document.getElementById('langBtn');
+  if (lb) lb.textContent = t('lang.toggle');
+}
+function setLang(lang) {
+  window.i18n.lang = (lang === 'en' ? 'en' : 'zh');
+  try { localStorage.setItem('wp_lang', window.i18n.lang); } catch (_) {}
+  document.documentElement.lang = (window.i18n.lang === 'en' ? 'en' : 'zh-CN');
+  applyI18nNav();
+  if (typeof renderView === 'function') renderView();
+}
+window.setLang = setLang;
 
 /* ── State (single source of truth) ─────────────────────────────── */
 const state = {
@@ -1404,7 +1516,7 @@ function populateBranchPicker() {
 }
 
 /* ── Constants ──────────────────────────────────────────────────── */
-const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'finance', 'targets'];
+const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'finance', 'inbox', 'targets'];
 const OWNER_ONLY_VIEWS = new Set(['targets']);
 
 // Phase 2: monthly_targets store list (10 stores per Notion + schema CHECK).
@@ -1717,6 +1829,7 @@ const FETCHERS = {
   products:  fetchProducts,
   today:     fetchToday,
   finance:   null, // backlog: waits on multi-month financial sync
+  inbox:     fetchInbox,   // Phase 10A — 派派盒
   targets:   fetchTargets,
 };
 
@@ -1834,6 +1947,7 @@ function renderView() {
     products:  renderProducts,
     today:     renderToday,
     finance:   renderStubView,
+    inbox:     renderInbox,   // Phase 10A — 派派盒
     targets:   renderTargets,
   };
   const main = document.getElementById('main');
@@ -2925,8 +3039,13 @@ function buildAssignModalDom() {
     { value: 'w03_manager',  label: 'W03 店长' },
     { value: 'w05_manager',  label: 'W05 店长' },
     { value: 'w07_manager',  label: 'W07 店长' },
+    { value: 'w11_manager',  label: 'W11 店长' },
     { value: 'marketing_lead', label: 'Marketing 负责人' },
     { value: 'purchasing_lead', label: '采购负责人' },
+    { value: 'finance_lead',   label: '财务负责人' },
+    { value: 'warehouse_lead', label: '仓库负责人' },
+    { value: 'hr_lead',        label: 'HR 负责人' },
+    { value: 'bi_lead',        label: 'BI / 数据负责人' },
   ];
   const sevSel = s.severity || 'amber';
   const seedSourceUrl = s.source_url || (window.location.pathname + window.location.search);
@@ -5008,6 +5127,155 @@ function renderCustomerTrend(s) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Phase 10A — 派派盒 (Action Inbox). Frontend-only: reuses
+   /api/kpi?view=actions (RBAC: owner→all, manager→own) for reads, and
+   /api/sync action_* modes via postAction() for writes. Assignee 不能直接
+   拒绝 (只 接受 / 提议改→renegotiate / 完成); owner 视角只读。KPI/overdue/
+   tabs 客户端算。
+═══════════════════════════════════════════════════════════════════ */
+async function fetchInbox(signal) {
+  const j = await getJSON('/api/kpi?view=actions', signal);
+  state.role = j.session_role || state.role;
+  return j;
+}
+function inboxIsOverdue(a) {
+  return (a.status === 'pending' || a.status === 'accepted')
+    && a.ddl && a.ddl < new Date().toISOString().slice(0, 10);
+}
+function inboxDaysToDdl(a) {
+  if (!a.ddl) return null;
+  const ms = new Date(a.ddl + 'T00:00:00') - new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+  return Math.round(ms / 86400000);
+}
+function renderInbox(s) {
+  const isOwner = (s.role === 'owner');
+  const title = '<h1 class="page-title">📥 ' + t('title.inbox') + '</h1>'
+    + '<p class="page-sub">' + (isOwner ? t('inbox.owner_view') : t('inbox.assignee_view')) + '</p>';
+  if (s.loading || !s.data) return title + '<div class="inv-empty">' + t('inbox.empty') + '</div>';
+  const actions = (s.data.actions || []).map(a => ({ ...a, _overdue: inboxIsOverdue(a), _dtd: inboxDaysToDdl(a) }));
+  const monthStart = new Date().toISOString().slice(0, 7) + '-01';
+  const kpi = {
+    pending:  actions.filter(a => a.status === 'pending').length,
+    accepted: actions.filter(a => a.status === 'accepted').length,
+    done_month: actions.filter(a => a.status === 'done' && a.done_at && a.done_at.slice(0, 10) >= monthStart).length,
+    overdue:  actions.filter(a => a._overdue).length,
+  };
+  if (!state.inboxTab) state.inboxTab = isOwner ? 'all' : 'pending';
+  const tabs = [
+    { key: 'all',           n: actions.length },
+    { key: 'pending',       n: kpi.pending },
+    { key: 'accepted',      n: kpi.accepted },
+    { key: 'renegotiating', n: actions.filter(a => a.status === 'renegotiating').length },
+    { key: 'done',          n: actions.filter(a => a.status === 'done').length },
+    { key: 'rejected',      n: actions.filter(a => a.status === 'rejected').length },
+    { key: 'overdue',       n: kpi.overdue },
+  ];
+  const tabBar = '<div class="inbox-tabs">' + tabs.map(tab =>
+    '<button class="inbox-tab-btn ' + (state.inboxTab === tab.key ? 'active' : '') + '" onclick="inboxSetTab(\'' + tab.key + '\')">'
+    + t('inbox.tab.' + tab.key) + ' <span class="inbox-tab-count">' + tab.n + '</span></button>').join('') + '</div>';
+  const filtered = state.inboxTab === 'all' ? actions
+    : state.inboxTab === 'overdue' ? actions.filter(a => a._overdue)
+    : actions.filter(a => a.status === state.inboxTab);
+  return title + renderInboxKpi(kpi) + tabBar + renderInboxTable(filtered, isOwner);
+}
+function renderInboxKpi(kpi) {
+  const cards = [
+    { label: t('inbox.kpi.pending'),    value: kpi.pending,    icon: '🟠', color: '#D97706' },
+    { label: t('inbox.kpi.accepted'),   value: kpi.accepted,   icon: '🔵', color: '#2563EB' },
+    { label: t('inbox.kpi.done_month'), value: kpi.done_month, icon: '✅', color: '#16A34A' },
+    { label: t('inbox.kpi.overdue'),    value: kpi.overdue,    icon: '🔴', color: '#DC2626' },
+  ];
+  return '<div class="inbox-kpi-row">' + cards.map(c =>
+    '<div class="inbox-kpi-card" style="border-top:3px solid ' + c.color + '">'
+    + '<div class="inbox-kpi-icon">' + c.icon + '</div>'
+    + '<div class="inbox-kpi-label">' + escapeHtml(c.label) + '</div>'
+    + '<div class="inbox-kpi-value" style="color:' + c.color + '">' + c.value + '</div></div>').join('') + '</div>';
+}
+function renderInboxTable(rows, isOwner) {
+  if (!rows.length) return '<div class="inv-empty">' + t('inbox.empty') + '</div>';
+  return '<table class="inbox-table"><thead><tr>'
+    + '<th>' + t('inbox.col.title') + '</th><th>' + t('inbox.col.assignee') + '</th>'
+    + '<th>' + t('inbox.col.module') + '</th><th>' + t('inbox.col.severity') + '</th>'
+    + '<th>' + t('inbox.col.ddl') + '</th><th>' + t('inbox.col.status') + '</th>'
+    + '<th>' + t('inbox.col.action') + '</th></tr></thead><tbody>'
+    + rows.map(r => renderInboxRow(r, isOwner)).join('') + '</tbody></table>';
+}
+function renderInboxRow(r, isOwner) {
+  const statusKey = r._overdue ? 'overdue' : r.status;
+  const sevLabel = { red: '🔴', amber: '🟡', green: '🟢' }[r.severity] || '⚪';
+  let ddl = '—';
+  if (r.ddl) {
+    ddl = r.ddl;
+    if (r._overdue) ddl += ' <span style="color:#DC2626;font-size:11px">(逾期 ' + (-r._dtd) + 'd)</span>';
+    else if (r._dtd != null && r._dtd <= 3) ddl += ' <span style="color:#D97706;font-size:11px">(' + r._dtd + 'd)</span>';
+  }
+  let btns = '<button class="inbox-btn view" onclick="inboxView(' + r.id + ')">' + t('inbox.btn.view') + '</button>';
+  if (!isOwner) {
+    if (r.status === 'pending') {
+      btns = '<button class="inbox-btn accept" onclick="inboxAccept(' + r.id + ')">' + t('inbox.btn.accept') + '</button>'
+           + '<button class="inbox-btn propose" onclick="inboxPropose(' + r.id + ')">' + t('inbox.btn.propose') + '</button>' + btns;
+    } else if (r.status === 'accepted') {
+      btns = '<button class="inbox-btn done" onclick="inboxDone(' + r.id + ')">' + t('inbox.btn.done') + '</button>' + btns;
+    }
+  }
+  return '<tr' + (r._overdue ? ' class="inbox-row-overdue"' : '') + '>'
+    + '<td><strong>' + escapeHtml(r.title || '—') + '</strong>'
+    + (r.description ? '<br><span class="inbox-desc">' + escapeHtml(String(r.description).slice(0, 80)) + (String(r.description).length > 80 ? '…' : '') + '</span>' : '') + '</td>'
+    + '<td>' + escapeHtml(r.assignee || '—') + '</td>'
+    + '<td>' + escapeHtml(r.module || '—') + '</td>'
+    + '<td>' + sevLabel + '</td>'
+    + '<td>' + ddl + '</td>'
+    + '<td>' + t('inbox.status.' + statusKey) + '</td>'
+    + '<td class="inbox-action-cell">' + btns + '</td></tr>';
+}
+window.inboxSetTab = function(tab) { state.inboxTab = tab; renderView(); };
+async function inboxRefresh() { await loadView(); }
+window.inboxAccept = async function(id) {
+  try { await postAction({ mode: 'action_accept', action_id: id }); showS4Toast('✓ 已接受', 'ok'); inboxRefresh(); }
+  catch (e) { showS4Toast('接受失败: ' + e.message, 'bad'); }
+};
+window.inboxDone = async function(id) {
+  const note = prompt(t('inbox.confirm_done'));
+  if (note == null) return;
+  try { await postAction({ mode: 'action_done', action_id: id, done_note: note }); showS4Toast('✓ 已完成', 'ok'); inboxRefresh(); }
+  catch (e) { showS4Toast('完成失败: ' + e.message, 'bad'); }
+};
+window.inboxPropose = async function(id) {
+  const ddl = prompt(t('inbox.propose_ddl')); if (ddl === null) return;
+  const amt = prompt(t('inbox.propose_amount')); if (amt === null) return;
+  const note = prompt(t('inbox.propose_note')); if (note === null) return;
+  try {
+    await postAction({ mode: 'action_renegotiate', action_id: id,
+      proposed_ddl: (ddl && /^\d{4}-\d{2}-\d{2}$/.test(ddl.trim())) ? ddl.trim() : null,
+      proposed_amount: (amt && amt.trim() !== '' && !isNaN(Number(amt))) ? Number(amt) : null,
+      proposed_note: note.trim() || null });
+    showS4Toast('💬 已提议, 等老板审批', 'ok'); inboxRefresh();
+  } catch (e) { showS4Toast('提议失败: ' + e.message, 'bad'); }
+};
+window.inboxView = function(id) {
+  const a = ((state.data && state.data.actions) || []).find(x => x.id === id);
+  if (!a) return;
+  const row = (k, v) => (v != null && v !== '') ? '<div style="margin-bottom:4px"><strong>' + k + ':</strong> ' + escapeHtml(String(v)) + '</div>' : '';
+  const wrap = document.createElement('div');
+  wrap.className = 's4-modal-backdrop';
+  wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+  wrap.innerHTML = '<div class="s4-modal"><div class="s4-modal-header"><h2>' + escapeHtml(a.title || 'Action') + '</h2>'
+    + '<button class="s4-btn text" onclick="this.closest(\'.s4-modal-backdrop\').remove()">✕</button></div>'
+    + '<div class="s4-modal-body">'
+    + row('Assignee', a.assignee) + row('Assigner', a.assigner) + row('Module', a.module)
+    + row('Severity', a.severity) + row('DDL', a.ddl) + row('Status', a.status)
+    + row('Created', a.created_at && String(a.created_at).slice(0, 16).replace('T', ' '))
+    + row('Accepted', a.accepted_at && String(a.accepted_at).slice(0, 16).replace('T', ' '))
+    + row('Done', a.done_at && String(a.done_at).slice(0, 16).replace('T', ' '))
+    + (a.description ? '<div style="margin:8px 0"><strong>Description:</strong><br>' + escapeHtml(a.description) + '</div>' : '')
+    + row('Amount', a.amount != null ? a.amount + ' ' + (a.amount_unit || '') : null)
+    + (a.proposed_note ? row('Proposed', a.proposed_note + (a.proposed_ddl ? ' · ddl ' + a.proposed_ddl : '') + (a.proposed_amount != null ? ' · ' + a.proposed_amount : '')) : '')
+    + row('Done note', a.done_note)
+    + '</div></div>';
+  document.body.appendChild(wrap);
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    RENDER · PRODUCTS  (Stage B)
    3 KPI from /api/products (Velocity ABCD / Top 20 migrations / Strategic Push)
    + 4 alerts (mostly placeholder — V1 same; need stock context).
@@ -5405,6 +5673,7 @@ function enterApp() {
   // Phase 2: ⚙️ targets sidebar link — owner only
   const navTargets = document.getElementById('navTargets');
   if (navTargets) navTargets.style.display = (state.role === 'owner') ? '' : 'none';
+  applyI18nNav();  // Phase 10A — bilingual nav labels + lang button text
   populateMonthPicker();
   // Bug 2 fix: populate branch picker immediately (from STORE_META + any
   // seeded codes) so it's visible before the first fetch resolves.
