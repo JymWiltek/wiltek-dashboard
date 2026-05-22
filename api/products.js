@@ -42,6 +42,26 @@ export default async function handler(req, res) {
     p_branch = user.store;
   }
   const p_month  = String(req.query?.month || '').trim() || null;
+
+  // Phase 8 (2026-05-22) — Products Owner BI (8-section payload). Legacy
+  // products_payload path preserved below (other views may reference it).
+  const mode = String(req.query?.mode || '').trim().toLowerCase();
+  if (mode === 'phase8') {
+    try {
+      const { data, error } = await sb().rpc('products_phase8_payload', { p_ym: p_month, p_branch });
+      if (error) {
+        console.error('[/api/products mode=phase8] RPC error:', error);
+        res.status(500).json({ ok: false, error: error.message }); return;
+      }
+      res.status(200).json({ ok: true, fetched_at: new Date().toISOString(),
+        session_role: user.role, session_store: user.store, effective_branch: p_branch, ...data });
+    } catch (e) {
+      console.error('[/api/products mode=phase8] catch:', e);
+      res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+    return;
+  }
+
   try {
     const { data, error } = await sb().rpc('products_payload', { p_month, p_branch });
     if (error) { res.status(500).json({ ok: false, error: error.message }); return; }
