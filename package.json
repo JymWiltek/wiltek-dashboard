@@ -9,6 +9,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:report": "playwright show-report",
     "test:i18n": "node tools/i18n_audit.js --count && node tools/i18n_check.js --ci",
+    "test:i18n:runtime": "node tools/i18n_runtime_check.js",
     "test:rbac": "node tools/rbac_test.js"
   },
   "devDependencies": {
