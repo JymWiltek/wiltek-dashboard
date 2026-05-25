@@ -326,20 +326,26 @@ async function handleSalesDaily(req, res, user, ym, queryBranch) {
 // Phase 4 · Sales Module V3 (Agentic OS · 2-tier) — view handlers
 // ═══════════════════════════════════════════════════════════════════════
 
-// Phase 6 — Customer page (owner BI). 5 sub-views map to 5 RPCs.
-async function handleCustomer(req, res, user, ym, view, queryBranch) {
-  if (user && user.role !== 'owner') {
+// Phase 6 — Customer page. Owner = company (all sub-views); manager = own store
+// (V2 Launch Fix 2: the two store-scopable sub-views only, forced to their store).
+async function handleCustomer(req, res, user, ym, view, queryBranch, effectiveBranch) {
+  const isOwner = !user || user.role === 'owner';
+  // Cross-store / company-only sub-views stay owner-only; managers get the two
+  // store-scopable ones (race cards + payload) FORCED to their own store.
+  const MANAGER_VIEWS = new Set(['customer-race', 'customer-payload']);
+  if (!isOwner && !MANAGER_VIEWS.has(view)) {
     return res.status(403).json({ ok: false, error: 'owner only' });
   }
+  const scope = isOwner ? (queryBranch || null) : (effectiveBranch || (user && user.store) || null);
   const map = {
     'customer-overview': { rpc: 'customer_overview_kpi',      args: { p_ym: ym } },
-    'customer-race':     { rpc: 'customer_by_race',           args: { p_ym: ym, p_store: queryBranch || null } },
+    'customer-race':     { rpc: 'customer_by_race',           args: { p_ym: ym, p_store: scope } },
     'customer-matrix':   { rpc: 'customer_store_race_matrix', args: { p_ym: ym } },
     'customer-trend':    { rpc: 'customer_trend',             args: { p_ym: ym } },
     'customer-member':   { rpc: 'customer_member_analysis',   args: { p_ym: ym } },
     // Phase 6b: V1's full customer dataset (buckets_by_window / churn /
     // cross_by_window / top100). p_branch null = company; manager = own store.
-    'customer-payload':  { rpc: 'customers_payload',          args: { p_month: ym, p_branch: queryBranch || null } },
+    'customer-payload':  { rpc: 'customers_payload',          args: { p_month: ym, p_branch: scope } },
     // Phase 6c: 会员入会龄段 × 品类 (main_group) 本月销售矩阵.
     'customer-age-category': { rpc: 'customer_age_category_crosstab', args: { p_ym: ym } },
   };
@@ -559,7 +565,7 @@ export default async function handler(req, res) {
     // Phase 5 — Owner Overview 4-KPI hero
     if (view === 'overview')    return handleOverview(req, res, user, ym, effectiveBranch);
     // Phase 6 — Customer page (owner only)
-    if (view.startsWith('customer-')) return handleCustomer(req, res, user, ym, view, queryBranch);
+    if (view.startsWith('customer-')) return handleCustomer(req, res, user, ym, view, queryBranch, effectiveBranch);
     // Phase 4 — Agentic OS Sales V3 dispatch
     if (view === 'sales-owner') return handleSalesOwner(req, res, user, ym);
     if (view === 'sales-store') return handleSalesStore(req, res, user, ym, queryBranch);

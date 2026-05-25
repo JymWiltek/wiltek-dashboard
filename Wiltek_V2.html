@@ -2299,7 +2299,7 @@ function syncUrl() {
   const u = new URL(window.location.href);
   u.searchParams.set('view', state.view);
   u.searchParams.set('month', state.month);
-  if (state.branch) u.searchParams.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) u.searchParams.set('branch', getEffectiveBranch());
   else              u.searchParams.delete('branch');
   history.replaceState(null, '', u.toString());
 }
@@ -2340,7 +2340,7 @@ async function getJSON(url, signal) {
 
 function kpiQuery() {
   const p = new URLSearchParams({ view: state.view, month: state.month });
-  if (state.branch) p.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) p.set('branch', getEffectiveBranch());
   return p.toString();
 }
 // monthBranchQuery — '?month=YYYY-MM[&branch=W0X]' for the non-/api/kpi
@@ -2350,7 +2350,7 @@ function kpiQuery() {
 function monthBranchQuery() {
   const p = new URLSearchParams();
   if (state.month)  p.set('month', state.month);
-  if (state.branch) p.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) p.set('branch', getEffectiveBranch());
   const s = p.toString();
   return s ? '?' + s : '';
 }
@@ -2373,7 +2373,7 @@ async function fetchSales(signal) {
   // from kpiQuery() (which would carry 'view=overview' and break the
   // .replace() derivations).
   const mb = new URLSearchParams({ view: 'sales', month: state.month });
-  if (state.branch) mb.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) mb.set('branch', getEffectiveBranch());
   const baseQ    = mb.toString();
   const dailyQ   = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
@@ -2482,9 +2482,9 @@ async function fetchCustomers(signal) {
   // + actions (Action Plan 第 6 层「我派出去的」列, assigner=owner).
   const m = state.month;
   const raceQ = new URLSearchParams({ view: 'customer-race', month: m });
-  if (state.branch) raceQ.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) raceQ.set('branch', getEffectiveBranch());
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
-  if (state.branch) payloadQ.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) payloadQ.set('branch', getEffectiveBranch());
   const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
   const [payload, race, matrix, trend, agecat, actions] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
@@ -2504,7 +2504,7 @@ async function fetchProducts(signal) {
   // pro_preference / top_brands / action_plan). Scope NOT IN (W10/W12/WEX).
   const baseQ = new URLSearchParams();
   if (state.month)  baseQ.set('month', state.month);
-  if (state.branch) baseQ.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) baseQ.set('branch', getEffectiveBranch());
   baseQ.set('mode', 'phase8');
   const j = await getJSON('/api/products?' + baseQ.toString(), signal);
   state.role = j.session_role || state.role;
@@ -2520,7 +2520,7 @@ async function fetchInventory(signal) {
   // 顶部经营判断卡 (5 问 5 答). 并行拉, judgement 优雅降级。
   const baseQ = new URLSearchParams();
   if (state.month)  baseQ.set('month', state.month);
-  if (state.branch) baseQ.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) baseQ.set('branch', getEffectiveBranch());
   const base = baseQ.toString();
   const sep = base ? '&' : '';
   const [main, judgement] = await Promise.all([
@@ -3761,7 +3761,7 @@ let drillLoadId = 0;
 function loadSalesDrill(dim) {
   const myId = ++drillLoadId;
   const p = new URLSearchParams({ view: 'sales-drill', dim, month: state.month });
-  if (state.branch) p.set('branch', getEffectiveBranch());
+  if (getEffectiveBranch()) p.set('branch', getEffectiveBranch());
   getJSON('/api/kpi?' + p.toString(), undefined)
     .then(j => {
       if (myId !== drillLoadId) return;
