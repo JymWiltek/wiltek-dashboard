@@ -1831,7 +1831,6 @@ window.i18n = {
     'customer.race.other':          { zh: '其他走廊客', en: 'Other walk-in' },
     // renderCustomers — header sub + section aux + tier-2 placeholder
     'customer.header.sub':          { zh: '会员资产 + 走廊客转化 + 流失/沉睡名单', en: 'Member assets + walk-in conversion + churn/dormant lists' },
-    'customer.tier2_soon':          { zh: 'Tier 2 客户视角下个 sprint。当前仅 owner。', en: 'Tier 2 customer view is next sprint. Owner only for now.' },
     'customer.aux.race':            { zh: '本月走廊客 by race · 含走廊客目标', en: 'This month walk-in by ethnicity · with walk-in target' },
     'customer.aux.age':             { zh: '入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价', en: 'Membership tenure · members / this-month spend / repurchase rate / 12M AOV' },
     'customer.aux.age_cat':         { zh: '本月销售 · 各龄段买什么 (customer_buy_lines)', en: 'This-month sales · what each age segment buys (customer_buy_lines)' },
@@ -5453,10 +5452,24 @@ const AGE_TIER_ORDER = ['<1y', '1-5y', '5-8y', '8y+'];
 const AGE_TIER_ICON  = { '<1y': '🌱', '1-5y': '🌿', '5-8y': '🌳', '8y+': '🏛' };
 
 function renderCustomers(s) {
-  // Owner-only (Tier 2 customer view = future sprint).
+  // 件2 (2026-05-25): manager parity — store-scoped 4 race cards. Cross-store
+  // pieces (churn radar / store×race matrix / VIP lists) stay owner-only.
   if (s.role && s.role !== 'owner') {
-    return '<div class="sales-v3"><h1 class="s4-title">Customer</h1>'
-      + '<div class="s4-data-gap">' + t('customer.tier2_soon') + '</div></div>';
+    const myStore = (s.user && s.user.store) || '?';
+    const mHead = '<div class="s4-page-header"><div>'
+      + '<h1 class="s4-title">' + t('nav.customers') + ' · ' + myStore + '</h1>'
+      + '<div class="s4-sub">' + t('page.sub.month_scope') + ' ' + s.month + ' · ' + t('customer.aux.race') + '</div>'
+      + '</div></div>';
+    if (s.loading || !s.data) {
+      return '<div class="sales-v3">' + mHead
+        + '<div class="cust-race-grid">'
+        +   '<div class="cust-race-card"><div class="skeleton h-value" style="height:32px"></div></div>'.repeat(4)
+        + '</div></div>';
+    }
+    return '<div class="sales-v3">' + mHead
+      + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'
+      + renderCustomerRaceCards(s)
+      + '</div>';
   }
   const header = ''
     + '<div class="s4-page-header">'
