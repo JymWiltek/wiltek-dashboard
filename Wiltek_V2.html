@@ -2378,8 +2378,10 @@ async function fetchSales(signal) {
     ? new URLSearchParams({ view: 'actions', assigner: myRoleId }).toString()
     : new URLSearchParams({ view: 'actions', assignee: myRoleId }).toString();
 
-  // Phase 5 Overview 4-KPI hero (owner only). Degrades gracefully.
-  const overviewQ = new URLSearchParams({ view: 'overview', month: state.month }).toString();
+  // Overview 4-KPI hero. Owner = company; manager = own store (件1 parity).
+  const overviewP = new URLSearchParams({ view: 'overview', month: state.month });
+  if (!tierIsOwner && state.user && state.user.store) overviewP.set('branch', state.user.store);
+  const overviewQ = overviewP.toString();
 
   const fetches = [
     getJSON('/api/kpi?' + baseQ,     signal),
@@ -2388,10 +2390,9 @@ async function fetchSales(signal) {
     getJSON('/api/kpi?' + tierQ,     signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + actionsQ,  signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
   ];
-  // Only owner needs the overview KPI block (Tier 2 has no 4-KPI hero).
-  fetches.push(tierIsOwner
-    ? getJSON('/api/kpi?' + overviewQ, signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null }))
-    : Promise.resolve(null));
+  // 件1: both owner (company) AND manager (own store) get the 4-KPI hero block.
+  fetches.push(getJSON('/api/kpi?' + overviewQ, signal)
+    .catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null })));
 
   const [kpi, targets, daily, tier, actions, overview] = await Promise.all(fetches);
   state.role = kpi.session_role || state.role;
@@ -4581,8 +4582,9 @@ function renderSalesStoreV3(s) {
 
   if (s.loading || !s.data) {
     return '<div class="sales-v3">' + header
-      + '<div class="s4-tier2-target"><div class="skeleton h-value" style="width:140px;height:36px"></div></div>'
-      + '</div>';
+      + '<div class="kpi-hero-row">'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="height:32px"></div></div>'.repeat(4)
+      + '</div></div>';
   }
 
   const tier = (s.data.tier && s.data.tier.data) || null;
@@ -4591,11 +4593,6 @@ function renderSalesStoreV3(s) {
   if (degraded || !tier) {
     banner = '<div class="s4-data-gap" style="margin:14px 0"><strong>' + t('today.banner.rpc_undeployed') + '</strong>' + t('today.banner.rpc_fallback') + '<code>tools/migration_phase4_sales_v3.sql</code>' + t('today.banner.rpc_fallback_tail') + '</div>';
   }
-
-  // ── My Target (Part C / Section 1)
-  const myTarget = tier
-    ? renderS4MyTarget(tier)
-    : renderS4MyTargetFallback(s, myStore);
 
   // ── My Anomalies
   const myAnomalies = tier && Array.isArray(tier.anomalies) && tier.anomalies.length > 0
@@ -4631,11 +4628,15 @@ function renderSalesStoreV3(s) {
     ? '<div class="s4-peer-ranking">' + peerRows + '</div>'
     : '<div class="s4-data-gap">' + t('today.peer.empty') + '</div>';
 
+  // 件1 (2026-05-25): 4-KPI hero (Sales/Walk-in/Closing/AOV) scoped to own
+  // store — full parity with owner. Replaces the single My-Target card.
+  // Reuses renderOverviewKpiRow (reads s.data.overview, now manager-scoped).
+  const kpiHero = renderOverviewKpiRow(s);
+
   return '<div class="sales-v3">'
     + header
     + banner
-    + '<div class="s4-section-title">' + t('today.section.target') + ' · ' + s.month + '</div>'
-    + myTarget
+    + kpiHero
     + '<div class="s4-section-title">' + t('today.section.anomaly') + '</div>'
     + myAnomalies
     + '<div class="s4-section-title">' + t('today.section.action') + '</div>'
@@ -4645,53 +4646,8 @@ function renderSalesStoreV3(s) {
     + '</div>';
 }
 
-function renderS4MyTarget(tier) {
-  const pct = tier.pct;
-  const status = pct == null ? 'gray'
-              : pct >= 100   ? 'green'
-              : pct >= 85    ? 'amber'
-              : 'red';
-  const shortfall = tier.shortfall;
-  return ''
-    + '<div class="s4-tier2-target">'
-    +   '<div class="label">' + t('today.target.this_month') + '</div>'
-    +   '<div class="target-num">' + fmtRM(tier.target) + '</div>'
-    +   '<div class="row2">'
-    +     '<div><div class="label">' + t('today.target.my_actual') + '</div>'
-    +       '<div class="actual-num ' + status + '" style="color:' + (status === 'red' ? 'var(--s4-red-text)' : status === 'green' ? 'var(--s4-green-text)' : 'var(--s4-amber-text)') + '">'
-    +       fmtRM(tier.actual) + (pct != null ? ' (' + pct.toFixed(1) + '%)' : '') + '</div>'
-    +     '</div>'
-    +     '<div><div class="label">' + t('today.target.gap') + '</div>'
-    +       '<div class="gap-num ' + (shortfall > 0 ? 'red' : 'green') + '" style="color:' + (shortfall > 0 ? 'var(--s4-red-text)' : 'var(--s4-green-text)') + '">'
-    +       (shortfall > 0 ? '-RM ' : '+RM ') + Math.round(Math.abs(shortfall)).toLocaleString('en-US') + '</div>'
-    +     '</div>'
-    +   '</div>'
-    +   '<div class="s4-hero-progress" style="margin-top:24px">'
-    +     '<div class="bar"><span class="' + status + '" style="width:' + Math.min(100, pct || 0) + '%"></span></div>'
-    +     '<div><span class="bar-meta-r">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
-    +   '</div>'
-    +   '<div class="row3">'
-    +     '<div class="compare-row">' + t('common.vs_prev') + ' ' + (tier.vs_last_month != null ? fmtRM(tier.vs_last_month) + ' · <span class="' + (tier.actual >= tier.vs_last_month ? 'delta-up' : 'delta-down') + '">' + (tier.actual >= tier.vs_last_month ? '↑' : '↓') + ' ' + Math.abs((tier.actual - tier.vs_last_month) / Math.max(1, tier.vs_last_month) * 100).toFixed(1) + '%</span>' : '—') + '</div>'
-    +     '<div class="compare-row">' + t('today.target.vs_last_year') + ' ' + (tier.vs_last_year != null ? fmtRM(tier.vs_last_year) : '—') + '</div>'
-    +     '<div class="compare-row">' + t('today.target.vs_6mo_avg') + ' ' + (tier.vs_6mo_avg != null ? fmtRM(tier.vs_6mo_avg) : '—') + '</div>'
-    +     '<div class="compare-row">' + t('today.target.invoices_aov') + ' ' + fmtInt(tier.invoices) + ' · ' + t('today.target.aov') + ' ' + (tier.aov != null ? fmtRMpr(tier.aov) : '—') + '</div>'
-    +   '</div>'
-    + '</div>';
-}
-function renderS4MyTargetFallback(s, myStore) {
-  const d = s.data.kpi || {};
-  const t = s.data.targets || {};
-  const myT = t.summary?.by_store?.[myStore]?.sales || 0;
-  const branch = d.by_branch?.[myStore] || { sales: 0, invoices: 0 };
-  return renderS4MyTarget({
-    target: myT, actual: branch.sales,
-    pct: myT > 0 ? branch.sales / myT * 100 : null,
-    shortfall: myT - branch.sales,
-    invoices: branch.invoices,
-    aov: branch.invoices > 0 ? branch.sales / branch.invoices : null,
-    vs_last_month: null, vs_last_year: null, vs_6mo_avg: null,
-  });
-}
+// (renderS4MyTarget / renderS4MyTargetFallback removed in 件1 — the manager
+//  Overview now uses the shared 4-KPI hero row renderOverviewKpiRow().)
 
 function renderS4AssignedActionCard(a) {
   const sev = a.severity || 'amber';
