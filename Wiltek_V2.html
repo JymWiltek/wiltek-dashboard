@@ -2096,7 +2096,45 @@ function populateBranchPicker() {
 
 /* ── Constants ──────────────────────────────────────────────────── */
 const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'finance', 'inbox', 'targets'];
-const OWNER_ONLY_VIEWS = new Set(['targets']);
+
+// ── V2-Launch 件2 (2026-05-25): RBAC page-access matrix (Jym 拍板) ──
+// Role tiers (state.role is normalized at login): owner / manager (store-scoped)
+// / staff (hr, marketing, warehouse + legacy finance/bi — all-store, no
+// owner-only pages). Owner-only pages: finance, targets.
+function rbacRole(role) {
+  if (role === 'owner')   return 'owner';
+  if (role === 'manager') return 'manager';
+  return 'staff';
+}
+const RBAC = {
+  pages: {
+    overview:  ['owner', 'staff', 'manager'],
+    sales:     ['owner', 'staff', 'manager'],
+    inventory: ['owner', 'staff', 'manager'],
+    customers: ['owner', 'staff', 'manager'],
+    products:  ['owner', 'staff', 'manager'],
+    today:     ['owner', 'staff', 'manager'],
+    inbox:     ['owner', 'staff', 'manager'],
+    finance:   ['owner'],
+    targets:   ['owner'],
+  },
+  canSeePage(role, page) {
+    const allowed = RBAC.pages[page];
+    if (!allowed) return true;                  // unknown view → don't hard-block
+    return allowed.includes(rbacRole(role));
+  },
+};
+// Managers are pinned to their own store; owner/staff use the branch picker.
+function getEffectiveBranch() {
+  if (state.role === 'manager') return (state.user && state.user.store) || null;
+  return state.branch || null;
+}
+function applyRbacToNav(role) {
+  document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
+    const v = a.getAttribute('data-view');
+    a.style.display = RBAC.canSeePage(role, v) ? '' : 'none';
+  });
+}
 
 // Phase 2: monthly_targets store list (10 stores per Notion + schema CHECK).
 // Active 5 + WCO can be set; W10/W11/W12/WEX shown but greyed (historical).
@@ -2179,7 +2217,7 @@ function syncUrl() {
   const u = new URL(window.location.href);
   u.searchParams.set('view', state.view);
   u.searchParams.set('month', state.month);
-  if (state.branch) u.searchParams.set('branch', state.branch);
+  if (state.branch) u.searchParams.set('branch', getEffectiveBranch());
   else              u.searchParams.delete('branch');
   history.replaceState(null, '', u.toString());
 }
@@ -2220,7 +2258,7 @@ async function getJSON(url, signal) {
 
 function kpiQuery() {
   const p = new URLSearchParams({ view: state.view, month: state.month });
-  if (state.branch) p.set('branch', state.branch);
+  if (state.branch) p.set('branch', getEffectiveBranch());
   return p.toString();
 }
 // monthBranchQuery — '?month=YYYY-MM[&branch=W0X]' for the non-/api/kpi
@@ -2230,7 +2268,7 @@ function kpiQuery() {
 function monthBranchQuery() {
   const p = new URLSearchParams();
   if (state.month)  p.set('month', state.month);
-  if (state.branch) p.set('branch', state.branch);
+  if (state.branch) p.set('branch', getEffectiveBranch());
   const s = p.toString();
   return s ? '?' + s : '';
 }
@@ -2253,7 +2291,7 @@ async function fetchSales(signal) {
   // from kpiQuery() (which would carry 'view=overview' and break the
   // .replace() derivations).
   const mb = new URLSearchParams({ view: 'sales', month: state.month });
-  if (state.branch) mb.set('branch', state.branch);
+  if (state.branch) mb.set('branch', getEffectiveBranch());
   const baseQ    = mb.toString();
   const dailyQ   = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
@@ -2361,9 +2399,9 @@ async function fetchCustomers(signal) {
   // + actions (Action Plan 第 6 层「我派出去的」列, assigner=owner).
   const m = state.month;
   const raceQ = new URLSearchParams({ view: 'customer-race', month: m });
-  if (state.branch) raceQ.set('branch', state.branch);
+  if (state.branch) raceQ.set('branch', getEffectiveBranch());
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
-  if (state.branch) payloadQ.set('branch', state.branch);
+  if (state.branch) payloadQ.set('branch', getEffectiveBranch());
   const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
   const [payload, race, matrix, trend, agecat, actions] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
@@ -2383,7 +2421,7 @@ async function fetchProducts(signal) {
   // pro_preference / top_brands / action_plan). Scope NOT IN (W10/W12/WEX).
   const baseQ = new URLSearchParams();
   if (state.month)  baseQ.set('month', state.month);
-  if (state.branch) baseQ.set('branch', state.branch);
+  if (state.branch) baseQ.set('branch', getEffectiveBranch());
   baseQ.set('mode', 'phase8');
   const j = await getJSON('/api/products?' + baseQ.toString(), signal);
   state.role = j.session_role || state.role;
@@ -2399,7 +2437,7 @@ async function fetchInventory(signal) {
   // 顶部经营判断卡 (5 问 5 答). 并行拉, judgement 优雅降级。
   const baseQ = new URLSearchParams();
   if (state.month)  baseQ.set('month', state.month);
-  if (state.branch) baseQ.set('branch', state.branch);
+  if (state.branch) baseQ.set('branch', getEffectiveBranch());
   const base = baseQ.toString();
   const sep = base ? '&' : '';
   const [main, judgement] = await Promise.all([
@@ -2426,6 +2464,12 @@ const FETCHERS = {
 let activeFetch = null;
 
 async function loadView() {
+  // RBAC guard: block direct URL nav (e.g. ?view=finance) to a disallowed view.
+  if (!RBAC.canSeePage(state.role, state.view)) {
+    console.warn('[V2] RBAC: role', state.role, 'cannot access', state.view, '→ overview');
+    state.view = 'overview';
+    syncUrl();
+  }
   if (activeFetch) { try { activeFetch.abort(); } catch (_) {} }
   activeFetch = new AbortController();
   const myCtl = activeFetch;
@@ -2518,7 +2562,7 @@ function renderView() {
   const bp = document.getElementById('branchPicker');
   if (bp) {
     bp.value = state.branch || '';
-    bp.disabled = (state.role !== 'owner');
+    bp.disabled = (state.role === 'manager');
   }
   // month picker keeps state in sync
   const mp = document.getElementById('monthPicker');
@@ -2563,13 +2607,14 @@ function onMonthChange(ym) {
 function onViewChange(v) {
   if (!ALLOWED_VIEWS.includes(v) || v === state.view) return false;
   // Phase 2: owner-only views (e.g. ⚙️ targets) — silently block.
-  if (OWNER_ONLY_VIEWS.has(v) && state.role !== 'owner') return false;
+  if (!RBAC.canSeePage(state.role, v)) return false;
   state.view = v;
   syncUrl();
   loadView();
   return false; // anchor onclick swallow
 }
 function onBranchChange(b) {
+  if (state.role === 'manager') return;   // managers are store-pinned, can't switch
   const next = b || null;
   if (next === state.branch) return;
   state.branch = next;
@@ -3631,7 +3676,7 @@ let drillLoadId = 0;
 function loadSalesDrill(dim) {
   const myId = ++drillLoadId;
   const p = new URLSearchParams({ view: 'sales-drill', dim, month: state.month });
-  if (state.branch) p.set('branch', state.branch);
+  if (state.branch) p.set('branch', getEffectiveBranch());
   getJSON('/api/kpi?' + p.toString(), undefined)
     .then(j => {
       if (myId !== drillLoadId) return;
@@ -6616,7 +6661,7 @@ async function doLogin(ev) {
     };
     state.role = (j.user.role === 'owner') ? 'owner'
               : (/_mgr$/.test(j.user.role) ? 'manager' : (j.user.role || 'manager'));
-    if (state.role !== 'owner' && j.user.store) state.branch = j.user.store;
+    if (state.role === 'manager' && j.user.store) state.branch = j.user.store;
     writeSession(state.user);
     enterApp();
     return false;
@@ -6643,11 +6688,11 @@ function enterApp() {
   document.getElementById('app').setAttribute('aria-hidden', 'false');
   document.getElementById('userName').textContent = state.user.display_name;
   document.getElementById('userRole').textContent = state.user.role;
-  // hide branch picker for non-owners
-  document.getElementById('branchPicker').style.display = (state.role === 'owner') ? '' : 'none';
-  // Phase 2: ⚙️ targets sidebar link — owner only
-  const navTargets = document.getElementById('navTargets');
-  if (navTargets) navTargets.style.display = (state.role === 'owner') ? '' : 'none';
+  // 件2 RBAC: branch picker shown to owner + staff (all-store roles); hidden for
+  // store-pinned managers.
+  document.getElementById('branchPicker').style.display = (state.role === 'manager') ? 'none' : '';
+  // 件2 RBAC: hide nav pages the role can't see (finance/targets → owner only).
+  applyRbacToNav(state.role);
   applyI18nNav();  // Phase 10A — bilingual nav labels + lang button text
   populateMonthPicker();
   // Bug 2 fix: populate branch picker immediately (from STORE_META + any
@@ -6685,7 +6730,7 @@ function boot() {
     state.user = sess;
     state.role = (sess.role === 'owner') ? 'owner'
               : (/_mgr$/.test(sess.role || '') ? 'manager' : (sess.role || 'manager'));
-    if (state.role !== 'owner' && sess.store) state.branch = sess.store;
+    if (state.role === 'manager' && sess.store) state.branch = sess.store;
     enterApp();
   }
 }
