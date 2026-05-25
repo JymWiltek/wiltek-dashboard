@@ -1831,7 +1831,6 @@ window.i18n = {
     'customer.race.other':          { zh: '其他走廊客', en: 'Other walk-in' },
     // renderCustomers — header sub + section aux + tier-2 placeholder
     'customer.header.sub':          { zh: '会员资产 + 走廊客转化 + 流失/沉睡名单', en: 'Member assets + walk-in conversion + churn/dormant lists' },
-    'customer.tier2_soon':          { zh: 'Tier 2 客户视角下个 sprint。当前仅 owner。', en: 'Tier 2 customer view is next sprint. Owner only for now.' },
     'customer.aux.race':            { zh: '本月走廊客 by race · 含走廊客目标', en: 'This month walk-in by ethnicity · with walk-in target' },
     'customer.aux.age':             { zh: '入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价', en: 'Membership tenure · members / this-month spend / repurchase rate / 12M AOV' },
     'customer.aux.age_cat':         { zh: '本月销售 · 各龄段买什么 (customer_buy_lines)', en: 'This-month sales · what each age segment buys (customer_buy_lines)' },
@@ -2003,6 +2002,24 @@ window.i18n = {
     'gtd.kpi.ccnn_pct':      { zh: '分行清单 %', en: 'Branch Checklist %' },
     'gtd.kpi.sm_posts':      { zh: '社媒发帖数', en: 'Social Media Posts' },
     'gtd.kpi.discon_pct':    { zh: '停产库存 %', en: 'Discontinued Stock %' },
+    // ═══ V2 Launch Fix 件4 — 判断卡 prose bilingual (composed FE-side from RPC numbers) ═══
+    'inv.judge.ans.yes':       { zh: '是',   en: 'Yes' },
+    'inv.judge.ans.mid':       { zh: '一般', en: 'Moderate' },
+    'inv.judge.ans.no':        { zh: '否',   en: 'No' },
+    'inv.judge.verdict.poor':  { zh: '差',   en: 'Poor' },
+    'inv.judge.verdict.fair':  { zh: '一般', en: 'Fair' },
+    'inv.judge.verdict.good':  { zh: '好',   en: 'Good' },
+    'inv.judge.dir.worse':     { zh: '退步', en: 'Worse' },
+    'inv.judge.dir.better':    { zh: '进步', en: 'Better' },
+    'inv.judge.dir.same':      { zh: '持平', en: 'Same' },
+    'inv.judge.dir.unknown':   { zh: '—',    en: '—' },
+    'inv.judge.q1.headline':   { zh: 'Misplaced+Dead+Disc 占 {pct}%, RM {rm} 锁住', en: 'Misplaced+Dead+Disc = {pct}%, RM {rm} locked' },
+    'inv.judge.q1.detail':     { zh: 'Misplaced 占大头, 不是真"多", 是"放错店"', en: 'Misplaced dominates — not truly "overstocked", but "in the wrong store"' },
+    'inv.judge.q2.headline':   { zh: 'A 类 (Top 80% 收入) {n} 个 SKU 全公司无库存', en: 'Class A (Top 80% revenue): {n} SKU out of stock company-wide' },
+    'inv.judge.q3.headline':   { zh: 'A 类无库存 {n} 个 (按 90d 销售排名, top 10)', en: 'Class A out-of-stock: {n} (ranked by 90d sales, top 10)' },
+    'inv.judge.q4.detail':     { zh: '最严重: {store} Dead% {pct}%', en: 'Worst: {store} Dead% {pct}%' },
+    'inv.judge.q5.detail':     { zh: '卖完不补 = 直接漏单', en: 'Sold out & not restocked = lost sales' },
+    'inv.synth.scope_warn_detail': { zh: '{curr} 含仓库快照但 {prev} 没有, vs 上月对比受 scope 变化影响', en: '{curr} includes a warehouse snapshot but {prev} does not; vs-last-month comparison is affected by the scope change' },
     // <<V2_LAUNCH_I18N_KEYS>> — 件1 新增 cell 级 keys 插在这一行之前
   },
 };
@@ -2378,8 +2395,10 @@ async function fetchSales(signal) {
     ? new URLSearchParams({ view: 'actions', assigner: myRoleId }).toString()
     : new URLSearchParams({ view: 'actions', assignee: myRoleId }).toString();
 
-  // Phase 5 Overview 4-KPI hero (owner only). Degrades gracefully.
-  const overviewQ = new URLSearchParams({ view: 'overview', month: state.month }).toString();
+  // Overview 4-KPI hero. Owner = company; manager = own store (件1 parity).
+  const overviewP = new URLSearchParams({ view: 'overview', month: state.month });
+  if (!tierIsOwner && state.user && state.user.store) overviewP.set('branch', state.user.store);
+  const overviewQ = overviewP.toString();
 
   const fetches = [
     getJSON('/api/kpi?' + baseQ,     signal),
@@ -2388,10 +2407,9 @@ async function fetchSales(signal) {
     getJSON('/api/kpi?' + tierQ,     signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + actionsQ,  signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
   ];
-  // Only owner needs the overview KPI block (Tier 2 has no 4-KPI hero).
-  fetches.push(tierIsOwner
-    ? getJSON('/api/kpi?' + overviewQ, signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null }))
-    : Promise.resolve(null));
+  // 件1: both owner (company) AND manager (own store) get the 4-KPI hero block.
+  fetches.push(getJSON('/api/kpi?' + overviewQ, signal)
+    .catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, data: null })));
 
   const [kpi, targets, daily, tier, actions, overview] = await Promise.all(fetches);
   state.role = kpi.session_role || state.role;
@@ -4581,8 +4599,9 @@ function renderSalesStoreV3(s) {
 
   if (s.loading || !s.data) {
     return '<div class="sales-v3">' + header
-      + '<div class="s4-tier2-target"><div class="skeleton h-value" style="width:140px;height:36px"></div></div>'
-      + '</div>';
+      + '<div class="kpi-hero-row">'
+      +   '<div class="kpi-card"><div class="skeleton h-value" style="height:32px"></div></div>'.repeat(4)
+      + '</div></div>';
   }
 
   const tier = (s.data.tier && s.data.tier.data) || null;
@@ -4591,11 +4610,6 @@ function renderSalesStoreV3(s) {
   if (degraded || !tier) {
     banner = '<div class="s4-data-gap" style="margin:14px 0"><strong>' + t('today.banner.rpc_undeployed') + '</strong>' + t('today.banner.rpc_fallback') + '<code>tools/migration_phase4_sales_v3.sql</code>' + t('today.banner.rpc_fallback_tail') + '</div>';
   }
-
-  // ── My Target (Part C / Section 1)
-  const myTarget = tier
-    ? renderS4MyTarget(tier)
-    : renderS4MyTargetFallback(s, myStore);
 
   // ── My Anomalies
   const myAnomalies = tier && Array.isArray(tier.anomalies) && tier.anomalies.length > 0
@@ -4631,11 +4645,15 @@ function renderSalesStoreV3(s) {
     ? '<div class="s4-peer-ranking">' + peerRows + '</div>'
     : '<div class="s4-data-gap">' + t('today.peer.empty') + '</div>';
 
+  // 件1 (2026-05-25): 4-KPI hero (Sales/Walk-in/Closing/AOV) scoped to own
+  // store — full parity with owner. Replaces the single My-Target card.
+  // Reuses renderOverviewKpiRow (reads s.data.overview, now manager-scoped).
+  const kpiHero = renderOverviewKpiRow(s);
+
   return '<div class="sales-v3">'
     + header
     + banner
-    + '<div class="s4-section-title">' + t('today.section.target') + ' · ' + s.month + '</div>'
-    + myTarget
+    + kpiHero
     + '<div class="s4-section-title">' + t('today.section.anomaly') + '</div>'
     + myAnomalies
     + '<div class="s4-section-title">' + t('today.section.action') + '</div>'
@@ -4645,53 +4663,8 @@ function renderSalesStoreV3(s) {
     + '</div>';
 }
 
-function renderS4MyTarget(tier) {
-  const pct = tier.pct;
-  const status = pct == null ? 'gray'
-              : pct >= 100   ? 'green'
-              : pct >= 85    ? 'amber'
-              : 'red';
-  const shortfall = tier.shortfall;
-  return ''
-    + '<div class="s4-tier2-target">'
-    +   '<div class="label">' + t('today.target.this_month') + '</div>'
-    +   '<div class="target-num">' + fmtRM(tier.target) + '</div>'
-    +   '<div class="row2">'
-    +     '<div><div class="label">' + t('today.target.my_actual') + '</div>'
-    +       '<div class="actual-num ' + status + '" style="color:' + (status === 'red' ? 'var(--s4-red-text)' : status === 'green' ? 'var(--s4-green-text)' : 'var(--s4-amber-text)') + '">'
-    +       fmtRM(tier.actual) + (pct != null ? ' (' + pct.toFixed(1) + '%)' : '') + '</div>'
-    +     '</div>'
-    +     '<div><div class="label">' + t('today.target.gap') + '</div>'
-    +       '<div class="gap-num ' + (shortfall > 0 ? 'red' : 'green') + '" style="color:' + (shortfall > 0 ? 'var(--s4-red-text)' : 'var(--s4-green-text)') + '">'
-    +       (shortfall > 0 ? '-RM ' : '+RM ') + Math.round(Math.abs(shortfall)).toLocaleString('en-US') + '</div>'
-    +     '</div>'
-    +   '</div>'
-    +   '<div class="s4-hero-progress" style="margin-top:24px">'
-    +     '<div class="bar"><span class="' + status + '" style="width:' + Math.min(100, pct || 0) + '%"></span></div>'
-    +     '<div><span class="bar-meta-r">' + (pct != null ? pct.toFixed(1) + '%' : '—') + '</span></div>'
-    +   '</div>'
-    +   '<div class="row3">'
-    +     '<div class="compare-row">' + t('common.vs_prev') + ' ' + (tier.vs_last_month != null ? fmtRM(tier.vs_last_month) + ' · <span class="' + (tier.actual >= tier.vs_last_month ? 'delta-up' : 'delta-down') + '">' + (tier.actual >= tier.vs_last_month ? '↑' : '↓') + ' ' + Math.abs((tier.actual - tier.vs_last_month) / Math.max(1, tier.vs_last_month) * 100).toFixed(1) + '%</span>' : '—') + '</div>'
-    +     '<div class="compare-row">' + t('today.target.vs_last_year') + ' ' + (tier.vs_last_year != null ? fmtRM(tier.vs_last_year) : '—') + '</div>'
-    +     '<div class="compare-row">' + t('today.target.vs_6mo_avg') + ' ' + (tier.vs_6mo_avg != null ? fmtRM(tier.vs_6mo_avg) : '—') + '</div>'
-    +     '<div class="compare-row">' + t('today.target.invoices_aov') + ' ' + fmtInt(tier.invoices) + ' · ' + t('today.target.aov') + ' ' + (tier.aov != null ? fmtRMpr(tier.aov) : '—') + '</div>'
-    +   '</div>'
-    + '</div>';
-}
-function renderS4MyTargetFallback(s, myStore) {
-  const d = s.data.kpi || {};
-  const t = s.data.targets || {};
-  const myT = t.summary?.by_store?.[myStore]?.sales || 0;
-  const branch = d.by_branch?.[myStore] || { sales: 0, invoices: 0 };
-  return renderS4MyTarget({
-    target: myT, actual: branch.sales,
-    pct: myT > 0 ? branch.sales / myT * 100 : null,
-    shortfall: myT - branch.sales,
-    invoices: branch.invoices,
-    aov: branch.invoices > 0 ? branch.sales / branch.invoices : null,
-    vs_last_month: null, vs_last_year: null, vs_6mo_avg: null,
-  });
-}
+// (renderS4MyTarget / renderS4MyTargetFallback removed in 件1 — the manager
+//  Overview now uses the shared 4-KPI hero row renderOverviewKpiRow().)
 
 function renderS4AssignedActionCard(a) {
   const sev = a.severity || 'amber';
@@ -5048,19 +5021,21 @@ function renderInventory(s) {
   const synthBanner = d.is_synthetic
     ? '<div class="inv-synth-banner"><strong>⚠️ SYNTH</strong> · ' + escapeHtml(d.snapshot_date || '—')
       + ' + ' + escapeHtml(d.snapshot_prev_date || '—') + ' ' + t('inv.synth.banner')
-      + (d.scope_warning ? '<br><strong>' + t('inv.synth.scope_warn') + '</strong>: ' + escapeHtml(d.scope_warning) : '')
+      + (d.scope_warning ? '<br><strong>' + t('inv.synth.scope_warn') + '</strong>: ' + t('inv.synth.scope_warn_detail', { curr: d.snapshot_date || '—', prev: d.snapshot_prev_date || '—' }) : '')
       + '</div>'
     : '';
 
+  // 件3 (2026-05-25): reorder — 判断卡 moved from top to after ABC (作为诊断总结).
+  // New order: hero → 5class → matrix → warehouse → ABC → 判断卡 → drill.
   return title
     + synthBanner
-    + renderInvJudgement(d.judgement)
     + renderInvHero(d.hero, d.is_synthetic)
     + renderInv5Class(d.health_5class)
     + renderInventoryCharts(d.matrix_main6)
     + renderInvMatrix(d.matrix_main6, d.matrix_company_dead_pct)
     + renderInvWarehouses(d.warehouses)
     + renderInvABC(d.abc)
+    + renderInvJudgement(d.judgement)
     + renderInvSkuLists(d.sku_lists)
     + renderInvOemTransit(d.oem_in_transit)
     + renderInvActionPlan(d.action_plan || []);
@@ -5075,39 +5050,59 @@ function renderInvJudgement(j) {
   const dirIcon = { up: '↑', down: '↓', same: '→', unknown: '—' }[v.direction] || '—';
   const dirColor = { up: '#16A34A', down: '#DC2626', same: '#6B7280', unknown: '#6B7280' }[v.direction] || '#6B7280';
 
-  const q1 = qBlock(t('inv.judge.q1'), j.q1_overstock, []);
-  const q2 = qBlock(t('inv.judge.q2'), j.q2_understock, [
+  // 件4 (2026-05-25): compose ALL judgement prose bilingually FE-side from the
+  // RPC's structured numbers (the RPC zh strings are kept but ignored here) so
+  // switching to EN leaves zero Chinese. byte-match: numbers come straight from RPC.
+  const rl = j.red_lines || {};
+  const ansLabel = (lvl) => ({ red: t('inv.judge.ans.yes'), amber: t('inv.judge.ans.mid'), green: t('inv.judge.ans.no') }[lvl] || '');
+  const q1d = j.q1_overstock || {}, q2d = j.q2_understock || {}, q4d = j.q4_dead || {}, q5c = j.q5_core || {};
+  const aNoStock = (q5c.a_no_stock != null) ? q5c.a_no_stock : (((rl.a_no_stock_count || {}).value) || 0);
+  const q1pct = ((((rl.misplaced_pct || {}).value) || 0) + (((rl.company_dead_pct || {}).value) || 0)).toFixed(1);
+  const q1rm  = (q1d.misplaced_rm || 0) + (q4d.dead_rm || 0);
+
+  const q1 = qBlock(t('inv.judge.q1'), {
+    level: q1d.level, answer: ansLabel(q1d.level),
+    headline: t('inv.judge.q1.headline', { pct: q1pct, rm: fmtInt(q1rm) }),
+    detail: t('inv.judge.q1.detail'),
+  }, []);
+  const q2 = qBlock(t('inv.judge.q2'), {
+    level: q2d.level, answer: ansLabel(q2d.level),
+    headline: t('inv.judge.q2.headline', { n: aNoStock }),
+  }, [
     { label: '📋 ' + t('inv.judge.btn.view_list'), action: () => invJumpToSkuTab('a_no_stock') },
     { label: '📤 ' + t('inv.judge.btn.assign_purchase'), action: () => invJudgeAssign(j.q2_understock) },
   ]);
   const q3 = qBlock(t('inv.judge.q3'), {
     level: 'amber', answer: '',
-    headline: (j.q3_what_to_order || {}).headline || '',
+    headline: t('inv.judge.q3.headline', { n: aNoStock }),
     detail: q3Top10Detail((j.q3_what_to_order || {}).top10),
   }, [{ label: '📋 ' + t('inv.judge.btn.view_top10'), action: () => invJumpToSkuTab('a_no_stock') }]);
   const q4 = qBlock(t('inv.judge.q4'), {
-    level: (j.q4_dead || {}).level, answer: '',
-    headline: t('inv.judge.q4.headline', { sku: fmtInt((j.q4_dead || {}).dead_sku || 0), rm: fmtRM((j.q4_dead || {}).dead_rm || 0) }),
-    detail: (j.q4_dead || {}).detail,
+    level: q4d.level, answer: '',
+    headline: t('inv.judge.q4.headline', { sku: fmtInt(q4d.dead_sku || 0), rm: fmtRM(q4d.dead_rm || 0) }),
+    detail: q4d.worst_store ? t('inv.judge.q4.detail', { store: q4d.worst_store, pct: q4d.worst_store_pct }) : '',
   }, [
     { label: '📋 ' + t('inv.judge.btn.dead_list'), action: () => invJumpToSkuTab('dead_top50') },
     { label: '📋 ' + t('inv.judge.btn.disc_list'), action: () => invJumpToSkuTab('discontinued_top50') },
     { label: '📤 ' + t('inv.judge.btn.assign_clearance'), action: () => invJudgeAssign(j.q4_dead) },
   ]);
-  const q5c = j.q5_core || {};
   const q5 = qBlock(t('inv.judge.q5'), {
     level: q5c.level, answer: '',
     headline: t('inv.judge.q5.headline', { total: fmtInt(q5c.a_total_sku || 0), nostock: (q5c.a_no_stock || 0) }),
-    detail: q5c.detail,
+    detail: t('inv.judge.q5.detail'),
   }, [{ label: '📋 ' + t('inv.judge.btn.view_a_all'), action: () => invJumpToSkuTab('a_class_all') }]);
+
+  // Bilingual verdict label + direction (RPC v.label / v.direction_label are zh-only).
+  const verdictLabel = ({ red: t('inv.judge.verdict.poor'), amber: t('inv.judge.verdict.fair'), green: t('inv.judge.verdict.good') }[v.level]) || (v.label || '—');
+  const dirLabel = ({ down: t('inv.judge.dir.worse'), up: t('inv.judge.dir.better'), same: t('inv.judge.dir.same'), unknown: t('inv.judge.dir.unknown') }[v.direction]) || (v.direction_label || '—');
 
   return ''
     + '<div class="inv-judgement-card">'
     +   '<div class="judge-head">'
     +     '<div class="judge-title">📋 ' + escapeHtml(j.snapshot_date || '') + ' ' + t('inv.judge.title') + '</div>'
     +     '<div class="judge-verdict" style="color:' + verdictColor + '">'
-    +       verdictIcon + ' ' + t('inv.judge.overall') + ': <strong>' + escapeHtml(v.label || '—') + '</strong>'
-    +       ' · ' + t('common.vs_prev') + ' <span style="color:' + dirColor + '">' + dirIcon + ' ' + escapeHtml(v.direction_label || '—') + '</span>'
+    +       verdictIcon + ' ' + t('inv.judge.overall') + ': <strong>' + escapeHtml(verdictLabel) + '</strong>'
+    +       ' · ' + t('common.vs_prev') + ' <span style="color:' + dirColor + '">' + dirIcon + ' ' + escapeHtml(dirLabel) + '</span>'
     +       ' (<strong>' + (v.red_lines_triggered != null ? v.red_lines_triggered : 0) + '</strong> ' + t('inv.judge.red_lines_triggered')
     +       (v.red_lines_prev > 0 ? t('inv.judge.red_lines_prev', { n: v.red_lines_prev }) : '') + ')'
     +     '</div>'
@@ -5497,10 +5492,24 @@ const AGE_TIER_ORDER = ['<1y', '1-5y', '5-8y', '8y+'];
 const AGE_TIER_ICON  = { '<1y': '🌱', '1-5y': '🌿', '5-8y': '🌳', '8y+': '🏛' };
 
 function renderCustomers(s) {
-  // Owner-only (Tier 2 customer view = future sprint).
+  // 件2 (2026-05-25): manager parity — store-scoped 4 race cards. Cross-store
+  // pieces (churn radar / store×race matrix / VIP lists) stay owner-only.
   if (s.role && s.role !== 'owner') {
-    return '<div class="sales-v3"><h1 class="s4-title">Customer</h1>'
-      + '<div class="s4-data-gap">' + t('customer.tier2_soon') + '</div></div>';
+    const myStore = (s.user && s.user.store) || '?';
+    const mHead = '<div class="s4-page-header"><div>'
+      + '<h1 class="s4-title">' + t('nav.customers') + ' · ' + myStore + '</h1>'
+      + '<div class="s4-sub">' + t('page.sub.month_scope') + ' ' + s.month + ' · ' + t('customer.aux.race') + '</div>'
+      + '</div></div>';
+    if (s.loading || !s.data) {
+      return '<div class="sales-v3">' + mHead
+        + '<div class="cust-race-grid">'
+        +   '<div class="cust-race-card"><div class="skeleton h-value" style="height:32px"></div></div>'.repeat(4)
+        + '</div></div>';
+    }
+    return '<div class="sales-v3">' + mHead
+      + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'
+      + renderCustomerRaceCards(s)
+      + '</div>';
   }
   const header = ''
     + '<div class="s4-page-header">'

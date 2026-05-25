@@ -159,7 +159,8 @@ BEGIN
       'answer', CASE WHEN rl_misplaced_pct + rl_company_dead_pct > 60 THEN '是'
                      WHEN rl_misplaced_pct + rl_company_dead_pct > 40 THEN '一般' ELSE '否' END,
       'headline', 'Misplaced+Dead+Disc 占 ' || (rl_misplaced_pct + rl_company_dead_pct)::text || '%, RM ' || to_char(v_misplaced_rm + v_dead_rm, 'FM999,999,999') || ' 锁住',
-      'detail', 'Misplaced 占大头, 不是真"多", 是"放错店"'
+      'detail', 'Misplaced 占大头, 不是真"多", 是"放错店"',
+      'misplaced_rm', v_misplaced_rm  -- V2 Fix 件4: structured field so FE can compose bilingual headline
     ),
     'q2_understock', jsonb_build_object(
       'level', CASE WHEN rl_a_no_stock > TH_A_NO_STOCK THEN 'red' WHEN rl_a_no_stock > 10 THEN 'amber' ELSE 'green' END,
@@ -199,6 +200,7 @@ BEGIN
       'level', CASE WHEN rl_company_dead_pct > TH_DEAD_PCT THEN 'red' WHEN rl_company_dead_pct > 20 THEN 'amber' ELSE 'green' END,
       'dead_sku', v_dead_sku, 'dead_rm', v_dead_rm,
       'detail', CASE WHEN rl_worst_store IS NOT NULL THEN '最严重: ' || rl_worst_store || ' Dead% ' || rl_worst_store_pct::text || '%' ELSE '' END,
+      'worst_store', rl_worst_store, 'worst_store_pct', rl_worst_store_pct,  -- V2 Fix 件4: structured for FE bilingual q4 detail
       'drill_tab_primary', 'dead_top50', 'drill_tab_secondary', 'discontinued_top50', 'action_id', 'clear_dead_stock'
     ),
     'q5_core', jsonb_build_object(

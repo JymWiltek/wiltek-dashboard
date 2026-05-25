@@ -363,12 +363,11 @@ async function handleCustomer(req, res, user, ym, view, queryBranch) {
   });
 }
 
-// view=overview — Phase 5 Owner Overview 4-KPI hero. Owner only.
-async function handleOverview(req, res, user, ym) {
-  if (user && user.role !== 'owner') {
-    return res.status(403).json({ ok: false, error: 'owner only' });
-  }
-  const { data, error } = await sb().rpc('overview_kpi', { p_ym: ym });
+// view=overview — 4-KPI hero. Owner = company (branch null); manager = own store.
+// V2 Launch Fix 件1 (2026-05-25): overview_kpi gained p_branch; branch enforced
+// upstream (effectiveBranch). p_branch null → company aggregate (unchanged).
+async function handleOverview(req, res, user, ym, branch) {
+  const { data, error } = await sb().rpc('overview_kpi', { p_ym: ym, p_branch: branch || null });
   if (error) {
     console.error('[/api/kpi overview] rpc error:', error.message);
     return res.status(200).json({
@@ -380,7 +379,9 @@ async function handleOverview(req, res, user, ym) {
   }
   return res.status(200).json({
     ok: true, view: 'overview', ym,
-    session_role: user?.role || null,
+    session_role:  user?.role  || null,
+    session_store: user?.store || null,
+    effective_branch: branch || null,
     fetched_at: new Date().toISOString(),
     data,
   });
@@ -556,7 +557,7 @@ export default async function handler(req, res) {
     if (view === 'sales-trend') return handleSalesTrend(req, res, user, ym, queryBranch);
     if (view === 'sales-daily') return handleSalesDaily(req, res, user, ym, queryBranch);
     // Phase 5 — Owner Overview 4-KPI hero
-    if (view === 'overview')    return handleOverview(req, res, user, ym);
+    if (view === 'overview')    return handleOverview(req, res, user, ym, effectiveBranch);
     // Phase 6 — Customer page (owner only)
     if (view.startsWith('customer-')) return handleCustomer(req, res, user, ym, view, queryBranch);
     // Phase 4 — Agentic OS Sales V3 dispatch
