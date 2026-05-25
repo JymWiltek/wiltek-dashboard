@@ -1260,6 +1260,30 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
   font-family: 'SF Mono', Menlo, monospace; z-index: 999;
 }
 .dev-badge.fail { background: var(--danger); }
+
+/* 件4 (2026-05-25): GTD Tracker — ported from Wiltek_MASTER.html */
+.gtd-toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0 18px; flex-wrap: wrap; }
+.gtd-toolbar .gtd-scope { font-size: 13px; color: var(--text-meta); padding: 4px 10px; border: 1px solid var(--line, #E6E6E6); border-radius: 6px; }
+.gtd-toolbar .gtd-save-btn { background: var(--brand, #1F5F4A); color: #fff; border: 0; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.gtd-toolbar .gtd-save-btn:hover { background: #19503e; }
+.gtd-toolbar .gtd-save-status { font-size: 12px; color: var(--text-meta); font-style: italic; }
+.gtd-section-title { font-size: 13px; font-weight: 600; color: var(--text, #1A1A1A); margin: 16px 0 8px; }
+.gtd-table-wrap { overflow-x: auto; margin-bottom: 8px; }
+.gtd-table { width: 100%; border-collapse: collapse; min-width: 1100px; background: #fff; border: 1px solid var(--line, #E6E6E6); border-radius: 8px; }
+.gtd-table th, .gtd-table td { padding: 8px 10px; border-bottom: 1px solid var(--line, #E6E6E6); font-size: 12px; text-align: left; font-variant-numeric: tabular-nums; }
+.gtd-table th { background: var(--surface, #FAFAFA); font-weight: 600; color: var(--text, #1A1A1A); text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
+.gtd-table th.month, .gtd-table td.month { text-align: center; min-width: 70px; }
+.gtd-table td.task-name, .gtd-table td.kpi-name { font-weight: 500; min-width: 220px; }
+.gtd-table td.note { font-size: 11px; color: var(--text-meta); max-width: 260px; }
+.gtd-table select, .gtd-table input[type="number"] { width: 100%; padding: 4px 6px; border: 1px solid var(--line, #E6E6E6); border-radius: 4px; font-size: 12px; font-family: inherit; box-sizing: border-box; font-variant-numeric: tabular-nums; text-align: center; }
+.gtd-table select.gtd-status-Done     { background: #DEF2E5; color: #1F5F4A; font-weight: 600; }
+.gtd-table select.gtd-status-Updated  { background: #FCEDD0; color: #8A6310; font-weight: 600; }
+.gtd-table select.gtd-status-Undone   { background: #FBE2E2; color: #8A2424; font-weight: 600; }
+.gtd-table .gtd-status-cell.kpi-ok    { background: #DEF2E5; color: #1F5F4A; font-weight: 700; text-align: center; }
+.gtd-table .gtd-status-cell.kpi-near  { background: #FCEDD0; color: #8A6310; font-weight: 700; text-align: center; }
+.gtd-table .gtd-status-cell.kpi-bad   { background: #FBE2E2; color: #8A2424; font-weight: 700; text-align: center; }
+.gtd-table td.target-cell { font-weight: 600; min-width: 80px; }
+.gtd-table td.target-locked { color: var(--text-meta); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -1313,6 +1337,8 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
       <a href="#" data-view="customers" onclick="return onViewChange('customers')"><span class="icon">👥</span>Customers</a>
       <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products</a>
       <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today</a>
+      <!-- 件4 (2026-05-25): GTD Tracker ported from MASTER. -->
+      <a href="#" data-view="gtd"       onclick="return onViewChange('gtd')"><span class="icon">✅</span>GTD</a>
       <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance<span class="stub">…</span></a>
       <!-- Phase 10A (2026-05-22) 派派盒 — both owner + managers. -->
       <a href="#" data-view="inbox"     onclick="return onViewChange('inbox')"><span class="icon">📥</span>派派盒</a>
@@ -1942,6 +1968,41 @@ window.i18n = {
     'modal.orphan.after_link':           { zh: '后, 下次 cron sync 自动 propagate metadata, alert 清除.', en: 'and the next cron sync will auto-propagate metadata, clearing the alert.' },
     'store.name.WCO': { zh: 'WCO · HQ 开单',    en: 'WCO · HQ Billing' },
     'store.name.WEX': { zh: 'WEX · 展览/特殊',  en: 'WEX · Exhibition/Special' },
+    // ═══ V2-Launch 件4 — GTD Tracker (ported from MASTER) ═══
+    'gtd.title':       { zh: 'GTD 进度跟踪', en: 'GTD Tracker' },
+    'gtd.sub':         { zh: '每月任务 + KPI 跟踪 · 按店 (数据存 Supabase, 跨设备同步)', en: 'Monthly tasks + KPI tracker · by store (Supabase-backed, cross-device)' },
+    'gtd.scope':       { zh: '分行视角 · {branch}', en: 'Branch · {branch}' },
+    'gtd.btn.save':    { zh: '保存', en: 'Save' },
+    'gtd.col.task':    { zh: '任务', en: 'Task' },
+    'gtd.col.note':    { zh: '说明', en: 'Note' },
+    'gtd.col.target':  { zh: '目标', en: 'Target' },
+    'gtd.month_suffix':{ zh: '月', en: 'mo' },
+    'gtd.tasks_title': { zh: '每月任务进度', en: 'Monthly Task Schedule' },
+    'gtd.kpis_title':  { zh: '每月 KPI', en: 'Monthly KPIs' },
+    'gtd.saving':      { zh: '保存中...', en: 'Saving...' },
+    'gtd.saved':       { zh: '✓ 已保存 · 跨设备同步', en: '✓ Saved · cross-device synced' },
+    'gtd.save_fail':   { zh: '⚠ 已存本地。服务器保存失败: {reason}', en: '⚠ Saved locally. Server save failed: {reason}' },
+    'gtd.save_unreachable': { zh: '⚠ 已存本地。/api/gtd 不可达。', en: '⚠ Saved locally. /api/gtd unreachable.' },
+    // GTD task names (bilingual data — selected by lang at render)
+    'gtd.task.bunting':     { zh: '横幅 & 海报内容', en: 'Bunting & Banners contents' },
+    'gtd.task.sm_profile':  { zh: '社媒主页内容', en: 'Social media profile contents' },
+    'gtd.task.gbp_photos':  { zh: 'Google 商户照片', en: 'Google Business Profile photos' },
+    'gtd.task.theme_deco':  { zh: '主题装饰', en: 'Theme decoration' },
+    'gtd.task.vital_stock': { zh: '关键库存复核', en: 'Vital Stock Review' },
+    'gtd.task.wa_catalog':  { zh: 'WhatsApp 商品目录', en: 'WhatsApp Business catalog' },
+    'gtd.task.ccnn':        { zh: '分行 CCNN 清单', en: 'Branches Checklist (CCNN)' },
+    'gtd.task.bmm_share':   { zh: 'BMM 信息分享给员工', en: 'BMM info sharing to Staffs' },
+    'gtd.task.training':    { zh: '培训手册更新', en: 'Training booklet / updates' },
+    'gtd.task.display_bm':  { zh: '产品陈列标杆', en: 'Products Display Benchmark' },
+    // GTD KPI names (bilingual data)
+    'gtd.kpi.sales_rm':      { zh: '销售 (RM)', en: 'Sales (RM)' },
+    'gtd.kpi.avg_basket_rm': { zh: '客单价 (RM)', en: 'Avg Basket (RM)' },
+    'gtd.kpi.walkin':        { zh: '客流', en: 'Walk-In Customers' },
+    'gtd.kpi.closing_rate':  { zh: '成交率 %', en: 'Closing Rate %' },
+    'gtd.kpi.gbp_reviews':   { zh: '新增 Google 评价', en: 'New Google Reviews' },
+    'gtd.kpi.ccnn_pct':      { zh: '分行清单 %', en: 'Branch Checklist %' },
+    'gtd.kpi.sm_posts':      { zh: '社媒发帖数', en: 'Social Media Posts' },
+    'gtd.kpi.discon_pct':    { zh: '停产库存 %', en: 'Discontinued Stock %' },
     // <<V2_LAUNCH_I18N_KEYS>> — 件1 新增 cell 级 keys 插在这一行之前
   },
 };
@@ -1957,7 +2018,7 @@ function t(key, opt) {
   return s;
 }
 window.t = t;
-const NAV_ICON = { overview: '📊', inventory: '📦', customers: '👥', products: '🏷️', today: '🏠', finance: '💰', inbox: '📥', targets: '⚙️' };
+const NAV_ICON = { overview: '📊', inventory: '📦', customers: '👥', products: '🏷️', today: '🏠', gtd: '✅', finance: '💰', inbox: '📥', targets: '⚙️' };
 function applyI18nNav() {
   document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
     const v = a.getAttribute('data-view');
@@ -2095,7 +2156,7 @@ function populateBranchPicker() {
 }
 
 /* ── Constants ──────────────────────────────────────────────────── */
-const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'finance', 'inbox', 'targets'];
+const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'gtd', 'finance', 'inbox', 'targets'];
 
 // ── V2-Launch 件2 (2026-05-25): RBAC page-access matrix (Jym 拍板) ──
 // Role tiers (state.role is normalized at login): owner / manager (store-scoped)
@@ -2114,6 +2175,7 @@ const RBAC = {
     customers: ['owner', 'staff', 'manager'],
     products:  ['owner', 'staff', 'manager'],
     today:     ['owner', 'staff', 'manager'],
+    gtd:       ['owner', 'staff', 'manager'],  // 件4: internal ops tracker — all roles (Jym 待最终确认; 默认全开)
     inbox:     ['owner', 'staff', 'manager'],
     finance:   ['owner'],
     targets:   ['owner'],
@@ -2455,6 +2517,7 @@ const FETCHERS = {
   customers: fetchCustomers,
   products:  fetchProducts,
   today:     fetchToday,
+  gtd:       fetchGtd,     // 件4 — GTD Tracker (hydrate from /api/gtd)
   finance:   null, // backlog: waits on multi-month financial sync
   inbox:     fetchInbox,   // Phase 10A — 派派盒
   targets:   fetchTargets,
@@ -2579,6 +2642,7 @@ function renderView() {
     customers: renderCustomers,
     products:  renderProducts,
     today:     renderToday,
+    gtd:       renderGtd,     // 件4 — GTD Tracker
     finance:   renderStubView,
     inbox:     renderInbox,   // Phase 10A — 派派盒
     targets:   renderTargets,
@@ -6518,6 +6582,196 @@ function renderToday(s) {
 
   return title + banner + actionPlan + storeTable + domainGrid;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   件4 (2026-05-25) — GTD Tracker, ported from Wiltek_MASTER.html.
+   Monthly task + KPI tracker, per store. Data persists in Supabase via
+   the existing /api/gtd (flat key→value map: <branch>::<kind>::<id>::<idx>).
+   localStorage key 'wp_gtd_v2' caches/drafts (isolated from V1 'wp_gtd_v1').
+   Task/KPI display names live in the i18n dict (gtd.task.* / gtd.kpi.*).
+   ═══════════════════════════════════════════════════════════════════ */
+const GTD_DEFAULT_TASKS = [
+  { id: 'bunting',     note_en: 'Update store visual displays each month' },
+  { id: 'sm_profile',  note_en: 'Refresh FB / IG profile + cover' },
+  { id: 'gbp_photos',  note_en: 'Add fresh in-store photos' },
+  { id: 'theme_deco',  note_en: 'Seasonal / promo theme setup' },
+  { id: 'vital_stock', note_en: 'Top-seller stock cover review' },
+  { id: 'wa_catalog',  note_en: 'Update product catalog' },
+  { id: 'ccnn',        note_en: 'Cleanliness · Comfort · Newness · Niceness' },
+  { id: 'bmm_share',   note_en: 'Brand merchandising memo to floor staff' },
+  { id: 'training',    note_en: 'Roll out new product / process training' },
+  { id: 'display_bm',  note_en: 'Compare display vs benchmark store' },
+];
+const GTD_DEFAULT_KPIS = [
+  { id: 'sales_rm',      target: 80000, unit: 'RM' },
+  { id: 'avg_basket_rm', target: 250,   unit: 'RM' },
+  { id: 'walkin',        target: 350,   unit: '' },
+  { id: 'closing_rate',  target: 70,    unit: '%' },
+  { id: 'gbp_reviews',   target: 15,    unit: '' },
+  { id: 'ccnn_pct',      target: 95,    unit: '%' },
+  { id: 'sm_posts',      target: 10,    unit: '' },
+  { id: 'discon_pct',    target: 10,    unit: '%' /* lower-is-better */ },
+];
+const GTD_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const GTD_LS_KEY = 'wp_gtd_v2';
+// zh month labels derived via dict suffix (keeps source Chinese-free for audit).
+function gtdMonthLabels() {
+  return (window.i18n.lang === 'zh')
+    ? GTD_MONTHS.map((_, i) => (i + 1) + t('gtd.month_suffix'))
+    : GTD_MONTHS;
+}
+
+function gtdActiveBranch() {
+  // Managers pinned to own store (getEffectiveBranch); owner/staff default W01.
+  return getEffectiveBranch() || 'W01';
+}
+function gtdLoadStore() {
+  try { return JSON.parse(localStorage.getItem(GTD_LS_KEY) || '{}') || {}; }
+  catch (_) { return {}; }
+}
+function gtdSaveStore(store) {
+  try { localStorage.setItem(GTD_LS_KEY, JSON.stringify(store)); } catch (_) {}
+}
+function gtdGetCellValue(store, branch, kind, rowId, monthIdx) {
+  return store[`${branch}::${kind}::${rowId}::${monthIdx}`];
+}
+function gtdSetCellValue(store, branch, kind, rowId, monthIdx, value) {
+  const k = `${branch}::${kind}::${rowId}::${monthIdx}`;
+  if (value === null || value === undefined || value === '') delete store[k];
+  else store[k] = value;
+}
+function gtdGetTargetOverride(store, branch, kpiId) {
+  return store[`${branch}::target::${kpiId}`];
+}
+function gtdSetTargetOverride(store, branch, kpiId, value) {
+  const k = `${branch}::target::${kpiId}`;
+  if (value === null || value === undefined || value === '') delete store[k];
+  else store[k] = value;
+}
+function gtdKpiStatus(actual, target, kpiId) {
+  if (actual === undefined || actual === null || actual === '' || isNaN(+actual)) return null;
+  if (!target || isNaN(+target) || +target === 0) return null;
+  const ratio = +actual / +target;
+  const lowerIsBetter = (kpiId === 'discon_pct');
+  if (lowerIsBetter) { if (ratio <= 1.0) return 'ok'; if (ratio <= 1.25) return 'near'; return 'bad'; }
+  if (ratio >= 1.0) return 'ok'; if (ratio >= 0.8) return 'near'; return 'bad';
+}
+
+async function fetchGtd(signal) {
+  // Hydrate from Supabase (/api/gtd) → merge into localStorage cache.
+  try {
+    const r = await fetch('/api/gtd?t=' + Date.now(), { cache: 'no-store', headers: authHeaders(), signal });
+    const j = await r.json();
+    if (j && j.ok) {
+      const merged = Object.assign({}, gtdLoadStore(), j.store || {});
+      gtdSaveStore(merged);
+      return { ok: true, rows: j.rows, session_role: j.session_role };
+    }
+    return { ok: false, error: (j && j.error) || 'gtd fetch failed' };
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
+function renderGtd(s) {
+  const months = gtdMonthLabels();
+  const branch = gtdActiveBranch();
+  const isOwnerRole = (state.role === 'owner');
+  const header = '<div class="page-header"><div>'
+    + '<h1 class="page-title">✅ ' + t('gtd.title') + '</h1>'
+    + '<p class="page-sub">' + t('gtd.sub') + '</p></div></div>';
+  if (s.loading) {
+    return header + '<div class="gtd-toolbar"><span class="skeleton h-row" style="width:240px;height:28px"></span></div>';
+  }
+  const store = gtdLoadStore();
+  const scope = t('gtd.scope', { branch }) + (isOwnerRole ? ' · Owner' : '');
+  const toolbar = '<div class="gtd-toolbar">'
+    + '<span class="gtd-scope">' + escapeHtml(scope) + '</span>'
+    + '<button id="gtdSaveBtn" class="gtd-save-btn" type="button">💾 ' + t('gtd.btn.save') + '</button>'
+    + '<span class="gtd-save-status" id="gtdSaveStatus"></span>'
+    + '</div>';
+
+  // Tasks table
+  const taskHead = '<thead><tr><th>' + t('gtd.col.task') + '</th>'
+    + months.map(m => '<th class="month">' + m + '</th>').join('')
+    + '<th>' + t('gtd.col.note') + '</th></tr></thead>';
+  const taskBody = GTD_DEFAULT_TASKS.map(task => {
+    const cells = GTD_MONTHS.map((_, idx) => {
+      const v = gtdGetCellValue(store, branch, 'task', task.id, idx) || '';
+      const cls = v ? ('gtd-status-' + v) : '';
+      const opts = ['', 'Done', 'Updated', 'Undone'].map(o =>
+        '<option value="' + o + '"' + (o === v ? ' selected' : '') + '>' + (o || '—') + '</option>').join('');
+      return '<td class="month"><select class="' + cls + '" data-gtd="task" data-row="' + task.id + '" data-month="' + idx + '">' + opts + '</select></td>';
+    }).join('');
+    return '<tr><td class="task-name">' + escapeHtml(t('gtd.task.' + task.id)) + '</td>'
+      + cells + '<td class="note">' + escapeHtml(task.note_en || '') + '</td></tr>';
+  }).join('');
+  const tasksTable = '<div class="gtd-section-title">' + t('gtd.tasks_title') + '</div>'
+    + '<div class="gtd-table-wrap"><table class="gtd-table">' + taskHead + '<tbody>' + taskBody + '</tbody></table></div>';
+
+  // KPI table
+  const kpiHead = '<thead><tr><th>KPI</th><th class="target-cell">' + t('gtd.col.target') + '</th>'
+    + months.map(m => '<th class="month">' + m + '</th>').join('') + '</tr></thead>';
+  const kpiBody = GTD_DEFAULT_KPIS.map(kpi => {
+    const ovr = gtdGetTargetOverride(store, branch, kpi.id);
+    const target = (ovr !== undefined && ovr !== '') ? +ovr : kpi.target;
+    const cells = GTD_MONTHS.map((_, idx) => {
+      const v = gtdGetCellValue(store, branch, 'kpi', kpi.id, idx);
+      const status = gtdKpiStatus(v, target, kpi.id);
+      const valStr = (v === undefined || v === null || v === '') ? '' : v;
+      const cls = status ? ('gtd-status-cell kpi-' + status) : '';
+      return '<td class="month ' + cls + '"><input type="number" step="any" data-gtd="kpi" data-row="' + kpi.id + '" data-month="' + idx + '" value="' + valStr + '"></td>';
+    }).join('');
+    const targetCell = isOwnerRole
+      ? '<td class="target-cell"><input type="number" step="any" data-gtd="target" data-row="' + kpi.id + '" value="' + target + '"></td>'
+      : '<td class="target-cell target-locked">🔒 ' + target + (kpi.unit || '') + '</td>';
+    return '<tr><td class="kpi-name">' + escapeHtml(t('gtd.kpi.' + kpi.id)) + '</td>'
+      + targetCell + cells + '</tr>';
+  }).join('');
+  const kpiTable = '<div class="gtd-section-title">' + t('gtd.kpis_title') + '</div>'
+    + '<div class="gtd-table-wrap"><table class="gtd-table">' + kpiHead + '<tbody>' + kpiBody + '</tbody></table></div>';
+
+  return '<div class="gtd-view">' + header + toolbar + tasksTable + kpiTable + '</div>';
+}
+
+/* GTD persistence — delegated listeners wired once. */
+(function wireGtdV2() {
+  if (window.__gtd_wired_v2) return;
+  window.__gtd_wired_v2 = true;
+  document.addEventListener('change', e => {
+    const tgt = e.target;
+    const kind = tgt && tgt.getAttribute && tgt.getAttribute('data-gtd');
+    if (!kind) return;
+    const branch = gtdActiveBranch();
+    const store = gtdLoadStore();
+    const row = tgt.getAttribute('data-row');
+    if (kind === 'target') gtdSetTargetOverride(store, branch, row, tgt.value);
+    else gtdSetCellValue(store, branch, kind, row, +tgt.getAttribute('data-month'), tgt.value);
+    gtdSaveStore(store);
+    if (state.view === 'gtd') renderView();   // re-render for status colours
+  });
+  document.addEventListener('click', e => {
+    const btn = e.target.closest && e.target.closest('#gtdSaveBtn');
+    if (!btn) return;
+    const status = document.getElementById('gtdSaveStatus');
+    if (status) status.textContent = t('gtd.saving');
+    const branch = gtdActiveBranch();
+    const store = gtdLoadStore();
+    fetch('/api/gtd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ branch, store }),
+    }).then(r => r.json()).then(j => {
+      if (j && j.ok) {
+        if (j.store) gtdSaveStore(j.store);
+        if (status) status.textContent = t('gtd.saved');
+      } else if (status) {
+        status.textContent = t('gtd.save_fail', { reason: (j && j.error) || 'unknown' });
+      }
+    }).catch(() => { if (status) status.textContent = t('gtd.save_unreachable'); });
+  });
+})();
 
 /* ── Stub view (Finance) ─────────────────────────────────────────── */
 function renderStubView(s) {
