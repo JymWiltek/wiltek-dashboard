@@ -2264,9 +2264,12 @@ function clearSession() {
 }
 
 /* ── URL sync ───────────────────────────────────────────────────── */
+// 件3 (2026-05-25): backward-compat for old MASTER (V1) URLs / bookmarks.
+const VIEW_ALIAS_MAP = { kpi: 'overview', stock: 'inventory', purchasing: 'inventory' };
 function readUrlState() {
   const p = new URL(window.location.href).searchParams;
-  const v = p.get('view');
+  let v = p.get('view');
+  if (v && !ALLOWED_VIEWS.includes(v) && VIEW_ALIAS_MAP[v]) v = VIEW_ALIAS_MAP[v];
   const m = p.get('month');
   const b = p.get('branch');
   return {
