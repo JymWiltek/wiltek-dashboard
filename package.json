@@ -7,7 +7,9 @@
     "serve": "node tests/serve.js",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:i18n": "node tools/i18n_audit.js --count && node tools/i18n_check.js --ci",
+    "test:rbac": "node tools/rbac_test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
