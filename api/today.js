@@ -53,6 +53,9 @@ export default async function handler(req, res) {
   let p_branch;
   if (user.role === 'owner') {
     p_branch = queryBranch || null;
+  } else if (!user.store) {
+    // Fix 3: staff (marketing/hr/warehouse, no store) → company default, may pick like owner.
+    p_branch = queryBranch || null;
   } else {
     if (queryBranch && queryBranch !== user.store) {
       return res.status(403).json({ ok: false, error: 'branch not allowed for this user' });

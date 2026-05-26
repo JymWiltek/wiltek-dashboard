@@ -2378,7 +2378,9 @@ async function fetchSales(signal) {
   const dailyQ   = baseQ.replace('view=sales', 'view=sales-daily');
   const targetsQ = new URLSearchParams({ view: 'targets', month: state.month }).toString();
   const role    = (state.user && state.user.role) || state.role || 'owner';
-  const tierIsOwner = role === 'owner';
+  // Fix 3: HQ all-store roles (owner + marketing/hr/warehouse) get the Tier-1
+  // company overview; only store-bound managers get the Tier-2 store view.
+  const tierIsOwner = role === 'owner' || role === 'marketing' || role === 'hr' || role === 'warehouse';
   const myRoleId = userRoleId(state.user) || 'owner';
 
   // Tier-specific endpoint
@@ -5494,7 +5496,9 @@ const AGE_TIER_ICON  = { '<1y': '🌱', '1-5y': '🌿', '5-8y': '🌳', '8y+': '
 function renderCustomers(s) {
   // 件2 (2026-05-25): manager parity — store-scoped 4 race cards. Cross-store
   // pieces (churn radar / store×race matrix / VIP lists) stay owner-only.
-  if (s.role && s.role !== 'owner') {
+  // Fix 3 (Scheme C): only store-bound managers get the limited 4-race view;
+  // owner + HQ staff (marketing/hr/warehouse) get the full company Customer page.
+  if (s.role === 'manager') {
     const myStore = (s.user && s.user.store) || '?';
     const mHead = '<div class="s4-page-header"><div>'
       + '<h1 class="s4-title">' + t('nav.customers') + ' · ' + myStore + '</h1>'

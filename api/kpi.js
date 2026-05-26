@@ -326,17 +326,28 @@ async function handleSalesDaily(req, res, user, ym, queryBranch) {
 // Phase 4 · Sales Module V3 (Agentic OS · 2-tier) — view handlers
 // ═══════════════════════════════════════════════════════════════════════
 
-// Phase 6 — Customer page. Owner = company (all sub-views); manager = own store
-// (V2 Launch Fix 2: the two store-scopable sub-views only, forced to their store).
+// Phase 6 — Customer page. V2 Launch Fix 3 (Scheme C):
+//   owner / staff (marketing, hr, warehouse) → ALL sub-views, company scope
+//     (queryBranch optional, like owner — HQ all-store roles).
+//   manager → only the two store-scopable sub-views, FORCED to own store.
+//   finance / bi / other → 403 (not in the 9-user set).
 async function handleCustomer(req, res, user, ym, view, queryBranch, effectiveBranch) {
-  const isOwner = !user || user.role === 'owner';
-  // Cross-store / company-only sub-views stay owner-only; managers get the two
-  // store-scopable ones (race cards + payload) FORCED to their own store.
+  const role = user ? user.role : 'owner';        // null user = legacy owner fallback
+  const isOwner   = role === 'owner';
+  const isStaff   = role === 'marketing' || role === 'hr' || role === 'warehouse';
+  const isManager = role === 'manager';
   const MANAGER_VIEWS = new Set(['customer-race', 'customer-payload']);
-  if (!isOwner && !MANAGER_VIEWS.has(view)) {
-    return res.status(403).json({ ok: false, error: 'owner only' });
+  if (isManager && !MANAGER_VIEWS.has(view)) {
+    return res.status(403).json({ ok: false, error: 'manager scope' });
   }
-  const scope = isOwner ? (queryBranch || null) : (effectiveBranch || (user && user.store) || null);
+  if (!isOwner && !isStaff && !isManager) {
+    return res.status(403).json({ ok: false, error: 'role not permitted' });
+  }
+  // Manager → own store (enforced upstream as effectiveBranch); owner/staff →
+  // queryBranch (null = company default).
+  const scope = isManager
+    ? (effectiveBranch || (user && user.store) || null)
+    : (queryBranch || null);
   const map = {
     'customer-overview': { rpc: 'customer_overview_kpi',      args: { p_ym: ym } },
     'customer-race':     { rpc: 'customer_by_race',           args: { p_ym: ym, p_store: scope } },
@@ -393,9 +404,12 @@ async function handleOverview(req, res, user, ym, branch) {
   });
 }
 
-// view=sales-owner — Tier 1 Owner overview. Owner only.
+// view=sales-owner — Tier 1 company overview. Owner + HQ staff (all-store roles).
+// V2 Launch Fix 3: marketing/hr/warehouse see the same company overview as owner.
 async function handleSalesOwner(req, res, user, ym) {
-  if (user && user.role !== 'owner') {
+  const role = user ? user.role : 'owner';
+  const seeAll = role === 'owner' || role === 'marketing' || role === 'hr' || role === 'warehouse';
+  if (!seeAll) {
     return res.status(403).json({ ok: false, error: 'owner only' });
   }
   // Try RPC; if it errors (migration not applied), surface a clean
@@ -545,8 +559,15 @@ export default async function handler(req, res) {
   const user = await loadSessionUser(sessionUserName);
   let effectiveBranch = null;
   if (user) {
-    if (user.role === 'owner') effectiveBranch = queryBranch || null;
-    else {
+    if (user.role === 'owner') {
+      effectiveBranch = queryBranch || null;
+    } else if (!user.store) {
+      // V2 Launch Fix 3: staff (marketing/hr/warehouse) are HQ all-store roles
+      // with NO store binding → company by default, may pick any branch like
+      // owner (no 403).
+      effectiveBranch = queryBranch || null;
+    } else {
+      // Store-bound manager: pinned to own store; reject foreign branch.
       if (queryBranch && queryBranch !== user.store) {
         res.status(403).json({ ok: false, error: 'branch not allowed for this user' });
         return;
