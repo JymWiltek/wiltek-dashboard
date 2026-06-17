@@ -2057,7 +2057,10 @@ window.setLang = setLang;
 
 /* ── State (single source of truth) ─────────────────────────────── */
 const state = {
-  month:   '2026-04',
+  // null = unresolved; boot() sets it from the URL if pinned, otherwise
+  // enterApp() defaults it to the LATEST month in data (via loadMonths).
+  // Default-month fix (2026-06-17): no longer hard-coded to a stale month.
+  month:   null,
   branch:  null,        // null = all stores (owner only)
   view:    'overview',  // Phase 5: owner default landing (was 'sales')
   role:    'owner',     // 'owner' | 'manager' | 'warehouse'
@@ -2244,19 +2247,35 @@ const RACE_TARGET_COLS = [
 // they have sales in by_branch, but mark them "no target".)
 const SALES_PROGRESS_STORES = ['W01','W02','W03','W05','W07','WCO'];
 
-/* Generate 28 months 2024-01..2026-04 — matches sales table range.
-   When sync extends the table, append new months here. */
+/* Default-month fix (2026-06-17): the month list now comes from data via
+   loadMonths() (/api/kpi?view=months), newest-first. buildMonthList() below
+   is kept only as an OFFLINE FALLBACK if that fetch fails — its hard-coded
+   end month is intentionally NOT the source of truth anymore. */
 function buildMonthList() {
   const months = [];
   for (let y = 2024; y <= 2026; y++) {
-    const maxM = (y === 2026) ? 4 : 12;
+    const maxM = (y === 2026) ? 5 : 12;
     for (let m = 1; m <= maxM; m++) {
       months.push(y + '-' + String(m).padStart(2, '0'));
     }
   }
   return months.reverse(); // newest first
 }
-const ALL_MONTHS = buildMonthList();
+let ALL_MONTHS = buildMonthList();
+
+/* Pull the distinct months present in data and adopt them as the picker list.
+   Returns the latest month (newest-first[0]). On failure, keeps the offline
+   fallback list. No ?month param needed (see api/kpi.js handleMonths). */
+async function loadMonths() {
+  try {
+    const r = await getJSON('/api/kpi?view=months');
+    if (r && Array.isArray(r.months) && r.months.length) {
+      ALL_MONTHS = r.months;
+      return r.latest || ALL_MONTHS[0];
+    }
+  } catch (_) { /* keep offline fallback ALL_MONTHS */ }
+  return ALL_MONTHS[0];
+}
 
 /* SQL truth for byte-match assertion (DEV mode).
    These come from Sprint 5 Stage 1 PR #30 byte-match verification. */
@@ -6952,7 +6971,7 @@ function doLogout() {
   document.getElementById('login').style.display = 'flex';
 }
 
-function enterApp() {
+async function enterApp() {
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').classList.add('ready');
   document.getElementById('app').setAttribute('aria-hidden', 'false');
@@ -6964,6 +6983,11 @@ function enterApp() {
   // 件2 RBAC: hide nav pages the role can't see (finance/targets → owner only).
   applyRbacToNav(state.role);
   applyI18nNav();  // Phase 10A — bilingual nav labels + lang button text
+  // Default-month fix (2026-06-17): resolve months from data BEFORE building
+  // the picker so the default is the latest month in the DB, not a stale
+  // hard-coded value. A month pinned in the URL (set by boot) still wins.
+  const latestMonth = await loadMonths();
+  if (!state.month) state.month = latestMonth;
   populateMonthPicker();
   // Bug 2 fix: populate branch picker immediately (from STORE_META + any
   // seeded codes) so it's visible before the first fetch resolves.
