@@ -35,7 +35,11 @@ const PHASE5_VIEWS = ['overview'];
 // (age-tier buckets / churn / cross-tab / top100 VIPs) — same Supabase as V1.
 // Phase 6c (2026-05-21): age-bucket × category cross-tab (买什么).
 const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload', 'customer-age-category'];
-const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS];
+// Default-month fix (2026-06-17): lightweight months list so the FE defaults
+// to the LATEST month present in data instead of a hard-coded value. Not a
+// new Vercel function (same kpi.js); needs no ?month param.
+const META_VIEWS = ['months'];
+const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS, ...META_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
 const KEY = process.env.WILTEK_SUPABASE_SERVICE_ROLE_KEY;
@@ -404,6 +408,30 @@ async function handleOverview(req, res, user, ym, branch) {
   });
 }
 
+// view=months — distinct months present in sales data, newest-first. The FE
+// uses this to (1) populate the month picker and (2) default to the LATEST
+// month instead of a hard-coded value. No month/branch param needed; not
+// scope-sensitive (the same list for every role). Source: v_total_amt_by_month
+// (one row per ym), same view /api/customers uses for months_seen.
+async function handleMonths(req, res) {
+  const { data, error } = await sb()
+    .from('v_total_amt_by_month')
+    .select('ym')
+    .order('ym', { ascending: false });
+  if (error) {
+    console.error('[/api/kpi months] error:', error.message);
+    return res.status(200).json({ ok: true, view: 'months', months: [], latest: null,
+      degraded: true, degraded_reason: error.message });
+  }
+  const months = (data || []).map(r => r.ym);
+  return res.status(200).json({
+    ok: true, view: 'months',
+    fetched_at: new Date().toISOString(),
+    months,
+    latest: months[0] || null,
+  });
+}
+
 // view=sales-owner — Tier 1 company overview. Owner + HQ staff (all-store roles).
 // V2 Launch Fix 3: marketing/hr/warehouse see the same company overview as owner.
 async function handleSalesOwner(req, res, user, ym) {
@@ -547,9 +575,10 @@ export default async function handler(req, res) {
     res.status(400).json({ ok: false, error: 'bad view; allowed: ' + ALLOWED_VIEWS.join(',') });
     return;
   }
-  // view=actions doesn't need month (it queries actions_assigned directly,
-  // not month-bounded KPI data). All other views require YYYY-MM.
-  if (view !== 'actions' && !/^\d{4}-\d{2}$/.test(ym)) {
+  // view=actions / view=months don't need month (actions queries
+  // actions_assigned directly; months returns the distinct-month list used
+  // to resolve the default). All other views require YYYY-MM.
+  if (view !== 'actions' && view !== 'months' && !/^\d{4}-\d{2}$/.test(ym)) {
     res.status(400).json({ ok: false, error: 'bad month; expected YYYY-MM' });
     return;
   }
@@ -592,6 +621,8 @@ export default async function handler(req, res) {
     if (view === 'sales-store') return handleSalesStore(req, res, user, ym, queryBranch);
     if (view === 'sales-drill') return handleSalesDrill(req, res, user, ym, queryBranch);
     if (view === 'actions')     return handleActions(req, res, user);
+    // Meta — distinct months list (drives FE default-month resolution)
+    if (view === 'months')      return handleMonths(req, res);
 
     // Legacy KPI path — single RPC dispatch
     const rpcName = view + '_kpi_one_month';
