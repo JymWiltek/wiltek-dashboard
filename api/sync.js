@@ -2212,15 +2212,21 @@ export default async function handler(req, res) {
   }
   if (parsedFloat) {
     const p = await previewFloatation(parsedFloat);
-    // Float apply always runs if there's ANY work to do (latest_new OR backfill).
-    // The 'noop' action only fires when both are zero.
-    if (p.action === 'append' || p.action === 'conflict' ||
-        p.backfill_w11_rows > 0 || p.backfill_other_rows > 0) {
-      targets.push({
-        table: 'floatation', plan: p,
-        overwrite: !!confirmOverwrite.floatation,
-      });
-    }
+    // STEP 1b (2026-06-18): floatation ALWAYS enters the apply targets, even on
+    // a 'noop' preview. applyFloatation now self-heals the current + previous
+    // month on every sync — idempotent (UPSERT on (date,store)), strictly
+    // bounded to those two months, and never rewriting older history. The old
+    // gate only pushed floatation when there were NEW rows (append/conflict) or
+    // backfill, so the heal never ran once the latest month already existed —
+    // that left the partial-month figure frozen (BUG 2026-06; preview also only
+    // ever inspects latest_ym, never the previous month). confirm_overwrite is
+    // no longer required for the heal (kept for parity / telemetry).
+    // Floatation ONLY — do NOT broaden this to other targets (sales runs in
+    // append mode and would create duplicate rows if forced).
+    targets.push({
+      table: 'floatation', plan: p,
+      overwrite: !!confirmOverwrite.floatation,
+    });
   }
   if (parsedPoGrn) {
     const p = await previewPoGrn(parsedPoGrn);
