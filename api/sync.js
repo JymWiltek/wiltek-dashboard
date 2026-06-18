@@ -955,24 +955,40 @@ async function applyFloatation(parsed, overwrite, user) {
     const [y, m] = parsed.latest_ym.split('-').map(Number);
     return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
   })() : '9999-12-31';
+  // Partial-month-freeze fix (2026-06-18): the floatation sheet reports a
+  // RUNNING month total, so a sync early in a month writes a partial figure
+  // (e.g. 2026-05 walk-in landed at ~1/4 of the real month). The old rule
+  // skipped any existing (date,store) row, freezing that partial value forever
+  // — unlike the other monthly targets, which upsert-replace and self-heal.
+  // floatation now self-heals too, but STRICTLY bounded to the CURRENT +
+  // PREVIOUS month (= [startOfPrev, startOfNext)); rows older than the previous
+  // month still hit skip below, so historical floatation (Phase 0 migration
+  // rows + closed months) is never rewritten. Runs on EVERY sync — no
+  // confirm_overwrite is required for this self-heal.
+  const startOfPrev = parsed.latest_ym ? (() => {
+    const [y, m] = parsed.latest_ym.split('-').map(Number);
+    return m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, '0')}-01`;
+  })() : '9999-12-31';
 
   const newInserts = [];                 // not in DB → always insert
-  const overwriteRows = [];              // in DB + latest_ym → maybe replace
+  const overwriteRows = [];              // in DB + current/prev month → refresh
   for (const r of parsed.rows) {
     const enriched = { ...r, updated_by: user.username };
     const inDb = dbKeys.has(`${r.date}|${r.store}`);
     if (!inDb) { newInserts.push(enriched); continue; }
-    if (overwrite && r.date >= startOfMonth && r.date < startOfNext) {
+    // Heal the current + previous month from the sheet on every sync.
+    if (r.date >= startOfPrev && r.date < startOfNext) {
       overwriteRows.push(enriched);
     }
-    // else: row exists and not overwriting → skip (preserve existing data,
-    // including the Phase 0 migration rows for the other stores).
+    // else: row OLDER than the previous month → skip (history never rewritten;
+    // preserves Phase 0 migration rows and closed months).
   }
 
   // Insert pass — additive, no conflict possible since these keys are new.
   const resInsert = await chunkInsert('floatation', newInserts, { onConflict: 'date,store' });
-  // Overwrite pass — UPSERT replaces existing rows for latest_ym only when
-  // owner explicitly confirmed.
+  // Heal pass — UPSERT replaces existing current/prev-month rows with the live
+  // sheet values (self-heal of partial-month figures). Bounded above to those
+  // two months only.
   let resOver = { ok: 0, err: 0 };
   if (overwriteRows.length) {
     resOver = await chunkInsert('floatation', overwriteRows, { onConflict: 'date,store' });
@@ -992,7 +1008,9 @@ async function applyFloatation(parsed, overwrite, user) {
     source_row_count, source_amt_sum: +source_amt_sum.toFixed(2),
     db_row_count_after: db_actual, assertion_failed,
     backfill_count:          newInserts.filter(r => r.date < startOfMonth).length,
-    mode: overwrite ? 'overwrite_latest_plus_backfill' : 'append_plus_backfill',
+    // self-heal of current+prev month now runs unconditionally; the flag is
+    // kept for signature/telemetry parity only.
+    mode: overwrite ? 'heal_current_prev_plus_backfill (confirm_overwrite set)' : 'heal_current_prev_plus_backfill',
   };
 }
 
