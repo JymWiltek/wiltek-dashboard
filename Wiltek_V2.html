@@ -1684,6 +1684,8 @@ window.i18n = {
     'overview.attrib.gap':          { zh: '缺口 RM', en: 'Gap RM' },
     'overview.attrib.over':         { zh: '超 RM', en: 'Over RM' },
     'overview.matrix.unit':         { zh: '单', en: 'invoices' },
+    'overview.matrix.nonstore_bucket': { zh: '已关 / 总部 / 非门店 ({n}) · 营收 {sales}（计入公司总额，不计入门店排名）', en: 'Closed / HQ / non-store ({n}) · revenue {sales} (in company total, excluded from store ranking)' },
+    'overview.matrix.nonstore_csv': { zh: 'CSV 导出', en: 'CSV export' },
     'overview.drill.tab.trend12m':  { zh: '12M 趋势', en: '12M Trend' },
     'overview.drill.tab.category':  { zh: '品类', en: 'Category' },
     'overview.drill.tab.customer':  { zh: '客型', en: 'Customer Type' },
@@ -2232,6 +2234,16 @@ const TARGET_STORES = {
   W12: { name: 'W12 · Bandar Seri Putra (closed)',  group: 'historical' },
   WEX: { name: 'WEX · Exhibition/Special',   group: 'historical' },
 };
+// PR-B (2026-06-18) · canonical live-store list. The 5 operating retail
+// branches. Applies ONLY to store-level LISTS that treat a code as an
+// operating store: Store Performance ranking, the anomaly/action generator,
+// and the Targets editor rows. NEVER applied to company aggregates (SALES /
+// WALK-IN / AOV stay all-codes, default company SALES = RM 324,188) nor to a
+// user-selected branch filter (that is honoured exactly). Non-live codes
+// (W11 closed / WCO HQ / W10 / W12 / WEX) are kept in company totals and
+// surfaced in a collapsed "non-store" bucket so revenue stays auditable.
+const STORES_LIVE = ['W01','W02','W03','W05','W07'];
+const isLiveStore = (code) => STORES_LIVE.includes(code);
 const TARGET_STORE_ORDER = ['W01','W02','W03','W05','W07','WCO','W10','W11','W12','WEX'];
 // Phase 6f — Race walk-in target editor: 6 主力店 × 4 种族 (公司层自动加总)。
 const RACE_TARGET_STORES = ['W01','W02','W03','W05','W07','W11'];
@@ -4095,7 +4107,13 @@ function renderSalesOwnerV3(s) {
   const tierData = tierResp.data || null;
   const degraded = !!tierResp.degraded;
   const stores   = Array.isArray(tierData?.stores)    ? tierData.stores : [];
-  const anomalies = Array.isArray(tierData?.anomalies) ? tierData.anomalies : [];
+  // PR-B: the anomaly/action generator must not treat closed/HQ codes as
+  // operating stores ("go investigate WCO" — HQ has no sales target). Keep
+  // company-level anomalies (no store) and live-store anomalies only. The RPC
+  // is untouched; this is a view-layer filter. Non-live store revenue still
+  // shows in the Store Performance "non-store" bucket below.
+  const anomalies = (Array.isArray(tierData?.anomalies) ? tierData.anomalies : [])
+    .filter(a => !a.store || isLiveStore(a.store));
 
   let banner = '';
   if (degraded) {
@@ -4362,7 +4380,7 @@ function renderS4StoreMatrix(stores, anomalies) {
   const anomByStore = {};
   for (const a of anomalies || []) if (a.store) anomByStore[a.store] = a;
   // Phase 5b: sort by store code (W01→W02→W03→W05→W07→W11→WCO), not pct.
-  return sortStoresByCode(stores).map(row => {
+  const s4StoreRowHtml = (row) => {
     const sev = row.status === 'critical' ? 'red critical'
               : row.status === 'behind'   ? 'red'
               : row.status === 'exceeded' ? 'green'
@@ -4405,8 +4423,42 @@ function renderS4StoreMatrix(stores, anomalies) {
       +   '<div class="shortfall ' + (isOver ? 'green' : 'red') + '">' + (isOver ? '+RM ' : '-RM ') + Math.round(Math.abs(shortfall)).toLocaleString('en-US') + '</div>'
       +   '<div class="row-action"><button class="s4-btn primary" onclick=\'openAssignModal(' + JSON.stringify(recoSeed).replace(/"/g, '&quot;') + ')\'>' + btnLabel + '</button></div>'
       + '</div>';
-  }).join('');
+  };
+  // PR-B: rank only live operating stores. Closed/HQ codes (W11/WCO/...) drop
+  // to a collapsed "non-store" bucket — still rendered (assign button +
+  // amounts) so their revenue is drillable, plus a CSV export. Company total
+  // is the hero (sums ALL stores) and is NOT affected by this list split.
+  const sorted  = sortStoresByCode(stores);
+  const live    = sorted.filter(r => isLiveStore(r.store));
+  const nonLive = sorted.filter(r => !isLiveStore(r.store));
+  window.__nonStoreRows = nonLive;   // consumed by s4ExportNonStoreCsv()
+  const liveHtml = live.map(s4StoreRowHtml).join('');
+  if (!nonLive.length) return liveHtml;
+  const nonLiveSales = nonLive.reduce((a, r) => a + (+r.actual || 0), 0);
+  const bucket = '<details class="s4-nonstore-bucket" style="margin-top:10px">'
+    + '<summary style="cursor:pointer;color:var(--s4-text-light);font-size:13px;padding:6px 0">'
+    +   escapeHtml(t('overview.matrix.nonstore_bucket', { n: nonLive.length, sales: fmtRM(nonLiveSales) }))
+    +   ' <button class="inv-csv-btn" onclick="event.preventDefault();s4ExportNonStoreCsv()">📥 ' + t('overview.matrix.nonstore_csv') + '</button>'
+    + '</summary>'
+    + nonLive.map(s4StoreRowHtml).join('')
+    + '</details>';
+  return liveHtml + bucket;
 }
+window.s4ExportNonStoreCsv = function() {
+  const rows = window.__nonStoreRows || [];
+  if (!rows.length) return;
+  const cols = ['store', 'actual', 'target', 'pct', 'invoices', 'aov', 'status'];
+  const csv = [cols.join(',')].concat(rows.map(r => cols.map(k => {
+    const v = r[k]; if (v == null) return '';
+    const str = String(v); return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  }).join(','))).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'wiltek-nonstore-' + (state.month || '') + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+};
 function renderS4StoreMatrixFallback(s) {
   // Use legacy /api/kpi sales by_branch + targets to synthesize rows
   const d = s.data.kpi || {};
@@ -4827,8 +4879,9 @@ function renderTargets(s) {
        ? '<div class="targets-fallback-note">' + t('targets.fallback.all_empty', { ym: s.data.ym }) + '</div>'
        : '');
 
-  // Build grid rows
-  const rows = TARGET_STORE_ORDER.map(code => {
+  // Build grid rows — PR-B: only live operating stores get targets (HQ/closed
+  // codes have no sales target). Non-live target rows removed from the editor.
+  const rows = TARGET_STORE_ORDER.filter(isLiveStore).map(code => {
     const meta = TARGET_STORES[code];
     const cur  = targetsEditor.byStore[code] || { sales: null, footfall: null };
     const histClass = meta.group === 'historical' ? 'historical' : '';
@@ -4849,14 +4902,16 @@ function renderTargets(s) {
       + '</tr>';
   }).join('');
 
-  // Summary computations
-  const salesTot = Object.values(targetsEditor.byStore)
-    .reduce((a, v) => a + (+v.sales || 0), 0);
-  const footTot = Object.values(targetsEditor.byStore)
-    .reduce((a, v) => a + (+v.footfall || 0), 0);
+  // Summary computations — PR-B: sum only the live store rows shown above
+  // (non-live codes are no longer editable target rows).
+  const liveTargetCodes = TARGET_STORE_ORDER.filter(isLiveStore);
+  const salesTot = liveTargetCodes
+    .reduce((a, code) => a + (+((targetsEditor.byStore[code] || {}).sales) || 0), 0);
+  const footTot = liveTargetCodes
+    .reduce((a, code) => a + (+((targetsEditor.byStore[code] || {}).footfall) || 0), 0);
 
   // Phase 6f — Race Walk-in Targets 表 (6 主力店 × 4 种族 + 公司层自动加总)
-  const raceRows = RACE_TARGET_STORES.map(code => {
+  const raceRows = RACE_TARGET_STORES.filter(isLiveStore).map(code => {
     const meta = TARGET_STORES[code];
     const cur  = targetsEditor.byStore[code] || blankTargetRow();
     let rowTot = 0;
@@ -4871,7 +4926,7 @@ function renderTargets(s) {
       + inputs + '<td class="num" id="race-rowtot-' + code + '"><strong>' + fmtInt(rowTot) + '</strong></td></tr>';
   }).join('');
   const coTot = {}; RACE_TARGET_COLS.forEach(c => coTot[c.key] = 0);
-  RACE_TARGET_STORES.forEach(code => {
+  RACE_TARGET_STORES.filter(isLiveStore).forEach(code => {
     const cur = targetsEditor.byStore[code] || {};
     RACE_TARGET_COLS.forEach(c => { coTot[c.key] += (+cur[c.key] || 0); });
   });
