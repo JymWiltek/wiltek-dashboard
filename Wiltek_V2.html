@@ -406,6 +406,9 @@ table.branch-table .mini-bar-fill {
 .today-runway .r-value.warn { color: var(--warn); }
 .today-runway .r-value.bad  { color: var(--danger); }
 .today-runway .r-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+/* BUG-12: per-column period tags + cross-month warning on the Today snapshot */
+.col-period { font-size: 11px; font-weight: 400; color: var(--text-light); white-space: nowrap; }
+.today-period-note { font-size: 12px; color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 6px 10px; margin: 2px 0 8px; }
 
 .section-title {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
@@ -6731,13 +6734,30 @@ function renderToday(s) {
   }).join('');
   if (!storeRows) storeRows = '<tr><td colspan="8" class="muted" style="text-align:center;padding:14px">No store data in /api/today response</td></tr>';
 
+  // BUG-12 fix (2026-06-18): the snapshot mixes MTD sales (s.month) with
+  // floatation walk-in / closing / basket (floatation_as_of) — frequently a
+  // DIFFERENT month. Label each column group with its own explicit period so
+  // the two months are never read as one. (Today reads the static
+  // today-data.js asset; this ONLY relabels — it does NOT re-align the data.)
+  const salesPeriod = s.month || null;
+  const footAsOf    = stores[0]?.floatation_as_of || null;
+  const footPeriod  = footAsOf ? String(footAsOf).slice(0, 7) : null;
+  const salesTag    = salesPeriod ? '<span class="col-period">· ' + escapeHtml(salesPeriod) + '</span>' : '';
+  const footTag     = footPeriod  ? '<span class="col-period">· ' + escapeHtml(footPeriod)  + '</span>' : '';
+  const periodNote  = (footPeriod && salesPeriod && footPeriod !== salesPeriod)
+    ? '<div class="today-period-note">⚠️ Sales columns = ' + escapeHtml(salesPeriod)
+      + ' · Walk-in / Closing / Basket = ' + escapeHtml(footPeriod)
+      + ' (floatation as of ' + escapeHtml(footAsOf) + ') — different months, do not read across.</div>'
+    : '';
+
   const storeTable = ''
-    + '<div class="section-title">5-store snapshot · ' + s.month + (stores[0]?.floatation_as_of ? ' · floatation ' + stores[0].floatation_as_of : '') + '</div>'
+    + '<div class="section-title">5-store snapshot</div>'
+    + periodNote
     + '<table class="store-table">'
     +   '<thead><tr>'
     +     '<th>Store</th><th>Name</th>'
-    +     '<th>MTD sales</th><th>Invoices</th>'
-    +     '<th>Walk-in</th><th>Closing rate</th><th>Basket est.</th>'
+    +     '<th>MTD sales ' + salesTag + '</th><th>Invoices ' + salesTag + '</th>'
+    +     '<th>Walk-in ' + footTag + '</th><th>Closing rate ' + footTag + '</th><th>Basket est. ' + footTag + '</th>'
     +     '<th>Anom</th>'
     +   '</tr></thead>'
     +   '<tbody>' + storeRows + '</tbody>'
