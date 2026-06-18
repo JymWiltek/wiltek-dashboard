@@ -2417,8 +2417,14 @@ async function fetchSales(signal) {
     : new URLSearchParams({ view: 'actions', assignee: myRoleId }).toString();
 
   // Overview 4-KPI hero. Owner = company; manager = own store (件1 parity).
+  // BUG-7 fix (2026-06-18): use getEffectiveBranch() so an owner/staff store
+  // pick is passed to overview_kpi (it accepts p_branch and scopes its target
+  // lookup too). Was manager-only → owner dropdown picked a branch but the
+  // hero stayed on company figures. Owner with no pick → null → company
+  // (byte-match preserved).
   const overviewP = new URLSearchParams({ view: 'overview', month: state.month });
-  if (!tierIsOwner && state.user && state.user.store) overviewP.set('branch', state.user.store);
+  const ovBranch = getEffectiveBranch();
+  if (ovBranch) overviewP.set('branch', ovBranch);
   const overviewQ = overviewP.toString();
 
   const fetches = [
@@ -4133,6 +4139,14 @@ function renderSalesOwnerV3(s) {
    gracefully: if RPC missing, synthesize Sales card from /api/kpi sales
    + targets, others show "目标未设/数据待接".
 ═══════════════════════════════════════════════════════════════════ */
+// Per-store rows from the sales-owner tier payload (same source Store
+// Performance renders). Used as the BUG-1 backfill when the overview_kpi MV
+// lags behind a sync. Returns [] if unavailable.
+function ovStores(s) {
+  return (s && s.data && s.data.tier && s.data.tier.data && Array.isArray(s.data.tier.data.stores))
+    ? s.data.tier.data.stores : [];
+}
+
 function renderOverviewKpiRow(s) {
   const ovResp = s.data.overview || null;
   const degraded = !ovResp || ovResp.degraded || !ovResp.data;
@@ -4166,6 +4180,45 @@ function renderOverviewKpiRow(s) {
       closing_rate: { actual: null, target: null, pct: null, status: 'gray', _note: window.t('overview.kpi.note_rpc_undeployed') },
       basket_size:  { actual: d.invoices > 0 ? +(d.sales / d.invoices).toFixed(2) : null, target: null, pct: null, status: 'gray', _note: window.t('overview.kpi.note_basket_no_target') },
     };
+  }
+
+  // BUG-1 fix (2026-06-18): overview_kpi reads mv_sales_kpi_monthly, which can
+  // lag a sync (latest month missing from the MV → SALES & BASKET actuals come
+  // back null and blank as "—", while Store Performance / Products read the
+  // sales table directly and show the real number). When the RM heroes blank
+  // but per-store rows exist, backfill from those same per-store actuals
+  // (sales-owner / Store Performance source), honouring the selected branch.
+  // Self-healing: once the MV catches up, kpis.sales.actual is non-null and
+  // this branch is skipped → byte-identical to today on healthy months.
+  if (kpis && kpis.sales && kpis.sales.actual == null) {
+    const stores = (ovStores(s) || []);
+    const eb = getEffectiveBranch();
+    const scoped = eb ? stores.filter(r => r.store === eb) : stores;
+    let fbSales = 0, fbInv = 0, hasRows = false;
+    for (const r of scoped) {
+      if (r && r.actual != null) { fbSales += Number(r.actual); hasRows = true; }
+      if (r && r.invoices != null) { fbInv += Number(r.invoices); }
+    }
+    if (hasRows) {
+      const statusFor = (pct) => pct == null ? 'gray' : pct >= 100 ? 'green' : pct >= 80 ? 'amber' : pct >= 50 ? 'red' : 'darkred';
+      const sTgt = kpis.sales.target;
+      const sPct = (sTgt && sTgt > 0) ? +(fbSales / sTgt * 100).toFixed(1) : null;
+      kpis.sales = Object.assign({}, kpis.sales, {
+        actual: fbSales, pct: sPct,
+        shortfall: sTgt != null ? +(sTgt - fbSales).toFixed(2) : null,
+        status: statusFor(sPct), _fallback: true,
+      });
+      const fbBasket = fbInv > 0 ? +(fbSales / fbInv).toFixed(2) : null;
+      if (kpis.basket_size && kpis.basket_size.actual == null && fbBasket != null) {
+        const bTgt = kpis.basket_size.target;
+        const bPct = (bTgt && bTgt > 0) ? +(fbBasket / bTgt * 100).toFixed(1) : null;
+        kpis.basket_size = Object.assign({}, kpis.basket_size, {
+          actual: fbBasket, pct: bPct,
+          shortfall: bTgt != null ? +(bTgt - fbBasket).toFixed(2) : null,
+          status: statusFor(bPct), _fallback: true,
+        });
+      }
+    }
   }
 
   const source = kpis || fallbackKpis || {};
