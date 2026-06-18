@@ -248,6 +248,23 @@ export default async function handler(req, res) {
         console.error('[/api/inventory mode=phase7] RPC error:', error);
         return res.status(500).json({ ok: false, error: error.message });
       }
+      // PR-C (2026-06-18): expose the PREVIOUS snapshot's synthetic status so
+      // the FE can gate "vs Last Month" deltas — a real-vs-synthetic MoM is
+      // fiction (BUG-5: Apr is 100% synthetic, May is the first real snapshot).
+      // The RPC already returns is_synthetic for the current snapshot; this
+      // adds the same flag for snapshot_prev_date. is_synthetic is whole-
+      // snapshot all-or-none, so one probe row is representative. Done in the
+      // API layer to avoid rewriting the large phase7 RPC.
+      let is_synth_prev = null;
+      if (data && data.snapshot_prev_date) {
+        const { data: prevRow } = await sb()
+          .from('inventory_snapshots')
+          .select('is_synthetic')
+          .eq('snapshot_date', data.snapshot_prev_date)
+          .limit(1)
+          .maybeSingle();
+        if (prevRow) is_synth_prev = !!prevRow.is_synthetic;
+      }
       return res.status(200).json({
         ok: true,
         fetched_at: new Date().toISOString(),
@@ -255,6 +272,7 @@ export default async function handler(req, res) {
         session_role: user.role,
         session_store: user.store,
         effective_branch: p_branch,
+        is_synth_prev,
         ...data,
       });
     } catch (e) {

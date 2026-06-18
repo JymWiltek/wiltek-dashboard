@@ -1780,6 +1780,7 @@ window.i18n = {
     // ── V2-Launch 件1 · Inventory Owner-BI (cell-level) ──
     'inv.scope.composition':        { zh: '主力 6 + 仓库 3 + HQ', en: 'Main 6 + Warehouses 3 + HQ' },
     'inv.synth.banner':             { zh: '均为系统估算快照, 5/31 起换真月底快照.', en: 'are both system-estimated snapshots; real month-end snapshots start May 31.' },
+    'inv.mom.incomparable':         { zh: '无可比上月（上月为合成快照）', en: 'No comparable last month (prior was a synthetic snapshot)' },
     'inv.synth.scope_warn':         { zh: 'scope 警告', en: 'scope warning' },
     'inv.col.class':                { zh: '分类', en: 'Class' },
     'inv.col.share':                { zh: '占比', en: 'Share' },
@@ -5154,15 +5155,28 @@ function renderInventory(s) {
       + '</div>'
     : '';
 
+  // PR-C / BUG-5: a "vs Last Month" delta is only meaningful when BOTH the
+  // current and previous snapshots are real. Apr 2026 is 100% synthetic, May
+  // is the first real snapshot → May-vs-Apr arrows are real-vs-placeholder
+  // fiction. Gate every Inventory MoM on both months being real; auto-re-
+  // enables once two real snapshots exist (no hard-coded month). When the
+  // current snapshot is itself synthetic the existing SYNTH banner already
+  // explains it; this banner covers the real-current / synthetic-prev case.
+  const momComparable = !d.is_synthetic && !d.is_synth_prev;
+  const momGapBanner = (!momComparable && !d.is_synthetic)
+    ? '<div class="inv-synth-banner">⚠️ ' + t('inv.mom.incomparable') + '</div>'
+    : '';
+
   // 件3 (2026-05-25): reorder — 判断卡 moved from top to after ABC (作为诊断总结).
   // New order: hero → 5class → matrix → warehouse → ABC → 判断卡 → drill.
   return title
     + synthBanner
-    + renderInvHero(d.hero, d.is_synthetic)
-    + renderInv5Class(d.health_5class)
+    + momGapBanner
+    + renderInvHero(d.hero, d.is_synthetic, momComparable)
+    + renderInv5Class(d.health_5class, momComparable)
     + renderInventoryCharts(d.matrix_main6)
     + renderInvMatrix(d.matrix_main6, d.matrix_company_dead_pct)
-    + renderInvWarehouses(d.warehouses)
+    + renderInvWarehouses(d.warehouses, momComparable)
     + renderInvABC(d.abc)
     + renderInvJudgement(d.judgement)
     + renderInvSkuLists(d.sku_lists)
@@ -5324,7 +5338,7 @@ function heroLightDot(color) {
 }
 
 // ── Section 1: Hero 4 卡 (无目标进度条, 有 vs 上月 + SYNTH 角标) ──
-function renderInvHero(hero, isSynth) {
+function renderInvHero(hero, isSynth, momComparable) {
   if (!hero) return '';
   const defs = [
     { key: 'total_stock',   icon: '📦', title: t('inv.hero.total'),  invert: true  },
@@ -5332,9 +5346,29 @@ function renderInvHero(hero, isSynth) {
     { key: 'slow',          icon: '🐢', title: t('inv.hero.slow'),   invert: true,  subSuffix: t('inv.hero.pct_of_total') },
     { key: 'active',        icon: '✅', title: t('inv.hero.active'),  invert: false, subSuffix: t('inv.hero.pct_of_total') },
   ];
-  return '<div class="kpi-hero-row inv-hero">' + defs.map(def => renderInvHeroCard(def, hero[def.key] || {}, isSynth)).join('') + '</div>';
+  return '<div class="kpi-hero-row inv-hero">' + defs.map(def => renderInvHeroCard(def, hero[def.key] || {}, isSynth, momComparable)).join('') + '</div>';
 }
-function renderInvHeroCard(def, k, isSynth) {
+function renderInvHeroCard(def, k, isSynth, momComparable) {
+  // PR-C / BUG-5: hide the MoM delta when last month isn't comparable
+  // (synthetic snapshot) and show an honest label instead of a fictional arrow.
+  if (momComparable === false) {
+    const amountStr0 = k.amount == null ? '—' : fmtRM(k.amount);
+    const skuLine0   = k.sku != null ? fmtInt(k.sku) + ' SKU' : '';
+    const pctLine0   = (def.subSuffix && k.pct_of_total != null) ? Number(k.pct_of_total).toFixed(1) + def.subSuffix : '';
+    return ''
+      + '<div class="kpi-card inv-hero-card">'
+      +   heroLightDot('gray')
+      +   (isSynth ? '<span class="inv-synth-badge">SYNTH</span>' : '')
+      +   '<div class="kpi-icon">' + def.icon + '</div>'
+      +   '<div class="kpi-title">' + def.title + '</div>'
+      +   '<div class="kpi-actual">' + amountStr0 + '</div>'
+      +   '<div class="inv-hero-sub">'
+      +     (skuLine0 ? '<span>' + skuLine0 + '</span>' : '')
+      +     (pctLine0 ? '<span class="inv-hero-pct">' + pctLine0 + '</span>' : '')
+      +   '</div>'
+      +   '<div class="kpi-meta"><span style="color:var(--s4-text-light);font-size:11px">' + t('inv.mom.incomparable') + '</span></div>'
+      + '</div>';
+  }
   const momPct = k.mom_pct, momAmt = k.mom_amount;
   let momColor = 'var(--s4-text-light)', momArrow = '↔';
   if (momPct != null && Math.abs(momPct) >= 2) {
@@ -5369,14 +5403,16 @@ function renderInvHeroCard(def, k, isSynth) {
 }
 
 // ── Section 2: 5 段分类详表 ──
-function renderInv5Class(h) {
+function renderInv5Class(h, momComparable) {
   if (!h) return '';
   const ORDER = ['Active', 'Slow', 'Misplaced', 'Dead', 'Discontinued'];
   const TONE = { Active: 'green', Slow: 'amber', Misplaced: 'amber', Dead: 'red', Discontinued: 'red' };
   const LABEL = { Active: t('inv.5class.Active'), Slow: t('inv.5class.Slow'), Misplaced: t('inv.5class.Misplaced'), Dead: t('inv.5class.Dead'), Discontinued: t('inv.5class.Discontinued') };
   const rows = ORDER.map(cls => {
     const k = h[cls] || {};
-    const momPct = k.mom_pct;
+    // PR-C / BUG-5: suppress fictional MoM when last month isn't comparable
+    // (synthetic). The banner above the section states the reason.
+    const momPct = (momComparable === false) ? null : k.mom_pct;
     const momColor = momPct == null ? 'var(--s4-text-light)' : (momPct > 0 ? 'var(--s4-red-text)' : 'var(--s4-green-text)');
     const momStr = momPct == null ? '—' : (momPct > 0 ? '↑ +' : '↓ ') + momPct.toFixed(1) + '%';
     return '<tr>'
@@ -5428,10 +5464,14 @@ function warehouseCard(code, label, value, rows, tone) {
     +   '<div class="wh-rows">' + rows.map(r => '<div><span class="wh-rk">' + r[0] + '</span><span class="wh-rv">' + r[1] + '</span></div>').join('') + '</div>'
     + '</div>';
 }
-function renderInvWarehouses(w) {
+function renderInvWarehouses(w, momComparable) {
   if (!w) return '';
   const WLO = w.WLO || {}, WSR = w.WSR || {}, WL1 = w.WL1 || {};
-  const momStr = (o) => o.mom_note ? escapeHtml(o.mom_note) : (o.mom_amount != null ? ((o.mom_amount > 0 ? '↑ +' : '↓ ') + fmtRM(Math.abs(o.mom_amount))) : '—');
+  // PR-C / BUG-5: when last month isn't comparable (synthetic), suppress the
+  // warehouse MoM amount too (banner above explains). mom_note (scope gap) and
+  // the real-vs-real path are unchanged.
+  const momStr = (o) => (momComparable === false) ? '—'
+    : (o.mom_note ? escapeHtml(o.mom_note) : (o.mom_amount != null ? ((o.mom_amount > 0 ? '↑ +' : '↓ ') + fmtRM(Math.abs(o.mom_amount))) : '—'));
   return ''
     + '<div class="inv-section-title">🏭 ' + t('inv.section.warehouses') + '</div>'
     + '<div class="inv-section-sub">' + t('inv.warehouse.sub') + '</div>'
