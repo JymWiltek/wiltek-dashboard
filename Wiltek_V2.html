@@ -1445,7 +1445,7 @@ window.i18n = {
     'inv.hero.slow':   { zh: '缓销',   en: 'Slow-moving' },
     'inv.hero.active': { zh: '健康货 (Active)', en: 'Active (Healthy)' },
     'inv.section.5class':     { zh: '5 段分类 (按 V1 逻辑)', en: '5-Class Health' },
-    'inv.section.matrix':     { zh: '主力 6 店 × 5 段 矩阵', en: '6-Store × 5-Class Matrix' },
+    'inv.section.matrix':     { zh: '5 门店 × 5 段 矩阵', en: '5-Store × 5-Class Matrix' },
     'inv.section.warehouses': { zh: '仓库专区', en: 'Warehouses' },
     'inv.section.abc':        { zh: 'ABC 分类 · Top 80% 收入贡献', en: 'ABC Classification · Top 80% Revenue' },
     'inv.section.sku_lists':  { zh: 'SKU 名单 (drill)', en: 'SKU Lists (Drill)' },
@@ -1454,7 +1454,7 @@ window.i18n = {
     'inv.section.charts_dead':{ zh: '6 店死货 RM', en: 'Dead Stock by Store' },
     'inv.5class.Active':       { zh: 'Active 在转',       en: 'Active' },
     'inv.5class.Slow':         { zh: 'Slow 缓销',         en: 'Slow-moving' },
-    'inv.5class.Misplaced':    { zh: 'Misplaced 错配店',  en: 'Misplaced' },
+    'inv.5class.Misplaced':    { zh: '可调拨',  en: 'Transferable' },
     'inv.5class.Dead':         { zh: 'Dead 死货',         en: 'Dead' },
     'inv.5class.Discontinued': { zh: 'Discontinued 停产', en: 'Discontinued' },
     'inv.warehouse.WLO': { zh: '主仓', en: 'Main Warehouse' },
@@ -1682,6 +1682,7 @@ window.i18n = {
     'overview.kpi.behind_pp':       { zh: '差', en: 'Behind' },
     'overview.kpi.target':          { zh: '目标', en: 'Target' },
     'overview.kpi.target_unset':    { zh: '目标未设', en: 'Target not set' },
+    'overview.kpi.month_incomplete': { zh: '本月未完整 · 暂不比上月', en: 'Month incomplete · MoM hidden' },
     'overview.attrib.actual':       { zh: '实际', en: 'Actual' },
     'overview.attrib.target':       { zh: '目标', en: 'Target' },
     'overview.attrib.gap':          { zh: '缺口 RM', en: 'Gap RM' },
@@ -1943,7 +1944,7 @@ window.i18n = {
     'inbox.toast.proposed':              { zh: '已提议, 等老板审批', en: 'Proposed, awaiting owner review' },
     'inbox.toast.propose_fail':          { zh: '提议失败: {err}', en: 'Propose failed: {err}' },
     // ── V2-Launch 件1: Products page ──
-    'prod.page.scope':                   { zh: '全公司 (主力 6 店 + 仓 NOT IN W10/W12/WEX)', en: 'Full company (6 core stores + warehouses NOT IN W10/W12/WEX)' },
+    'prod.page.scope':                   { zh: '全公司 (5 门店 + 仓库, 排除已关 W10/W12/WEX)', en: 'Full company (5 live stores + warehouses, excl. closed W10/W12/WEX)' },
     'prod.loading':                      { zh: '加载中...', en: 'Loading...' },
     'prod.notes':                        { zh: 'sales 28 月历史 · customer_buy_lines 仅 2026-04 单月 (多月 sync 等) · 价格段从真实成交反推 (items.prc_range 字段不可信)', en: 'sales: 28 months history · customer_buy_lines: 2026-04 single month only (awaiting multi-month sync) · price bands derived from real transactions (items.prc_range field unreliable)' },
     'prod.notes.label':                  { zh: '数据说明', en: 'Data note' },
@@ -2019,8 +2020,8 @@ window.i18n = {
     'inv.judge.dir.better':    { zh: '进步', en: 'Better' },
     'inv.judge.dir.same':      { zh: '持平', en: 'Same' },
     'inv.judge.dir.unknown':   { zh: '—',    en: '—' },
-    'inv.judge.q1.headline':   { zh: 'Misplaced+Dead+Disc 占 {pct}%, RM {rm} 锁住', en: 'Misplaced+Dead+Disc = {pct}%, RM {rm} locked' },
-    'inv.judge.q1.detail':     { zh: 'Misplaced 占大头, 不是真"多", 是"放错店"', en: 'Misplaced dominates — not truly "overstocked", but "in the wrong store"' },
+    'inv.judge.q1.headline':   { zh: '可调拨+Dead+Disc 占 {pct}%, RM {rm} 锁住', en: 'Transferable+Dead+Disc = {pct}%, RM {rm} locked' },
+    'inv.judge.q1.detail':     { zh: '可调拨占大头, 不是真"多", 是"放错店可转调"', en: 'Transferable dominates — not truly "overstocked"; it can be moved between stores' },
     'inv.judge.q2.headline':   { zh: 'A 类 (Top 80% 收入) {n} 个 SKU 全公司无库存', en: 'Class A (Top 80% revenue): {n} SKU out of stock company-wide' },
     'inv.judge.q3.headline':   { zh: 'A 类无库存 {n} 个 (按 90d 销售排名, top 10)', en: 'Class A out-of-stock: {n} (ranked by 90d sales, top 10)' },
     'inv.judge.q4.detail':     { zh: '最严重: {store} Dead% {pct}%', en: 'Worst: {store} Dead% {pct}%' },
@@ -4244,6 +4245,19 @@ function renderOverviewKpiRow(s) {
   }
 
   const source = kpis || fallbackKpis || {};
+
+  // BUG-6 (2026-06-20): floatation walk-in for the CURRENT (in-progress)
+  // calendar month is a partial running total — suppress its MoM arrow and
+  // flag the month incomplete so a partial month never reads as a real
+  // decline. Complete past months are unaffected (the floatation self-heal
+  // already corrects them), so the default 2026-05 view shows a real MoM.
+  if (source.walkin && ymIsCurrentCalendarMonth(s.month)) {
+    source.walkin = Object.assign({}, source.walkin, {
+      vs_last_month_pct: null,
+      _note: t('overview.kpi.month_incomplete'),
+    });
+  }
+
   const banner = degraded
     ? '<div class="s4-data-gap" style="margin-bottom:12px"><strong>' + t('overview.kpi.overview_rpc_undeployed') + '</strong> · '
       + '<code>tools/migration_phase5_overview.sql</code>' + t('overview.kpi.overview_rpc_pending') + '</div>'
@@ -4255,6 +4269,14 @@ function renderOverviewKpiRow(s) {
   }).join('');
 
   return banner + '<div class="kpi-hero-row">' + cards + '</div>';
+}
+
+// True when ym (YYYY-MM) is the current calendar month in the user's browser —
+// i.e. an in-progress month whose floatation/sales are still accumulating.
+function ymIsCurrentCalendarMonth(ym) {
+  const d = new Date();
+  const cur = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  return ym === cur;
 }
 
 function renderOverviewKpiCard(def, k) {
@@ -4319,7 +4341,11 @@ function renderOverviewKpiCard(def, k) {
     +   '</div>'
     +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + barPct + '%;background:' + statusColor + '"></div></div>'
     +   '<div class="kpi-meta">'
-    +     (targetStr ? t('overview.kpi.target') + ' <strong>' + targetStr + '</strong><br>' : (k._note ? '' : t('overview.kpi.target_unset') + '<br>'))
+    +     (targetStr ? t('overview.kpi.target') + ' <strong>' + targetStr + '</strong><br>'
+            // BUG-11 (2026-06-20): Closing-Rate & Basket-Size have no inputs in
+            // the Targets editor, so never promise "Target not set" for them
+            // (smaller change than adding editor inputs). Sales/Walk-in keep it.
+            : (k._note || def.key === 'closing_rate' || def.key === 'basket_size' ? '' : t('overview.kpi.target_unset') + '<br>'))
     +     (gapLine ? gapLine + '<br>' : '')
     +     (vsLmLine ? vsLmLine : noteLine)
     +   '</div>'
@@ -5435,7 +5461,13 @@ function renderInv5Class(h, momComparable) {
 // ── Section 3: 主力 6 店 × 5 段 矩阵 ──
 function renderInvMatrix(rows, companyDeadPct) {
   if (!rows || !rows.length) return '';
-  const hdr = [t('inv.col.store'), 'Active', 'Slow', 'Misplaced', 'Dead', 'Disc.', t('inv.col.total_rm'), 'Dead%']
+  // BUG-3 (2026-06-20): the store matrix must list ONLY live operating stores.
+  // The phase7 RPC's main6 CTE still includes W11 (closed) — filter it out
+  // here so no closed/HQ code is ranked as a store. (Company grand totals are
+  // unaffected; this is the store-level LIST only.)
+  rows = rows.filter(r => isLiveStore(r.store));
+  if (!rows.length) return '';
+  const hdr = [t('inv.col.store'), 'Active', 'Slow', t('inv.5class.Misplaced'), 'Dead', 'Disc.', t('inv.col.total_rm'), 'Dead%']
     .map((h, i) => '<div class="h ' + (i === 0 ? '' : 'num') + '">' + h + '</div>').join('');
   const cells = rows.map(r => {
     const dp = +r.dead_pct;
