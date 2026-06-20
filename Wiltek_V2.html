@@ -1344,6 +1344,7 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
            'overview'; ?view=sales kept as backward-compat alias. -->
       <a href="#" data-view="overview" onclick="return onViewChange('overview')"><span class="icon">📊</span>Overview</a>
       <a href="#" data-view="inventory" onclick="return onViewChange('inventory')"><span class="icon">📦</span>Inventory</a>
+      <a href="#" data-view="deadstock" onclick="return onViewChange('deadstock')"><span class="icon">💀</span>Dead Stock</a>
       <a href="#" data-view="customers" onclick="return onViewChange('customers')"><span class="icon">👥</span>Customers</a>
       <a href="#" data-view="products"  onclick="return onViewChange('products')"><span class="icon">🏷️</span>Products</a>
       <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today</a>
@@ -1403,6 +1404,7 @@ window.i18n = {
   dict: {
     'nav.overview':  { zh: '总览',   en: 'Overview' },
     'nav.inventory': { zh: '库存',   en: 'Inventory' },
+    'nav.deadstock': { zh: '死货',   en: 'Dead Stock' },
     'nav.customers': { zh: '客户',   en: 'Customers' },
     'nav.products':  { zh: '产品',   en: 'Products' },
     'nav.today':     { zh: '今日',   en: 'Today' },
@@ -1689,6 +1691,21 @@ window.i18n = {
     'overview.kpi.behind_pp':       { zh: '差', en: 'Behind' },
     'overview.kpi.target':          { zh: '目标', en: 'Target' },
     'overview.kpi.target_unset':    { zh: '目标未设', en: 'Target not set' },
+    'deadstock.title':         { zh: '死货追踪', en: 'Dead Stock Tracker' },
+    'deadstock.sub':           { zh: '基于 {date} 真实库存快照 · 按近 365/90 天销售速度分类 (非 item_status)', en: 'Based on the {date} real inventory snapshot · classified by trailing 365/90-day sales velocity (not item_status)' },
+    'deadstock.card.dead_rm':  { zh: '死货价值 (按成本)', en: 'Dead Stock (value-at-cost)' },
+    'deadstock.card.dead_sku': { zh: '死货 SKU 数', en: 'Dead SKUs' },
+    'deadstock.card.cash':     { zh: '可释放现金 @ {pct}%', en: 'Cash Release @ {pct}%' },
+    'deadstock.card.cash_assume': { zh: '假设 {pct}% 回收率 (可调)', en: 'assumes {pct}% recovery (configurable)' },
+    'deadstock.section.live':  { zh: '门店死货 (5 门店)', en: 'Store Dead Stock (5 live stores)' },
+    'deadstock.section.wh':    { zh: '仓库/总部死货 (单列): {rm} · {n} SKU', en: 'Warehouse / HQ dead stock (separate): {rm} · {n} SKU' },
+    'deadstock.col.code':      { zh: '货号', en: 'Code' },
+    'deadstock.col.desc':      { zh: '描述', en: 'Description' },
+    'deadstock.col.value':     { zh: '价值 (成本)', en: 'Value-at-cost' },
+    'deadstock.col.last_sold': { zh: '最后售出', en: 'Last Sold' },
+    'deadstock.col.days':      { zh: '距今天数', en: 'Days Since' },
+    'deadstock.col.bucket':    { zh: '账龄', en: 'Aging' },
+    'deadstock.foot.velocity': { zh: 'Dead = 近 365 天 0 售出 · Slow = 365 天内有售但近 90 天 0 · Active = 近 90 天有售。销售为月颗粒。', en: 'Dead = 0 sold in trailing 365d · Slow = sold within 365d but 0 in trailing 90d · Active = sold in trailing 90d. Sales are month-grain.' },
     'finance.title':           { zh: '财务', en: 'Finance' },
     'finance.sub':             { zh: '公司损益 + 资产负债 · 财务数据手工载入 (待自动同步接管)', en: 'Company P&L + balance sheet · financials hand-loaded (durable sync owns writes later)' },
     'finance.section.trend':   { zh: '公司损益趋势 (TOTAL)', en: 'Company P&L Trend (TOTAL)' },
@@ -2080,7 +2097,7 @@ function t(key, opt) {
   return s;
 }
 window.t = t;
-const NAV_ICON = { overview: '📊', inventory: '📦', customers: '👥', products: '🏷️', today: '🏠', gtd: '✅', finance: '💰', inbox: '📥', targets: '⚙️' };
+const NAV_ICON = { overview: '📊', inventory: '📦', deadstock: '💀', customers: '👥', products: '🏷️', today: '🏠', gtd: '✅', finance: '💰', inbox: '📥', targets: '⚙️' };
 function applyI18nNav() {
   document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
     const v = a.getAttribute('data-view');
@@ -2220,7 +2237,7 @@ function populateBranchPicker() {
 }
 
 /* ── Constants ──────────────────────────────────────────────────── */
-const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'customers', 'products', 'today', 'gtd', 'finance', 'inbox', 'targets'];
+const ALLOWED_VIEWS = ['overview', 'sales', 'inventory', 'deadstock', 'customers', 'products', 'today', 'gtd', 'finance', 'inbox', 'targets'];
 
 // ── V2-Launch 件2 (2026-05-25): RBAC page-access matrix (Jym 拍板) ──
 // Role tiers (state.role is normalized at login): owner / manager (store-scoped)
@@ -2236,6 +2253,7 @@ const RBAC = {
     overview:  ['owner', 'staff', 'manager'],
     sales:     ['owner', 'staff', 'manager'],
     inventory: ['owner', 'staff', 'manager'],
+    deadstock: ['owner', 'staff', 'manager'],
     customers: ['owner', 'staff', 'manager'],
     products:  ['owner', 'staff', 'manager'],
     today:     ['owner', 'staff', 'manager'],
@@ -2645,10 +2663,18 @@ async function fetchInventory(signal) {
   return { ...main, judgement };
 }
 
+async function fetchDeadstock(signal) {
+  // recovery rate is configurable via &rate=0..1 (default 0.5 server-side).
+  const rate = (state.deadstockRate > 0 && state.deadstockRate <= 1) ? '&rate=' + state.deadstockRate : '';
+  const j = await getJSON('/api/kpi?view=deadstock' + rate, signal);
+  state.role = j.session_role || state.role;
+  return j;
+}
 const FETCHERS = {
   overview:  fetchSales,  // Phase 5 — same multi-source fetch (adds overview KPI)
   sales:     fetchSales,  // backward-compat alias
   inventory: fetchInventory,
+  deadstock: fetchDeadstock,
   customers: fetchCustomers,
   products:  fetchProducts,
   today:     fetchToday,
@@ -2774,6 +2800,7 @@ function renderView() {
     overview:  renderSales,  // Phase 5 — dispatcher (owner→Overview, mgr→Tier 2)
     sales:     renderSales,  // backward-compat alias
     inventory: renderInventory,
+    deadstock: renderDeadstock,
     customers: renderCustomers,
     products:  renderProducts,
     today:     renderToday,
@@ -7098,6 +7125,52 @@ function renderGtd(s) {
 })();
 
 /* ── Stub view (Finance) ─────────────────────────────────────────── */
+/* ── Dead-stock tracker (2026-06-20) — owner + inventory roles ──────── */
+function renderDeadstock(s) {
+  const title = '<h1 class="page-title">💀 ' + t('deadstock.title') + '</h1>';
+  if (!['owner', 'staff', 'manager', 'marketing', 'hr', 'warehouse'].includes(s.role)) {
+    return title + '<div class="s4-data-gap">' + t('targets.no_permission') + '</div>';
+  }
+  if (s.loading || !s.data) return title + '<div class="skeleton h-row"></div><div class="skeleton h-row"></div>';
+  const d = s.data;
+  if (d.degraded) return title + '<div class="s4-data-gap">⚠ ' + escapeHtml(d.degraded_reason || 'unavailable') + '</div>';
+  const h = d.headline || {};
+  const ratePct = Math.round((d.recovery_rate || 0.5) * 100);
+
+  const cards = '<div class="kpi-hero-row">'
+    + '<div class="kpi-card"><div class="kpi-title">' + t('deadstock.card.dead_rm') + '</div><div class="kpi-actual" style="color:var(--s4-red-text)">' + fmtRM(h.dead_rm || 0) + '</div></div>'
+    + '<div class="kpi-card"><div class="kpi-title">' + t('deadstock.card.dead_sku') + '</div><div class="kpi-actual">' + fmtInt(h.dead_sku || 0) + '</div></div>'
+    + '<div class="kpi-card"><div class="kpi-title">' + t('deadstock.card.cash', { pct: ratePct }) + '</div><div class="kpi-actual" style="color:var(--s4-green-text)">' + fmtRM(h.cash_release || 0) + '</div>'
+    +   '<div class="inv-hero-pct">' + t('deadstock.card.cash_assume', { pct: ratePct }) + '</div></div>'
+    + '</div>';
+
+  const rowsHtml = (arr) => (arr || []).map(r => '<tr>'
+    + '<td><strong>' + escapeHtml(r.item_code) + '</strong></td>'
+    + '<td>' + escapeHtml(r.descr || '—') + '</td>'
+    + '<td>' + escapeHtml(r.store) + '</td>'
+    + '<td class="num">' + fmtInt(r.qty) + '</td>'
+    + '<td class="num">' + fmtRM(r.amount) + '</td>'
+    + '<td>' + (r.last_sold || '—') + '</td>'
+    + '<td class="num">' + (r.days_since == null ? '—' : fmtInt(r.days_since)) + '</td>'
+    + '<td>' + escapeHtml(r.bucket) + '</td>'
+    + '</tr>').join('');
+  const head = '<thead><tr><th>' + t('deadstock.col.code') + '</th><th>' + t('deadstock.col.desc') + '</th><th>' + t('inv.col.store') + '</th>'
+    + '<th class="num">' + t('prod.col.qty') + '</th><th class="num">' + t('deadstock.col.value') + '</th>'
+    + '<th>' + t('deadstock.col.last_sold') + '</th><th class="num">' + t('deadstock.col.days') + '</th><th>' + t('deadstock.col.bucket') + '</th></tr></thead>';
+  const liveTable = '<div class="inv-section-title">🏪 ' + t('deadstock.section.live') + '</div>'
+    + '<table class="store-table">' + head + '<tbody>' + (rowsHtml(d.live) || '<tr><td colspan="8" class="muted">—</td></tr>') + '</tbody></table>';
+  const whTable = (d.warehouse && d.warehouse.length) ? (
+    '<div class="inv-section-title">🏭 ' + t('deadstock.section.wh', { rm: fmtRM(d.warehouse_rm || 0), n: d.warehouse_sku || 0 }) + '</div>'
+    + '<table class="store-table">' + head + '<tbody>' + rowsHtml(d.warehouse) + '</tbody></table>'
+  ) : '';
+
+  return title
+    + '<p class="page-sub">' + t('deadstock.sub', { date: d.snapshot_date || '—' }) + '</p>'
+    + cards
+    + '<div class="fin-foot">' + t('deadstock.foot.velocity') + '</div>'
+    + liveTable + whTable;
+}
+
 function renderStubView(s) {
   return ''
     + '<h1 class="page-title">' + viewTitle(s.view) + '</h1>'
