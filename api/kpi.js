@@ -40,7 +40,9 @@ const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', '
 // new Vercel function (same kpi.js); needs no ?month param.
 // Finance page (2026-06-20): read-only consumer of financial_monthly +
 // financial_balance_sheet (another process hand-loads them). Owner-only.
-const META_VIEWS = ['months', 'finance'];
+// Dead-stock tracker (2026-06-20): owner + inventory roles. Read-only over the
+// latest real inventory snapshot + sales velocity. No ?month param.
+const META_VIEWS = ['months', 'finance', 'deadstock'];
 const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS, ...META_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
@@ -509,6 +511,84 @@ async function handleFinance(req, res, user) {
   });
 }
 
+// view=deadstock — owner + inventory roles. Dead-stock tracker built on the
+// corrected value-at-cost (`amount`) of the latest REAL inventory snapshot,
+// classified by trailing sales velocity (NOT the 37%-null item_status):
+//   Dead   = 0 units sold in the trailing 365 days (or never sold)
+//   Slow   = sold within 365d but 0 in the trailing 90d
+//   Active = sold in the trailing 90d
+// STORES_LIVE only for the headline + live list; warehouse codes are a separate
+// bucket, never a store. Read-only; bounded fetches (no new RPC).
+async function handleDeadstock(req, res, user) {
+  const role = user ? user.role : null;
+  if (!user || !['owner', 'staff', 'manager', 'marketing', 'hr', 'warehouse'].includes(role)) {
+    return res.status(403).json({ ok: false, error: 'inventory roles only' });
+  }
+  const STORES_LIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
+  const recovery = (() => { const r = parseFloat(req.query?.rate); return (r > 0 && r <= 1) ? r : 0.5; })();
+  async function fetchAll(builder) {
+    const out = []; let from = 0; const step = 1000;
+    for (let p = 0; p < 30; p++) {
+      const { data, error } = await builder().range(from, from + step - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      out.push(...data); if (data.length < step) break; from += step;
+    }
+    return out;
+  }
+  try {
+    const { data: snapRow } = await sb().from('inventory_snapshots')
+      .select('snapshot_date').eq('is_synthetic', false)
+      .order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
+    const snap = snapRow?.snapshot_date;
+    if (!snap) return res.status(200).json({ ok: true, view: 'deadstock', degraded: true, degraded_reason: 'no real snapshot' });
+    const snapMs = new Date(snap + 'T00:00:00Z').getTime();
+    const DAY = 86400000;
+
+    const lastSale = {};
+    (await fetchAll(() => sb().from('v_item_last_sale').select('item_code, last_sale_date')))
+      .forEach(r => { lastSale[r.item_code] = r.last_sale_date; });
+
+    const inv = await fetchAll(() => sb().from('inventory_snapshots')
+      .select('item_code, store, qty, amount').eq('snapshot_date', snap).gt('amount', 0));
+
+    const dead = [];
+    for (const r of inv) {
+      const ls = lastSale[r.item_code] || null;
+      const days = ls ? Math.round((snapMs - new Date(ls + 'T00:00:00Z').getTime()) / DAY) : null;
+      const movement = (days == null || days > 365) ? 'Dead' : (days > 90 ? 'Slow' : 'Active');
+      if (movement !== 'Dead') continue;
+      dead.push({
+        item_code: r.item_code, store: r.store, qty: +r.qty, amount: Math.round(+r.amount),
+        last_sold: ls, days_since: days,
+        bucket: days == null ? '365+' : days <= 90 ? '0-90' : days <= 180 ? '90-180' : days <= 365 ? '180-365' : '365+',
+        is_live: STORES_LIVE.includes(r.store),
+      });
+    }
+    // descriptions only for the dead set (bounded)
+    const codes = [...new Set(dead.map(d => d.item_code))];
+    const descr = {};
+    for (let i = 0; i < codes.length; i += 300) {
+      const { data } = await sb().from('items').select('item_code, description_zh, main_group').in('item_code', codes.slice(i, i + 300));
+      (data || []).forEach(it => { descr[it.item_code] = it.description_zh || it.main_group || '—'; });
+    }
+    dead.forEach(d => { d.descr = descr[d.item_code] || '—'; });
+    dead.sort((a, b) => b.amount - a.amount);
+    const live = dead.filter(d => d.is_live);
+    const wh = dead.filter(d => !d.is_live);
+    const sum = (a) => a.reduce((s, d) => s + d.amount, 0);
+    const deadRm = sum(live);
+    return res.status(200).json({
+      ok: true, view: 'deadstock', snapshot_date: snap, recovery_rate: recovery,
+      headline: { dead_rm: deadRm, dead_sku: live.length, cash_release: Math.round(deadRm * recovery) },
+      live, warehouse: wh, warehouse_rm: sum(wh), warehouse_sku: wh.length,
+    });
+  } catch (e) {
+    console.error('[/api/kpi deadstock]', e.message);
+    return res.status(200).json({ ok: true, view: 'deadstock', degraded: true, degraded_reason: e.message });
+  }
+}
+
 // view=sales-owner — Tier 1 company overview. Owner + HQ staff (all-store roles).
 // V2 Launch Fix 3: marketing/hr/warehouse see the same company overview as owner.
 async function handleSalesOwner(req, res, user, ym) {
@@ -655,7 +735,7 @@ export default async function handler(req, res) {
   // view=actions / view=months don't need month (actions queries
   // actions_assigned directly; months returns the distinct-month list used
   // to resolve the default). All other views require YYYY-MM.
-  if (view !== 'actions' && view !== 'months' && view !== 'finance' && !/^\d{4}-\d{2}$/.test(ym)) {
+  if (view !== 'actions' && view !== 'months' && view !== 'finance' && view !== 'deadstock' && !/^\d{4}-\d{2}$/.test(ym)) {
     res.status(400).json({ ok: false, error: 'bad month; expected YYYY-MM' });
     return;
   }
@@ -687,6 +767,8 @@ export default async function handler(req, res) {
   try {
     // Finance page — owner-only, read-only over financial_* tables
     if (view === 'finance')     return handleFinance(req, res, user);
+    // Dead-stock tracker — owner + inventory roles
+    if (view === 'deadstock')   return handleDeadstock(req, res, user);
     // Extension views — route to dedicated handlers
     if (view === 'targets')     return handleTargets(req, res, user, ym, queryBranch);
     if (view === 'sales-trend') return handleSalesTrend(req, res, user, ym, queryBranch);
