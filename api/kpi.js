@@ -38,7 +38,9 @@ const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', '
 // Default-month fix (2026-06-17): lightweight months list so the FE defaults
 // to the LATEST month present in data instead of a hard-coded value. Not a
 // new Vercel function (same kpi.js); needs no ?month param.
-const META_VIEWS = ['months'];
+// Finance page (2026-06-20): read-only consumer of financial_monthly +
+// financial_balance_sheet (another process hand-loads them). Owner-only.
+const META_VIEWS = ['months', 'finance'];
 const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS, ...META_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
@@ -448,6 +450,65 @@ async function handleMonths(req, res) {
   });
 }
 
+// view=finance — owner-only. READ-ONLY consumer of financial_monthly +
+// financial_balance_sheet (another process hand-loads them; a durable sync owns
+// writes later — this handler never writes). Returns: company P&L trend (TOTAL,
+// all months), the latest month that has per-branch rows (live stores only),
+// the latest COMPLETE balance-sheet snapshot (skips daily partials with no
+// cash), and a derived cash-runway. Caveat flags travel with the data.
+async function handleFinance(req, res, user) {
+  if (!user || user.role !== 'owner') {
+    return res.status(403).json({ ok: false, error: 'owner only' });
+  }
+  const STORES_LIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
+  const { data: monthly, error: mErr } = await sb().from('financial_monthly')
+    .select('year_month, net_sales_inv, cogs_inv, gross_profit_inv, total_exp_inv, net_profit_inv')
+    .eq('branch', 'TOTAL').order('year_month', { ascending: true });
+  if (mErr) {
+    return res.status(200).json({ ok: true, view: 'finance', degraded: true, degraded_reason: mErr.message });
+  }
+  const { data: brAll } = await sb().from('financial_monthly')
+    .select('year_month, branch, net_sales_inv, cogs_inv, gross_profit_inv, total_exp_inv, net_profit_inv')
+    .in('branch', STORES_LIVE).order('year_month', { ascending: false });
+  const branchMonth = (brAll && brAll.length) ? brAll[0].year_month : null;
+  const branches = (brAll || []).filter(r => r.year_month === branchMonth);
+  // latest COMPLETE balance sheet — daily partial snapshots have cash_total null
+  const { data: bsRows } = await sb().from('financial_balance_sheet')
+    .select('snap_date, cash_total, stock_value, building, term_loan, overdraft, hire_purchase, oaf, asset_subtotal, loan_subtotal, net_equity, ratio')
+    .not('cash_total', 'is', null).order('snap_date', { ascending: false }).limit(1);
+  const bs = (bsRows && bsRows[0]) || null;
+  // cash runway = cash ÷ avg monthly net BURN over the trailing 3 months that
+  // were actually loss-making (net_profit < 0). null if the recent run profits.
+  let cash_runway = null;
+  if (bs && bs.cash_total != null) {
+    const recent = (monthly || []).slice(-3);
+    const burns = recent.filter(m => +m.net_profit_inv < 0).map(m => -(+m.net_profit_inv));
+    const avgBurn = burns.length ? burns.reduce((a, b) => a + b, 0) / burns.length : null;
+    cash_runway = {
+      cash: +bs.cash_total,
+      monthly_burn: avgBurn != null ? +avgBurn.toFixed(2) : null,
+      runway_months: avgBurn ? +(+bs.cash_total / avgBurn).toFixed(1) : null,
+      burn_basis: 'avg of negative net_profit over the trailing 3 months',
+    };
+  }
+  return res.status(200).json({
+    ok: true, view: 'finance',
+    fetched_at: new Date().toISOString(),
+    session_role: user.role,
+    monthly: monthly || [],
+    branch_month: branchMonth,
+    branches,
+    balance_sheet: bs,
+    cash_runway,
+    flags: {
+      stock_revaluation_months: (monthly || []).filter(m => +m.cogs_inv < 0).map(m => m.year_month),
+      branch_sum_ne_total: true,  // per-branch excludes W11/WCO/WEX → never sums to TOTAL
+      company_cogs_basis: 'opening + purchases − closing',
+      branch_cogs_basis: 'transaction-level cost_of_sales',
+    },
+  });
+}
+
 // view=sales-owner — Tier 1 company overview. Owner + HQ staff (all-store roles).
 // V2 Launch Fix 3: marketing/hr/warehouse see the same company overview as owner.
 async function handleSalesOwner(req, res, user, ym) {
@@ -594,7 +655,7 @@ export default async function handler(req, res) {
   // view=actions / view=months don't need month (actions queries
   // actions_assigned directly; months returns the distinct-month list used
   // to resolve the default). All other views require YYYY-MM.
-  if (view !== 'actions' && view !== 'months' && !/^\d{4}-\d{2}$/.test(ym)) {
+  if (view !== 'actions' && view !== 'months' && view !== 'finance' && !/^\d{4}-\d{2}$/.test(ym)) {
     res.status(400).json({ ok: false, error: 'bad month; expected YYYY-MM' });
     return;
   }
@@ -624,6 +685,8 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Finance page — owner-only, read-only over financial_* tables
+    if (view === 'finance')     return handleFinance(req, res, user);
     // Extension views — route to dedicated handlers
     if (view === 'targets')     return handleTargets(req, res, user, ym, queryBranch);
     if (view === 'sales-trend') return handleSalesTrend(req, res, user, ym, queryBranch);
