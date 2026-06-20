@@ -450,6 +450,10 @@ table.branch-table .mini-bar-fill {
 .prod-pro-top10-title { font-size: 14px; font-weight: 600; color: #0F172A; margin: 12px 0 8px; }
 .prod-pro-row { background: #FFFBEB; }
 .prod-hero-sub { font-size: 13px; color: #374151; margin-top: 2px; }
+.completeness-banner {
+  background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A;
+  padding: 8px 14px; border-radius: 8px; margin: 0 0 14px; font-size: 12.5px; line-height: 1.5;
+}
 .inv-synth-banner {
   background: #FEF3C7; border: 1px solid #FDE68A; color: #78350F;
   padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; line-height: 1.5;
@@ -1683,6 +1687,10 @@ window.i18n = {
     'overview.kpi.target':          { zh: '目标', en: 'Target' },
     'overview.kpi.target_unset':    { zh: '目标未设', en: 'Target not set' },
     'overview.kpi.month_incomplete': { zh: '本月未完整 · 暂不比上月', en: 'Month incomplete · MoM hidden' },
+    'meta.footfall_through': { zh: '客流数据至 {date}', en: 'footfall through {date}' },
+    'meta.inv_real':         { zh: '库存真实快照 {date}', en: 'inventory real snapshot {date}' },
+    'meta.fin_through':      { zh: '财务至 {ym}', en: 'financials through {ym}' },
+    'meta.fin_pending':      { zh: '财务: 待同步', en: 'financials: pending' },
     'overview.attrib.actual':       { zh: '实际', en: 'Actual' },
     'overview.attrib.target':       { zh: '目标', en: 'Target' },
     'overview.attrib.gap':          { zh: '缺口 RM', en: 'Gap RM' },
@@ -2286,12 +2294,28 @@ let ALL_MONTHS = buildMonthList();
 async function loadMonths() {
   try {
     const r = await getJSON('/api/kpi?view=months');
+    if (r && r.meta) DATA_META = r.meta;   // M-6: data-completeness meta
     if (r && Array.isArray(r.months) && r.months.length) {
       ALL_MONTHS = r.months;
       return r.latest || ALL_MONTHS[0];
     }
   } catch (_) { /* keep offline fallback ALL_MONTHS */ }
   return ALL_MONTHS[0];
+}
+
+// M-6 (2026-06-20): standardized data-completeness banner shared by Overview,
+// Inventory and Customers. Reads DATA_META (from /api/kpi?view=months at boot):
+// footfall-through date · latest real inventory snapshot · financials status.
+let DATA_META = null;
+function completenessBanner() {
+  const m = DATA_META;
+  if (!m) return '';
+  const parts = [];
+  if (m.floatation_latest)     parts.push(t('meta.footfall_through', { date: m.floatation_latest }));
+  if (m.inventory_real_latest) parts.push(t('meta.inv_real', { date: m.inventory_real_latest }));
+  parts.push(m.financials_latest ? t('meta.fin_through', { ym: m.financials_latest }) : t('meta.fin_pending'));
+  if (!parts.length) return '';
+  return '<div class="completeness-banner">📊 ' + parts.join(' · ') + '</div>';
 }
 
 /* SQL truth for byte-match assertion (DEV mode).
@@ -4144,6 +4168,7 @@ function renderSalesOwnerV3(s) {
 
   return '<div class="sales-v3">'
     + header
+    + completenessBanner()   // M-6
     + banner
     + kpiHero
     + '<div class="s4-section-title">' + t('overview.section.matrix') + ' <span class="s4-section-aux">' + t('overview.section.matrix_aux') + '</span></div>'
@@ -5199,6 +5224,7 @@ function renderInventory(s) {
   // 件3 (2026-05-25): reorder — 判断卡 moved from top to after ABC (作为诊断总结).
   // New order: hero → 5class → matrix → warehouse → ABC → 判断卡 → drill.
   return title
+    + completenessBanner()   // M-6
     + synthBanner
     + momGapBanner
     + renderInvHero(d.hero, d.is_synthetic, momComparable)
@@ -5734,6 +5760,7 @@ function renderCustomers(s) {
   // Phase 6c 6+1 层链路: 谁来 → 多忠 → 买什么 → 哪店哪族 → 具体人 → 趋势 → 行动。
   return '<div class="sales-v3">'
     + header
+    + completenessBanner()   // M-6
     // 第 1 层 — 种族 (谁来)
     + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'
     + renderCustomerRaceCards(s)

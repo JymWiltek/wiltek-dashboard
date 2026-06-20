@@ -2321,11 +2321,20 @@ export default async function handler(req, res) {
   const errSummary = Object.keys(errorDetails).length
     ? Object.entries(errorDetails).map(([t, e]) => `${t}: [${e.code || '?'}] ${e.message}`).join(' | ')
     : null;
+  // MV refresh (2026-06-20, handover #7): the main multi-target apply loop never
+  // refreshed the materialized views (the other refresh_all_mviews() calls live
+  // only in legacy single-purpose handlers). So mv_sales_kpi_monthly drifted a
+  // full month stale — May sales present in the base table but the MV stuck at
+  // April → overview_kpi.sales.actual returned null for 2026-05. Refresh all MVs
+  // after every apply so the read layer never lags the base data again.
+  let mviewErr = null;
+  try { await sb().rpc('refresh_all_mviews'); }
+  catch (e) { mviewErr = e.message; console.error('[sync] refresh_all_mviews failed:', e.message); }
   await sb().from('sync_log').update({
     finished_at: new Date().toISOString(),
     status: anyFailed ? 'partial' : 'success',
     rows_appended: appended, rows_skipped: failed,
-    error_msg: errSummary,
+    error_msg: mviewErr ? (errSummary ? errSummary + ' | mview: ' + mviewErr : 'mview: ' + mviewErr) : errSummary,
   }).eq('id', sync_log_id);
   await sb().rpc('release_sync_lock');
 
@@ -2333,6 +2342,7 @@ export default async function handler(req, res) {
     ok: true, mode: 'apply',
     sync_log_id, backup_manifest_id: manifest.id,
     results, appended, failed, errorDetails,
+    mview_refresh_error: mviewErr,
     timestamp: new Date().toISOString(),
   });
 }

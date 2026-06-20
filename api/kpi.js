@@ -424,11 +424,27 @@ async function handleMonths(req, res) {
       degraded: true, degraded_reason: error.message });
   }
   const months = (data || []).map(r => r.ym);
+  // M-6 (2026-06-20): lightweight data-completeness meta for the shared banner
+  // across Overview / Inventory / Customers. All cheap single-row probes.
+  const meta = { floatation_latest: null, inventory_real_latest: null, financials_latest: null };
+  try {
+    const { data: fl } = await sb().from('floatation').select('date').order('date', { ascending: false }).limit(1).maybeSingle();
+    if (fl) meta.floatation_latest = fl.date;
+  } catch (_) { /* best-effort */ }
+  try {
+    const { data: snap } = await sb().from('inventory_snapshots').select('snapshot_date').eq('is_synthetic', false).order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
+    if (snap) meta.inventory_real_latest = snap.snapshot_date;
+  } catch (_) { /* best-effort */ }
+  try {
+    const { data: fin } = await sb().from('financial_monthly').select('year_month').order('year_month', { ascending: false }).limit(1).maybeSingle();
+    if (fin) meta.financials_latest = fin.year_month;
+  } catch (_) { /* best-effort */ }
   return res.status(200).json({
     ok: true, view: 'months',
     fetched_at: new Date().toISOString(),
     months,
     latest: months[0] || null,
+    meta,
   });
 }
 
