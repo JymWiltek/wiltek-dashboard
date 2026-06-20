@@ -10,7 +10,9 @@
     "test:report": "playwright show-report",
     "test:i18n": "node tools/i18n_audit.js --count && node tools/i18n_check.js --ci",
     "test:i18n:runtime": "node tools/i18n_runtime_check.js",
-    "test:rbac": "node tools/rbac_test.js"
+    "test:rbac": "node tools/rbac_test.js",
+    "test:deadstock": "node tools/deadstock_test.mjs",
+    "test:deadstock:live": "node tools/deadstock_reconcile.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
