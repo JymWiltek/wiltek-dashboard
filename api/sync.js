@@ -266,55 +266,66 @@ async function loadCbv3() {
   };
 }
 
+const RAWCS_MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 async function loadRawCs() {
   const text = await fetchSheetCsv(SHEETS.raw_cs.id, SHEETS.raw_cs.tab);
   const grid = parseCsv(text);
   if (!grid.length) return { rows: [], snapshot_date: null };
   const hdr = grid[0].map(s => String(s||'').trim().toUpperCase());
   const idx = {}; for (let i = 0; i < hdr.length; i++) idx[hdr[i]] = i;
-
-  // Sprint 4 fix: Raw CS Sheet now has an unlabelled STATUS column between
-  // BRANCH and QTY (header keeps old 5 names but data has 6 cols). Without
-  // this shift detection, qty was loading "N"/"D"/"F" status letters and
-  // parseNum returned 0 → 2026-04-30 snap had all qty=0.
-  //
-  // Detection: try parseNum on the first data row's "QTY"-positioned cell.
-  // If non-numeric → status column is there → shift QTY/UC/AMT one to the right.
-  const probeRow  = grid[1] || [];
-  const baseQty   = idx['QTY']       ?? 2;
-  const baseUc    = idx['UNIT COST'] ?? 3;
-  const baseAmt   = idx['ON HAND']   ?? idx['AMOUNT'] ?? 4;
-  const probeVal  = probeRow[baseQty];
-  const probeNumeric = probeVal != null && probeVal !== '' &&
-                       !isNaN(parseFloat(String(probeVal).trim()));
-  const shift     = probeNumeric ? 0 : 1;
-  const I = {
-    CODE: idx['STOCK CODE'] ?? idx['ITEM CODE'] ?? 0,
-    BR:   idx['BRANCH']     ?? idx['BRANCHES'] ?? 1,
-    QTY:  baseQty + shift,
-    UC:   baseUc  + shift,
-    AMT:  baseAmt + shift,
-    shift_detected: shift,
-  };
+  // STOCK CODE / BRANCH / MONTH are reliably found by header name (the live
+  // 'Raw CS' tab leads with a MONTH column, so the positional fallbacks are 1/2).
+  const CODE  = idx['STOCK CODE'] ?? idx['ITEM CODE'] ?? 1;
+  const BR    = idx['BRANCH']     ?? idx['BRANCHES']  ?? 2;
+  const MONTH = idx['MONTH'] ?? 0;
 
   const today = new Date();
-  const prev = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
+  const prev  = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
   const snapshot_date = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth()+1).padStart(2,'0')}-${String(prev.getUTCDate()).padStart(2,'0')}`;
+  // The sheet stacks ALL months (a MONTH column per row). Ingest ONLY the
+  // snapshot's month so the snapshot isn't a dedup of Apr+May.
+  const targetMonth = RAWCS_MON[prev.getUTCMonth()] + '-' + prev.getUTCFullYear(); // e.g. MAY-2026
+  const inTargetMonth = (r) => {
+    const m = String(r[MONTH] || '').trim().toUpperCase();
+    return !m || m === targetMonth;  // tolerate a missing MONTH column
+  };
+
+  // BUG-10 fix (2026-06-20): the 'Raw CS' columns DRIFT month-to-month — an
+  // unlabelled status/description column is inserted after BRANCH, but the
+  // header is NOT updated, so qty/cost/amount land at 4/5/6 (Apr) or 5/6/7
+  // (May). A fixed index (or the old single-row shift probe) corrupts one or
+  // the other. Detect the qty-start column by IDENTITY (amount ≈ qty × cost)
+  // via a majority vote over this month's rows, then apply that one offset to
+  // every row (so qty=0 empties map correctly too). Never invents a column.
+  const target = grid.slice(1).filter(r => r && inTargetMonth(r));
+  const votes = {};
+  let checked = 0;
+  for (const r of target) {
+    if (checked >= 800) break;
+    for (let q = BR + 1; q <= BR + 3; q++) {
+      const qty = parseNum(r[q]), cost = parseNum(r[q+1]), amt = parseNum(r[q+2]);
+      if (qty > 0 && cost > 0 && Math.abs(amt - qty * cost) <= 0.5) votes[q] = (votes[q] || 0) + 1;
+    }
+    checked += 1;
+  }
+  let QTY = BR + 2, bestN = -1;          // sensible default if no identity holds
+  for (const q of Object.keys(votes)) if (votes[q] > bestN) { bestN = votes[q]; QTY = +q; }
+  const UC = QTY + 1, AMT = QTY + 2;
+
   const rows = [];
-  for (let i = 1; i < grid.length; i++) {
-    const r = grid[i]; if (!r) continue;
-    const code = String(r[I.CODE] || '').trim(); if (!code) continue;
-    const br = String(r[I.BR] || '').trim();
+  for (const r of target) {
+    const code = String(r[CODE] || '').trim(); if (!code) continue;
+    const br = String(r[BR] || '').trim();
     rows.push({
       snapshot_date,
       store:     br,
       item_code: code,
-      qty:       parseNum(r[I.QTY]),
-      cost:      parseNum(r[I.UC]) || null,
-      amount:    parseNum(r[I.AMT]),
+      qty:       parseNum(r[QTY]),
+      cost:      parseNum(r[UC]) || null,
+      amount:    parseNum(r[AMT]),
     });
   }
-  return { rows, snapshot_date, total_rows: rows.length, column_shift_detected: shift };
+  return { rows, snapshot_date, total_rows: rows.length, qty_col_detected: QTY, target_month: targetMonth };
 }
 
 // ── Floatation: Sheet 1 (yearly summary, one row per month) ──────────
