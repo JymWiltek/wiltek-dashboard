@@ -418,6 +418,10 @@ async function handleOverview(req, res, user, ym, branch) {
 // scope-sensitive (the same list for every role). Source: v_total_amt_by_month
 // (one row per ym), same view /api/customers uses for months_seen.
 async function handleMonths(req, res) {
+  // Month-picker fix (2026-06-20): the dropdown must offer EVERY month that has
+  // data in ANY source, not just sales. Floatation already has 2026-06 while
+  // sales/inventory end at May, so June was previously unselectable. Union the
+  // distinct month across sales / floatation / inventory / customers.
   const { data, error } = await sb()
     .from('v_total_amt_by_month')
     .select('ym')
@@ -427,7 +431,23 @@ async function handleMonths(req, res) {
     return res.status(200).json({ ok: true, view: 'months', months: [], latest: null,
       degraded: true, degraded_reason: error.message });
   }
-  const months = (data || []).map(r => r.ym);
+  const salesMonths = (data || []).map(r => r.ym).filter(Boolean);
+  const ymSet = new Set(salesMonths);
+  const toYm = (d) => d ? String(d).slice(0, 7) : null;
+  // floatation is the source that carries the current (in-progress) month —
+  // raw + small (monthly grain). Inventory/customers via their monthly MVs.
+  try { (await sb().from('floatation').select('date')).data?.forEach(r => { const m = toYm(r.date); if (m) ymSet.add(m); }); } catch (_) {}
+  try { (await sb().from('mv_inventory_kpi_monthly').select('snapshot_date')).data?.forEach(r => { const m = toYm(r.snapshot_date); if (m) ymSet.add(m); }); } catch (_) {}
+  try { (await sb().from('mv_customers_kpi_monthly').select('ym')).data?.forEach(r => { if (r.ym) ymSet.add(r.ym); }); } catch (_) {}
+  // months = full union (newest first) so every data-bearing month is selectable.
+  // Cap at the current calendar month so sentinel/synthetic future rows (e.g. a
+  // 2099-12 placeholder in mv_inventory_kpi_monthly) never reach the picker.
+  const now = new Date();
+  const curYm = now.getUTCFullYear() + '-' + String(now.getUTCMonth() + 1).padStart(2, '0');
+  const months = [...ymSet].filter(m => /^\d{4}-\d{2}$/.test(m) && m <= curYm).sort().reverse();
+  // latest (the FE default) stays the latest SALES month so the dashboard opens
+  // on a full-data month, not an in-progress one with only footfall.
+  const latestSales = salesMonths[0] || months[0] || null;
   // M-6 (2026-06-20): lightweight data-completeness meta for the shared banner
   // across Overview / Inventory / Customers. All cheap single-row probes.
   const meta = { floatation_latest: null, inventory_real_latest: null, financials_latest: null };
@@ -446,8 +466,9 @@ async function handleMonths(req, res) {
   return res.status(200).json({
     ok: true, view: 'months',
     fetched_at: new Date().toISOString(),
-    months,
-    latest: months[0] || null,
+    months,                       // full union (newest first) — drives the picker
+    available_months: months,     // explicit alias per spec
+    latest: latestSales,          // FE default = latest full-data (sales) month
     meta,
   });
 }
