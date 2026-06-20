@@ -26,7 +26,6 @@ const src = fs.readFileSync(FILE, 'utf8');
 // 产品级保留英文 label (两语言都英文, Jym 设计语汇) — 非泄漏
 const INTENTIONAL_EN = new Set([
   'lang.toggle',            // 语言切换钮故意显示目标语言文字
-  'customer.section.action',
   'inv.section.action',
   'today.section.target',
   'customer.tab.top_vip',

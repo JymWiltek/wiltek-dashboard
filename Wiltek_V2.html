@@ -1445,7 +1445,7 @@ window.i18n = {
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
     'customer.section.trend':   { zh: '12 月走廊客趋势', en: '12-Month Walk-in Trend' },
-    'customer.section.action':  { zh: 'Customer Action Plan', en: 'Customer Action Plan' },
+    'customer.section.action':  { zh: '客户行动计划', en: 'Customer Action Plan' },
     'customer.tab.dormant_vip':  { zh: '😴 沉睡 VIP', en: '😴 Dormant VIP' },
     'customer.tab.lapsed_loyal': { zh: '⚠ 老客流失', en: '⚠ Lapsed Loyal' },
     'customer.tab.top_vip':      { zh: '⭐ Top VIP',  en: '⭐ Top VIP' },
@@ -1944,7 +1944,18 @@ window.i18n = {
     // renderCustomerActionPlan
     'customer.action.anomaly_empty':    { zh: '本月暂无 high-severity 客户异常 ✓', en: 'No high-severity customer anomalies this month ✓' },
     'customer.action.sent_empty':       { zh: '尚未派出任何 Action — 点页顶 [⊕ 派派] 派第一条', en: 'No actions assigned yet — click [⊕ Assign] at top to assign your first' },
-    'customer.action.sent_title':       { zh: '我派出去的 Action ({n})', en: 'Actions I Assigned ({n})' },
+    'customer.action.sent_title':       { zh: '我派出去的任务 ({n})', en: 'Actions I Assigned ({n})' },
+    'action.status.pending':       { zh: '待接受', en: 'Pending' },
+    'action.status.accepted':      { zh: '已接受', en: 'Accepted' },
+    'action.status.in_progress':   { zh: '进行中', en: 'In Progress' },
+    'action.status.done':          { zh: '已完成', en: 'Done' },
+    'action.status.overdue':       { zh: '已逾期', en: 'Overdue' },
+    'action.status.renegotiating': { zh: '协商中', en: 'Renegotiating' },
+    'action.status.rejected':      { zh: '已拒绝', en: 'Rejected' },
+    'race.short.chinese':          { zh: '华裔', en: 'Chinese' },
+    'race.short.malay':            { zh: '巫裔', en: 'Malay' },
+    'race.short.indian':           { zh: '印裔', en: 'Indian' },
+    'race.short.other':            { zh: '其他', en: 'Other' },
     // renderCustomerStoreRaceMatrix
     'customer.matrix.gap':          { zh: 'customer_store_race_matrix RPC 未部署 · 待 migration apply', en: 'customer_store_race_matrix RPC not deployed · pending migration apply' },
     'customer.matrix.tip_closing':  { zh: 'vs 上月成交', en: 'vs Last Month closing' },
@@ -4833,7 +4844,7 @@ function renderS4SentActionCard(a) {
     + '<div class="s4-action-card ' + sevCls + '">'
     +   '<div class="a-title">' + escapeHtml(a.title) + '</div>'
     +   '<div class="a-detail">→ ' + escapeHtml(a.assignee) + amtStr + ddlStr + '</div>'
-    +   '<div class="a-detail"><span class="' + statusCls + '">' + t('overview.sent.status') + (a.status || 'pending') + '</span></div>'
+    +   '<div class="a-detail"><span class="' + statusCls + '">' + t('overview.sent.status') + t('action.status.' + (a.status || 'pending'), a.status || 'pending') + '</span></div>'
     +   renegBox + doneNoteBox
     +   (buttons ? '<div class="a-controls">' + buttons + '</div>' : '')
     + '</div>';
@@ -4940,7 +4951,7 @@ function renderS4AssignedActionCard(a) {
     + '<div class="s4-action-card ' + sev + '">'
     +   '<div class="a-title">' + escapeHtml(a.title) + amtStr + ddlStr + '</div>'
     +   (a.description ? '<div class="a-detail">' + escapeHtml(a.description) + '</div>' : '')
-    +   '<div class="a-detail"><span class="' + statusCls + '">' + t('today.action.status') + (a.status || 'pending') + '</span></div>'
+    +   '<div class="a-detail"><span class="' + statusCls + '">' + t('today.action.status') + t('action.status.' + (a.status || 'pending'), a.status || 'pending') + '</span></div>'
     +   (buttons ? '<div class="a-controls">' + buttons + '</div>' : '')
     + '</div>';
 }
@@ -5901,7 +5912,7 @@ function buildCustomerAnomalies(s) {
   const rd = (s.data.race    && s.data.race.data)    || null;
   const md = (s.data.matrix  && s.data.matrix.data)  || null;
   const ad = (s.data.agecat  && s.data.agecat.data)  || null;
-  const RACE_LABEL = { chinese: 'Chinese', malay: 'Malay', indian: 'Indian', other: 'Other' };
+  const RACE_LABEL = { chinese: t('race.short.chinese'), malay: t('race.short.malay'), indian: t('race.short.indian'), other: t('race.short.other') };
   const out = [];
 
   // 1) 店 × 种族 closing 偏低 (样本 ≥ 5):
@@ -6210,7 +6221,7 @@ function renderCustomerStoreRaceMatrix(s) {
   return ''
     + '<div class="s4-drill"><div class="s4-drill-body">'
     +   '<table><thead><tr>'
-    +     '<th>' + t('customer.col.store') + '</th><th>Chinese</th><th>Malay</th><th>Indian</th><th>Other</th><th>' + t('customer.col.total_walkin') + '</th>'
+    +     '<th>' + t('customer.col.store') + '</th><th>' + t('race.short.chinese') + '</th><th>' + t('race.short.malay') + '</th><th>' + t('race.short.indian') + '</th><th>' + t('race.short.other') + '</th><th>' + t('customer.col.total_walkin') + '</th>'
     +   '</tr></thead><tbody>' + rows + totRow + '</tbody></table>'
     +   '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.matrix.footnote') + '</div>'
     + '</div></div>';

@@ -114,8 +114,39 @@ for (const lang of ['en']) {
     }
   }
 }
+// ── ZH-mode DATA-bearing scan (件: 2026-06-20) ───────────────────────────────
+// The EN scan above + the static dict purity check both MISS leaks that only
+// appear in the ZH RENDER OUTPUT with real data: a raw DB enum concatenated
+// into the HTML (e.g. `... + a.status` → "pending") or a hardcoded English
+// literal in render code (e.g. ethnicity `<th>Chinese</th>`). Neither is a dict
+// entry, so static scans can't see them, and the loading-state EN scan never
+// renders the data-bearing nodes. Here we render those exact paths WITH data in
+// ZH and fail if a known user-facing English token survives untranslated.
 setLang('zh');
+let zhLeaks = 0;
+const ZH_BLOCK = ['pending', 'accepted', 'in_progress', 'done', 'overdue', 'renegotiating', 'rejected', 'Chinese', 'Malay', 'Indian'];
+const blockRe = new RegExp('(?:^|[^A-Za-z_])(' + ZH_BLOCK.join('|') + ')(?:$|[^A-Za-z_])');
+function zhScan(label, html) {
+  ran++;
+  const text = strip(html).replace(/\s+/g, ' ');
+  const hit = text.match(blockRe);
+  if (hit) {
+    zhLeaks++;
+    console.error(`✗ [zh] ${label} leaked English UI token "${hit[1]}" — translate by key (e.g. t('action.status.X') / t('race.short.X')).  …${text.slice(Math.max(0, hit.index - 15), hit.index + 45)}…`);
+  }
+}
+const STATUSES = ['pending', 'accepted', 'in_progress', 'done', 'overdue', 'renegotiating', 'rejected'];
+if (typeof sandbox.renderS4SentActionCard === 'function') {
+  for (const st of STATUSES) zhScan('renderS4SentActionCard(status=' + st + ')', sandbox.renderS4SentActionCard({ id: 1, title: '任务', assignee: 'jym', status: st }));
+}
+if (typeof sandbox.renderS4AssignedActionCard === 'function') {
+  for (const st of STATUSES) { try { zhScan('renderS4AssignedActionCard(status=' + st + ')', sandbox.renderS4AssignedActionCard({ id: 1, title: '任务', status: st })); } catch (_) {} }
+}
+if (typeof sandbox.renderCustomerStoreRaceMatrix === 'function') {
+  try { zhScan('renderCustomerStoreRaceMatrix', sandbox.renderCustomerStoreRaceMatrix({ data: { matrix: { data: { matrix: [{ store: 'W01' }] } } } })); } catch (_) {}
+}
 
-console.log(`\ni18n runtime check: ran ${ran} render calls; EN leaks = ${leaks}`);
-if (leaks) process.exit(1);
-console.log('✓ PASS — EN render output contains 0 Chinese (loading-state scaffolding scan).');
+const totalLeaks = leaks + zhLeaks;
+console.log(`\ni18n runtime check: ran ${ran} render calls; EN→中文 leaks = ${leaks}; ZH→English leaks = ${zhLeaks}`);
+if (totalLeaks) process.exit(1);
+console.log('✓ PASS — EN render 0 中文; ZH render 0 untranslated English enum/label (data-bearing scan).');
