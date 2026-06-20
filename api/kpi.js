@@ -23,6 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { createClient } from '@supabase/supabase-js';
+import { computeDeadstock } from "../lib/deadstock.mjs";
 
 const LEGACY_VIEWS = ['sales', 'inventory', 'customers', 'floatation', 'products'];
 const EXT_VIEWS    = ['targets', 'sales-trend', 'sales-daily'];
@@ -540,17 +541,23 @@ async function handleFinance(req, res, user) {
 //   Active = sold in the trailing 90d
 // STORES_LIVE only for the headline + live list; warehouse codes are a separate
 // bucket, never a store. Read-only; bounded fetches (no new RPC).
+// DEADSTOCK_LIVE + computeDeadstock (the pure, unit-tested core) live in
+// ../lib/deadstock.mjs — imported at top. The deployed endpoint must equal the
+// canonical prod SQL documented there; tools/deadstock_test.mjs locks it.
+
 async function handleDeadstock(req, res, user) {
   const role = user ? user.role : null;
   if (!user || !['owner', 'staff', 'manager', 'marketing', 'hr', 'warehouse'].includes(role)) {
     return res.status(403).json({ ok: false, error: 'inventory roles only' });
   }
-  const STORES_LIVE = ['W01', 'W02', 'W03', 'W05', 'W07'];
   const recovery = (() => { const r = parseFloat(req.query?.rate); return (r > 0 && r <= 1) ? r : 0.5; })();
-  async function fetchAll(builder) {
+  // Paginate with a STABLE, unique ORDER so pages never overlap or gap.
+  // (.range() without an explicit order is non-deterministic in PostgREST →
+  // it was duplicating/dropping rows → a 2.8× inflated dead total. BUG fix.)
+  async function fetchAll(builder, orderCol) {
     const out = []; let from = 0; const step = 1000;
-    for (let p = 0; p < 30; p++) {
-      const { data, error } = await builder().range(from, from + step - 1);
+    for (let p = 0; p < 40; p++) {
+      const { data, error } = await builder().order(orderCol, { ascending: true }).range(from, from + step - 1);
       if (error) throw error;
       if (!data || !data.length) break;
       out.push(...data); if (data.length < step) break; from += step;
@@ -563,47 +570,28 @@ async function handleDeadstock(req, res, user) {
       .order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
     const snap = snapRow?.snapshot_date;
     if (!snap) return res.status(200).json({ ok: true, view: 'deadstock', degraded: true, degraded_reason: 'no real snapshot' });
-    const snapMs = new Date(snap + 'T00:00:00Z').getTime();
-    const DAY = 86400000;
 
     const lastSale = {};
-    (await fetchAll(() => sb().from('v_item_last_sale').select('item_code, last_sale_date')))
+    (await fetchAll(() => sb().from('v_item_last_sale').select('item_code, last_sale_date'), 'item_code'))
       .forEach(r => { lastSale[r.item_code] = r.last_sale_date; });
-
+    // No amount filter: a dead SKU with 0 value still counts toward dead_sku
+    // (matches the canonical DISTINCT item_code = 230); it adds 0 to dead_rm.
     const inv = await fetchAll(() => sb().from('inventory_snapshots')
-      .select('item_code, store, qty, amount').eq('snapshot_date', snap).gt('amount', 0));
+      .select('id, item_code, store, qty, amount').eq('snapshot_date', snap), 'id');
 
-    const dead = [];
-    for (const r of inv) {
-      const ls = lastSale[r.item_code] || null;
-      const days = ls ? Math.round((snapMs - new Date(ls + 'T00:00:00Z').getTime()) / DAY) : null;
-      const movement = (days == null || days > 365) ? 'Dead' : (days > 90 ? 'Slow' : 'Active');
-      if (movement !== 'Dead') continue;
-      dead.push({
-        item_code: r.item_code, store: r.store, qty: +r.qty, amount: Math.round(+r.amount),
-        last_sold: ls, days_since: days,
-        bucket: days == null ? '365+' : days <= 90 ? '0-90' : days <= 180 ? '90-180' : days <= 365 ? '180-365' : '365+',
-        is_live: STORES_LIVE.includes(r.store),
-      });
-    }
-    // descriptions only for the dead set (bounded)
-    const codes = [...new Set(dead.map(d => d.item_code))];
+    const payload = computeDeadstock(inv, lastSale, snap, recovery);
+
+    // descriptions for the dead set (bounded)
+    const codes = [...new Set(payload.live.concat(payload.warehouse).map(d => d.item_code))];
     const descr = {};
     for (let i = 0; i < codes.length; i += 300) {
       const { data } = await sb().from('items').select('item_code, description_zh, main_group').in('item_code', codes.slice(i, i + 300));
       (data || []).forEach(it => { descr[it.item_code] = it.description_zh || it.main_group || '—'; });
     }
-    dead.forEach(d => { d.descr = descr[d.item_code] || '—'; });
-    dead.sort((a, b) => b.amount - a.amount);
-    const live = dead.filter(d => d.is_live);
-    const wh = dead.filter(d => !d.is_live);
-    const sum = (a) => a.reduce((s, d) => s + d.amount, 0);
-    const deadRm = sum(live);
-    return res.status(200).json({
-      ok: true, view: 'deadstock', snapshot_date: snap, recovery_rate: recovery,
-      headline: { dead_rm: deadRm, dead_sku: live.length, cash_release: Math.round(deadRm * recovery) },
-      live, warehouse: wh, warehouse_rm: sum(wh), warehouse_sku: wh.length,
-    });
+    payload.live.forEach(d => { d.descr = descr[d.item_code] || '—'; });
+    payload.warehouse.forEach(d => { d.descr = descr[d.item_code] || '—'; });
+
+    return res.status(200).json({ ok: true, view: 'deadstock', ...payload });
   } catch (e) {
     console.error('[/api/kpi deadstock]', e.message);
     return res.status(200).json({ ok: true, view: 'deadstock', degraded: true, degraded_reason: e.message });
