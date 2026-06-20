@@ -175,7 +175,11 @@ REVOKE SELECT ON public.mv_products_kpi_monthly   FROM anon;
 -- actions). All the Portal's data RPCs are SECURITY INVOKER, so they are NOT
 -- listed here. Revoke EXECUTE from anon + authenticated; service_role/postgres
 -- keep it (sync/cron path).
-REVOKE EXECUTE ON FUNCTION public.actions_sweep_overdue() FROM anon, authenticated;
+-- NOTE: EXECUTE was granted to PUBLIC (Postgres default), so revoking from
+-- anon/authenticated alone is NOT enough — anon stays able to call it via the
+-- PUBLIC grant. Revoke from PUBLIC too (branch-tested 2026-06-19: with PUBLIC
+-- the anon-executable SecDef count drops to 0). service_role/postgres keep it.
+REVOKE EXECUTE ON FUNCTION public.actions_sweep_overdue() FROM PUBLIC, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────
 -- SECTION 7 — Revoke the broad anon table grants (read + write) everywhere.
