@@ -454,6 +454,9 @@ table.branch-table .mini-bar-fill {
   background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A;
   padding: 8px 14px; border-radius: 8px; margin: 0 0 14px; font-size: 12.5px; line-height: 1.5;
 }
+.fin-reval-row { background: #FFFBEB; }
+.fin-flag { font-size: 11px; color: #B45309; font-weight: 600; }
+.fin-foot { font-size: 12px; color: var(--text-meta); margin: 6px 0 16px; line-height: 1.5; }
 .inv-synth-banner {
   background: #FEF3C7; border: 1px solid #FDE68A; color: #78350F;
   padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; line-height: 1.5;
@@ -1346,7 +1349,7 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
       <a href="#" data-view="today"     onclick="return onViewChange('today')"><span class="icon">🏠</span>Today</a>
       <!-- 件4 (2026-05-25): GTD Tracker ported from MASTER. -->
       <a href="#" data-view="gtd"       onclick="return onViewChange('gtd')"><span class="icon">✅</span>GTD</a>
-      <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance<span class="stub">…</span></a>
+      <a href="#" data-view="finance"   onclick="return onViewChange('finance')"><span class="icon">💰</span>Finance</a>
       <!-- Phase 10A (2026-05-22) 派派盒 — both owner + managers. -->
       <a href="#" data-view="inbox"     onclick="return onViewChange('inbox')"><span class="icon">📥</span>派派盒</a>
       <!-- Phase 2 (2026-05-16) ⚙️ Targets page — owner only.
@@ -1686,6 +1689,33 @@ window.i18n = {
     'overview.kpi.behind_pp':       { zh: '差', en: 'Behind' },
     'overview.kpi.target':          { zh: '目标', en: 'Target' },
     'overview.kpi.target_unset':    { zh: '目标未设', en: 'Target not set' },
+    'finance.title':           { zh: '财务', en: 'Finance' },
+    'finance.sub':             { zh: '公司损益 + 资产负债 · 财务数据手工载入 (待自动同步接管)', en: 'Company P&L + balance sheet · financials hand-loaded (durable sync owns writes later)' },
+    'finance.section.trend':   { zh: '公司损益趋势 (TOTAL)', en: 'Company P&L Trend (TOTAL)' },
+    'finance.col.month':       { zh: '月份', en: 'Month' },
+    'finance.col.net_sales':   { zh: '净销售', en: 'Net Sales' },
+    'finance.col.gp':          { zh: '毛利', en: 'Gross Profit' },
+    'finance.col.exp':         { zh: '总费用', en: 'Total Exp' },
+    'finance.col.net':         { zh: '净利', en: 'Net Profit' },
+    'finance.flag.reval':      { zh: '库存重估', en: 'stock reval' },
+    'finance.flag.reval_tip':  { zh: '库存重估月 · COGS 为负 → GP% 不可比', en: 'stock-revaluation month · COGS negative → GP% not comparable' },
+    'finance.foot.reval':      { zh: '标 * 的月份为库存重估月 (COGS 为负, GP% 超 100%) — 不可与其他月直接比较。', en: 'Months marked * are stock-revaluation months (COGS negative, GP% > 100%) — not comparable to other months.' },
+    'finance.section.branch':  { zh: '{ym} 各门店损益 (5 门店)', en: '{ym} Per-Branch P&L (5 live stores)' },
+    'finance.foot.branch_ne_total': { zh: '各门店之和 ≠ 公司 TOTAL (设计如此): TOTAL 含已关店 W11 + 总部/成本中心 WCO/WEX。差额非错误。', en: 'Per-branch rows do NOT sum to TOTAL by design: TOTAL includes closed store W11 + HQ/cost-centre WCO/WEX. The gap is not an error.' },
+    'finance.foot.cogs_basis': { zh: '门店 GP% 勿与公司 GP% 直接比较: 公司 COGS = 期初+进货−期末; 门店 COGS = 交易级 cost_of_sales (口径不同)。', en: 'Do NOT compare branch GP% to company GP% directly: company COGS = opening+purchases−closing; branch COGS = transaction-level cost_of_sales (different basis).' },
+    'finance.section.bs':      { zh: '资产负债快照 · {date}', en: 'Balance Sheet Snapshot · {date}' },
+    'finance.bs.cash':         { zh: '现金', en: 'Cash' },
+    'finance.bs.stock':        { zh: '库存价值', en: 'Stock Value' },
+    'finance.bs.equity':       { zh: '净资产', en: 'Net Equity' },
+    'finance.bs.gearing':      { zh: '负债率 (负债/净资产)', en: 'Gearing (loans/equity)' },
+    'finance.bs.liability':    { zh: '负债', en: 'Liability' },
+    'finance.bs.term_loan':    { zh: '定期贷款', en: 'Term Loan' },
+    'finance.bs.overdraft':    { zh: '透支 (OD)', en: 'Overdraft (OD)' },
+    'finance.bs.hire_purchase':{ zh: '租购 (HP)', en: 'Hire Purchase (HP)' },
+    'finance.bs.loan_total':   { zh: '负债合计', en: 'Total Liabilities' },
+    'finance.foot.gearing':    { zh: '负债率 = 负债合计 ÷ 净资产。', en: 'Gearing = total liabilities ÷ net equity.' },
+    'finance.runway.label':    { zh: '现金跑道', en: 'Cash Runway' },
+    'finance.runway.sub':      { zh: '现金 {cash} ÷ 近月均净烧 {burn}', en: 'cash {cash} ÷ avg recent net burn {burn}' },
     'overview.kpi.month_incomplete': { zh: '本月未完整 · 暂不比上月', en: 'Month incomplete · MoM hidden' },
     'meta.footfall_through': { zh: '客流数据至 {date}', en: 'footfall through {date}' },
     'meta.inv_real':         { zh: '库存真实快照 {date}', en: 'inventory real snapshot {date}' },
@@ -2055,7 +2085,6 @@ function applyI18nNav() {
   document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
     const v = a.getAttribute('data-view');
     let html = '<span class="icon">' + (NAV_ICON[v] || '') + '</span>' + t('nav.' + v, v);
-    if (v === 'finance') html += '<span class="stub">…</span>';
     a.innerHTML = html;
   });
   const lb = document.getElementById('langBtn');
@@ -2229,7 +2258,12 @@ function getEffectiveBranch() {
 function applyRbacToNav(role) {
   document.querySelectorAll('nav.menu a[data-view]').forEach(a => {
     const v = a.getAttribute('data-view');
-    a.style.display = RBAC.canSeePage(role, v) ? '' : 'none';
+    // Finance build (2026-06-20): for disallowed pages (e.g. Finance for non-
+    // owners) REMOVE the link from the DOM, not just hide it — a non-owner must
+    // not have the financial nav entry inspectable. doLogout() reloads the page
+    // so the next login starts from the full static nav before re-filtering.
+    if (RBAC.canSeePage(role, v)) a.style.display = '';
+    else a.remove();
   });
 }
 
@@ -2581,6 +2615,18 @@ async function fetchProducts(signal) {
 async function fetchToday(signal) {
   const j = await getJSON('/api/today' + monthBranchQuery(), signal);
   state.role = j.session_role || state.role;
+  // Finance build (2026-06-20): today_payload reads the latest BS snapshot,
+  // which is currently a daily PARTIAL (cash null) — so cash_runway comes back
+  // null even though a complete May-31 snapshot exists. Pull the read-only
+  // finance endpoint (owner only) and let renderToday fall back to it.
+  if ((j.session_role || state.role) === 'owner') {
+    j.finance = await getJSON('/api/kpi?view=finance', signal).catch(() => null);
+  }
+  return j;
+}
+async function fetchFinance(signal) {
+  const j = await getJSON('/api/kpi?view=finance', signal);
+  state.role = j.session_role || state.role;
   return j;
 }
 async function fetchInventory(signal) {
@@ -2607,7 +2653,7 @@ const FETCHERS = {
   products:  fetchProducts,
   today:     fetchToday,
   gtd:       fetchGtd,     // 件4 — GTD Tracker (hydrate from /api/gtd)
-  finance:   null, // backlog: waits on multi-month financial sync
+  finance:   fetchFinance, // Finance page (owner-only, read-only financial_*)
   inbox:     fetchInbox,   // Phase 10A — 派派盒
   targets:   fetchTargets,
 };
@@ -2732,7 +2778,7 @@ function renderView() {
     products:  renderProducts,
     today:     renderToday,
     gtd:       renderGtd,     // 件4 — GTD Tracker
-    finance:   renderStubView,
+    finance:   renderFinance,
     inbox:     renderInbox,   // Phase 10A — 派派盒
     targets:   renderTargets,
   };
@@ -6732,12 +6778,28 @@ function renderToday(s) {
     : 'All sources synced · status from /api/today';
 
   let runwayVal = 'pending', runwaySub = 'FMM cash data not yet loaded', runwayCls = '';
+  // Finance build (2026-06-20): today_payload reads the latest BS row, which is
+  // a daily PARTIAL (cash null) → cash_runway null. Fall back to the read-only
+  // finance endpoint (latest COMPLETE snapshot + trailing net burn) attached by
+  // fetchToday as s.data.finance.
+  const fin = (s.data && s.data.finance) || null;
+  const finRunway = fin && fin.cash_runway;
   if (st.cash_runway_months != null) {
     const m = +st.cash_runway_months;
     runwayVal = m.toFixed(1) + ' months';
     runwayCls = m > 6 ? 'ok' : m > 3 ? 'warn' : 'bad';
     runwaySub = 'Cash ' + fmtMoneyShort(st.cash_total) +
       (st.financial_balance_sheet_as_of ? ' · as of ' + st.financial_balance_sheet_as_of.slice(0, 10) : '');
+  } else if (finRunway && finRunway.cash != null) {
+    const bsDate = fin.balance_sheet && fin.balance_sheet.snap_date ? fin.balance_sheet.snap_date : '';
+    if (finRunway.runway_months != null) {
+      runwayVal = finRunway.runway_months.toFixed(1) + ' months';
+      runwayCls = finRunway.runway_months > 6 ? 'ok' : finRunway.runway_months > 3 ? 'warn' : 'bad';
+      runwaySub = 'Cash ' + fmtMoneyShort(finRunway.cash) + ' ÷ burn ' + fmtMoneyShort(finRunway.monthly_burn) + (bsDate ? ' · as of ' + bsDate : '');
+    } else {
+      runwayVal = fmtMoneyShort(finRunway.cash);
+      runwaySub = 'Cash on hand · recent months profitable (no burn)' + (bsDate ? ' · as of ' + bsDate : '');
+    }
   } else if (st.cash_total != null) {
     runwayVal = fmtMoneyShort(st.cash_total);
     runwaySub = 'Cash on hand · monthly burn pending';
@@ -7046,6 +7108,91 @@ function renderStubView(s) {
     + '</div>';
 }
 
+/* ── Finance page (2026-06-20) — owner-only, read-only over financial_* ── */
+function renderFinance(s) {
+  const title = '<h1 class="page-title">💰 ' + t('finance.title') + '</h1>';
+  // Defence in depth — owner only (RBAC guard + nav removal already gate this).
+  if (s.role !== 'owner') return title + '<div class="s4-data-gap">' + t('targets.no_permission') + '</div>';
+  if (s.loading || !s.data) return title + '<div class="skeleton h-row"></div><div class="skeleton h-row"></div>';
+  const d = s.data;
+  if (d.degraded) return title + '<div class="s4-data-gap">⚠ ' + escapeHtml(d.degraded_reason || 'financial data unavailable') + '</div>';
+
+  const monthly = Array.isArray(d.monthly) ? d.monthly : [];
+  const flags = d.flags || {};
+  const revalSet = new Set(flags.stock_revaluation_months || []);
+  const gpPct = (m) => (+m.net_sales_inv > 0) ? (100 * +m.gross_profit_inv / +m.net_sales_inv) : null;
+
+  // ── Section 1: company P&L trend ──────────────────────────────────
+  const trendRows = monthly.map(m => {
+    const reval = revalSet.has(m.year_month);
+    const gp = gpPct(m);
+    const netCls = +m.net_profit_inv >= 0 ? 'delta-pos' : 'delta-neg';
+    return '<tr' + (reval ? ' class="fin-reval-row"' : '') + '>'
+      + '<td><strong>' + escapeHtml(m.year_month) + '</strong>' + (reval ? ' <span class="fin-flag">⚠ ' + t('finance.flag.reval') + '</span>' : '') + '</td>'
+      + '<td class="num">' + fmtRM(+m.net_sales_inv) + '</td>'
+      + '<td class="num">' + fmtRM(+m.gross_profit_inv) + '</td>'
+      + '<td class="num">' + (gp == null ? '—' : (reval ? '<span class="muted" title="' + t('finance.flag.reval_tip') + '">' + gp.toFixed(1) + '% *</span>' : gp.toFixed(1) + '%')) + '</td>'
+      + '<td class="num">' + fmtRM(+m.total_exp_inv) + '</td>'
+      + '<td class="num ' + netCls + '">' + fmtRM(+m.net_profit_inv) + '</td>'
+      + '</tr>';
+  }).join('');
+  const trend = '<div class="inv-section-title">📈 ' + t('finance.section.trend') + '</div>'
+    + '<table class="store-table"><thead><tr>'
+    + '<th>' + t('finance.col.month') + '</th><th class="num">' + t('finance.col.net_sales') + '</th>'
+    + '<th class="num">' + t('finance.col.gp') + '</th><th class="num">GP%</th>'
+    + '<th class="num">' + t('finance.col.exp') + '</th><th class="num">' + t('finance.col.net') + '</th>'
+    + '</tr></thead><tbody>' + trendRows + '</tbody></table>'
+    + (revalSet.size ? '<div class="fin-foot">* ' + t('finance.foot.reval') + '</div>' : '');
+
+  // ── Section 2: latest month per-branch P&L ───────────────────────
+  const branches = Array.isArray(d.branches) ? d.branches : [];
+  const brRows = branches.map(b => {
+    const gp = gpPct(b);
+    const netCls = +b.net_profit_inv >= 0 ? 'delta-pos' : 'delta-neg';
+    return '<tr><td><strong>' + escapeHtml(b.branch) + '</strong></td>'
+      + '<td class="num">' + fmtRM(+b.net_sales_inv) + '</td>'
+      + '<td class="num">' + fmtRM(+b.gross_profit_inv) + '</td>'
+      + '<td class="num">' + (gp == null ? '—' : gp.toFixed(1) + '%') + '</td>'
+      + '<td class="num">' + fmtRM(+b.total_exp_inv) + '</td>'
+      + '<td class="num ' + netCls + '">' + fmtRM(+b.net_profit_inv) + '</td></tr>';
+  }).join('');
+  const branchSection = branches.length ? (
+    '<div class="inv-section-title">🏪 ' + t('finance.section.branch', { ym: d.branch_month || '—' }) + '</div>'
+    + '<table class="store-table"><thead><tr>'
+    + '<th>' + t('inv.col.store') + '</th><th class="num">' + t('finance.col.net_sales') + '</th>'
+    + '<th class="num">' + t('finance.col.gp') + '</th><th class="num">GP%</th>'
+    + '<th class="num">' + t('finance.col.exp') + '</th><th class="num">' + t('finance.col.net') + '</th>'
+    + '</tr></thead><tbody>' + brRows + '</tbody></table>'
+    + '<div class="fin-foot">⚠ ' + t('finance.foot.branch_ne_total') + '<br>⚠ ' + t('finance.foot.cogs_basis') + '</div>'
+  ) : '';
+
+  // ── Section 3: balance sheet snapshot ────────────────────────────
+  const bs = d.balance_sheet;
+  let bsSection = '';
+  if (bs) {
+    const gearing = (+bs.net_equity > 0 && bs.loan_subtotal != null) ? (100 * +bs.loan_subtotal / +bs.net_equity) : null;
+    const card = (label, val, tone) => '<div class="kpi-card"><div class="kpi-title">' + label + '</div>'
+      + '<div class="kpi-actual"' + (tone ? ' style="color:' + tone + '"' : '') + '>' + val + '</div></div>';
+    bsSection = '<div class="inv-section-title">🏦 ' + t('finance.section.bs', { date: bs.snap_date }) + '</div>'
+      + '<div class="kpi-hero-row">'
+      +   card(t('finance.bs.cash'), fmtRM(+bs.cash_total))
+      +   card(t('finance.bs.stock'), fmtRM(+bs.stock_value))
+      +   card(t('finance.bs.equity'), fmtRM(+bs.net_equity))
+      +   card(t('finance.bs.gearing'), gearing == null ? '—' : gearing.toFixed(1) + '%', gearing != null && gearing > 100 ? 'var(--s4-red-text)' : null)
+      + '</div>'
+      + '<table class="store-table" style="margin-top:10px"><thead><tr><th>' + t('finance.bs.liability') + '</th><th class="num">RM</th></tr></thead><tbody>'
+      +   '<tr><td>' + t('finance.bs.term_loan') + '</td><td class="num">' + fmtRM(+bs.term_loan) + '</td></tr>'
+      +   '<tr><td>' + t('finance.bs.overdraft') + '</td><td class="num">' + fmtRM(+bs.overdraft) + '</td></tr>'
+      +   '<tr><td>' + t('finance.bs.hire_purchase') + '</td><td class="num">' + fmtRM(+bs.hire_purchase) + '</td></tr>'
+      +   '<tr><td>OAF</td><td class="num">' + fmtRM(+bs.oaf) + '</td></tr>'
+      +   '<tr><td><strong>' + t('finance.bs.loan_total') + '</strong></td><td class="num"><strong>' + fmtRM(+bs.loan_subtotal) + '</strong></td></tr>'
+      + '</tbody></table>'
+      + '<div class="fin-foot">' + t('finance.foot.gearing') + '</div>';
+  }
+
+  return title + '<p class="page-sub">' + t('finance.sub') + '</p>' + trend + branchSection + bsSection;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Orphan SKU modal — Stage C-orphan (2026-05-16)
    Click banner → list items + provide Sheet SM tab link + CSV export.
@@ -7193,9 +7340,10 @@ async function doLogin(ev) {
 function doLogout() {
   clearSession();
   state.user = null;
-  document.getElementById('app').classList.remove('ready');
-  document.getElementById('app').setAttribute('aria-hidden', 'true');
-  document.getElementById('login').style.display = 'flex';
+  // Reload so the next login rebuilds the full nav from the static markup
+  // before applyRbacToNav() re-filters it (nav links are .remove()d, not hidden,
+  // for disallowed pages — see applyRbacToNav).
+  window.location.reload();
 }
 
 async function enterApp() {
