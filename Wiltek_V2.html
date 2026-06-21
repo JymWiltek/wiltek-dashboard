@@ -987,6 +987,15 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 .cust-race-card .crc-target-set:hover { color: #1F5F4A; border-bottom-color: #1F5F4A; }
 input.target-input.target-flash { animation: target-flash 1.4s ease-out; }
 @keyframes target-flash { 20% { box-shadow: 0 0 0 3px rgba(31,95,74,0.45); background: #ECFDF5; } 100% { box-shadow: 0 0 0 0 rgba(31,95,74,0); } }
+/* PR-A: top Sales Target Band + freshness chip */
+.cust-fresh-chip { font-size: 12px; color: #6B7280; background: #F9FAFB; border: 1px solid #F3F4F6; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.cust-target-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+.cust-target-band .ctb-cell { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 18px; text-align: center; }
+.cust-target-band .ctb-label { font-size: 12px; color: #6B7280; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+.cust-target-band .ctb-num { font-size: 40px; font-weight: 800; color: #0F172A; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.cust-target-band .ctb-sub { font-size: 13px; font-weight: 600; margin-top: 4px; min-height: 18px; }
+.cust-target-band .ctb-fb { font-size: 11px; color: #9CA3AF; font-weight: 400; }
+@media (max-width: 767px) { .cust-target-band { grid-template-columns: 1fr; } }
 
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
@@ -1454,6 +1463,13 @@ window.i18n = {
     'overview.hero.closing': { zh: '成交率',     en: 'Closing Rate' },
     'overview.hero.basket':  { zh: '客单 (AOV)', en: 'Basket Size (AOV)' },
     'customer.section.race':    { zh: '种族拆分', en: 'Walk-in by Ethnicity' },
+    'customer.band.target':         { zh: '目标来客数', en: 'Target Walk-in' },
+    'customer.band.actual':         { zh: '本月来客数', en: 'Actual Walk-in' },
+    'customer.band.deficit_surplus':{ zh: '差额 (缺口/盈余)', en: 'Deficit / Surplus' },
+    'customer.band.surplus':        { zh: '盈余', en: 'Surplus' },
+    'customer.band.deficit':        { zh: '缺口', en: 'Deficit' },
+    'customer.band.target_fallback':{ zh: '(沿用 {ym})', en: '(last set {ym})' },
+    'customer.fresh.chip':          { zh: '客流至 {foot} · 库存快照 {inv} · 顾客购买至 {cbl} 月底 · 财报至 {fin}', en: 'Footfall through {foot} · Inventory snapshot {inv} · Customer purchases through {cbl}-end · Financials through {fin}' },
     'customer.section.age':     { zh: '会员入会时长分段', en: 'Member Tenure Segments' },
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
@@ -5933,6 +5949,8 @@ function renderCustomers(s) {
   return '<div class="sales-v3">'
     + header
     + completenessBanner()   // M-6
+    // PR-A — Sales Target Band (来客数 target vs actual) at the very top.
+    + renderCustomerTargetBand(s)
     // 第 1 层 — 种族 (谁来)
     + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'
     + renderCustomerRaceCards(s)
@@ -6219,6 +6237,37 @@ function renderCustomerCharts(s) {
         missingLabel: t('chart.closing.not_set'),
         missingTitle: t('chart.closing.not_set_tip'),
       }) + '</div>';
+}
+
+// PR-A — top Sales Target Band (3 cols) + freshness chip. Reuses monthly_targets
+// (no new table): TARGET = Σ footfall targets over live stores (with last-month
+// fallback); ACTUAL = Σ this-month walk-in over live stores (from matrix);
+// DEFICIT/SURPLUS = ACTUAL − TARGET (signed, green ≥0 / red <0).
+function renderCustomerTargetBand(s) {
+  const meta = (s.data.freshness && s.data.freshness.meta) || {};
+  const chip = '<div class="cust-fresh-chip">' + t('customer.fresh.chip', {
+    foot: meta.floatation_latest || '—', inv: meta.inventory_real_latest || '—',
+    cbl: meta.cbl_latest || '—', fin: meta.financials_latest || '—' }) + '</div>';
+  // ACTUAL — Σ this-month walk-in over live stores (matrix total_walkin).
+  const mtx = (s.data.matrix && s.data.matrix.data && s.data.matrix.data.matrix) || [];
+  const actual = mtx.length ? mtx.filter(m => isLiveStore(m.store)).reduce((a, m) => a + (m.total_walkin || 0), 0) : null;
+  // TARGET — Σ footfall targets over live stores.
+  const byStore = (s.data.targets && s.data.targets.summary && s.data.targets.summary.by_store) || {};
+  let target = null;
+  STORES_LIVE.forEach(st => { const f = byStore[st] && byStore[st].footfall; if (f != null) target = (target || 0) + (+f || 0); });
+  const fbUsed = s.data.targets && s.data.targets.fallback_used;
+  const fb = fbUsed ? ' <span class="ctb-fb">' + t('customer.band.target_fallback', { ym: s.data.targets.fallback_from }) + '</span>' : '';
+  const deficit = (actual != null && target != null) ? actual - target : null;
+  const defColor = deficit == null ? 'var(--s4-text-light)' : deficit >= 0 ? 'var(--s4-green-text)' : 'var(--s4-red-text)';
+  const defLabel = deficit == null ? '—' : deficit >= 0 ? t('customer.band.surplus') : t('customer.band.deficit');
+  const defVal = deficit == null ? '—' : (deficit >= 0 ? '+' : '') + fmtInt(deficit);
+  const fmtQ = v => v == null ? '—' : fmtInt(v);
+  return chip
+    + '<div class="cust-target-band">'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.target') + '</div><div class="ctb-num">' + fmtQ(target) + '</div><div class="ctb-sub">' + (fbUsed ? fb : '&nbsp;') + '</div></div>'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.actual') + '</div><div class="ctb-num">' + fmtQ(actual) + '</div><div class="ctb-sub">&nbsp;</div></div>'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.deficit_surplus') + '</div><div class="ctb-num" style="color:' + defColor + '">' + defVal + '</div><div class="ctb-sub" style="color:' + defColor + '">' + defLabel + '</div></div>'
+    + '</div>';
 }
 
 function renderCustomerRaceCards(s) {
