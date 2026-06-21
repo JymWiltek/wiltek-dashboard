@@ -1963,7 +1963,11 @@ window.i18n = {
     'customer.col.total_walkin':    { zh: 'Total 客流', en: 'Total Walk-in' },
     'customer.col.total_members':   { zh: 'Total 会员', en: 'Total Members' },
     'customer.col.total_members_tip': { zh: '在此店登记的会员(不含散客)。', en: 'Loyalty members enrolled at this store (excludes walk-in customers).' },
-    'customer.matrix.footnote':     { zh: '格式: 客流 → 购买 (成交率%) · 绿≥80% 黄60-79% 红<60% · 样本<5 不上色 · hover 看 Revenue/AOV', en: 'Format: walk-in → bought (closing %) · green ≥80% amber 60-79% red <60% · sample <5 uncolored · hover for Revenue/AOV' },
+    'customer.col.store_closing':     { zh: '本店成交率', en: 'Store Closing %' },
+    'customer.col.store_closing_tip': { zh: '本店所有族裔的整体成交率', en: 'Overall closing rate across all ethnicities at this store' },
+    'customer.matrix.no_walkin':      { zh: '本月无客流', en: 'no walk-in' },
+    'customer.matrix.small_sample':   { zh: '样本不足', en: 'sample too small to grade' },
+    'customer.matrix.footnote':     { zh: '每格: 成交率%(上) · 客流 → 购买(下) · 绿≥80% 黄60-79% 红<60% · 样本<5 显示 — · hover 看 Revenue/AOV/对比', en: 'Each cell: closing % (top) · walk-in → bought (bottom) · green ≥80% amber 60-79% red <60% · sample <5 shown as — · hover for Revenue/AOV/deltas' },
     // renderCustomerLists
     'customer.lists.gap':           { zh: 'customers_payload 未返回数据 — 客户名单不可用。', en: 'customers_payload returned no data — customer lists unavailable.' },
     'customer.lists.all_stores':    { zh: '全部店', en: 'All stores' },
@@ -6166,59 +6170,76 @@ function renderCustomerStoreRaceMatrix(s) {
     if (ia === -1 && ib === -1) return (a.store||'').localeCompare(b.store||'');
     if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib;
   });
-  const cell = (rc) => {
-    if (!rc || (!rc.walkin && !rc.purchases)) return '<span style="color:var(--s4-text-light)">—</span>';
-    const cr = rc.closing_rate;
-    // color only when sample >= 5 walk-in
-    let color = 'var(--s4-text-primary)';
-    if (rc.walkin >= 5 && cr != null) {
-      color = cr >= 80 ? 'var(--s4-green-text)' : cr >= 60 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)';
+  // PR-G: grade colour (≥80 green / 60-79 amber / <60 red).
+  const gradeColor = (r) => r >= 80 ? 'var(--s4-green-text)' : r >= 60 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)';
+  // PR-G: two-line cell — closing % (large, coloured) over "walk-in → bought"
+  // (small, muted). "—" disambiguated by tooltip: no walk-in vs sample <5.
+  const twoLine = (walk, bought, cr, baseTip) => {
+    if (walk === 0) {
+      return '<span title="' + t('customer.matrix.no_walkin') + '" style="color:var(--s4-text-light)">—</span>';
     }
-    // Phase 6f: tooltip 加 vs 上月 成交 (pp) + walk-in (%)。
-    let tip = 'Revenue ' + fmtRM(rc.revenue) + ' · AOV ' + (rc.purchases > 0 ? fmtRMpr(rc.revenue / rc.purchases) : '—');
-    if (rc.closing_prev != null && cr != null) {
+    const gradable = walk >= 5 && cr != null;
+    const top = gradable
+      ? '<div style="font-weight:700;font-size:15px;color:' + gradeColor(cr) + '">' + cr.toFixed(0) + '%</div>'
+      : '<div style="font-weight:700;font-size:15px;color:var(--s4-text-light)">—</div>';
+    const bottom = '<div style="font-size:11px;font-weight:400;color:var(--s4-text-light)">' + fmtInt(walk) + ' → ' + fmtInt(bought) + '</div>';
+    const tip = gradable ? baseTip : (t('customer.matrix.small_sample') + (baseTip ? ' · ' + baseTip : ''));
+    return '<span title="' + tip + '" style="display:inline-block;text-align:right;font-variant-numeric:tabular-nums">' + top + bottom + '</span>';
+  };
+  const cell = (rc) => {
+    const walk = (rc && rc.walkin) || 0, bought = (rc && rc.purchases) || 0, cr = rc ? rc.closing_rate : null;
+    // Phase 6f tooltip: Revenue / AOV + vs 上月 成交 (pp) + walk-in (%)。
+    let tip = 'Revenue ' + fmtRM((rc && rc.revenue) || 0) + ' · AOV ' + (bought > 0 ? fmtRMpr(rc.revenue / bought) : '—');
+    if (rc && rc.closing_prev != null && cr != null) {
       const dpp = cr - rc.closing_prev;
       tip += ' · ' + t('customer.matrix.tip_closing') + ' ' + (dpp >= 0 ? '+' : '') + dpp.toFixed(1) + 'pp';
     }
-    if (rc.walkin_prev != null && rc.walkin_prev > 0) {
-      const wd = (rc.walkin - rc.walkin_prev) / rc.walkin_prev * 100;
+    if (rc && rc.walkin_prev != null && rc.walkin_prev > 0) {
+      const wd = (walk - rc.walkin_prev) / rc.walkin_prev * 100;
       tip += ' · ' + t('customer.matrix.tip_walkin') + ' ' + (wd >= 0 ? '+' : '') + wd.toFixed(0) + '%';
     }
-    return '<span title="' + tip + '">'
-      + fmtInt(rc.walkin) + ' → ' + fmtInt(rc.purchases)
-      + (cr != null ? ' <span style="color:' + color + '">(' + cr.toFixed(0) + '%)</span>' : '')
-      + '</span>';
+    return twoLine(walk, bought, cr, tip);
+  };
+  // PR-G: store-level closing % = Σ bought / Σ walk-in across the 4 ethnicities.
+  const RK = ['chinese', 'malay', 'indian', 'other'];
+  const storeClosing = (m) => {
+    let sw = 0, sb = 0; RK.forEach(rk => { if (m[rk]) { sw += (m[rk].walkin || 0); sb += (m[rk].purchases || 0); } });
+    return twoLine(sw, sb, sw > 0 ? sb / sw * 100 : null, '');
   };
   const rows = sorted.map(m => ''
     + '<tr>'
     +   '<td><strong>' + escapeHtml(matrixStoreLabel(m.store)) + '</strong></td>'
-    +   '<td>' + cell(m.chinese) + '</td>'
-    +   '<td>' + cell(m.malay) + '</td>'
-    +   '<td>' + cell(m.indian) + '</td>'
-    +   '<td>' + cell(m.other) + '</td>'
+    +   '<td class="num">' + storeClosing(m) + '</td>'
+    +   '<td class="num">' + cell(m.chinese) + '</td>'
+    +   '<td class="num">' + cell(m.malay) + '</td>'
+    +   '<td class="num">' + cell(m.indian) + '</td>'
+    +   '<td class="num">' + cell(m.other) + '</td>'
     +   '<td class="num"><strong>' + fmtInt(m.total_walkin) + '</strong></td>'
     +   '<td class="num"><strong>' + fmtInt(m.total_members) + '</strong></td>'
     + '</tr>').join('');
   // company total row
-  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0, mem: 0 };
+  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0, mem: 0, bought: 0 };
   sorted.forEach(m => {
     tot.ch += (m.chinese?.walkin || 0); tot.my += (m.malay?.walkin || 0);
     tot.in_ += (m.indian?.walkin || 0); tot.ot += (m.other?.walkin || 0);
     tot.walk += (m.total_walkin || 0); tot.mem += (m.total_members || 0);
+    RK.forEach(rk => { if (m[rk]) tot.bought += (m[rk].purchases || 0); });
   });
+  const totRaceWalk = tot.ch + tot.my + tot.in_ + tot.ot;
   // PR-C hygiene: an ethnicity column with 0 across all live stores → "—", not "0".
   const ethTot = (v) => v > 0 ? fmtInt(v) : '<span style="color:var(--s4-text-light)">—</span>';
   const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)">'
     + '<td>' + t('customer.matrix.company_total') + '</td>'
-    + '<td>' + ethTot(tot.ch) + '</td><td>' + ethTot(tot.my) + '</td>'
-    + '<td>' + ethTot(tot.in_) + '</td><td>' + ethTot(tot.ot) + '</td>'
+    + '<td class="num">' + twoLine(totRaceWalk, tot.bought, totRaceWalk > 0 ? tot.bought / totRaceWalk * 100 : null, '') + '</td>'
+    + '<td class="num">' + ethTot(tot.ch) + '</td><td class="num">' + ethTot(tot.my) + '</td>'
+    + '<td class="num">' + ethTot(tot.in_) + '</td><td class="num">' + ethTot(tot.ot) + '</td>'
     + '<td class="num">' + fmtInt(tot.walk) + '</td>'
     + '<td class="num">' + fmtInt(tot.mem) + '</td></tr>';
   return ''
     + '<div class="s4-drill"><div class="s4-drill-body">'
-    +   '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'  // PR-C: scoped horizontal scroll on mobile (7 cols > 380px); does NOT touch shared .s4-drill-body
+    +   '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'  // PR-C: scoped horizontal scroll on mobile (cols > 380px); does NOT touch shared .s4-drill-body
     +   '<table><thead><tr>'
-    +     '<th>' + t('customer.col.store') + '</th><th>' + t('race.short.chinese') + '</th><th>' + t('race.short.malay') + '</th><th>' + t('race.short.indian') + '</th><th>' + t('race.short.other') + '</th><th>' + t('customer.col.total_walkin') + '</th><th title="' + t('customer.col.total_members_tip') + '">' + t('customer.col.total_members') + '</th>'
+    +     '<th>' + t('customer.col.store') + '</th><th class="num" title="' + t('customer.col.store_closing_tip') + '">' + t('customer.col.store_closing') + '</th><th class="num">' + t('race.short.chinese') + '</th><th class="num">' + t('race.short.malay') + '</th><th class="num">' + t('race.short.indian') + '</th><th class="num">' + t('race.short.other') + '</th><th class="num">' + t('customer.col.total_walkin') + '</th><th class="num" title="' + t('customer.col.total_members_tip') + '">' + t('customer.col.total_members') + '</th>'
     +   '</tr></thead><tbody>' + rows + totRow + '</tbody></table>'
     +   '</div>'
     +   '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.matrix.footnote') + '</div>'
