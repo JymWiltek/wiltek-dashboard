@@ -978,6 +978,15 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 .cust-race-card .crc-hist .crc-up   { color: #16A34A; font-weight: 600; }
 .cust-race-card .crc-hist .crc-down { color: #DC2626; font-weight: 600; }
 .cust-race-card .crc-hist .crc-flat { color: #6B7280; font-weight: 600; }
+/* PR-B: muted empty-ethnicity card (0 walk-in) + tappable "set target" link + flash */
+.cust-race-card.crc-empty .crc-big,
+.cust-race-card.crc-empty .crc-cr,
+.cust-race-card.crc-empty .crc-meta,
+.cust-race-card.crc-empty .crc-hist { opacity: 0.45; }
+.cust-race-card .crc-target-set { color: #9CA3AF; text-decoration: none; cursor: pointer; border-bottom: 1px dashed #C7CDD4; }
+.cust-race-card .crc-target-set:hover { color: #1F5F4A; border-bottom-color: #1F5F4A; }
+input.target-input.target-flash { animation: target-flash 1.4s ease-out; }
+@keyframes target-flash { 20% { box-shadow: 0 0 0 3px rgba(31,95,74,0.45); background: #ECFDF5; } 100% { box-shadow: 0 0 0 0 rgba(31,95,74,0); } }
 
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
@@ -1918,6 +1927,7 @@ window.i18n = {
     'customer.race.target':         { zh: '走廊客目标', en: 'Walk-in target' },
     'customer.race.progress':       { zh: '进度', en: 'Progress' },
     'customer.race.target_unset':   { zh: '走廊客目标待设', en: 'Walk-in target not set' },
+    'customer.race.set_target_hint':{ zh: '点击前往目标页设定此族裔走廊客目标', en: 'Tap to set this ethnicity\'s walk-in target on the Targets page' },
     // buildCustomerAnomalies
     'customer.anom.closing_low.title':  { zh: '{store} {race} 转化偏低', en: '{store} {race} closing rate low' },
     'customer.anom.closing_low.detail': { zh: '{store} {race} 成交 {cr}% (样本 {n} 人)', en: '{store} {race} closing {cr}% (sample {n} ppl)' },
@@ -2736,6 +2746,14 @@ async function loadView() {
     if (harvestStores(state.view, data)) populateBranchPicker();
     runByteMatchAssertion();
     renderView();
+    // PR-B: after navigating to Targets via a race card, focus + flash the input.
+    if (state.view === 'targets' && window.pendingTargetFocus) {
+      const want = window.pendingTargetFocus; window.pendingTargetFocus = null;
+      setTimeout(() => {
+        const el = document.querySelector('input.target-input[data-type="' + want + '"]');
+        if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); el.classList.add('target-flash'); }
+      }, 60);
+    }
   } catch (e) {
     if (e.name === 'AbortError' || myCtl.signal.aborted) {
       console.log('[V2] loadView aborted (superseded)');
@@ -2848,6 +2866,14 @@ function onViewChange(v) {
   state.view = v;
   syncUrl();
   loadView();
+  return false; // anchor onclick swallow
+}
+// PR-B: jump from a "walk-in target not set" race card to the Targets page,
+// pre-focusing the matching race walk-in input (current month is already state.month).
+// Owner-only page; RBAC silently blocks non-owners (link is a no-op for them).
+function gotoTargets(targetType) {
+  window.pendingTargetFocus = targetType || null;
+  onViewChange('targets');
   return false; // anchor onclick swallow
 }
 function onBranchChange(b) {
@@ -6131,33 +6157,39 @@ function renderCustomerRaceCards(s) {
     const r = byRace[rk] || {};
     const meta = RACE_META[rk];
     const cr = r.closing_rate;
-    const crColor = cr == null ? '#6B7280' : cr >= 80 ? '#16A34A' : cr >= 60 ? '#D97706' : '#DC2626';
-    const barPct = Math.min(100, cr || 0);
+    // PR-B: an ethnicity with 0 walk-in this month → all numeric fields render
+    // "—" (not RM 0 / 0.0% / ↓100%) and the card is visually muted.
+    const empty = (r.walkin || 0) === 0;
+    const crColor = (empty || cr == null) ? '#6B7280' : cr >= 80 ? '#16A34A' : cr >= 60 ? '#D97706' : '#DC2626';
+    const barPct = empty ? 0 : Math.min(100, cr || 0);
     const tgtColor = r.walkin_target_pct == null ? '#6B7280'
       : r.walkin_target_pct >= 100 ? '#16A34A' : r.walkin_target_pct >= 80 ? '#D97706' : '#DC2626';
+    // PR-B: "target not set" is a tap target → Targets page, race input pre-focused.
     const targetLine = (r.walkin_target != null)
       ? t('customer.race.target') + ' <strong>' + fmtInt(r.walkin_target) + '</strong> · ' + t('customer.race.progress') + ' <strong style="color:' + tgtColor + '">'
         + (r.walkin_target_pct != null ? r.walkin_target_pct.toFixed(0) + '%' : '—') + '</strong>'
-      : '<span style="color:#9CA3AF">' + t('customer.race.target_unset') + '</span>';
-    const hist = '<div class="crc-hist">'
-      + histPctSpan(t('common.vs_prev'), r.walkin || 0, r.walkin_prev)
-      + '<span>' + t('customer.vs_last_year') + ' —</span>'
-      + histPctSpan(t('customer.vs_3mo_avg'), r.walkin || 0, r.walkin_3mo_avg)
-      + '</div>';
+      : '<a href="#" class="crc-target-set" onclick="return gotoTargets(\'walkin_' + rk + '\')" title="' + t('customer.race.set_target_hint') + '">' + t('customer.race.target_unset') + ' ›</a>';
+    const hist = empty
+      ? '<div class="crc-hist"><span>' + t('common.vs_prev') + ' —</span><span>' + t('customer.vs_last_year') + ' —</span><span>' + t('customer.vs_3mo_avg') + ' —</span></div>'
+      : '<div class="crc-hist">'
+        + histPctSpan(t('common.vs_prev'), r.walkin || 0, r.walkin_prev)
+        + '<span>' + t('customer.vs_last_year') + ' —</span>'
+        + histPctSpan(t('customer.vs_3mo_avg'), r.walkin || 0, r.walkin_3mo_avg)
+        + '</div>';
     // Phase 10B 灯: 走廊客 target 完成率 ≥95 绿 / 80-95 黄 / <80 红; 无目标灰。
     const raceLight = heroLightColor(r.walkin_target_pct, 95, 80, false);
     return ''
-      + '<div class="cust-race-card">'
+      + '<div class="cust-race-card' + (empty ? ' crc-empty' : '') + '">'
       +   heroLightDot(raceLight)
       +   '<div class="crc-icon">' + meta.icon + '</div>'
       +   '<div class="crc-title">' + t(meta.labelKey) + '</div>'
-      +   '<div class="crc-big">' + fmtInt(r.walkin || 0) + ' <span class="crc-unit">' + t('customer.unit.ppl') + '</span></div>'
-      +   '<div class="crc-cr" style="color:' + crColor + '">' + (cr != null ? cr.toFixed(1) + '% ' + t('customer.closing') : '— ' + t('customer.closing')) + '</div>'
+      +   '<div class="crc-big">' + (empty ? '—' : fmtInt(r.walkin || 0)) + ' <span class="crc-unit">' + t('customer.unit.ppl') + '</span></div>'
+      +   '<div class="crc-cr" style="color:' + crColor + '">' + (!empty && cr != null ? cr.toFixed(1) + '% ' + t('customer.closing') : '— ' + t('customer.closing')) + '</div>'
       +   '<div class="crc-bar"><span style="width:' + barPct + '%"></span></div>'
       +   '<div class="crc-meta">'
-      +     t('customer.bought') + ' <strong>' + fmtInt(r.purchases || 0) + '</strong> ' + t('customer.unit.ppl') + ' · ' + t('customer.of_walkin') + ' ' + (r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
-      +     'Revenue <strong>' + fmtRM(r.revenue || 0) + '</strong> (' + (r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
-      +     'Avg Basket <strong>' + (r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
+      +     t('customer.bought') + ' <strong>' + (empty ? '—' : fmtInt(r.purchases || 0)) + '</strong> ' + t('customer.unit.ppl') + ' · ' + t('customer.of_walkin') + ' ' + (!empty && r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
+      +     'Revenue <strong>' + (empty ? '—' : fmtRM(r.revenue || 0)) + '</strong> (' + (!empty && r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
+      +     'Avg Basket <strong>' + (!empty && r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
       +   '</div>'
       +   '<div class="crc-target">' + targetLine + '</div>'
       +   '<div class="crc-foot"><hr class="crc-sep">' + hist + '</div>'
