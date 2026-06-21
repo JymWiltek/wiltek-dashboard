@@ -1963,6 +1963,8 @@ window.i18n = {
     'customer.matrix.company_total':{ zh: '公司合计', en: 'Company Total' },
     'customer.col.store':           { zh: '店', en: 'Store' },
     'customer.col.total_walkin':    { zh: 'Total 客流', en: 'Total Walk-in' },
+    'customer.col.total_members':   { zh: 'Total 会员', en: 'Total Members' },
+    'customer.col.total_members_tip': { zh: '在此店登记的会员(不含散客)。', en: 'Loyalty members enrolled at this store (excludes walk-in customers).' },
     'customer.matrix.footnote':     { zh: '格式: 客流 → 购买 (成交率%) · 绿≥80% 黄60-79% 红<60% · 样本<5 不上色 · hover 看 Revenue/AOV', en: 'Format: walk-in → bought (closing %) · green ≥80% amber 60-79% red <60% · sample <5 uncolored · hover for Revenue/AOV' },
     // renderCustomerLists
     'customer.lists.gap':           { zh: 'customers_payload 未返回数据 — 客户名单不可用。', en: 'customers_payload returned no data — customer lists unavailable.' },
@@ -6169,7 +6171,8 @@ function renderCustomerStoreRaceMatrix(s) {
     return '<div class="s4-data-gap">' + t('customer.matrix.gap') + '</div>';
   }
   const matrix = Array.isArray(resp.data.matrix) ? resp.data.matrix : [];
-  const sorted = matrix.slice().sort((a, b) => {
+  // PR-C hygiene: only live stores (drops W11/WCO etc. the RPC still returns).
+  const sorted = matrix.filter(m => isLiveStore(m.store)).sort((a, b) => {
     const ia = MATRIX_STORE_ORDER.indexOf(a.store), ib = MATRIX_STORE_ORDER.indexOf(b.store);
     if (ia === -1 && ib === -1) return (a.store||'').localeCompare(b.store||'');
     if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib;
@@ -6205,24 +6208,30 @@ function renderCustomerStoreRaceMatrix(s) {
     +   '<td>' + cell(m.indian) + '</td>'
     +   '<td>' + cell(m.other) + '</td>'
     +   '<td class="num"><strong>' + fmtInt(m.total_walkin) + '</strong></td>'
+    +   '<td class="num"><strong>' + fmtInt(m.total_members) + '</strong></td>'
     + '</tr>').join('');
   // company total row
-  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0 };
+  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0, mem: 0 };
   sorted.forEach(m => {
     tot.ch += (m.chinese?.walkin || 0); tot.my += (m.malay?.walkin || 0);
     tot.in_ += (m.indian?.walkin || 0); tot.ot += (m.other?.walkin || 0);
-    tot.walk += (m.total_walkin || 0);
+    tot.walk += (m.total_walkin || 0); tot.mem += (m.total_members || 0);
   });
+  // PR-C hygiene: an ethnicity column with 0 across all live stores → "—", not "0".
+  const ethTot = (v) => v > 0 ? fmtInt(v) : '<span style="color:var(--s4-text-light)">—</span>';
   const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)">'
     + '<td>' + t('customer.matrix.company_total') + '</td>'
-    + '<td>' + fmtInt(tot.ch) + '</td><td>' + fmtInt(tot.my) + '</td>'
-    + '<td>' + fmtInt(tot.in_) + '</td><td>' + fmtInt(tot.ot) + '</td>'
-    + '<td class="num">' + fmtInt(tot.walk) + '</td></tr>';
+    + '<td>' + ethTot(tot.ch) + '</td><td>' + ethTot(tot.my) + '</td>'
+    + '<td>' + ethTot(tot.in_) + '</td><td>' + ethTot(tot.ot) + '</td>'
+    + '<td class="num">' + fmtInt(tot.walk) + '</td>'
+    + '<td class="num">' + fmtInt(tot.mem) + '</td></tr>';
   return ''
     + '<div class="s4-drill"><div class="s4-drill-body">'
+    +   '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'  // PR-C: scoped horizontal scroll on mobile (7 cols > 380px); does NOT touch shared .s4-drill-body
     +   '<table><thead><tr>'
-    +     '<th>' + t('customer.col.store') + '</th><th>' + t('race.short.chinese') + '</th><th>' + t('race.short.malay') + '</th><th>' + t('race.short.indian') + '</th><th>' + t('race.short.other') + '</th><th>' + t('customer.col.total_walkin') + '</th>'
+    +     '<th>' + t('customer.col.store') + '</th><th>' + t('race.short.chinese') + '</th><th>' + t('race.short.malay') + '</th><th>' + t('race.short.indian') + '</th><th>' + t('race.short.other') + '</th><th>' + t('customer.col.total_walkin') + '</th><th title="' + t('customer.col.total_members_tip') + '">' + t('customer.col.total_members') + '</th>'
     +   '</tr></thead><tbody>' + rows + totRow + '</tbody></table>'
+    +   '</div>'
     +   '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.matrix.footnote') + '</div>'
     + '</div></div>';
 }
