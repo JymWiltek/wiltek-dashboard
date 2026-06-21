@@ -978,6 +978,24 @@ table.branch-table tr.progress-far     .progress-cell { color: var(--danger); }
 .cust-race-card .crc-hist .crc-up   { color: #16A34A; font-weight: 600; }
 .cust-race-card .crc-hist .crc-down { color: #DC2626; font-weight: 600; }
 .cust-race-card .crc-hist .crc-flat { color: #6B7280; font-weight: 600; }
+/* PR-B: muted empty-ethnicity card (0 walk-in) + tappable "set target" link + flash */
+.cust-race-card.crc-empty .crc-big,
+.cust-race-card.crc-empty .crc-cr,
+.cust-race-card.crc-empty .crc-meta,
+.cust-race-card.crc-empty .crc-hist { opacity: 0.45; }
+.cust-race-card .crc-target-set { color: #9CA3AF; text-decoration: none; cursor: pointer; border-bottom: 1px dashed #C7CDD4; }
+.cust-race-card .crc-target-set:hover { color: #1F5F4A; border-bottom-color: #1F5F4A; }
+input.target-input.target-flash { animation: target-flash 1.4s ease-out; }
+@keyframes target-flash { 20% { box-shadow: 0 0 0 3px rgba(31,95,74,0.45); background: #ECFDF5; } 100% { box-shadow: 0 0 0 0 rgba(31,95,74,0); } }
+/* PR-A: top Sales Target Band + freshness chip */
+.cust-fresh-chip { font-size: 12px; color: #6B7280; background: #F9FAFB; border: 1px solid #F3F4F6; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.cust-target-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+.cust-target-band .ctb-cell { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 18px; text-align: center; }
+.cust-target-band .ctb-label { font-size: 12px; color: #6B7280; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+.cust-target-band .ctb-num { font-size: 40px; font-weight: 800; color: #0F172A; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.cust-target-band .ctb-sub { font-size: 13px; font-weight: 600; margin-top: 4px; min-height: 18px; }
+.cust-target-band .ctb-fb { font-size: 11px; color: #9CA3AF; font-weight: 400; }
+@media (max-width: 767px) { .cust-target-band { grid-template-columns: 1fr; } }
 
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
@@ -1416,6 +1434,11 @@ window.i18n = {
     // Phase 10B — chart titles
     'chart.dead_by_store':    { zh: '6 店死货 RM',       en: 'Dead Stock by Store' },
     'chart.store_closing':    { zh: '6 店成交率',        en: 'Store Closing Rate' },
+    'chart.closing.target':     { zh: '目标',     en: 'Target' },
+    'chart.closing.avg12m':     { zh: '12 月均',  en: '12-Mo Avg' },
+    'chart.closing.this_month': { zh: '本月',     en: 'This Month' },
+    'chart.closing.not_set':    { zh: '未设',     en: 'not set' },
+    'chart.closing.not_set_tip':{ zh: '此店未设成交率目标 — 点击前往目标页设定', en: 'No closing-rate target for this store — tap to set on the Targets page' },
     'chart.cat_12m':          { zh: '12 月品类销售趋势', en: '12-Month Category Trend' },
     'chart.price_band_donut': { zh: '价格段分布',        en: 'Price Band Distribution' },
     'chart.top_mg_bar':       { zh: 'Top 10 品类销售',   en: 'Top 10 Categories' },
@@ -1440,8 +1463,14 @@ window.i18n = {
     'overview.hero.closing': { zh: '成交率',     en: 'Closing Rate' },
     'overview.hero.basket':  { zh: '客单 (AOV)', en: 'Basket Size (AOV)' },
     'customer.section.race':    { zh: '种族拆分', en: 'Walk-in by Ethnicity' },
-    'customer.section.age':     { zh: '会员年龄分段', en: 'Member Age Segments' },
-    'customer.section.age_cat': { zh: '会员年龄段 × 品类', en: 'Age × Category' },
+    'customer.band.target':         { zh: '目标来客数', en: 'Target Walk-in' },
+    'customer.band.actual':         { zh: '本月来客数', en: 'Actual Walk-in' },
+    'customer.band.deficit_surplus':{ zh: '差额 (缺口/盈余)', en: 'Deficit / Surplus' },
+    'customer.band.surplus':        { zh: '盈余', en: 'Surplus' },
+    'customer.band.deficit':        { zh: '缺口', en: 'Deficit' },
+    'customer.band.target_fallback':{ zh: '(沿用 {ym})', en: '(last set {ym})' },
+    'customer.fresh.chip':          { zh: '客流至 {foot} · 库存快照 {inv} · 顾客购买至 {cbl} 月底 · 财报至 {fin}', en: 'Footfall through {foot} · Inventory snapshot {inv} · Customer purchases through {cbl}-end · Financials through {fin}' },
+    'customer.section.age':     { zh: '会员入会时长分段', en: 'Member Tenure Segments' },
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
     'customer.section.trend':   { zh: '12 月走廊客趋势', en: '12-Month Walk-in Trend' },
@@ -1895,12 +1924,12 @@ window.i18n = {
     'customer.header.sub':          { zh: '会员资产 + 走廊客转化 + 流失/沉睡名单', en: 'Member assets + walk-in conversion + churn/dormant lists' },
     'customer.aux.race':            { zh: '本月走廊客 by race · 含走廊客目标', en: 'This month walk-in by ethnicity · with walk-in target' },
     'customer.aux.age':             { zh: '入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价', en: 'Membership tenure · members / this-month spend / repurchase rate / 12M AOV' },
-    'customer.aux.age_cat':         { zh: '本月销售 · 各龄段买什么 (customer_buy_lines)', en: 'This-month sales · what each age segment buys (customer_buy_lines)' },
     'customer.aux.matrix':          { zh: 'walk-in → 购买 (成交率)', en: 'walk-in → bought (closing rate)' },
     'customer.aux.vip':             { zh: '沉睡 VIP / 老客流失 / Top VIP · 可按店筛选', en: 'Dormant VIP / lapsed loyal / Top VIP · filter by store' },
     'customer.aux.action':          { zh: '异常自动检测 + 归因 + 派派', en: 'Auto anomaly detection + root cause + assign' },
     // renderCustomerAgeTiers
-    'customer.agetier.gap':         { zh: 'customers_payload 未返回数据 — 会员分段不可用。', en: 'customers_payload returned no data — age segments unavailable. ' },
+    'customer.agetier.gap':         { zh: 'customers_payload 未返回数据 — 入会时长分段不可用。', en: 'customers_payload returned no data — tenure segments unavailable. ' },
+    'customer.tenure.sync_hover':   { zh: '顾客购买数据每月 5 号前后同步一次。最新数据:{last}。下次同步约:{next}。', en: 'Customer purchase data syncs once monthly, around the 5th. Last sync: {last}. Next sync expected ~{next}.' },
     'customer.agetier.title':       { zh: '{tier} 会员', en: '{tier} members' },
     'customer.agetier.spend':       { zh: '本月消费', en: 'This-month spend' },
     'customer.agetier.repeat':      { zh: '复购率', en: 'Repurchase rate' },
@@ -1919,6 +1948,7 @@ window.i18n = {
     'customer.race.target':         { zh: '走廊客目标', en: 'Walk-in target' },
     'customer.race.progress':       { zh: '进度', en: 'Progress' },
     'customer.race.target_unset':   { zh: '走廊客目标待设', en: 'Walk-in target not set' },
+    'customer.race.set_target_hint':{ zh: '点击前往目标页设定此族裔走廊客目标', en: 'Tap to set this ethnicity\'s walk-in target on the Targets page' },
     // buildCustomerAnomalies
     'customer.anom.closing_low.title':  { zh: '{store} {race} 转化偏低', en: '{store} {race} closing rate low' },
     'customer.anom.closing_low.detail': { zh: '{store} {race} 成交 {cr}% (样本 {n} 人)', en: '{store} {race} closing {cr}% (sample {n} ppl)' },
@@ -1965,7 +1995,11 @@ window.i18n = {
     'customer.col.total_walkin':    { zh: 'Total 客流', en: 'Total Walk-in' },
     'customer.col.total_members':   { zh: 'Total 会员', en: 'Total Members' },
     'customer.col.total_members_tip': { zh: '在此店登记的会员(不含散客)。', en: 'Loyalty members enrolled at this store (excludes walk-in customers).' },
-    'customer.matrix.footnote':     { zh: '格式: 客流 → 购买 (成交率%) · 绿≥80% 黄60-79% 红<60% · 样本<5 不上色 · hover 看 Revenue/AOV', en: 'Format: walk-in → bought (closing %) · green ≥80% amber 60-79% red <60% · sample <5 uncolored · hover for Revenue/AOV' },
+    'customer.col.store_closing':     { zh: '本店成交率', en: 'Store Closing %' },
+    'customer.col.store_closing_tip': { zh: '本店所有族裔的整体成交率', en: 'Overall closing rate across all ethnicities at this store' },
+    'customer.matrix.no_walkin':      { zh: '本月无客流', en: 'no walk-in' },
+    'customer.matrix.small_sample':   { zh: '样本不足', en: 'sample too small to grade' },
+    'customer.matrix.footnote':     { zh: '每格: 成交率%(上) · 客流 → 购买(下) · 绿≥80% 黄60-79% 红<60% · 样本<5 显示 — · hover 看 Revenue/AOV/对比', en: 'Each cell: closing % (top) · walk-in → bought (bottom) · green ≥80% amber 60-79% red <60% · sample <5 shown as — · hover for Revenue/AOV/deltas' },
     // renderCustomerLists
     'customer.lists.gap':           { zh: 'customers_payload 未返回数据 — 客户名单不可用。', en: 'customers_payload returned no data — customer lists unavailable.' },
     'customer.lists.all_stores':    { zh: '全部店', en: 'All stores' },
@@ -1981,12 +2015,6 @@ window.i18n = {
     'customer.col.cust_type':       { zh: '客型', en: 'Type' },
     'customer.col.visits_12m':      { zh: '12M 访问', en: '12M Visits' },
     'customer.cell.months':         { zh: '{n} 月', en: '{n} mo' },
-    // renderCustomerAgeCategoryCrosstab
-    'customer.crosstab.no_data':       { zh: 'customer_buy_lines 本月无品类数据', en: 'customer_buy_lines has no category data this month' },
-    'customer.crosstab.uncategorized': { zh: '(未分类)', en: '(Uncategorized)' },
-    'customer.col.category':           { zh: '品类', en: 'Category' },
-    'customer.col.total':              { zh: '合计', en: 'Total' },
-    'customer.crosstab.footnote':      { zh: '每格: 本月销售 RM · 底色越深销售越高 · top 8 品类', en: 'Each cell: this-month sales RM · darker = higher sales · top 8 categories' },
     // renderCustomerTrend
     'customer.trend.gap':           { zh: 'customer_trend RPC 未部署或无数据。', en: 'customer_trend RPC not deployed or no data.' },
     'customer.trend.footnote':      { zh: '月度走廊客 (floatation 月颗粒,自 2026-01 起有记录)。', en: 'Monthly walk-in (floatation monthly grain, recorded since 2026-01).' },
@@ -2619,17 +2647,20 @@ async function fetchCustomers(signal) {
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
   if (getEffectiveBranch()) payloadQ.set('branch', getEffectiveBranch());
   const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
-  const [payload, race, matrix, trend, agecat, actions] = await Promise.all([
+  const [payload, race, matrix, trend, agecat, actions, freshness, closing, targets] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-trend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-age-category', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'actions', assigner: myRoleId }), signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'months' }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, meta: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-closing-series', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'targets', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, targets: [] })),
   ]);
   if (race && race.session_role) state.role = race.session_role;
   else if (payload && payload.session_role) state.role = payload.session_role;
-  return { payload, race, matrix, trend, agecat, actions };
+  return { payload, race, matrix, trend, agecat, actions, freshness, closing, targets };
 }
 async function fetchProducts(signal) {
   // Phase 8: Products Owner BI — 1 RPC (mode=phase8) returns the 8-section
@@ -2738,6 +2769,14 @@ async function loadView() {
     if (harvestStores(state.view, data)) populateBranchPicker();
     runByteMatchAssertion();
     renderView();
+    // PR-B: after navigating to Targets via a race card, focus + flash the input.
+    if (state.view === 'targets' && window.pendingTargetFocus) {
+      const want = window.pendingTargetFocus; window.pendingTargetFocus = null;
+      setTimeout(() => {
+        const el = document.querySelector('input.target-input[data-type="' + want + '"]');
+        if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); el.classList.add('target-flash'); }
+      }, 60);
+    }
   } catch (e) {
     if (e.name === 'AbortError' || myCtl.signal.aborted) {
       console.log('[V2] loadView aborted (superseded)');
@@ -2850,6 +2889,14 @@ function onViewChange(v) {
   state.view = v;
   syncUrl();
   loadView();
+  return false; // anchor onclick swallow
+}
+// PR-B: jump from a "walk-in target not set" race card to the Targets page,
+// pre-focusing the matching race walk-in input (current month is already state.month).
+// Owner-only page; RBAC silently blocks non-owners (link is a no-op for them).
+function gotoTargets(targetType) {
+  window.pendingTargetFocus = targetType || null;
+  onViewChange('targets');
   return false; // anchor onclick swallow
 }
 function onBranchChange(b) {
@@ -3804,6 +3851,61 @@ function svgBarChart(opts) {
     svg += '<text class="axis-text" x="' + (padL - 8) + '" y="' + (cy + 4) + '" text-anchor="end">' + svgEscape(r.label || '') + '</text>';
     svg += '<rect x="' + padL + '" y="' + (cy - barH / 2) + '" width="' + Math.max(0, barW) + '" height="' + barH + '" fill="' + color + '" rx="2"/>';
     svg += '<text class="legend-text" x="' + (padL + Math.max(0, barW) + 6) + '" y="' + (cy + 4) + '">' + svgEscape(valueFmt(r.value || 0)) + '</text>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// PR-F — vertical grouped bar chart. opts:{ groups:[{label, bars:[{value|null, color, name}]}],
+//   yMax, valueFmt, legend:[{label,color}], onMissingTap, missingLabel, missingTitle }.
+// value=null → dotted "not set" placeholder (tap → onMissingTap). viewBox scales,
+// so full two-line x-labels (code + name) never clip at any viewport.
+function svgGroupedBarChart(opts) {
+  const W = opts.width || 700, H = opts.height || 320, yMax = opts.yMax || 100;
+  const padL = 40, padR = 14, padT = 18, padB = 64;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const groups = opts.groups || [];
+  if (!groups.length) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  const yScale = v => plotH * (1 - (Math.max(0, Math.min(yMax, v)) / yMax));
+  const gW = plotW / groups.length;
+  const valueFmt = opts.valueFmt || (v => Math.round(v).toString());
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  [0, 25, 50, 75, 100].forEach(g => {
+    if (g > yMax) return;
+    const y = padT + yScale(g);
+    svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#E5E7EB" stroke-width="1"/>';
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + g + '</text>';
+  });
+  groups.forEach((grp, gi) => {
+    const gx = padL + gi * gW;
+    const bars = grp.bars || [];
+    const innerPad = gW * 0.16;
+    const slot = (gW - innerPad * 2) / Math.max(1, bars.length);
+    const barW = Math.min(slot * 0.82, 28);
+    bars.forEach((b, bi) => {
+      const bx = gx + innerPad + bi * slot + (slot - barW) / 2;
+      if (b.value == null) {
+        const tap = opts.onMissingTap ? ' style="cursor:pointer" onclick="' + opts.onMissingTap + '"' : '';
+        svg += '<rect x="' + bx + '" y="' + (padT + plotH - 22) + '" width="' + barW + '" height="22" fill="none" stroke="' + (b.color || '#9CA3AF') + '" stroke-width="1.5" stroke-dasharray="3 3" rx="2"' + tap + '><title>' + svgEscape(opts.missingTitle || 'not set') + '</title></rect>';
+        svg += '<text class="axis-text" x="' + (bx + barW / 2) + '" y="' + (padT + plotH - 28) + '" text-anchor="middle" font-size="8" fill="#9CA3AF">' + svgEscape(opts.missingLabel || '—') + '</text>';
+      } else {
+        const y = padT + yScale(b.value), hh = plotH - yScale(b.value);
+        svg += '<rect x="' + bx + '" y="' + y + '" width="' + barW + '" height="' + Math.max(0, hh) + '" fill="' + (b.color || '#1F5F4A') + '" rx="2"><title>' + svgEscape((b.name || '') + ' ' + valueFmt(b.value)) + '</title></rect>';
+        svg += '<text class="legend-text" x="' + (bx + barW / 2) + '" y="' + (y - 3) + '" text-anchor="middle" font-size="9">' + svgEscape(valueFmt(b.value)) + '</text>';
+      }
+    });
+    const cx = gx + gW / 2;
+    const parts = (grp.label || '').split(' ');
+    const code = parts.shift() || '';
+    const name = parts.join(' ');
+    svg += '<text class="axis-text" x="' + cx + '" y="' + (padT + plotH + 16) + '" text-anchor="middle" font-weight="700">' + svgEscape(code) + '</text>';
+    svg += '<text class="axis-text" x="' + cx + '" y="' + (padT + plotH + 29) + '" text-anchor="middle" font-size="9">' + svgEscape(name) + '</text>';
+  });
+  let lx = padL;
+  (opts.legend || []).forEach(l => {
+    svg += '<rect x="' + lx + '" y="' + (H - 13) + '" width="9" height="9" fill="' + l.color + '" rx="2"/>';
+    svg += '<text class="legend-text" x="' + (lx + 13) + '" y="' + (H - 5) + '">' + svgEscape(l.label) + '</text>';
+    lx += 26 + (l.label.length * 6.4);
   });
   svg += '</svg>';
   return svg;
@@ -5847,15 +5949,14 @@ function renderCustomers(s) {
   return '<div class="sales-v3">'
     + header
     + completenessBanner()   // M-6
+    // PR-A — Sales Target Band (来客数 target vs actual) at the very top.
+    + renderCustomerTargetBand(s)
     // 第 1 层 — 种族 (谁来)
     + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'
     + renderCustomerRaceCards(s)
     // 第 2 层 — 会员年龄分段 (这群人多忠)
     + '<div class="s4-section-title">' + t('customer.section.age') + ' <span class="s4-section-aux">' + t('customer.aux.age') + '</span></div>'
     + renderCustomerAgeTiers(s)
-    // 第 3 层 — 年龄段 × 品类 (他们买什么) — NEW
-    + '<div class="s4-section-title">' + t('customer.section.age_cat') + ' <span class="s4-section-aux">' + t('customer.aux.age_cat') + '</span></div>'
-    + renderCustomerAgeCategoryCrosstab(s)
     // 第 4 层 — 6 店 × 种族 (哪店哪族表现好)
     + renderCustomerCharts(s)
     + '<div class="s4-section-title">' + t('customer.section.matrix') + ' <span class="s4-section-aux">' + t('customer.aux.matrix') + '</span></div>'
@@ -5884,6 +5985,13 @@ function renderCustomerAgeTiers(s) {
   const by12 = {}; b12.forEach(x => by12[x.key] = x);
   const by1  = {}; b1.forEach(x => by1[x.key] = x);
   const total = (pd.summary && pd.summary.total_members) || b12.reduce((a, x) => a + (x.n || 0), 0);
+  // PR-D: customer_buy_lines syncs monthly (~5th). When this month has no cbl
+  // rows the 1m bucket is empty → show "—" for this-month spend, not RM 0.
+  const noCbl = b1.length === 0;
+  const fr = (s.data.freshness && s.data.freshness.meta) || {};
+  const lastSync = fr.cbl_latest || '—';
+  const nextSync = (function (ym) { if (!ym) return '—'; const p = ym.split('-'); let y = +p[0], mo = (+p[1]) + 2; while (mo > 12) { mo -= 12; y++; } return y + '-' + String(mo).padStart(2, '0') + '-05'; })(fr.cbl_latest);
+  const spendHover = t('customer.tenure.sync_hover', { last: lastSync, next: nextSync });
   const cards = AGE_TIER_ORDER.map(k => {
     const r = by12[k] || { n: 0, amt: 0, aov: 0, repeat_pct: null };
     const m = by1[k]  || { amt: 0 };
@@ -5896,7 +6004,7 @@ function renderCustomerAgeTiers(s) {
       +   '<div class="kpi-status-row"><span class="kpi-pct" style="color:var(--s4-text-primary);font-size:16px">' + t('customer.share_member', { pct: sharePct.toFixed(1) }) + '</span></div>'
       +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + Math.min(100, sharePct) + '%;background:var(--brand)"></div></div>'
       +   '<div class="kpi-meta">'
-      +     t('customer.agetier.spend') + ' <strong>' + fmtRM(m.amt) + '</strong><br>'
+      +     t('customer.agetier.spend') + ' <strong>' + (noCbl ? '<span title="' + spendHover + '" style="color:var(--s4-text-light)">—</span>' : fmtRM(m.amt)) + '</strong><br>'
       +     t('customer.agetier.repeat') + ' <strong>' + (r.repeat_pct != null ? Number(r.repeat_pct).toFixed(1) + '%' : '—') + '</strong> ' + t('customer.agetier.repeat_note') + '<br>'
       +     t('customer.agetier.aov') + ' <strong>' + (r.aov != null ? fmtRM(r.aov) : '—') + '</strong>'
       +   '</div>'
@@ -6096,26 +6204,70 @@ function histPctSpan(label, cur, base) {
   return '<span>' + label + ' <span class="' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span></span>';
 }
 
-// Phase 10B — Customer chart: 6 店成交率横条 (复用 matrix: Σ race purchases /
-// total_walkin per store)。走廊客趋势已由 renderCustomerTrend 渲染, 不重复。
+// PR-F — Store Closing Rate grouped chart: per live store, 3 bars =
+// Target (monthly_targets closing_rate) · 12-mo avg · this-month
+// (customer_closing_series from floatation). Missing target → dotted "not set"
+// placeholder, tap → Targets page.
 function renderCustomerCharts(s) {
-  let html = '';
-  const matrix = (s.data.matrix && s.data.matrix.data && s.data.matrix.data.matrix) || [];
-  if (matrix.length) {
-    const races = ['chinese', 'malay', 'indian', 'other'];
-    const bars = matrix.map(m => {
-      const walk = m.total_walkin || 0;
-      let pur = 0; races.forEach(rk => { if (m[rk]) pur += (m[rk].purchases || 0); });
-      const rate = walk > 0 ? Math.round(pur / walk * 1000) / 10 : 0;
-      return { label: matrixStoreLabel ? matrixStoreLabel(m.store) : m.store, value: rate,
-               color: rate >= 80 ? '#16A34A' : rate >= 60 ? '#D97706' : '#DC2626', store: m.store };
-    }).filter(b => b.value > 0).sort((a, b) => b.value - a.value);
-    if (bars.length) {
-      html += '<div class="inv-section-title">🎯 ' + t('chart.store_closing') + '</div>'
-        + '<div class="chart-card">' + svgBarChart({ rows: bars, width: 640, height: 220, valueFmt: v => v.toFixed(1) + '%' }) + '</div>';
-    }
-  }
-  return html;
+  const series = (s.data.closing && s.data.closing.data && s.data.closing.data.stores) || [];
+  if (!series.length) return '';
+  const byStore = {}; series.forEach(r => byStore[r.store] = r);
+  const tRows = (s.data.targets && s.data.targets.targets) || [];
+  const closeTarget = {}; tRows.forEach(r => { if (r.target_type === 'closing_rate') closeTarget[r.store] = +r.target_value; });
+  const order = STORES_LIVE.filter(st => byStore[st]);
+  const groups = order.map(st => {
+    const r = byStore[st];
+    const tv = closeTarget[st];
+    return { label: matrixStoreLabel(st), bars: [
+      { value: tv != null ? tv : null, color: '#64748B', name: t('chart.closing.target') },
+      { value: r.avg12m != null ? +r.avg12m : null, color: '#A7C4BC', name: t('chart.closing.avg12m') },
+      { value: r.this_month != null ? +r.this_month : null, color: '#1F5F4A', name: t('chart.closing.this_month') },
+    ] };
+  });
+  return '<div class="inv-section-title">🎯 ' + t('chart.store_closing') + '</div>'
+    + '<div class="chart-card">' + svgGroupedBarChart({
+        groups, width: 700, height: 320, yMax: 100,
+        valueFmt: v => v.toFixed(0) + '%',
+        legend: [
+          { label: t('chart.closing.target'), color: '#64748B' },
+          { label: t('chart.closing.avg12m'), color: '#A7C4BC' },
+          { label: t('chart.closing.this_month'), color: '#1F5F4A' },
+        ],
+        onMissingTap: "gotoTargets('closing_rate')",
+        missingLabel: t('chart.closing.not_set'),
+        missingTitle: t('chart.closing.not_set_tip'),
+      }) + '</div>';
+}
+
+// PR-A — top Sales Target Band (3 cols) + freshness chip. Reuses monthly_targets
+// (no new table): TARGET = Σ footfall targets over live stores (with last-month
+// fallback); ACTUAL = Σ this-month walk-in over live stores (from matrix);
+// DEFICIT/SURPLUS = ACTUAL − TARGET (signed, green ≥0 / red <0).
+function renderCustomerTargetBand(s) {
+  const meta = (s.data.freshness && s.data.freshness.meta) || {};
+  const chip = '<div class="cust-fresh-chip">' + t('customer.fresh.chip', {
+    foot: meta.floatation_latest || '—', inv: meta.inventory_real_latest || '—',
+    cbl: meta.cbl_latest || '—', fin: meta.financials_latest || '—' }) + '</div>';
+  // ACTUAL — Σ this-month walk-in over live stores (matrix total_walkin).
+  const mtx = (s.data.matrix && s.data.matrix.data && s.data.matrix.data.matrix) || [];
+  const actual = mtx.length ? mtx.filter(m => isLiveStore(m.store)).reduce((a, m) => a + (m.total_walkin || 0), 0) : null;
+  // TARGET — Σ footfall targets over live stores.
+  const byStore = (s.data.targets && s.data.targets.summary && s.data.targets.summary.by_store) || {};
+  let target = null;
+  STORES_LIVE.forEach(st => { const f = byStore[st] && byStore[st].footfall; if (f != null) target = (target || 0) + (+f || 0); });
+  const fbUsed = s.data.targets && s.data.targets.fallback_used;
+  const fb = fbUsed ? ' <span class="ctb-fb">' + t('customer.band.target_fallback', { ym: s.data.targets.fallback_from }) + '</span>' : '';
+  const deficit = (actual != null && target != null) ? actual - target : null;
+  const defColor = deficit == null ? 'var(--s4-text-light)' : deficit >= 0 ? 'var(--s4-green-text)' : 'var(--s4-red-text)';
+  const defLabel = deficit == null ? '—' : deficit >= 0 ? t('customer.band.surplus') : t('customer.band.deficit');
+  const defVal = deficit == null ? '—' : (deficit >= 0 ? '+' : '') + fmtInt(deficit);
+  const fmtQ = v => v == null ? '—' : fmtInt(v);
+  return chip
+    + '<div class="cust-target-band">'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.target') + '</div><div class="ctb-num">' + fmtQ(target) + '</div><div class="ctb-sub">' + (fbUsed ? fb : '&nbsp;') + '</div></div>'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.actual') + '</div><div class="ctb-num">' + fmtQ(actual) + '</div><div class="ctb-sub">&nbsp;</div></div>'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.deficit_surplus') + '</div><div class="ctb-num" style="color:' + defColor + '">' + defVal + '</div><div class="ctb-sub" style="color:' + defColor + '">' + defLabel + '</div></div>'
+    + '</div>';
 }
 
 function renderCustomerRaceCards(s) {
@@ -6129,33 +6281,39 @@ function renderCustomerRaceCards(s) {
     const r = byRace[rk] || {};
     const meta = RACE_META[rk];
     const cr = r.closing_rate;
-    const crColor = cr == null ? '#6B7280' : cr >= 80 ? '#16A34A' : cr >= 60 ? '#D97706' : '#DC2626';
-    const barPct = Math.min(100, cr || 0);
+    // PR-B: an ethnicity with 0 walk-in this month → all numeric fields render
+    // "—" (not RM 0 / 0.0% / ↓100%) and the card is visually muted.
+    const empty = (r.walkin || 0) === 0;
+    const crColor = (empty || cr == null) ? '#6B7280' : cr >= 80 ? '#16A34A' : cr >= 60 ? '#D97706' : '#DC2626';
+    const barPct = empty ? 0 : Math.min(100, cr || 0);
     const tgtColor = r.walkin_target_pct == null ? '#6B7280'
       : r.walkin_target_pct >= 100 ? '#16A34A' : r.walkin_target_pct >= 80 ? '#D97706' : '#DC2626';
+    // PR-B: "target not set" is a tap target → Targets page, race input pre-focused.
     const targetLine = (r.walkin_target != null)
       ? t('customer.race.target') + ' <strong>' + fmtInt(r.walkin_target) + '</strong> · ' + t('customer.race.progress') + ' <strong style="color:' + tgtColor + '">'
         + (r.walkin_target_pct != null ? r.walkin_target_pct.toFixed(0) + '%' : '—') + '</strong>'
-      : '<span style="color:#9CA3AF">' + t('customer.race.target_unset') + '</span>';
-    const hist = '<div class="crc-hist">'
-      + histPctSpan(t('common.vs_prev'), r.walkin || 0, r.walkin_prev)
-      + '<span>' + t('customer.vs_last_year') + ' —</span>'
-      + histPctSpan(t('customer.vs_3mo_avg'), r.walkin || 0, r.walkin_3mo_avg)
-      + '</div>';
+      : '<a href="#" class="crc-target-set" onclick="return gotoTargets(\'walkin_' + rk + '\')" title="' + t('customer.race.set_target_hint') + '">' + t('customer.race.target_unset') + ' ›</a>';
+    const hist = empty
+      ? '<div class="crc-hist"><span>' + t('common.vs_prev') + ' —</span><span>' + t('customer.vs_last_year') + ' —</span><span>' + t('customer.vs_3mo_avg') + ' —</span></div>'
+      : '<div class="crc-hist">'
+        + histPctSpan(t('common.vs_prev'), r.walkin || 0, r.walkin_prev)
+        + '<span>' + t('customer.vs_last_year') + ' —</span>'
+        + histPctSpan(t('customer.vs_3mo_avg'), r.walkin || 0, r.walkin_3mo_avg)
+        + '</div>';
     // Phase 10B 灯: 走廊客 target 完成率 ≥95 绿 / 80-95 黄 / <80 红; 无目标灰。
     const raceLight = heroLightColor(r.walkin_target_pct, 95, 80, false);
     return ''
-      + '<div class="cust-race-card">'
+      + '<div class="cust-race-card' + (empty ? ' crc-empty' : '') + '">'
       +   heroLightDot(raceLight)
       +   '<div class="crc-icon">' + meta.icon + '</div>'
       +   '<div class="crc-title">' + t(meta.labelKey) + '</div>'
-      +   '<div class="crc-big">' + fmtInt(r.walkin || 0) + ' <span class="crc-unit">' + t('customer.unit.ppl') + '</span></div>'
-      +   '<div class="crc-cr" style="color:' + crColor + '">' + (cr != null ? cr.toFixed(1) + '% ' + t('customer.closing') : '— ' + t('customer.closing')) + '</div>'
+      +   '<div class="crc-big">' + (empty ? '—' : fmtInt(r.walkin || 0)) + ' <span class="crc-unit">' + t('customer.unit.ppl') + '</span></div>'
+      +   '<div class="crc-cr" style="color:' + crColor + '">' + (!empty && cr != null ? cr.toFixed(1) + '% ' + t('customer.closing') : '— ' + t('customer.closing')) + '</div>'
       +   '<div class="crc-bar"><span style="width:' + barPct + '%"></span></div>'
       +   '<div class="crc-meta">'
-      +     t('customer.bought') + ' <strong>' + fmtInt(r.purchases || 0) + '</strong> ' + t('customer.unit.ppl') + ' · ' + t('customer.of_walkin') + ' ' + (r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
-      +     'Revenue <strong>' + fmtRM(r.revenue || 0) + '</strong> (' + (r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
-      +     'Avg Basket <strong>' + (r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
+      +     t('customer.bought') + ' <strong>' + (empty ? '—' : fmtInt(r.purchases || 0)) + '</strong> ' + t('customer.unit.ppl') + ' · ' + t('customer.of_walkin') + ' ' + (!empty && r.walkin_pct != null ? r.walkin_pct.toFixed(1) + '%' : '—') + '<br>'
+      +     'Revenue <strong>' + (empty ? '—' : fmtRM(r.revenue || 0)) + '</strong> (' + (!empty && r.revenue_pct != null ? r.revenue_pct.toFixed(1) + '%' : '—') + ')<br>'
+      +     'Avg Basket <strong>' + (!empty && r.avg_basket != null ? fmtRMpr(r.avg_basket) : '—') + '</strong>'
       +   '</div>'
       +   '<div class="crc-target">' + targetLine + '</div>'
       +   '<div class="crc-foot"><hr class="crc-sep">' + hist + '</div>'
@@ -6177,59 +6335,76 @@ function renderCustomerStoreRaceMatrix(s) {
     if (ia === -1 && ib === -1) return (a.store||'').localeCompare(b.store||'');
     if (ia === -1) return 1; if (ib === -1) return -1; return ia - ib;
   });
-  const cell = (rc) => {
-    if (!rc || (!rc.walkin && !rc.purchases)) return '<span style="color:var(--s4-text-light)">—</span>';
-    const cr = rc.closing_rate;
-    // color only when sample >= 5 walk-in
-    let color = 'var(--s4-text-primary)';
-    if (rc.walkin >= 5 && cr != null) {
-      color = cr >= 80 ? 'var(--s4-green-text)' : cr >= 60 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)';
+  // PR-G: grade colour (≥80 green / 60-79 amber / <60 red).
+  const gradeColor = (r) => r >= 80 ? 'var(--s4-green-text)' : r >= 60 ? 'var(--s4-amber-text)' : 'var(--s4-red-text)';
+  // PR-G: two-line cell — closing % (large, coloured) over "walk-in → bought"
+  // (small, muted). "—" disambiguated by tooltip: no walk-in vs sample <5.
+  const twoLine = (walk, bought, cr, baseTip) => {
+    if (walk === 0) {
+      return '<span title="' + t('customer.matrix.no_walkin') + '" style="color:var(--s4-text-light)">—</span>';
     }
-    // Phase 6f: tooltip 加 vs 上月 成交 (pp) + walk-in (%)。
-    let tip = 'Revenue ' + fmtRM(rc.revenue) + ' · AOV ' + (rc.purchases > 0 ? fmtRMpr(rc.revenue / rc.purchases) : '—');
-    if (rc.closing_prev != null && cr != null) {
+    const gradable = walk >= 5 && cr != null;
+    const top = gradable
+      ? '<div style="font-weight:700;font-size:15px;color:' + gradeColor(cr) + '">' + cr.toFixed(0) + '%</div>'
+      : '<div style="font-weight:700;font-size:15px;color:var(--s4-text-light)">—</div>';
+    const bottom = '<div style="font-size:11px;font-weight:400;color:var(--s4-text-light)">' + fmtInt(walk) + ' → ' + fmtInt(bought) + '</div>';
+    const tip = gradable ? baseTip : (t('customer.matrix.small_sample') + (baseTip ? ' · ' + baseTip : ''));
+    return '<span title="' + tip + '" style="display:inline-block;text-align:right;font-variant-numeric:tabular-nums">' + top + bottom + '</span>';
+  };
+  const cell = (rc) => {
+    const walk = (rc && rc.walkin) || 0, bought = (rc && rc.purchases) || 0, cr = rc ? rc.closing_rate : null;
+    // Phase 6f tooltip: Revenue / AOV + vs 上月 成交 (pp) + walk-in (%)。
+    let tip = 'Revenue ' + fmtRM((rc && rc.revenue) || 0) + ' · AOV ' + (bought > 0 ? fmtRMpr(rc.revenue / bought) : '—');
+    if (rc && rc.closing_prev != null && cr != null) {
       const dpp = cr - rc.closing_prev;
       tip += ' · ' + t('customer.matrix.tip_closing') + ' ' + (dpp >= 0 ? '+' : '') + dpp.toFixed(1) + 'pp';
     }
-    if (rc.walkin_prev != null && rc.walkin_prev > 0) {
-      const wd = (rc.walkin - rc.walkin_prev) / rc.walkin_prev * 100;
+    if (rc && rc.walkin_prev != null && rc.walkin_prev > 0) {
+      const wd = (walk - rc.walkin_prev) / rc.walkin_prev * 100;
       tip += ' · ' + t('customer.matrix.tip_walkin') + ' ' + (wd >= 0 ? '+' : '') + wd.toFixed(0) + '%';
     }
-    return '<span title="' + tip + '">'
-      + fmtInt(rc.walkin) + ' → ' + fmtInt(rc.purchases)
-      + (cr != null ? ' <span style="color:' + color + '">(' + cr.toFixed(0) + '%)</span>' : '')
-      + '</span>';
+    return twoLine(walk, bought, cr, tip);
+  };
+  // PR-G: store-level closing % = Σ bought / Σ walk-in across the 4 ethnicities.
+  const RK = ['chinese', 'malay', 'indian', 'other'];
+  const storeClosing = (m) => {
+    let sw = 0, sb = 0; RK.forEach(rk => { if (m[rk]) { sw += (m[rk].walkin || 0); sb += (m[rk].purchases || 0); } });
+    return twoLine(sw, sb, sw > 0 ? sb / sw * 100 : null, '');
   };
   const rows = sorted.map(m => ''
     + '<tr>'
     +   '<td><strong>' + escapeHtml(matrixStoreLabel(m.store)) + '</strong></td>'
-    +   '<td>' + cell(m.chinese) + '</td>'
-    +   '<td>' + cell(m.malay) + '</td>'
-    +   '<td>' + cell(m.indian) + '</td>'
-    +   '<td>' + cell(m.other) + '</td>'
+    +   '<td class="num">' + storeClosing(m) + '</td>'
+    +   '<td class="num">' + cell(m.chinese) + '</td>'
+    +   '<td class="num">' + cell(m.malay) + '</td>'
+    +   '<td class="num">' + cell(m.indian) + '</td>'
+    +   '<td class="num">' + cell(m.other) + '</td>'
     +   '<td class="num"><strong>' + fmtInt(m.total_walkin) + '</strong></td>'
     +   '<td class="num"><strong>' + fmtInt(m.total_members) + '</strong></td>'
     + '</tr>').join('');
   // company total row
-  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0, mem: 0 };
+  const tot = { ch: 0, my: 0, in_: 0, ot: 0, walk: 0, mem: 0, bought: 0 };
   sorted.forEach(m => {
     tot.ch += (m.chinese?.walkin || 0); tot.my += (m.malay?.walkin || 0);
     tot.in_ += (m.indian?.walkin || 0); tot.ot += (m.other?.walkin || 0);
     tot.walk += (m.total_walkin || 0); tot.mem += (m.total_members || 0);
+    RK.forEach(rk => { if (m[rk]) tot.bought += (m[rk].purchases || 0); });
   });
+  const totRaceWalk = tot.ch + tot.my + tot.in_ + tot.ot;
   // PR-C hygiene: an ethnicity column with 0 across all live stores → "—", not "0".
   const ethTot = (v) => v > 0 ? fmtInt(v) : '<span style="color:var(--s4-text-light)">—</span>';
   const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)">'
     + '<td>' + t('customer.matrix.company_total') + '</td>'
-    + '<td>' + ethTot(tot.ch) + '</td><td>' + ethTot(tot.my) + '</td>'
-    + '<td>' + ethTot(tot.in_) + '</td><td>' + ethTot(tot.ot) + '</td>'
+    + '<td class="num">' + twoLine(totRaceWalk, tot.bought, totRaceWalk > 0 ? tot.bought / totRaceWalk * 100 : null, '') + '</td>'
+    + '<td class="num">' + ethTot(tot.ch) + '</td><td class="num">' + ethTot(tot.my) + '</td>'
+    + '<td class="num">' + ethTot(tot.in_) + '</td><td class="num">' + ethTot(tot.ot) + '</td>'
     + '<td class="num">' + fmtInt(tot.walk) + '</td>'
     + '<td class="num">' + fmtInt(tot.mem) + '</td></tr>';
   return ''
     + '<div class="s4-drill"><div class="s4-drill-body">'
-    +   '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'  // PR-C: scoped horizontal scroll on mobile (7 cols > 380px); does NOT touch shared .s4-drill-body
+    +   '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'  // PR-C: scoped horizontal scroll on mobile (cols > 380px); does NOT touch shared .s4-drill-body
     +   '<table><thead><tr>'
-    +     '<th>' + t('customer.col.store') + '</th><th>' + t('race.short.chinese') + '</th><th>' + t('race.short.malay') + '</th><th>' + t('race.short.indian') + '</th><th>' + t('race.short.other') + '</th><th>' + t('customer.col.total_walkin') + '</th><th title="' + t('customer.col.total_members_tip') + '">' + t('customer.col.total_members') + '</th>'
+    +     '<th>' + t('customer.col.store') + '</th><th class="num" title="' + t('customer.col.store_closing_tip') + '">' + t('customer.col.store_closing') + '</th><th class="num">' + t('race.short.chinese') + '</th><th class="num">' + t('race.short.malay') + '</th><th class="num">' + t('race.short.indian') + '</th><th class="num">' + t('race.short.other') + '</th><th class="num">' + t('customer.col.total_walkin') + '</th><th class="num" title="' + t('customer.col.total_members_tip') + '">' + t('customer.col.total_members') + '</th>'
     +   '</tr></thead><tbody>' + rows + totRow + '</tbody></table>'
     +   '</div>'
     +   '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.matrix.footnote') + '</div>'
@@ -6324,58 +6499,6 @@ function renderCustomerLists(s) {
     +   '<div style="margin-left:auto;display:flex;align-items:center;padding:6px 14px">' + storeSel + '</div>'
     + '</div>'
     + '<div class="s4-drill-body">' + body + '</div></div>';
-}
-
-// 会员年龄段 × 品类 cross-tab (第 3 层 · NEW) — from customer_age_category_crosstab.
-// 横 = 4 龄段, 纵 = top 8 品类 (按总销售). 每格 = 本月销售 RM, 空 → —.
-// 格底色按 sales 深浅 (绿色渐变), 一眼看出龄段×品类热点。Jym:「这群顾客买什么」。
-function renderCustomerAgeCategoryCrosstab(s) {
-  const resp = s.data.agecat || {};
-  const pd = resp.data;
-  const rowsRaw = (pd && pd.rows) || [];
-  if (resp.degraded || !pd || pd.status === 'data_gap' || rowsRaw.length === 0) {
-    const msg = (pd && pd.message) || resp.degraded_reason || t('customer.crosstab.no_data');
-    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">⚠ ' + escapeHtml(msg) + '</div></div></div>';
-  }
-  const ages = AGE_TIER_ORDER;
-  // pivot: category -> {age: sales}; track category totals for top-8 select.
-  const byCat = {};
-  rowsRaw.forEach(r => {
-    const cat = r.category || t('customer.crosstab.uncategorized');
-    if (!byCat[cat]) byCat[cat] = { total: 0, cells: {} };
-    byCat[cat].cells[r.age_bucket] = (byCat[cat].cells[r.age_bucket] || 0) + (+r.sales || 0);
-    byCat[cat].total += (+r.sales || 0);
-  });
-  const cats = Object.keys(byCat).sort((a, b) => byCat[b].total - byCat[a].total).slice(0, 8);
-  // max cell value (across displayed cats) for color depth.
-  let maxCell = 0;
-  cats.forEach(c => ages.forEach(a => { const v = byCat[c].cells[a] || 0; if (v > maxCell) maxCell = v; }));
-  const cellBg = (v) => {
-    if (!v || maxCell <= 0) return '';
-    const alpha = 0.08 + 0.55 * (v / maxCell); // 0.08–0.63 green tint
-    return 'background:rgba(31,95,74,' + alpha.toFixed(3) + ');' + (alpha > 0.4 ? 'color:#fff;' : '');
-  };
-  const head = '<tr><th>' + t('customer.col.category') + '</th>' + ages.map(a => '<th>' + a + '</th>').join('') + '<th>' + t('customer.col.total') + '</th></tr>';
-  const body = cats.map(c => {
-    const cells = ages.map(a => {
-      const v = byCat[c].cells[a] || 0;
-      return v > 0
-        ? '<td style="' + cellBg(v) + '">' + fmtRM(v) + '</td>'
-        : '<td style="color:var(--s4-text-light)">—</td>';
-    }).join('');
-    return '<tr><td><strong>' + escapeHtml(c) + '</strong></td>' + cells + '<td><strong>' + fmtRM(byCat[c].total) + '</strong></td></tr>';
-  }).join('');
-  // column totals row
-  const colTot = ages.map(a => {
-    let t = 0; cats.forEach(c => { t += byCat[c].cells[a] || 0; });
-    return '<td><strong>' + fmtRM(t) + '</strong></td>';
-  }).join('');
-  const grand = cats.reduce((acc, c) => acc + byCat[c].total, 0);
-  const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)"><td>' + t('customer.col.total') + '</td>' + colTot + '<td>' + fmtRM(grand) + '</td></tr>';
-  return '<div class="s4-drill"><div class="s4-drill-body">'
-    + '<table><thead>' + head + '</thead><tbody>' + body + totRow + '</tbody></table>'
-    + '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.crosstab.footnote') + '</div>'
-    + '</div></div>';
 }
 
 // 12 月走廊客趋势 — single line (floatation monthly). From customer_trend RPC.
