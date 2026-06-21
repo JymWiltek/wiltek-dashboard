@@ -1552,6 +1552,24 @@ export default async function handler(req, res) {
   }
 
   // ───────────────────────────────────────────────────────────────────────
+  // Marketing rebuild §6 — web_pageviews UPSERT (owner only; handler enforces).
+  // POST /api/sync { mode:'pageviews_upsert', ym:'YYYY-MM', pageviews:int, note? }
+  if (mode === 'pageviews_upsert') {
+    try {
+      const ym  = String(body?.ym || '').trim();
+      const pv  = Number(body?.pageviews);
+      if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ ok: false, error: 'bad ym; expected YYYY-MM' });
+      if (!Number.isFinite(pv) || pv < 0) return res.status(400).json({ ok: false, error: 'pageviews must be a non-negative number' });
+      const row = { ym, pageviews: Math.round(pv), source: 'manual', note: (body?.note || null), updated_by: user.username, updated_at: new Date().toISOString() };
+      const { data, error } = await sb().from('web_pageviews').upsert(row, { onConflict: 'ym' }).select('ym, pageviews, updated_by, updated_at');
+      if (error) return res.status(500).json({ ok: false, error: 'upsert failed: ' + error.message });
+      return res.status(200).json({ ok: true, mode: 'pageviews_upsert', ym, row: (data && data[0]) || row });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message, where: 'pageviews_upsert' });
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Phase 4 — Agentic OS Action状态机 (2026-05-19)
   // Modes: action_assign / action_accept / action_done / action_renegotiate /
   //        action_approve_renegotiate / action_reject / actions_sweep_overdue.
