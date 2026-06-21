@@ -34,7 +34,7 @@ const PHASE5_VIEWS = ['overview'];
 // Phase 6b (2026-05-21): customer-payload reuses V1's customers_payload RPC
 // (age-tier buckets / churn / cross-tab / top100 VIPs) — same Supabase as V1.
 // Phase 6c (2026-05-21): age-bucket × category cross-tab (买什么).
-const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload', 'customer-age-category'];
+const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload', 'customer-age-category', 'customer-closing-series'];
 // Default-month fix (2026-06-17): lightweight months list so the FE defaults
 // to the LATEST month present in data instead of a hard-coded value. Not a
 // new Vercel function (same kpi.js); needs no ?month param.
@@ -367,6 +367,9 @@ async function handleCustomer(req, res, user, ym, view, queryBranch, effectiveBr
     'customer-payload':  { rpc: 'customers_payload',          args: { p_month: ym, p_branch: scope } },
     // Phase 6c: 会员入会龄段 × 品类 (main_group) 本月销售矩阵.
     'customer-age-category': { rpc: 'customer_age_category_crosstab', args: { p_ym: ym } },
+    // PR-F: per-live-store closing-rate series (this-month + 12-mo rolling avg)
+    // from floatation, for the grouped Store Closing Rate chart.
+    'customer-closing-series': { rpc: 'customer_closing_series', args: { p_ym: ym } },
   };
   const spec = map[view];
   if (!spec) return res.status(400).json({ ok: false, error: 'bad customer view' });

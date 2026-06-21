@@ -1425,6 +1425,11 @@ window.i18n = {
     // Phase 10B — chart titles
     'chart.dead_by_store':    { zh: '6 店死货 RM',       en: 'Dead Stock by Store' },
     'chart.store_closing':    { zh: '6 店成交率',        en: 'Store Closing Rate' },
+    'chart.closing.target':     { zh: '目标',     en: 'Target' },
+    'chart.closing.avg12m':     { zh: '12 月均',  en: '12-Mo Avg' },
+    'chart.closing.this_month': { zh: '本月',     en: 'This Month' },
+    'chart.closing.not_set':    { zh: '未设',     en: 'not set' },
+    'chart.closing.not_set_tip':{ zh: '此店未设成交率目标 — 点击前往目标页设定', en: 'No closing-rate target for this store — tap to set on the Targets page' },
     'chart.cat_12m':          { zh: '12 月品类销售趋势', en: '12-Month Category Trend' },
     'chart.price_band_donut': { zh: '价格段分布',        en: 'Price Band Distribution' },
     'chart.top_mg_bar':       { zh: 'Top 10 品类销售',   en: 'Top 10 Categories' },
@@ -2626,7 +2631,7 @@ async function fetchCustomers(signal) {
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
   if (getEffectiveBranch()) payloadQ.set('branch', getEffectiveBranch());
   const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
-  const [payload, race, matrix, trend, agecat, actions, freshness] = await Promise.all([
+  const [payload, race, matrix, trend, agecat, actions, freshness, closing, targets] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
@@ -2634,10 +2639,12 @@ async function fetchCustomers(signal) {
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-age-category', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'actions', assigner: myRoleId }), signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'months' }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, meta: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-closing-series', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'targets', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, targets: [] })),
   ]);
   if (race && race.session_role) state.role = race.session_role;
   else if (payload && payload.session_role) state.role = payload.session_role;
-  return { payload, race, matrix, trend, agecat, actions, freshness };
+  return { payload, race, matrix, trend, agecat, actions, freshness, closing, targets };
 }
 async function fetchProducts(signal) {
   // Phase 8: Products Owner BI — 1 RPC (mode=phase8) returns the 8-section
@@ -3828,6 +3835,61 @@ function svgBarChart(opts) {
     svg += '<text class="axis-text" x="' + (padL - 8) + '" y="' + (cy + 4) + '" text-anchor="end">' + svgEscape(r.label || '') + '</text>';
     svg += '<rect x="' + padL + '" y="' + (cy - barH / 2) + '" width="' + Math.max(0, barW) + '" height="' + barH + '" fill="' + color + '" rx="2"/>';
     svg += '<text class="legend-text" x="' + (padL + Math.max(0, barW) + 6) + '" y="' + (cy + 4) + '">' + svgEscape(valueFmt(r.value || 0)) + '</text>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// PR-F — vertical grouped bar chart. opts:{ groups:[{label, bars:[{value|null, color, name}]}],
+//   yMax, valueFmt, legend:[{label,color}], onMissingTap, missingLabel, missingTitle }.
+// value=null → dotted "not set" placeholder (tap → onMissingTap). viewBox scales,
+// so full two-line x-labels (code + name) never clip at any viewport.
+function svgGroupedBarChart(opts) {
+  const W = opts.width || 700, H = opts.height || 320, yMax = opts.yMax || 100;
+  const padL = 40, padR = 14, padT = 18, padB = 64;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const groups = opts.groups || [];
+  if (!groups.length) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  const yScale = v => plotH * (1 - (Math.max(0, Math.min(yMax, v)) / yMax));
+  const gW = plotW / groups.length;
+  const valueFmt = opts.valueFmt || (v => Math.round(v).toString());
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  [0, 25, 50, 75, 100].forEach(g => {
+    if (g > yMax) return;
+    const y = padT + yScale(g);
+    svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#E5E7EB" stroke-width="1"/>';
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + g + '</text>';
+  });
+  groups.forEach((grp, gi) => {
+    const gx = padL + gi * gW;
+    const bars = grp.bars || [];
+    const innerPad = gW * 0.16;
+    const slot = (gW - innerPad * 2) / Math.max(1, bars.length);
+    const barW = Math.min(slot * 0.82, 28);
+    bars.forEach((b, bi) => {
+      const bx = gx + innerPad + bi * slot + (slot - barW) / 2;
+      if (b.value == null) {
+        const tap = opts.onMissingTap ? ' style="cursor:pointer" onclick="' + opts.onMissingTap + '"' : '';
+        svg += '<rect x="' + bx + '" y="' + (padT + plotH - 22) + '" width="' + barW + '" height="22" fill="none" stroke="' + (b.color || '#9CA3AF') + '" stroke-width="1.5" stroke-dasharray="3 3" rx="2"' + tap + '><title>' + svgEscape(opts.missingTitle || 'not set') + '</title></rect>';
+        svg += '<text class="axis-text" x="' + (bx + barW / 2) + '" y="' + (padT + plotH - 28) + '" text-anchor="middle" font-size="8" fill="#9CA3AF">' + svgEscape(opts.missingLabel || '—') + '</text>';
+      } else {
+        const y = padT + yScale(b.value), hh = plotH - yScale(b.value);
+        svg += '<rect x="' + bx + '" y="' + y + '" width="' + barW + '" height="' + Math.max(0, hh) + '" fill="' + (b.color || '#1F5F4A') + '" rx="2"><title>' + svgEscape((b.name || '') + ' ' + valueFmt(b.value)) + '</title></rect>';
+        svg += '<text class="legend-text" x="' + (bx + barW / 2) + '" y="' + (y - 3) + '" text-anchor="middle" font-size="9">' + svgEscape(valueFmt(b.value)) + '</text>';
+      }
+    });
+    const cx = gx + gW / 2;
+    const parts = (grp.label || '').split(' ');
+    const code = parts.shift() || '';
+    const name = parts.join(' ');
+    svg += '<text class="axis-text" x="' + cx + '" y="' + (padT + plotH + 16) + '" text-anchor="middle" font-weight="700">' + svgEscape(code) + '</text>';
+    svg += '<text class="axis-text" x="' + cx + '" y="' + (padT + plotH + 29) + '" text-anchor="middle" font-size="9">' + svgEscape(name) + '</text>';
+  });
+  let lx = padL;
+  (opts.legend || []).forEach(l => {
+    svg += '<rect x="' + lx + '" y="' + (H - 13) + '" width="9" height="9" fill="' + l.color + '" rx="2"/>';
+    svg += '<text class="legend-text" x="' + (lx + 13) + '" y="' + (H - 5) + '">' + svgEscape(l.label) + '</text>';
+    lx += 26 + (l.label.length * 6.4);
   });
   svg += '</svg>';
   return svg;
@@ -6124,26 +6186,39 @@ function histPctSpan(label, cur, base) {
   return '<span>' + label + ' <span class="' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span></span>';
 }
 
-// Phase 10B — Customer chart: 6 店成交率横条 (复用 matrix: Σ race purchases /
-// total_walkin per store)。走廊客趋势已由 renderCustomerTrend 渲染, 不重复。
+// PR-F — Store Closing Rate grouped chart: per live store, 3 bars =
+// Target (monthly_targets closing_rate) · 12-mo avg · this-month
+// (customer_closing_series from floatation). Missing target → dotted "not set"
+// placeholder, tap → Targets page.
 function renderCustomerCharts(s) {
-  let html = '';
-  const matrix = (s.data.matrix && s.data.matrix.data && s.data.matrix.data.matrix) || [];
-  if (matrix.length) {
-    const races = ['chinese', 'malay', 'indian', 'other'];
-    const bars = matrix.map(m => {
-      const walk = m.total_walkin || 0;
-      let pur = 0; races.forEach(rk => { if (m[rk]) pur += (m[rk].purchases || 0); });
-      const rate = walk > 0 ? Math.round(pur / walk * 1000) / 10 : 0;
-      return { label: matrixStoreLabel ? matrixStoreLabel(m.store) : m.store, value: rate,
-               color: rate >= 80 ? '#16A34A' : rate >= 60 ? '#D97706' : '#DC2626', store: m.store };
-    }).filter(b => b.value > 0).sort((a, b) => b.value - a.value);
-    if (bars.length) {
-      html += '<div class="inv-section-title">🎯 ' + t('chart.store_closing') + '</div>'
-        + '<div class="chart-card">' + svgBarChart({ rows: bars, width: 640, height: 220, valueFmt: v => v.toFixed(1) + '%' }) + '</div>';
-    }
-  }
-  return html;
+  const series = (s.data.closing && s.data.closing.data && s.data.closing.data.stores) || [];
+  if (!series.length) return '';
+  const byStore = {}; series.forEach(r => byStore[r.store] = r);
+  const tRows = (s.data.targets && s.data.targets.targets) || [];
+  const closeTarget = {}; tRows.forEach(r => { if (r.target_type === 'closing_rate') closeTarget[r.store] = +r.target_value; });
+  const order = STORES_LIVE.filter(st => byStore[st]);
+  const groups = order.map(st => {
+    const r = byStore[st];
+    const tv = closeTarget[st];
+    return { label: matrixStoreLabel(st), bars: [
+      { value: tv != null ? tv : null, color: '#64748B', name: t('chart.closing.target') },
+      { value: r.avg12m != null ? +r.avg12m : null, color: '#A7C4BC', name: t('chart.closing.avg12m') },
+      { value: r.this_month != null ? +r.this_month : null, color: '#1F5F4A', name: t('chart.closing.this_month') },
+    ] };
+  });
+  return '<div class="inv-section-title">🎯 ' + t('chart.store_closing') + '</div>'
+    + '<div class="chart-card">' + svgGroupedBarChart({
+        groups, width: 700, height: 320, yMax: 100,
+        valueFmt: v => v.toFixed(0) + '%',
+        legend: [
+          { label: t('chart.closing.target'), color: '#64748B' },
+          { label: t('chart.closing.avg12m'), color: '#A7C4BC' },
+          { label: t('chart.closing.this_month'), color: '#1F5F4A' },
+        ],
+        onMissingTap: "gotoTargets('closing_rate')",
+        missingLabel: t('chart.closing.not_set'),
+        missingTitle: t('chart.closing.not_set_tip'),
+      }) + '</div>';
 }
 
 function renderCustomerRaceCards(s) {
