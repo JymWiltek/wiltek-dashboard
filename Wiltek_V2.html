@@ -1440,7 +1440,7 @@ window.i18n = {
     'overview.hero.closing': { zh: '成交率',     en: 'Closing Rate' },
     'overview.hero.basket':  { zh: '客单 (AOV)', en: 'Basket Size (AOV)' },
     'customer.section.race':    { zh: '种族拆分', en: 'Walk-in by Ethnicity' },
-    'customer.section.age':     { zh: '会员年龄分段', en: 'Member Age Segments' },
+    'customer.section.age':     { zh: '会员入会时长分段', en: 'Member Tenure Segments' },
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
     'customer.section.trend':   { zh: '12 月走廊客趋势', en: '12-Month Walk-in Trend' },
@@ -1898,7 +1898,8 @@ window.i18n = {
     'customer.aux.vip':             { zh: '沉睡 VIP / 老客流失 / Top VIP · 可按店筛选', en: 'Dormant VIP / lapsed loyal / Top VIP · filter by store' },
     'customer.aux.action':          { zh: '异常自动检测 + 归因 + 派派', en: 'Auto anomaly detection + root cause + assign' },
     // renderCustomerAgeTiers
-    'customer.agetier.gap':         { zh: 'customers_payload 未返回数据 — 会员分段不可用。', en: 'customers_payload returned no data — age segments unavailable. ' },
+    'customer.agetier.gap':         { zh: 'customers_payload 未返回数据 — 入会时长分段不可用。', en: 'customers_payload returned no data — tenure segments unavailable. ' },
+    'customer.tenure.sync_hover':   { zh: '顾客购买数据每月 5 号前后同步一次。最新数据:{last}。下次同步约:{next}。', en: 'Customer purchase data syncs once monthly, around the 5th. Last sync: {last}. Next sync expected ~{next}.' },
     'customer.agetier.title':       { zh: '{tier} 会员', en: '{tier} members' },
     'customer.agetier.spend':       { zh: '本月消费', en: 'This-month spend' },
     'customer.agetier.repeat':      { zh: '复购率', en: 'Repurchase rate' },
@@ -2615,17 +2616,18 @@ async function fetchCustomers(signal) {
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
   if (getEffectiveBranch()) payloadQ.set('branch', getEffectiveBranch());
   const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
-  const [payload, race, matrix, trend, agecat, actions] = await Promise.all([
+  const [payload, race, matrix, trend, agecat, actions, freshness] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-trend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-age-category', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'actions', assigner: myRoleId }), signal).catch(e => ({ ok: false, degraded: true, degraded_reason: e.message, actions: [] })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'months' }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, meta: null })),
   ]);
   if (race && race.session_role) state.role = race.session_role;
   else if (payload && payload.session_role) state.role = payload.session_role;
-  return { payload, race, matrix, trend, agecat, actions };
+  return { payload, race, matrix, trend, agecat, actions, freshness };
 }
 async function fetchProducts(signal) {
   // Phase 8: Products Owner BI — 1 RPC (mode=phase8) returns the 8-section
@@ -5877,6 +5879,13 @@ function renderCustomerAgeTiers(s) {
   const by12 = {}; b12.forEach(x => by12[x.key] = x);
   const by1  = {}; b1.forEach(x => by1[x.key] = x);
   const total = (pd.summary && pd.summary.total_members) || b12.reduce((a, x) => a + (x.n || 0), 0);
+  // PR-D: customer_buy_lines syncs monthly (~5th). When this month has no cbl
+  // rows the 1m bucket is empty → show "—" for this-month spend, not RM 0.
+  const noCbl = b1.length === 0;
+  const fr = (s.data.freshness && s.data.freshness.meta) || {};
+  const lastSync = fr.cbl_latest || '—';
+  const nextSync = (function (ym) { if (!ym) return '—'; const p = ym.split('-'); let y = +p[0], mo = (+p[1]) + 2; while (mo > 12) { mo -= 12; y++; } return y + '-' + String(mo).padStart(2, '0') + '-05'; })(fr.cbl_latest);
+  const spendHover = t('customer.tenure.sync_hover', { last: lastSync, next: nextSync });
   const cards = AGE_TIER_ORDER.map(k => {
     const r = by12[k] || { n: 0, amt: 0, aov: 0, repeat_pct: null };
     const m = by1[k]  || { amt: 0 };
@@ -5889,7 +5898,7 @@ function renderCustomerAgeTiers(s) {
       +   '<div class="kpi-status-row"><span class="kpi-pct" style="color:var(--s4-text-primary);font-size:16px">' + t('customer.share_member', { pct: sharePct.toFixed(1) }) + '</span></div>'
       +   '<div class="kpi-bar"><div class="kpi-bar-fill" style="width:' + Math.min(100, sharePct) + '%;background:var(--brand)"></div></div>'
       +   '<div class="kpi-meta">'
-      +     t('customer.agetier.spend') + ' <strong>' + fmtRM(m.amt) + '</strong><br>'
+      +     t('customer.agetier.spend') + ' <strong>' + (noCbl ? '<span title="' + spendHover + '" style="color:var(--s4-text-light)">—</span>' : fmtRM(m.amt)) + '</strong><br>'
       +     t('customer.agetier.repeat') + ' <strong>' + (r.repeat_pct != null ? Number(r.repeat_pct).toFixed(1) + '%' : '—') + '</strong> ' + t('customer.agetier.repeat_note') + '<br>'
       +     t('customer.agetier.aov') + ' <strong>' + (r.aov != null ? fmtRM(r.aov) : '—') + '</strong>'
       +   '</div>'

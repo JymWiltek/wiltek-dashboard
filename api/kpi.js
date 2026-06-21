@@ -450,10 +450,16 @@ async function handleMonths(req, res) {
   const latestSales = salesMonths[0] || months[0] || null;
   // M-6 (2026-06-20): lightweight data-completeness meta for the shared banner
   // across Overview / Inventory / Customers. All cheap single-row probes.
-  const meta = { floatation_latest: null, inventory_real_latest: null, financials_latest: null };
+  const meta = { floatation_latest: null, inventory_real_latest: null, financials_latest: null, cbl_latest: null };
   try {
     const { data: fl } = await sb().from('floatation').select('date').order('date', { ascending: false }).limit(1).maybeSingle();
     if (fl) meta.floatation_latest = fl.date;
+  } catch (_) { /* best-effort */ }
+  try {
+    // PR-D/A: customer_buy_lines is the monthly-cron purchase source; the customer
+    // page uses this for the tenure sync-hover + freshness chip.
+    const { data: cbl } = await sb().from('customer_buy_lines').select('year_month').order('year_month', { ascending: false }).limit(1).maybeSingle();
+    if (cbl) meta.cbl_latest = cbl.year_month;
   } catch (_) { /* best-effort */ }
   try {
     const { data: snap } = await sb().from('inventory_snapshots').select('snapshot_date').eq('is_synthetic', false).order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
