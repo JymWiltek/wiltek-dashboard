@@ -6227,9 +6227,11 @@ function renderCustomerStoreRaceMatrix(s) {
     + '<td class="num">' + fmtInt(tot.mem) + '</td></tr>';
   return ''
     + '<div class="s4-drill"><div class="s4-drill-body">'
+    +   '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'  // PR-C: scoped horizontal scroll on mobile (7 cols > 380px); does NOT touch shared .s4-drill-body
     +   '<table><thead><tr>'
     +     '<th>' + t('customer.col.store') + '</th><th>' + t('race.short.chinese') + '</th><th>' + t('race.short.malay') + '</th><th>' + t('race.short.indian') + '</th><th>' + t('race.short.other') + '</th><th>' + t('customer.col.total_walkin') + '</th><th title="' + t('customer.col.total_members_tip') + '">' + t('customer.col.total_members') + '</th>'
     +   '</tr></thead><tbody>' + rows + totRow + '</tbody></table>'
+    +   '</div>'
     +   '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.matrix.footnote') + '</div>'
     + '</div></div>';
 }
