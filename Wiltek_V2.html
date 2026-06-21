@@ -1441,7 +1441,6 @@ window.i18n = {
     'overview.hero.basket':  { zh: '客单 (AOV)', en: 'Basket Size (AOV)' },
     'customer.section.race':    { zh: '种族拆分', en: 'Walk-in by Ethnicity' },
     'customer.section.age':     { zh: '会员年龄分段', en: 'Member Age Segments' },
-    'customer.section.age_cat': { zh: '会员年龄段 × 品类', en: 'Age × Category' },
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
     'customer.section.trend':   { zh: '12 月走廊客趋势', en: '12-Month Walk-in Trend' },
@@ -1895,7 +1894,6 @@ window.i18n = {
     'customer.header.sub':          { zh: '会员资产 + 走廊客转化 + 流失/沉睡名单', en: 'Member assets + walk-in conversion + churn/dormant lists' },
     'customer.aux.race':            { zh: '本月走廊客 by race · 含走廊客目标', en: 'This month walk-in by ethnicity · with walk-in target' },
     'customer.aux.age':             { zh: '入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价', en: 'Membership tenure · members / this-month spend / repurchase rate / 12M AOV' },
-    'customer.aux.age_cat':         { zh: '本月销售 · 各龄段买什么 (customer_buy_lines)', en: 'This-month sales · what each age segment buys (customer_buy_lines)' },
     'customer.aux.matrix':          { zh: 'walk-in → 购买 (成交率)', en: 'walk-in → bought (closing rate)' },
     'customer.aux.vip':             { zh: '沉睡 VIP / 老客流失 / Top VIP · 可按店筛选', en: 'Dormant VIP / lapsed loyal / Top VIP · filter by store' },
     'customer.aux.action':          { zh: '异常自动检测 + 归因 + 派派', en: 'Auto anomaly detection + root cause + assign' },
@@ -1981,12 +1979,6 @@ window.i18n = {
     'customer.col.cust_type':       { zh: '客型', en: 'Type' },
     'customer.col.visits_12m':      { zh: '12M 访问', en: '12M Visits' },
     'customer.cell.months':         { zh: '{n} 月', en: '{n} mo' },
-    // renderCustomerAgeCategoryCrosstab
-    'customer.crosstab.no_data':       { zh: 'customer_buy_lines 本月无品类数据', en: 'customer_buy_lines has no category data this month' },
-    'customer.crosstab.uncategorized': { zh: '(未分类)', en: '(Uncategorized)' },
-    'customer.col.category':           { zh: '品类', en: 'Category' },
-    'customer.col.total':              { zh: '合计', en: 'Total' },
-    'customer.crosstab.footnote':      { zh: '每格: 本月销售 RM · 底色越深销售越高 · top 8 品类', en: 'Each cell: this-month sales RM · darker = higher sales · top 8 categories' },
     // renderCustomerTrend
     'customer.trend.gap':           { zh: 'customer_trend RPC 未部署或无数据。', en: 'customer_trend RPC not deployed or no data.' },
     'customer.trend.footnote':      { zh: '月度走廊客 (floatation 月颗粒,自 2026-01 起有记录)。', en: 'Monthly walk-in (floatation monthly grain, recorded since 2026-01).' },
@@ -5853,9 +5845,6 @@ function renderCustomers(s) {
     // 第 2 层 — 会员年龄分段 (这群人多忠)
     + '<div class="s4-section-title">' + t('customer.section.age') + ' <span class="s4-section-aux">' + t('customer.aux.age') + '</span></div>'
     + renderCustomerAgeTiers(s)
-    // 第 3 层 — 年龄段 × 品类 (他们买什么) — NEW
-    + '<div class="s4-section-title">' + t('customer.section.age_cat') + ' <span class="s4-section-aux">' + t('customer.aux.age_cat') + '</span></div>'
-    + renderCustomerAgeCategoryCrosstab(s)
     // 第 4 层 — 6 店 × 种族 (哪店哪族表现好)
     + renderCustomerCharts(s)
     + '<div class="s4-section-title">' + t('customer.section.matrix') + ' <span class="s4-section-aux">' + t('customer.aux.matrix') + '</span></div>'
@@ -6324,58 +6313,6 @@ function renderCustomerLists(s) {
     +   '<div style="margin-left:auto;display:flex;align-items:center;padding:6px 14px">' + storeSel + '</div>'
     + '</div>'
     + '<div class="s4-drill-body">' + body + '</div></div>';
-}
-
-// 会员年龄段 × 品类 cross-tab (第 3 层 · NEW) — from customer_age_category_crosstab.
-// 横 = 4 龄段, 纵 = top 8 品类 (按总销售). 每格 = 本月销售 RM, 空 → —.
-// 格底色按 sales 深浅 (绿色渐变), 一眼看出龄段×品类热点。Jym:「这群顾客买什么」。
-function renderCustomerAgeCategoryCrosstab(s) {
-  const resp = s.data.agecat || {};
-  const pd = resp.data;
-  const rowsRaw = (pd && pd.rows) || [];
-  if (resp.degraded || !pd || pd.status === 'data_gap' || rowsRaw.length === 0) {
-    const msg = (pd && pd.message) || resp.degraded_reason || t('customer.crosstab.no_data');
-    return '<div class="s4-drill"><div class="s4-drill-body"><div class="s4-data-gap">⚠ ' + escapeHtml(msg) + '</div></div></div>';
-  }
-  const ages = AGE_TIER_ORDER;
-  // pivot: category -> {age: sales}; track category totals for top-8 select.
-  const byCat = {};
-  rowsRaw.forEach(r => {
-    const cat = r.category || t('customer.crosstab.uncategorized');
-    if (!byCat[cat]) byCat[cat] = { total: 0, cells: {} };
-    byCat[cat].cells[r.age_bucket] = (byCat[cat].cells[r.age_bucket] || 0) + (+r.sales || 0);
-    byCat[cat].total += (+r.sales || 0);
-  });
-  const cats = Object.keys(byCat).sort((a, b) => byCat[b].total - byCat[a].total).slice(0, 8);
-  // max cell value (across displayed cats) for color depth.
-  let maxCell = 0;
-  cats.forEach(c => ages.forEach(a => { const v = byCat[c].cells[a] || 0; if (v > maxCell) maxCell = v; }));
-  const cellBg = (v) => {
-    if (!v || maxCell <= 0) return '';
-    const alpha = 0.08 + 0.55 * (v / maxCell); // 0.08–0.63 green tint
-    return 'background:rgba(31,95,74,' + alpha.toFixed(3) + ');' + (alpha > 0.4 ? 'color:#fff;' : '');
-  };
-  const head = '<tr><th>' + t('customer.col.category') + '</th>' + ages.map(a => '<th>' + a + '</th>').join('') + '<th>' + t('customer.col.total') + '</th></tr>';
-  const body = cats.map(c => {
-    const cells = ages.map(a => {
-      const v = byCat[c].cells[a] || 0;
-      return v > 0
-        ? '<td style="' + cellBg(v) + '">' + fmtRM(v) + '</td>'
-        : '<td style="color:var(--s4-text-light)">—</td>';
-    }).join('');
-    return '<tr><td><strong>' + escapeHtml(c) + '</strong></td>' + cells + '<td><strong>' + fmtRM(byCat[c].total) + '</strong></td></tr>';
-  }).join('');
-  // column totals row
-  const colTot = ages.map(a => {
-    let t = 0; cats.forEach(c => { t += byCat[c].cells[a] || 0; });
-    return '<td><strong>' + fmtRM(t) + '</strong></td>';
-  }).join('');
-  const grand = cats.reduce((acc, c) => acc + byCat[c].total, 0);
-  const totRow = '<tr class="total-row" style="font-weight:700;background:var(--s4-amber-bg-soft)"><td>' + t('customer.col.total') + '</td>' + colTot + '<td>' + fmtRM(grand) + '</td></tr>';
-  return '<div class="s4-drill"><div class="s4-drill-body">'
-    + '<table><thead>' + head + '</thead><tbody>' + body + totRow + '</tbody></table>'
-    + '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.crosstab.footnote') + '</div>'
-    + '</div></div>';
 }
 
 // 12 月走廊客趋势 — single line (floatation monthly). From customer_trend RPC.
