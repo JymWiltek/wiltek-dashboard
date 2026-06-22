@@ -2043,6 +2043,7 @@ window.i18n = {
     // renderCustomerLists
     'customer.lists.gap':           { zh: 'customers_payload 未返回数据 — 客户名单不可用。', en: 'customers_payload returned no data — customer lists unavailable.' },
     'customer.lists.all_stores':    { zh: '全部店', en: 'All stores' },
+    'customer.lists.closed_tag':    { zh: '(已关)', en: '(closed)' },
     'customer.lists.cap_note':      { zh: '只显示前 {cap} 条,共 {total} 条。', en: 'Showing first {cap} of {total}.' },
     'customer.lists.sleeping_empty':{ zh: '无沉睡 VIP (近 3 月 0 单的高值会员)', en: 'No dormant VIP (high-value members with 0 orders in last 3 months)' },
     'customer.lists.churn_empty':   { zh: '无高值流失老客 (终身 ≥ RM {thr},6 月+ 没回)', en: 'No high-value lapsed loyal members (lifetime ≥ RM {thr}, not back 6 months+)' },
@@ -6608,10 +6609,10 @@ function renderCustomerLists(s) {
   const thr = (pd.churn && pd.churn.summary && pd.churn.summary.high_value_threshold) || 1000;
 
   // store filter options (union of top100 + churn branches)
-  const storeSet = new Set();
-  top.forEach(r => { if (r.branch) storeSet.add(r.branch); });
-  churnRows.forEach(r => { if (r.branch) storeSet.add(r.branch); });
-  const stores = sortStoresByCode(Array.from(storeSet));
+  // §5 Option A: dropdown lists ONLY live operating stores (+ "All stores").
+  // Closed stores (W11/WCO/W10/W12/WEX) are NOT pickable filters — but their
+  // members still appear under "All stores" (rows are NOT filtered out).
+  const stores = STORES_LIVE.slice();
   const matchStore = (b) => !custVipStore || b === custVipStore;
   // §5 RBAC: only owner/staff get the store dropdown; store-bound managers are
   // locked to their own store server-side (customers_payload p_branch) → show a
@@ -6638,7 +6639,10 @@ function renderCustomerLists(s) {
     ? '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.lists.cap_note', { cap: CAP, total: fmtInt(n) }) + '</div>'
     : '';
   const nameCell = (r) => '<td><div style="font-weight:600">' + escapeHtml(r.name || r.mc || '—') + '</div><div style="font-size:11px;color:#6B7280">' + escapeHtml(r.mc || '') + '</div></td>';
-  const storeTag = (b) => '<td><strong>' + escapeHtml(b || '—') + '</strong></td>';
+  // §5 Option A #4: closed-store members stay in the list (esp. win-back targets);
+  // tag their home store "(closed)"/"(已关)" so it's clear without removing them.
+  const storeTag = (b) => '<td><strong>' + escapeHtml(b || '—') + '</strong>'
+    + (b && !isLiveStore(b) ? ' <span class="muted" style="font-size:10px">' + t('customer.lists.closed_tag') + '</span>' : '') + '</td>';
 
   let body;
   if (custListTab === 'sleeping') {
