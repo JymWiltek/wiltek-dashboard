@@ -996,6 +996,13 @@ input.target-input.target-flash { animation: target-flash 1.4s ease-out; }
 .cust-target-band .ctb-sub { font-size: 13px; font-weight: 600; margin-top: 4px; min-height: 18px; }
 .cust-target-band .ctb-fb { font-size: 11px; color: #9CA3AF; font-weight: 400; }
 @media (max-width: 767px) { .cust-target-band { grid-template-columns: 1fr; } }
+/* §9 motto strip + §6 web form + §7 marketing charts */
+.app-motto { flex: 1; text-align: center; font-weight: 800; letter-spacing: 0.5px; color: var(--brand, #1F5F4A); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 16px; }
+.web-pv-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }
+.web-pv-form input { height: 32px; width: 140px; border: 1px solid var(--s4-divider, #E5E7EB); border-radius: 6px; padding: 0 8px; }
+.web-pv-status { font-size: 12px; color: #6B7280; }
+.cust-mkt-charts { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+@media (max-width: 767px) { .app-motto { display: none; } .cust-mkt-charts { flex-direction: column; } }
 
 /* SECTION TITLE — used between hero/matrix/drill/actions */
 .s4-section-title {
@@ -1338,6 +1345,8 @@ input.target-input.target-flash { animation: target-flash 1.4s ease-out; }
       <span class="brand-name">Wiltek Portal</span>
       <span class="brand-tag">V2</span>
     </div>
+    <!-- §9 motto strip — slogan, intentionally English in both languages (whitelisted). -->
+    <div class="app-motto" title="Do It Right The First Time !!">Do It Right The First Time !!</div>
     <div class="header-right">
       <div class="role-chip"><strong id="userName">—</strong> · <span id="userRole">—</span></div>
       <!-- Branch picker — options injected by populateBranchPicker().
@@ -1474,7 +1483,38 @@ window.i18n = {
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
     'customer.section.trend':   { zh: '12 月走廊客趋势', en: '12-Month Walk-in Trend' },
-    'customer.section.action':  { zh: '客户行动计划', en: 'Customer Action Plan' },
+    'customer.section.action':  { zh: '行动中心', en: 'Action Center' },
+    // Marketing rebuild §2/§3/§5/§6/§7 section copy
+    'customer.ethmix.title':       { zh: '种族客流构成 · 按月', en: 'Walk-in Mix by Ethnicity · Monthly' },
+    'customer.ethmix.sub':         { zh: '每月堆叠 · 看族裔占比随时间变化', en: 'Stacked per month · how the ethnicity mix shifts over time' },
+    'customer.ethmix.footnote':    { zh: '族裔人数与闸机客流为分开记录,加总可能与总客流略有出入。', en: 'Ethnicity counts are recorded separately from turnstile footfall and may not sum exactly to total walk-in.' },
+    'customer.tenurespend.title':  { zh: '会员入会时长 · 月度消费', en: 'Member Tenure · Monthly Spend' },
+    'customer.tenurespend.sub':    { zh: '数据累积中 — 目前 {n} 个月。顾客购买数据每月约 5 号同步。', en: 'History building — {n} months available so far. Customer purchase data syncs monthly (~5th).' },
+    'customer.tenurespend.footnote': { zh: '按会员入会时长(customers.enrol_date)分桶,与上方分段卡片口径一致;未来日期已剔除。', en: 'Bucketed by member enrolment tenure (customers.enrol_date) — reconciles to the segment cards above; future-dated enrolments excluded.' },
+    'customer.lists.export':       { zh: '导出 CSV', en: 'Export CSV' },
+    'customer.lists.locked_store': { zh: '锁定门店 {store}', en: 'Locked to {store}' },
+    'customer.web.title':          { zh: '网站浏览量', en: 'Web Pageviews' },
+    'customer.web.sub':            { zh: '按月 · 业主可直接填写', en: 'By month · owner can enter directly' },
+    'customer.web.empty':          { zh: '尚未记录网站浏览量 — 填入本月数字。', en: 'No web traffic recorded yet — enter this month\'s pageviews.' },
+    'customer.web.form_label':     { zh: '{ym} 浏览量:', en: '{ym} pageviews:' },
+    'customer.web.save':           { zh: '保存', en: 'Save' },
+    'customer.web.saving':         { zh: '保存中…', en: 'Saving…' },
+    'customer.web.saved':          { zh: '✓ 已保存', en: '✓ Saved' },
+    'customer.web.save_failed':    { zh: '保存失败: ', en: 'Save failed: ' },
+    'customer.web.invalid':        { zh: '请输入有效数字', en: 'Enter a valid number' },
+    'customer.mkt.title':          { zh: '营销投放 · 本月', en: 'Marketing Spend · This Month' },
+    'customer.mkt.sub':            { zh: '按语言 / 渠道 · 含每获取成本', en: 'By language / channel · with cost-per-acquisition' },
+    'customer.mkt.empty':          { zh: '{ym} 营销数据未载入 — 数据管道待接入。', en: 'Marketing data not loaded for {ym} — ingest pipeline pending.' },
+    'customer.mkt.total':          { zh: '本月总投放', en: 'Total Spend' },
+    'customer.mkt.by_lang':        { zh: '按语言', en: 'By Language' },
+    'customer.mkt.by_channel':     { zh: '按渠道', en: 'By Channel' },
+    'customer.mkt.col_campaign':   { zh: '活动', en: 'Campaign' },
+    'customer.mkt.col_lang':       { zh: '语言', en: 'Language' },
+    'customer.mkt.col_channel':    { zh: '渠道', en: 'Channel' },
+    'customer.mkt.col_spend':      { zh: '投放', en: 'Spend' },
+    'customer.mkt.col_attr':       { zh: '归因销售', en: 'Attr. Sales' },
+    'customer.mkt.col_cpa':        { zh: '每获取成本', en: 'CPA' },
+    'app.motto':                   { zh: 'Do It Right The First Time !!', en: 'Do It Right The First Time !!' },
     'customer.tab.dormant_vip':  { zh: '😴 沉睡 VIP', en: '😴 Dormant VIP' },
     'customer.tab.lapsed_loyal': { zh: '⚠ 老客流失', en: '⚠ Lapsed Loyal' },
     'customer.tab.top_vip':      { zh: '⭐ Top VIP',  en: '⭐ Top VIP' },
@@ -1926,7 +1966,7 @@ window.i18n = {
     'customer.aux.age':             { zh: '入会时长 · 会员数 / 本月消费 / 复购率 / 12M 客单价', en: 'Membership tenure · members / this-month spend / repurchase rate / 12M AOV' },
     'customer.aux.matrix':          { zh: 'walk-in → 购买 (成交率)', en: 'walk-in → bought (closing rate)' },
     'customer.aux.vip':             { zh: '沉睡 VIP / 老客流失 / Top VIP · 可按店筛选', en: 'Dormant VIP / lapsed loyal / Top VIP · filter by store' },
-    'customer.aux.action':          { zh: '异常自动检测 + 归因 + 派派', en: 'Auto anomaly detection + root cause + assign' },
+    'customer.aux.action':          { zh: '自动异常检测 + 根因 + 派单追踪', en: 'Auto anomaly detection + root cause + assignment tracking' },
     // renderCustomerAgeTiers
     'customer.agetier.gap':         { zh: 'customers_payload 未返回数据 — 入会时长分段不可用。', en: 'customers_payload returned no data — tenure segments unavailable. ' },
     'customer.tenure.sync_hover':   { zh: '顾客购买数据每月 5 号前后同步一次。最新数据:{last}。下次同步约:{next}。', en: 'Customer purchase data syncs once monthly, around the 5th. Last sync: {last}. Next sync expected ~{next}.' },
@@ -2003,6 +2043,7 @@ window.i18n = {
     // renderCustomerLists
     'customer.lists.gap':           { zh: 'customers_payload 未返回数据 — 客户名单不可用。', en: 'customers_payload returned no data — customer lists unavailable.' },
     'customer.lists.all_stores':    { zh: '全部店', en: 'All stores' },
+    'customer.lists.closed_tag':    { zh: '(已关)', en: '(closed)' },
     'customer.lists.cap_note':      { zh: '只显示前 {cap} 条,共 {total} 条。', en: 'Showing first {cap} of {total}.' },
     'customer.lists.sleeping_empty':{ zh: '无沉睡 VIP (近 3 月 0 单的高值会员)', en: 'No dormant VIP (high-value members with 0 orders in last 3 months)' },
     'customer.lists.churn_empty':   { zh: '无高值流失老客 (终身 ≥ RM {thr},6 月+ 没回)', en: 'No high-value lapsed loyal members (lifetime ≥ RM {thr}, not back 6 months+)' },
@@ -2647,7 +2688,7 @@ async function fetchCustomers(signal) {
   const payloadQ = new URLSearchParams({ view: 'customer-payload', month: m });
   if (getEffectiveBranch()) payloadQ.set('branch', getEffectiveBranch());
   const myRoleId = (typeof userRoleId === 'function' ? userRoleId(state.user) : null) || 'owner';
-  const [payload, race, matrix, trend, agecat, actions, freshness, closing, targets] = await Promise.all([
+  const [payload, race, matrix, trend, agecat, actions, freshness, closing, targets, ethnicityMonths, tenureSpend, pageviews, marketing] = await Promise.all([
     getJSON('/api/kpi?' + payloadQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + raceQ.toString(), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-matrix', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
@@ -2657,10 +2698,14 @@ async function fetchCustomers(signal) {
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'months' }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, meta: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-closing-series', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
     getJSON('/api/kpi?' + new URLSearchParams({ view: 'targets', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, targets: [] })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-ethnicity-months', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'customer-tenure-spend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, data: null })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'web-pageviews' }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, rows: [] })),
+    getJSON('/api/kpi?' + new URLSearchParams({ view: 'marketing-spend', month: m }), signal).catch(e => ({ degraded: true, degraded_reason: e.message, rows: [] })),
   ]);
   if (race && race.session_role) state.role = race.session_role;
   else if (payload && payload.session_role) state.role = payload.session_role;
-  return { payload, race, matrix, trend, agecat, actions, freshness, closing, targets };
+  return { payload, race, matrix, trend, agecat, actions, freshness, closing, targets, ethnicityMonths, tenureSpend, pageviews, marketing };
 }
 async function fetchProducts(signal) {
   // Phase 8: Products Owner BI — 1 RPC (mode=phase8) returns the 8-section
@@ -3736,7 +3781,7 @@ function svgEscape(s) { return String(s).replace(/[<>&"']/g, c => ({
 function svgLineChart(opts) {
   // opts: { series: [{name, color, points:[{x,y}]}, ...], width, height, yFmt }
   const W = opts.width || 600, H = opts.height || 200;
-  const padL = 50, padR = 80, padT = 14, padB = 28;
+  const padL = 50, padR = 80, padT = opts.pointLabels ? 26 : 14, padB = 28;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const series = (opts.series || []).filter(s => s.points && s.points.length > 0);
   if (series.length === 0) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
@@ -3764,7 +3809,7 @@ function svgLineChart(opts) {
     const y = padT + (plotH / 4) * i;
     const v = yMax - ((yMax - yMin) * i / 4);
     svg += '<line class="grid-line" x1="' + padL + '" x2="' + (padL + plotW) + '" y1="' + y + '" y2="' + y + '"/>';
-    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + (opts.yFmt ? opts.yFmt(v) : Math.round(v)) + '</text>';
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + (opts.yFmt ? opts.yFmt(Math.round(v)) : Math.round(v)) + '</text>';
   }
   // x-axis labels (every 2nd or so to avoid overlap)
   const step = Math.max(1, Math.ceil(xs.length / 8));
@@ -3782,6 +3827,9 @@ function svgLineChart(opts) {
     svg += '<polyline class="data-line" points="' + pts + '" stroke="' + s.color + '"/>';
     for (let i = 0; i < s.points.length; i++) {
       svg += '<circle class="data-dot" cx="' + xToPx(i) + '" cy="' + yToPx(s.points[i].y) + '" r="2.5" fill="' + s.color + '"/>';
+      if (opts.pointLabels) {
+        svg += '<text class="legend-text" x="' + xToPx(i) + '" y="' + (yToPx(s.points[i].y) - 7) + '" text-anchor="middle" font-size="10" font-weight="600">' + svgEscape(opts.yFmt ? opts.yFmt(s.points[i].y) : Math.round(s.points[i].y)) + '</text>';
+      }
     }
   }
   // legend (right side stacked)
@@ -3906,6 +3954,50 @@ function svgGroupedBarChart(opts) {
     svg += '<rect x="' + lx + '" y="' + (H - 13) + '" width="9" height="9" fill="' + l.color + '" rx="2"/>';
     svg += '<text class="legend-text" x="' + (lx + 13) + '" y="' + (H - 5) + '">' + svgEscape(l.label) + '</text>';
     lx += 26 + (l.label.length * 6.4);
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// Marketing rebuild §2/§3 — vertical stacked bar (one bar per month).
+// opts:{ groups:[{label, segments:[{value,color,name}]}], width, height, valueFmt, legend }
+// viewBox scales → labels never clip. Per-segment <title> = value + % of bar total.
+function svgStackedBarChart(opts) {
+  const W = opts.width || 700, H = opts.height || 300;
+  const padL = 46, padR = 14, padT = 18, padB = 46;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const groups = opts.groups || [];
+  if (!groups.length) return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '"></svg>';
+  const totals = groups.map(g => (g.segments || []).reduce((a, s) => a + (s.value || 0), 0));
+  const maxT = Math.max(...totals, 1);
+  const yScale = v => plotH * (v / maxT);
+  const gW = plotW / groups.length;
+  const barW = Math.min(gW * 0.55, 46);
+  const valueFmt = opts.valueFmt || (v => Math.round(v).toString());
+  let svg = '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  for (let i = 0; i <= 4; i++) {
+    const v = maxT * i / 4, y = padT + plotH - yScale(v);
+    svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#E5E7EB" stroke-width="1"/>';
+    svg += '<text class="axis-text" x="' + (padL - 6) + '" y="' + (y + 3) + '" text-anchor="end">' + valueFmt(v) + '</text>';
+  }
+  groups.forEach((g, gi) => {
+    const cx = padL + gi * gW + gW / 2, bx = cx - barW / 2;
+    let yCursor = padT + plotH; const total = totals[gi];
+    (g.segments || []).forEach(seg => {
+      const h = yScale(seg.value || 0); if (h <= 0) return;
+      const y = yCursor - h;
+      const pct = total > 0 ? ((seg.value / total) * 100).toFixed(1) : '0';
+      svg += '<rect x="' + bx + '" y="' + y + '" width="' + barW + '" height="' + h + '" fill="' + (seg.color || '#888') + '"><title>' + svgEscape((seg.name || '') + ': ' + valueFmt(seg.value || 0) + ' (' + pct + '%)') + '</title></rect>';
+      yCursor = y;
+    });
+    svg += '<text class="legend-text" x="' + cx + '" y="' + (yCursor - 4) + '" text-anchor="middle" font-size="10" font-weight="600">' + valueFmt(total) + '</text>';
+    svg += '<text class="axis-text" x="' + cx + '" y="' + (padT + plotH + 16) + '" text-anchor="middle">' + svgEscape(g.label || '') + '</text>';
+  });
+  let lx = padL;
+  (opts.legend || []).forEach(l => {
+    svg += '<rect x="' + lx + '" y="' + (H - 12) + '" width="9" height="9" fill="' + l.color + '" rx="2"/>';
+    svg += '<text class="legend-text" x="' + (lx + 13) + '" y="' + (H - 4) + '">' + svgEscape(l.label) + '</text>';
+    lx += 26 + l.label.length * 6.4;
   });
   svg += '</svg>';
   return svg;
@@ -5945,30 +6037,31 @@ function renderCustomers(s) {
       + '</div></div>';
   }
 
-  // Phase 6c 6+1 层链路: 谁来 → 多忠 → 买什么 → 哪店哪族 → 具体人 → 趋势 → 行动。
+  // Marketing-rebuild page order: grouped by dimension (STORE/CONVERSION → MEMBER
+  // → MARKETING EXECUTION). See spec §1-§8.
   return '<div class="sales-v3">'
     + header
     + completenessBanner()   // M-6
-    // PR-A — Sales Target Band (来客数 target vs actual) at the very top.
-    + renderCustomerTargetBand(s)
-    // 第 1 层 — 种族 (谁来)
-    + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'
-    + renderCustomerRaceCards(s)
-    // 第 2 层 — 会员年龄分段 (这群人多忠)
-    + '<div class="s4-section-title">' + t('customer.section.age') + ' <span class="s4-section-aux">' + t('customer.aux.age') + '</span></div>'
-    + renderCustomerAgeTiers(s)
-    // 第 4 层 — 6 店 × 种族 (哪店哪族表现好)
-    + renderCustomerCharts(s)
-    + '<div class="s4-section-title">' + t('customer.section.matrix') + ' <span class="s4-section-aux">' + t('customer.aux.matrix') + '</span></div>'
-    + renderCustomerStoreRaceMatrix(s)
-    // 第 5 层 — 客户名单 (具体到人)
-    + '<div class="s4-section-title">' + t('customer.section.vip') + ' <span class="s4-section-aux">' + t('customer.aux.vip') + '</span></div>'
-    + renderCustomerLists(s)
-    // 12M 趋势 (背景趋势, 保留)
-    + '<div class="s4-section-title">' + t('customer.section.trend') + '</div>'
+    // ── STORE / CONVERSION ──
+    + renderCustomerTargetBand(s)                                   // 1 chip + 2 band
+    + '<div class="s4-section-title">' + t('customer.section.trend') + '</div>'  // 3 trend (moved under band) §1
     + renderCustomerTrend(s)
-    // 第 6 层 — Action Plan (该做什么 · 收尾) — NEW
-    + '<div class="s4-section-title">' + t('customer.section.action') + ' <span class="s4-section-aux">' + t('customer.aux.action') + '</span></div>'
+    + '<div class="s4-section-title">' + t('customer.section.race') + ' <span class="s4-section-aux">' + t('customer.aux.race') + '</span></div>'  // 4
+    + renderCustomerRaceCards(s)
+    + renderCustomerEthnicityStacked(s)                            // 5 NEW §2
+    + '<div class="s4-section-title">' + t('customer.section.matrix') + ' <span class="s4-section-aux">' + t('customer.aux.matrix') + '</span></div>'  // 6
+    + renderCustomerStoreRaceMatrix(s)
+    + renderCustomerCharts(s)                                       // 7 closing chart (moved after matrix) §4
+    // ── MEMBER ──
+    + '<div class="s4-section-title">' + t('customer.section.age') + ' <span class="s4-section-aux">' + t('customer.aux.age') + '</span></div>'  // 8
+    + renderCustomerAgeTiers(s)
+    + renderCustomerTenureSpendStacked(s)                          // 9 NEW §3
+    + '<div class="s4-section-title">' + t('customer.section.vip') + ' <span class="s4-section-aux">' + t('customer.aux.vip') + '</span></div>'  // 10
+    + renderCustomerLists(s)
+    // ── MARKETING EXECUTION ──
+    + renderMarketingSpend(s)                                       // 11 NEW §7
+    + renderWebPageviews(s)                                         // 12 NEW §6
+    + '<div class="s4-section-title">' + t('customer.section.action') + ' <span class="s4-section-aux">' + t('customer.aux.action') + '</span></div>'  // 13 Action Center §8
     + renderCustomerActionPlan(s);
 }
 
@@ -6165,6 +6258,7 @@ function renderCustomerActionPlan(s) {
       recommended_action: a.recommended_action,
       recommended_assignee: a.recommended_assignee,
       store: a.store || null,
+      module: 'customer',
       source_url: '?view=customers&month=' + state.month + (a.store ? '&branch=' + a.store : ''),
       source_data: a,
     }).replace(/"/g, '&quot;');
@@ -6180,7 +6274,12 @@ function renderCustomerActionPlan(s) {
     ? '<div>' + anomCards + '</div>'
     : '<div class="s4-data-gap">' + t('customer.action.anomaly_empty') + '</div>';
 
-  const actions = (s.data.actions && Array.isArray(s.data.actions.actions)) ? s.data.actions.actions : [];
+  // §8: only customer-module actions appear on the Customer page (sales/inventory
+  // assignments stay on their own pages). Diagnosis: the stray Chinese seen earlier
+  // was stored CONTENT in actions_assigned (module='sales' seed rows), NOT an i18n
+  // leak — those rows are deleted + this filter prevents recurrence.
+  const actions = ((s.data.actions && Array.isArray(s.data.actions.actions)) ? s.data.actions.actions : [])
+    .filter(a => a.module === 'customer');
   const sentCards = actions.map(a => renderS4SentActionCard(a)).join('');
   const sentBlock = sentCards
     ? '<div>' + sentCards + '</div>'
@@ -6237,6 +6336,91 @@ function renderCustomerCharts(s) {
         missingLabel: t('chart.closing.not_set'),
         missingTitle: t('chart.closing.not_set_tip'),
       }) + '</div>';
+}
+
+// Marketing rebuild — ethnicity segment colours (reused by §2 stacked bar + legend).
+const RACE_SEG_COLORS = { chinese: '#1F5F4A', malay: '#4D9FFF', indian: '#D97706', other: '#94A3B8' };
+const TENURE_SEG_COLORS = { '<1y': '#A7C4BC', '1-5y': '#6BA292', '5-8y': '#3E7D6B', '8y+': '#1F5F4A' };
+
+// §2 — Walk-in by Ethnicity, stacked bar by month. % is of the 4-ethnicity stack
+// sum (NOT walk_in_total — they don't reconcile; see footnote).
+function renderCustomerEthnicityStacked(s) {
+  const resp = s.data.ethnicityMonths || {};
+  const months = (resp.data && resp.data.months) || [];
+  if (resp.degraded || !months.length) return '';
+  const groups = months.map(m => ({ label: m.ym, segments: RACE_ORDER.map(rk => ({ value: m[rk] || 0, color: RACE_SEG_COLORS[rk], name: t(RACE_META[rk].labelKey) })) }));
+  const legend = RACE_ORDER.map(rk => ({ label: t(RACE_META[rk].labelKey), color: RACE_SEG_COLORS[rk] }));
+  return '<div class="s4-section-title">' + t('customer.ethmix.title') + ' <span class="s4-section-aux">' + t('customer.ethmix.sub') + '</span></div>'
+    + '<div class="chart-card">' + svgStackedBarChart({ groups, width: 760, height: 300, valueFmt: fmtInt, legend }) + '</div>'
+    + '<div class="muted" style="font-size:11px;margin-top:6px">' + t('customer.ethmix.footnote') + '</div>';
+}
+
+// §3 — Member Tenure monthly spend, stacked bar. Direct from customer_buy_lines
+// (shallow: cbl has only 2026-04, 2026-05 today).
+function renderCustomerTenureSpendStacked(s) {
+  const resp = s.data.tenureSpend || {};
+  const months = (resp.data && resp.data.months) || [];
+  if (resp.degraded || !months.length) return '';
+  const buckets = [['lt1', '<1y'], ['y1_5', '1-5y'], ['y5_8', '5-8y'], ['y8p', '8y+']];
+  const groups = months.map(m => ({ label: m.ym, segments: buckets.map(([k, lbl]) => ({ value: +m[k] || 0, color: TENURE_SEG_COLORS[lbl], name: lbl })) }));
+  const legend = buckets.map(([k, lbl]) => ({ label: lbl, color: TENURE_SEG_COLORS[lbl] }));
+  return '<div class="s4-section-title">' + t('customer.tenurespend.title') + ' <span class="s4-section-aux">' + t('customer.tenurespend.sub', { n: months.length }) + '</span></div>'
+    + '<div class="chart-card">' + svgStackedBarChart({ groups, width: 760, height: 300, valueFmt: v => 'RM ' + fmtInt(v), legend }) + '</div>'
+    + '<div class="muted" style="font-size:11px;margin-top:6px">' + t('customer.tenurespend.footnote') + '</div>';
+}
+
+// §7 — Marketing Spend (this month). Empty today (ingestion is a separate task) →
+// clean empty state, never RM 0 donuts/bars.
+function renderMarketingSpend(s) {
+  const resp = s.data.marketing || {};
+  const rows = resp.rows || [];
+  const title = '<div class="s4-section-title">' + t('customer.mkt.title') + ' <span class="s4-section-aux">' + t('customer.mkt.sub') + '</span></div>';
+  if (resp.degraded) return title + '<div class="s4-data-gap">' + t('customer.mkt.empty', { ym: s.month }) + '</div>';
+  if (!rows.length) return title + '<div class="s4-data-gap">' + t('customer.mkt.empty', { ym: s.month }) + '</div>';
+  const PALETTE = ['#1F5F4A', '#4D9FFF', '#D97706', '#DC2626', '#94A3B8', '#8B5CF6'];
+  const total = rows.reduce((a, r) => a + (+r.spend_myr || 0), 0);
+  const byLang = {}, byChan = {};
+  rows.forEach(r => { const l = r.language || '—', c = r.channel || '—'; byLang[l] = (byLang[l] || 0) + (+r.spend_myr || 0); byChan[c] = (byChan[c] || 0) + (+r.spend_myr || 0); });
+  const langSlices = Object.entries(byLang).map(([k, v], i) => ({ label: k, value: v, color: PALETTE[i % PALETTE.length] }));
+  const chanBars = Object.entries(byChan).map(([k, v]) => ({ label: k, value: v, color: '#1F5F4A' })).sort((a, b) => b.value - a.value);
+  const tbl = rows.map(r => '<tr><td>' + escapeHtml(r.campaign_name || '—') + '</td><td>' + escapeHtml(r.language || '—') + '</td><td>' + escapeHtml(r.channel || '—') + '</td><td class="num">' + fmtRM(r.spend_myr || 0) + '</td><td class="num">' + (r.attributed_sales_myr != null ? fmtRM(r.attributed_sales_myr) : '—') + '</td><td class="num">' + (r.leads ? fmtRMpr((+r.spend_myr || 0) / r.leads) : '—') + '</td></tr>').join('');
+  return title
+    + '<div class="kpi-card" style="margin-bottom:12px;max-width:320px"><div class="kpi-title">' + t('customer.mkt.total') + '</div><div class="kpi-actual">' + fmtRM(total) + '</div></div>'
+    + '<div class="cust-mkt-charts"><div class="chart-card"><div class="muted" style="font-size:12px;margin-bottom:4px">' + t('customer.mkt.by_lang') + '</div>' + svgPieChart({ slices: langSlices, width: 360, height: 220, valueFmt: fmtRM }) + '</div>'
+    + '<div class="chart-card"><div class="muted" style="font-size:12px;margin-bottom:4px">' + t('customer.mkt.by_channel') + '</div>' + svgBarChart({ rows: chanBars, width: 360, height: 220, valueFmt: fmtRM }) + '</div></div>'
+    + '<div class="s4-drill"><div class="s4-drill-body"><table><thead><tr><th>' + t('customer.mkt.col_campaign') + '</th><th>' + t('customer.mkt.col_lang') + '</th><th>' + t('customer.mkt.col_channel') + '</th><th class="num">' + t('customer.mkt.col_spend') + '</th><th class="num">' + t('customer.mkt.col_attr') + '</th><th class="num">' + t('customer.mkt.col_cpa') + '</th></tr></thead><tbody>' + tbl + '</tbody></table></div></div>';
+}
+
+// §6 — Web Pageviews. Owner-only inline form to enter/update this month's number.
+function renderWebPageviews(s) {
+  const resp = s.data.pageviews || {};
+  const rows = resp.rows || [];
+  const canEdit = !!resp.can_edit;
+  const title = '<div class="s4-section-title">' + t('customer.web.title') + ' <span class="s4-section-aux">' + t('customer.web.sub') + '</span></div>';
+  const cur = rows.find(r => r.ym === s.month);
+  const form = canEdit
+    ? '<div class="web-pv-form"><label for="webPvInput">' + t('customer.web.form_label', { ym: s.month }) + '</label> '
+      + '<input type="number" min="0" step="1" id="webPvInput" class="target-input" value="' + (cur ? cur.pageviews : '') + '" /> '
+      + '<button class="s4-btn primary" onclick="savePageviews()">' + t('customer.web.save') + '</button>'
+      + '<span id="webPvStatus" class="web-pv-status"></span></div>'
+    : '';
+  const body = rows.length
+    ? '<div class="chart-card">' + svgBarChart({ rows: rows.map(r => ({ label: r.ym, value: r.pageviews, color: '#4D9FFF' })), width: 640, height: Math.max(120, rows.length * 34 + 28), valueFmt: fmtInt }) + '</div>'
+    : '<div class="s4-data-gap">' + t('customer.web.empty') + '</div>';
+  return title + form + body;
+}
+async function savePageviews() {
+  const el = document.getElementById('webPvInput'); if (!el) return;
+  const st = document.getElementById('webPvStatus'); const v = el.value;
+  if (v === '' || isNaN(+v) || +v < 0) { if (st) st.textContent = ' ' + t('customer.web.invalid'); return; }
+  if (st) st.textContent = ' ' + t('customer.web.saving');
+  try {
+    const r = await fetch('/api/sync', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ mode: 'pageviews_upsert', ym: state.month, pageviews: +v }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (st) st.textContent = ' ' + t('customer.web.saved');
+    loadView();
+  } catch (e) { if (st) st.textContent = ' ' + t('customer.web.save_failed') + e.message; }
 }
 
 // PR-A — top Sales Target Band (3 cols) + freshness chip. Reuses monthly_targets
@@ -6425,15 +6609,21 @@ function renderCustomerLists(s) {
   const thr = (pd.churn && pd.churn.summary && pd.churn.summary.high_value_threshold) || 1000;
 
   // store filter options (union of top100 + churn branches)
-  const storeSet = new Set();
-  top.forEach(r => { if (r.branch) storeSet.add(r.branch); });
-  churnRows.forEach(r => { if (r.branch) storeSet.add(r.branch); });
-  const stores = sortStoresByCode(Array.from(storeSet));
+  // §5 Option A: dropdown lists ONLY live operating stores (+ "All stores").
+  // Closed stores (W11/WCO/W10/W12/WEX) are NOT pickable filters — but their
+  // members still appear under "All stores" (rows are NOT filtered out).
+  const stores = STORES_LIVE.slice();
   const matchStore = (b) => !custVipStore || b === custVipStore;
-  const storeSel = '<select onchange="setCustVipStore(this.value)" style="height:30px;border:1px solid var(--s4-divider);border-radius:6px;padding:0 8px;font-size:13px;background:var(--s4-card-bg);color:var(--s4-text-primary)">'
-    + '<option value=""' + (custVipStore === '' ? ' selected' : '') + '>' + t('customer.lists.all_stores') + '</option>'
-    + stores.map(st => '<option value="' + st + '"' + (custVipStore === st ? ' selected' : '') + '>' + escapeHtml(matrixStoreLabel(st)) + '</option>').join('')
-    + '</select>';
+  // §5 RBAC: only owner/staff get the store dropdown; store-bound managers are
+  // locked to their own store server-side (customers_payload p_branch) → show a
+  // locked label, no dropdown they could use to query other stores.
+  const isMgr = state.role === 'manager';
+  const storeControl = isMgr
+    ? '<span class="muted" style="font-size:12px;padding:6px 0">🔒 ' + t('customer.lists.locked_store', { store: (state.user && state.user.store) || '' }) + '</span>'
+    : '<select onchange="setCustVipStore(this.value)" style="height:30px;border:1px solid var(--s4-divider);border-radius:6px;padding:0 8px;font-size:13px;background:var(--s4-card-bg);color:var(--s4-text-primary)">'
+      + '<option value=""' + (custVipStore === '' ? ' selected' : '') + '>' + t('customer.lists.all_stores') + '</option>'
+      + stores.map(st => '<option value="' + st + '"' + (custVipStore === st ? ' selected' : '') + '>' + escapeHtml(matrixStoreLabel(st)) + '</option>').join('')
+      + '</select>';
 
   const tabs = [
     { id: 'sleeping', label: t('customer.tab.dormant_vip') },
@@ -6449,7 +6639,10 @@ function renderCustomerLists(s) {
     ? '<div class="muted" style="margin-top:8px;font-size:11px">' + t('customer.lists.cap_note', { cap: CAP, total: fmtInt(n) }) + '</div>'
     : '';
   const nameCell = (r) => '<td><div style="font-weight:600">' + escapeHtml(r.name || r.mc || '—') + '</div><div style="font-size:11px;color:#6B7280">' + escapeHtml(r.mc || '') + '</div></td>';
-  const storeTag = (b) => '<td><strong>' + escapeHtml(b || '—') + '</strong></td>';
+  // §5 Option A #4: closed-store members stay in the list (esp. win-back targets);
+  // tag their home store "(closed)"/"(已关)" so it's clear without removing them.
+  const storeTag = (b) => '<td><strong>' + escapeHtml(b || '—') + '</strong>'
+    + (b && !isLiveStore(b) ? ' <span class="muted" style="font-size:10px">' + t('customer.lists.closed_tag') + '</span>' : '') + '</td>';
 
   let body;
   if (custListTab === 'sleeping') {
@@ -6496,9 +6689,45 @@ function renderCustomerLists(s) {
   }
   return '<div class="s4-drill">'
     + '<div class="s4-drill-tabs">' + tabHtml
-    +   '<div style="margin-left:auto;display:flex;align-items:center;padding:6px 14px">' + storeSel + '</div>'
+    +   '<div style="margin-left:auto;display:flex;align-items:center;gap:10px;padding:6px 14px">'
+    +     '<button class="s4-btn" onclick="exportCustomerList()">📥 ' + t('customer.lists.export') + '</button>'
+    +     storeControl
+    +   '</div>'
     + '</div>'
     + '<div class="s4-drill-body">' + body + '</div></div>';
+}
+
+// §5 — CSV export of the current list (respects tab + store filter + RBAC scope:
+// the payload is server-scoped, so a manager export = own store only).
+function exportCustomerList() {
+  const pd = (state.data && state.data.payload && state.data.payload.data) || null;
+  if (!pd) return;
+  const top = pd.top100 || [];
+  const churnRows = (pd.churn && pd.churn.rows) || [];
+  const thr = (pd.churn && pd.churn.summary && pd.churn.summary.high_value_threshold) || 1000;
+  const ms = (b) => !custVipStore || b === custVipStore;
+  let recs = [], segment = '';
+  if (custListTab === 'sleeping') {
+    segment = t('customer.tab.dormant_vip');
+    recs = top.filter(r => (r.m3_visits || 0) === 0 && ms(r.branch)).sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0))
+      .map(r => [r.mc, r.name, r.branch, r.last, r.ltm_visits, r.ltm_amt, r.lifetime_amt, r.age_bucket, segment]);
+  } else if (custListTab === 'churn') {
+    segment = t('customer.tab.lapsed_loyal');
+    recs = churnRows.filter(r => (r.amount || 0) >= thr && ms(r.branch)).sort((a, b) => (b.amount || 0) - (a.amount || 0))
+      .map(r => [r.mc, r.name, r.branch, r.last, r.visits, '', r.amount, '', segment]);
+  } else {
+    segment = t('customer.tab.top_vip');
+    recs = top.filter(r => ms(r.branch)).sort((a, b) => (b.lifetime_amt || 0) - (a.lifetime_amt || 0))
+      .map(r => [r.mc, r.name, r.branch, r.last, r.ltm_visits, r.ltm_amt, r.lifetime_amt, r.age_bucket, segment]);
+  }
+  const header = ['member_code', 'name', 'primary_store', 'last_purchase_date', 'orders_12m', 'spend_12m', 'lifetime_spend', 'tenure_bucket', 'segment'];
+  const esc = (v) => { const sv = (v == null ? '' : String(v)); return /[",\n]/.test(sv) ? '"' + sv.replace(/"/g, '""') + '"' : sv; };
+  const csv = [header.join(',')].concat(recs.map(row => row.map(esc).join(','))).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'customers_' + custListTab + '_' + state.month + (custVipStore ? '_' + custVipStore : '') + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
 // 12 月走廊客趋势 — single line (floatation monthly). From customer_trend RPC.
@@ -6513,7 +6742,7 @@ function renderCustomerTrend(s) {
   return '<div class="s4-drill"><div class="s4-drill-body">'
     + svgLineChart({
         series: [{ name: 'Walk-in', color: '#1F5F4A', points: rows.map(p => ({ x: p.ym, y: p.walkin })) }],
-        width: 900, height: 240, yFmt: fmtInt,
+        width: 900, height: 240, yFmt: fmtInt, pointLabels: true,
       })
     + '<div class="meta" style="font-size:12px;color:#6B7280;margin-top:8px">' + t('customer.trend.footnote') + '</div>'
     + '</div></div>';

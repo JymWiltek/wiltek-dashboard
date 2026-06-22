@@ -29,6 +29,7 @@ const INTENTIONAL_EN = new Set([
   'inv.section.action',
   'today.section.target',
   'customer.tab.top_vip',
+  'app.motto',              // §9 slogan — intentionally English in both languages (Jym)
 ]);
 
 const HAN = /[一-鿿]/;

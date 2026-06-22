@@ -34,7 +34,7 @@ const PHASE5_VIEWS = ['overview'];
 // Phase 6b (2026-05-21): customer-payload reuses V1's customers_payload RPC
 // (age-tier buckets / churn / cross-tab / top100 VIPs) — same Supabase as V1.
 // Phase 6c (2026-05-21): age-bucket × category cross-tab (买什么).
-const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload', 'customer-age-category', 'customer-closing-series'];
+const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', 'customer-trend', 'customer-member', 'customer-payload', 'customer-age-category', 'customer-closing-series', 'customer-ethnicity-months', 'customer-tenure-spend'];
 // Default-month fix (2026-06-17): lightweight months list so the FE defaults
 // to the LATEST month present in data instead of a hard-coded value. Not a
 // new Vercel function (same kpi.js); needs no ?month param.
@@ -42,7 +42,7 @@ const PHASE6_VIEWS = ['customer-overview', 'customer-race', 'customer-matrix', '
 // financial_balance_sheet (another process hand-loads them). Owner-only.
 // Dead-stock tracker (2026-06-20): owner + inventory roles. Read-only over the
 // latest real inventory snapshot + sales velocity. No ?month param.
-const META_VIEWS = ['months', 'finance', 'deadstock'];
+const META_VIEWS = ['months', 'finance', 'deadstock', 'web-pageviews', 'marketing-spend'];
 const ALLOWED_VIEWS = [...LEGACY_VIEWS, ...EXT_VIEWS, ...PHASE4_VIEWS, ...PHASE5_VIEWS, ...PHASE6_VIEWS, ...META_VIEWS];
 
 const URL = process.env.WILTEK_SUPABASE_URL;
@@ -370,6 +370,9 @@ async function handleCustomer(req, res, user, ym, view, queryBranch, effectiveBr
     // PR-F: per-live-store closing-rate series (this-month + 12-mo rolling avg)
     // from floatation, for the grouped Store Closing Rate chart.
     'customer-closing-series': { rpc: 'customer_closing_series', args: { p_ym: ym } },
+    // Marketing rebuild §2/§3: month-series for stacked bars (no args — all months).
+    'customer-ethnicity-months': { rpc: 'customer_ethnicity_by_month', args: {} },
+    'customer-tenure-spend':     { rpc: 'customer_tenure_spend_by_month', args: {} },
   };
   const spec = map[view];
   if (!spec) return res.status(400).json({ ok: false, error: 'bad customer view' });
@@ -480,6 +483,27 @@ async function handleMonths(req, res) {
     latest: latestSales,          // FE default = latest full-data (sales) month
     meta,
   });
+}
+
+// view=web-pageviews — §6. Read-only list of monthly web pageviews (owner/staff;
+// store-bound managers blocked). Owner-only WRITE is via POST /api/sync pageviews_upsert.
+async function handleWebPageviews(req, res, user) {
+  if (user && user.store) return res.status(403).json({ ok: false, error: 'not permitted' });
+  const { data, error } = await sb().from('web_pageviews')
+    .select('ym, pageviews, source, note, updated_by, updated_at').order('ym');
+  if (error) return res.status(200).json({ ok: true, view: 'web-pageviews', rows: [], degraded: true, degraded_reason: error.message });
+  return res.status(200).json({ ok: true, view: 'web-pageviews', rows: data || [], can_edit: !!(user && user.role === 'owner'), fetched_at: new Date().toISOString() });
+}
+
+// view=marketing-spend — §7. Read-only this-month rollup (owner/staff). Empty table
+// today (ingestion pipeline is a separate task) → rows:[] → FE shows empty state.
+async function handleMarketingSpend(req, res, user, ym) {
+  if (user && user.store) return res.status(403).json({ ok: false, error: 'not permitted' });
+  const { data, error } = await sb().from('marketing_spend')
+    .select('month, channel, language, campaign_name, spend_myr, impressions, leads, attributed_sales_myr, notes')
+    .eq('month', ym);
+  if (error) return res.status(200).json({ ok: true, view: 'marketing-spend', ym, rows: [], degraded: true, degraded_reason: error.message });
+  return res.status(200).json({ ok: true, view: 'marketing-spend', ym, rows: data || [], fetched_at: new Date().toISOString() });
 }
 
 // view=finance — owner-only. READ-ONLY consumer of financial_monthly +
@@ -789,7 +813,7 @@ export default async function handler(req, res) {
   // view=actions / view=months don't need month (actions queries
   // actions_assigned directly; months returns the distinct-month list used
   // to resolve the default). All other views require YYYY-MM.
-  if (view !== 'actions' && view !== 'months' && view !== 'finance' && view !== 'deadstock' && !/^\d{4}-\d{2}$/.test(ym)) {
+  if (view !== 'actions' && view !== 'months' && view !== 'finance' && view !== 'deadstock' && view !== 'web-pageviews' && !/^\d{4}-\d{2}$/.test(ym)) {
     res.status(400).json({ ok: false, error: 'bad month; expected YYYY-MM' });
     return;
   }
@@ -838,6 +862,9 @@ export default async function handler(req, res) {
     if (view === 'actions')     return handleActions(req, res, user);
     // Meta — distinct months list (drives FE default-month resolution)
     if (view === 'months')      return handleMonths(req, res);
+    // Marketing rebuild §6/§7 — read-only panels (owner/staff; managers blocked).
+    if (view === 'web-pageviews')   return handleWebPageviews(req, res, user);
+    if (view === 'marketing-spend') return handleMarketingSpend(req, res, user, ym);
 
     // Legacy KPI path — single RPC dispatch
     const rpcName = view + '_kpi_one_month';
