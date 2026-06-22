@@ -1490,7 +1490,7 @@ window.i18n = {
     'customer.ethmix.footnote':    { zh: '族裔人数与闸机客流为分开记录,加总可能与总客流略有出入。', en: 'Ethnicity counts are recorded separately from turnstile footfall and may not sum exactly to total walk-in.' },
     'customer.tenurespend.title':  { zh: '会员入会时长 · 月度消费', en: 'Member Tenure · Monthly Spend' },
     'customer.tenurespend.sub':    { zh: '数据累积中 — 目前 {n} 个月。顾客购买数据每月约 5 号同步。', en: 'History building — {n} months available so far. Customer purchase data syncs monthly (~5th).' },
-    'customer.tenurespend.footnote': { zh: '直接取自 customer_buy_lines 月度购买额,按入会时长分桶。', en: 'Computed directly from customer_buy_lines monthly spend, bucketed by enrolment tenure.' },
+    'customer.tenurespend.footnote': { zh: '按会员入会时长(customers.enrol_date)分桶,与上方分段卡片口径一致;未来日期已剔除。', en: 'Bucketed by member enrolment tenure (customers.enrol_date) — reconciles to the segment cards above; future-dated enrolments excluded.' },
     'customer.lists.export':       { zh: '导出 CSV', en: 'Export CSV' },
     'customer.lists.locked_store': { zh: '锁定门店 {store}', en: 'Locked to {store}' },
     'customer.web.title':          { zh: '网站浏览量', en: 'Web Pageviews' },
