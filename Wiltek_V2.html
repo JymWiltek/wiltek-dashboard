@@ -995,6 +995,8 @@ input.target-input.target-flash { animation: target-flash 1.4s ease-out; }
 .cust-target-band .ctb-num { font-size: 40px; font-weight: 800; color: #0F172A; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 6px; }
 .cust-target-band .ctb-sub { font-size: 13px; font-weight: 600; margin-top: 4px; min-height: 18px; }
 .cust-target-band .ctb-fb { font-size: 11px; color: #9CA3AF; font-weight: 400; }
+.ctb-scope { font-size: 12px; font-weight: 600; color: #6B7280; margin: 2px 0 8px; }
+.cust-fresh-chip .cfc-sep { color: #C7CDD4; }
 @media (max-width: 767px) { .cust-target-band { grid-template-columns: 1fr; } }
 /* §9 motto strip + §6 web form + §7 marketing charts */
 .app-motto { flex: 1; text-align: center; font-weight: 800; letter-spacing: 0.5px; color: var(--brand, #1F5F4A); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 16px; }
@@ -1478,7 +1480,12 @@ window.i18n = {
     'customer.band.surplus':        { zh: '盈余', en: 'Surplus' },
     'customer.band.deficit':        { zh: '缺口', en: 'Deficit' },
     'customer.band.target_fallback':{ zh: '(沿用 {ym})', en: '(last set {ym})' },
+    'customer.band.target_notset':  { zh: '(未设目标)', en: '(target not set)' },
+    'customer.band.scope_label':    { zh: '范围:{scope}', en: 'Scope: {scope}' },
+    'customer.band.scope_company':  { zh: '全公司 · 在营门店', en: 'Company · all live stores' },
     'customer.fresh.chip':          { zh: '客流至 {foot} · 库存快照 {inv} · 顾客购买至 {cbl} 月底 · 财报至 {fin}', en: 'Footfall through {foot} · Inventory snapshot {inv} · Customer purchases through {cbl}-end · Financials through {fin}' },
+    'customer.fresh.synced':        { zh: '最后同步 {when}', en: 'Last synced {when}' },
+    'customer.fresh.next':          { zh: '下次顾客购买同步 ~{date}', en: 'Next purchases sync ~{date}' },
     'customer.section.age':     { zh: '会员入会时长分段', en: 'Member Tenure Segments' },
     'customer.section.matrix':  { zh: '6 店 × 种族表现矩阵', en: '6-Store × Ethnicity Matrix' },
     'customer.section.vip':     { zh: '客户名单', en: 'Customer Lists' },
@@ -6041,7 +6048,8 @@ function renderCustomers(s) {
   // → MARKETING EXECUTION). See spec §1-§8.
   return '<div class="sales-v3">'
     + header
-    + completenessBanner()   // M-6
+    // ISSUE 2: completenessBanner() removed here — the band's freshness chip is the
+    // single source of truth on the Customer page (it covers more + last/next sync).
     // ── STORE / CONVERSION ──
     + renderCustomerTargetBand(s)                                   // 1 chip + 2 band
     + '<div class="s4-section-title">' + t('customer.section.trend') + '</div>'  // 3 trend (moved under band) §1
@@ -6429,26 +6437,45 @@ async function savePageviews() {
 // DEFICIT/SURPLUS = ACTUAL − TARGET (signed, green ≥0 / red <0).
 function renderCustomerTargetBand(s) {
   const meta = (s.data.freshness && s.data.freshness.meta) || {};
-  const chip = '<div class="cust-fresh-chip">' + t('customer.fresh.chip', {
-    foot: meta.floatation_latest || '—', inv: meta.inventory_real_latest || '—',
-    cbl: meta.cbl_latest || '—', fin: meta.financials_latest || '—' }) + '</div>';
-  // ACTUAL — Σ this-month walk-in over live stores (matrix total_walkin).
+  // ── ISSUE 2: single merged freshness strip (the duplicate completeness-banner
+  // is removed from this page) + last-synced + next customer-purchase sync. ──
+  const nextSync = (function (ym) { if (!ym) return '—'; const p = ym.split('-'); let y = +p[0], mo = (+p[1]) + 2; while (mo > 12) { mo -= 12; y++; } return y + '-' + String(mo).padStart(2, '0') + '-05'; })(meta.cbl_latest);
+  const synced = meta.synced_at ? String(meta.synced_at).slice(0, 16).replace('T', ' ') : '—';
+  const chip = '<div class="cust-fresh-chip">'
+    + t('customer.fresh.chip', { foot: meta.floatation_latest || '—', inv: meta.inventory_real_latest || '—', cbl: meta.cbl_latest || '—', fin: meta.financials_latest || '—' })
+    + ' <span class="cfc-sep">·</span> ' + t('customer.fresh.synced', { when: synced })
+    + ' <span class="cfc-sep">·</span> ' + t('customer.fresh.next', { date: nextSync })
+    + '</div>';
+  // ── ISSUE 1: respect the selected store. Company (no store) = Σ live; a selected
+  // live store = that store's own actual (matrix) vs its own footfall target. ──
+  const sel = ((typeof getEffectiveBranch === 'function' ? getEffectiveBranch() : null) || null);
+  const selLive = sel && isLiveStore(sel);
   const mtx = (s.data.matrix && s.data.matrix.data && s.data.matrix.data.matrix) || [];
-  const actual = mtx.length ? mtx.filter(m => isLiveStore(m.store)).reduce((a, m) => a + (m.total_walkin || 0), 0) : null;
-  // TARGET — Σ footfall targets over live stores.
   const byStore = (s.data.targets && s.data.targets.summary && s.data.targets.summary.by_store) || {};
-  let target = null;
-  STORES_LIVE.forEach(st => { const f = byStore[st] && byStore[st].footfall; if (f != null) target = (target || 0) + (+f || 0); });
+  let actual = null, target = null;
+  if (selLive) {
+    const row = mtx.find(m => m.store === sel);
+    actual = row ? (row.total_walkin || 0) : null;
+    const f = byStore[sel] && byStore[sel].footfall;
+    target = (f != null) ? (+f || 0) : null;     // per-store target; null → "not set"
+  } else {
+    actual = mtx.length ? mtx.filter(m => isLiveStore(m.store)).reduce((a, m) => a + (m.total_walkin || 0), 0) : null;
+    STORES_LIVE.forEach(st => { const f = byStore[st] && byStore[st].footfall; if (f != null) target = (target || 0) + (+f || 0); });
+  }
   const fbUsed = s.data.targets && s.data.targets.fallback_used;
-  const fb = fbUsed ? ' <span class="ctb-fb">' + t('customer.band.target_fallback', { ym: s.data.targets.fallback_from }) + '</span>' : '';
+  const fb = fbUsed ? '<span class="ctb-fb">' + t('customer.band.target_fallback', { ym: s.data.targets.fallback_from }) + '</span>' : '&nbsp;';
+  const tgtSub = (target == null) ? '<span class="ctb-fb">' + t('customer.band.target_notset') + '</span>' : fb;
   const deficit = (actual != null && target != null) ? actual - target : null;
   const defColor = deficit == null ? 'var(--s4-text-light)' : deficit >= 0 ? 'var(--s4-green-text)' : 'var(--s4-red-text)';
   const defLabel = deficit == null ? '—' : deficit >= 0 ? t('customer.band.surplus') : t('customer.band.deficit');
   const defVal = deficit == null ? '—' : (deficit >= 0 ? '+' : '') + fmtInt(deficit);
   const fmtQ = v => v == null ? '—' : fmtInt(v);
+  // Scope label so a store's actual is never shown against a company target unlabeled.
+  const scope = selLive ? escapeHtml(matrixStoreLabel(sel)) : t('customer.band.scope_company');
   return chip
+    + '<div class="ctb-scope">' + t('customer.band.scope_label', { scope }) + '</div>'
     + '<div class="cust-target-band">'
-    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.target') + '</div><div class="ctb-num">' + fmtQ(target) + '</div><div class="ctb-sub">' + (fbUsed ? fb : '&nbsp;') + '</div></div>'
+    +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.target') + '</div><div class="ctb-num">' + fmtQ(target) + '</div><div class="ctb-sub">' + tgtSub + '</div></div>'
     +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.actual') + '</div><div class="ctb-num">' + fmtQ(actual) + '</div><div class="ctb-sub">&nbsp;</div></div>'
     +   '<div class="ctb-cell"><div class="ctb-label">' + t('customer.band.deficit_surplus') + '</div><div class="ctb-num" style="color:' + defColor + '">' + defVal + '</div><div class="ctb-sub" style="color:' + defColor + '">' + defLabel + '</div></div>'
     + '</div>';

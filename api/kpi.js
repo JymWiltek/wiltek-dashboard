@@ -456,10 +456,16 @@ async function handleMonths(req, res) {
   const latestSales = salesMonths[0] || months[0] || null;
   // M-6 (2026-06-20): lightweight data-completeness meta for the shared banner
   // across Overview / Inventory / Customers. All cheap single-row probes.
-  const meta = { floatation_latest: null, inventory_real_latest: null, financials_latest: null, cbl_latest: null };
+  const meta = { floatation_latest: null, inventory_real_latest: null, financials_latest: null, cbl_latest: null, synced_at: null };
   try {
     const { data: fl } = await sb().from('floatation').select('date').order('date', { ascending: false }).limit(1).maybeSingle();
     if (fl) meta.floatation_latest = fl.date;
+  } catch (_) { /* best-effort */ }
+  try {
+    // ISSUE 2: real "last synced" timestamp — most-recent ingest write (floatation
+    // is the highest-frequency source). created_at is stamped on each synced row.
+    const { data: sy } = await sb().from('floatation').select('created_at').order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (sy) meta.synced_at = sy.created_at;
   } catch (_) { /* best-effort */ }
   try {
     // PR-D/A: customer_buy_lines is the monthly-cron purchase source; the customer
